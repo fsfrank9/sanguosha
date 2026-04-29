@@ -14,7 +14,7 @@ index.html
 
 ## 当前版本
 
-`v3.0 正式流程扩展版`
+`v3.1 技能状态与标准包技能补丁`
 
 主要特性：
 
@@ -24,6 +24,36 @@ index.html
 - 标准 + 军争核心牌组。
 - 阶段、装备区、判定区、延时锦囊、部分武将技能和 AI 行动。
 - 火攻、铁索连环、顺手牵羊、过河拆桥等交互选择流程。
+- 技能实现状态可见：已实现技能可用；仅展示/待实现技能会明确标记为“未实现”，避免看起来有技能但实际无法触发。
+- 本轮补齐标准包相关自动技能：貂蝉【闭月】、吕蒙【克己】、黄月英【集智】。
+
+## 武将技能实现状态
+
+当前 catalog 统计：
+
+- 武将：68 名。
+- 技能条目：123 条。
+- 唯一技能 ID：118 个。
+- 已接入引擎逻辑的技能：17 个。
+- 有主动按钮/交互入口的技能：5 个。
+- 未实现技能：101 个，已在 UI 中标记为“未实现”。
+
+已实现技能：
+
+- 主动/交互技能：孙权【制衡】、黄盖【苦肉】、刘备【仁德】、周瑜【反间】、诸葛亮【观星】。
+- 转化/被动/自动技能：张飞【咆哮】、关羽/SP 关羽【武圣】、赵云/SP 赵云【龙胆】、曹操【奸雄】、马超/庞德/SP 庞德【马术】、马超【铁骑】、张辽【突袭】、周瑜【英姿】、诸葛亮【空城】、貂蝉/SP 貂蝉【闭月】、吕蒙【克己】、黄月英【集智】。
+
+本轮新增技能说明：
+
+- 【闭月】：貂蝉结束阶段摸 1 张牌；`endTurn` 和阶段推进到结束阶段的路径都会触发。
+- 【克己】：吕蒙本回合未使用/打出/响应过【杀】时，跳过弃牌阶段；主动使用【杀】与响应【杀】都会阻止触发。
+- 【集智】：黄月英成功使用普通锦囊后摸 1 张牌；响应使用【无懈可击】成功抵消锦囊时也会触发；非法使用或非普通锦囊不触发。
+
+## 官方资料对照
+
+`tests/fixtures/official_standard_skills.json` 保存了官网标准包武将/技能名的紧凑 fixture，用于校验本地 catalog 中当前批次技能名是否与官方资料源一致。
+
+注意：fixture 只保存必要字段和技能名，不保存完整技能正文。
 
 ## 测试
 
@@ -31,23 +61,15 @@ index.html
 
 ```bash
 node tests/game_engine.test.mjs
-node tests/v30_official_flow.test.mjs
+node tests/skills.test.mjs
+node tests/official_source.test.mjs
 ```
 
 全量回归：
 
 ```bash
-node tests/game_engine.test.mjs && \
-node tests/catalog.test.mjs && \
-node tests/ui_layout.test.mjs && \
-node tests/phases.test.mjs && \
-node tests/cards_equipment.test.mjs && \
-node tests/skills.test.mjs && \
-node tests/ai_flow.test.mjs && \
-node tests/visual_polish.test.mjs && \
-node tests/v27_regression.test.mjs && \
-node tests/v28_ux_rules.test.mjs && \
-node tests/v29_precise_target_log.test.mjs && \
-node tests/v30_official_flow.test.mjs && \
-node tests/advanced_engine.test.mjs
+for f in tests/*.mjs; do
+  printf '\n===== %s\n' "$f"
+  node "$f" || exit 1
+done
 ```
