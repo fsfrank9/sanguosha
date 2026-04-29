@@ -73,7 +73,8 @@ v4.0 不是重写，而是分批“安全拆源”：
 5. 已开始拆 `src/engine/*` runtime seam；`runtime`、`skill-runtime`、`card-runtime`、`state`、`phases`、`judgement` 已落地，其中 `skill-runtime` 已进入 Phase 4 的最小 hook registry 迁移阶段。
 6. Phase 4A 已把【闭月】作为第一条证明链路迁入 `onTurnEnd` hook：`completeTurn` 统一派发 hook，具体技能效果仍复用原 `triggerBiyue`，避免行为漂移。
 7. Phase 4B 已把吕蒙【克己】迁入 `onBeforeDiscardPhase` hook：`finishPlayPhase` 先派发进入弃牌前 hook，原有跳过弃牌行为与日志/返回值保持不变。
-8. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
+8. Phase 4C 已把黄月英【集智】迁入 `onCardUse` hook：普通锦囊成功使用与响应【无懈可击】统一通过 `SkillRuntime.runHook` 派发，非普通锦囊、非法使用与【铁索连环】重铸仍不触发。
+9. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
 
 详细迁移计划见：
 
@@ -101,7 +102,7 @@ docs/plans/2026-04-29-sanguosha-v4-architecture.md
 
 - 【闭月】：貂蝉结束阶段摸 1 张牌；`endTurn` 和阶段推进到结束阶段的路径都会触发。
 - 【克己】：吕蒙本回合未使用/打出/响应过【杀】时，跳过弃牌阶段；主动使用【杀】与响应【杀】都会阻止触发。
-- 【集智】：黄月英成功使用普通锦囊后摸 1 张牌；响应使用【无懈可击】成功抵消锦囊时也会触发；非法使用或非普通锦囊不触发。
+- 【集智】：黄月英成功使用普通锦囊后摸 1 张牌；响应使用【无懈可击】成功抵消锦囊时也会触发；非法使用、非普通锦囊或【铁索连环】重铸不触发。该触发入口已迁到 Phase 4C 的 `onCardUse` hook seam，实际摸牌效果仍复用原有行为 helper 以降低迁移风险。
 
 ## 官方资料对照与缓存
 

@@ -165,7 +165,7 @@ Acceptance criteria:
 
 ## Phase 4 — Skill registry and hooks
 
-**Status:** In progress. Phase 4A and Phase 4B are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, and 【克己】 now proves an entering-discard seam through `onBeforeDiscardPhase` without changing gameplay behavior.
+**Status:** In progress. Phase 4A–4C are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, 【克己】 proves `onBeforeDiscardPhase`, and 【集智】 proves `onCardUse` for successful normal-trick use and response-use paths without changing gameplay behavior.
 
 Introduce a hook-driven skill runtime before adding many more武将技能:
 
@@ -219,7 +219,24 @@ Verification completed for Phase 4B:
 - Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
 - Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
 
-Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are a dedicated `onCardUse` path for `集智` once card-use completion side effects are ready, then selected `onPhaseStart`/`onPhaseEnd` automatic skills.
+### Completed in Phase 4C
+
+- Registered `jizhi` through the shared registry with an `onCardUse` handler.
+- Kept the existing 【集智】 side-effect helper (`triggerJizhi`) and guard (`shouldTriggerJizhi`) so this batch only migrates the trigger seam.
+- Changed `finishTrickUse(game, actor, card, result, options)` to dispatch `SkillRuntime.runHook(skillRegistry, 'onCardUse', { game, actor, card, result, options })` only when `result && result.ok`.
+- Changed `consumeWuxie(game, actor, reason)` to dispatch the same `onCardUse` hook for successful response-use of 【无懈可击】 with `options: { response: true }`.
+- Preserved the existing 【集智】 behavior contract: successful normal tricks draw 1, successful 【无懈可击】 response draws 1, and basic cards, equipment, delayed tricks, illegal/failed uses, and 【铁索连环】重铸 do not trigger.
+- Extended `tests/skill_runtime_hooks.test.mjs` to guard the 【集智】 seam while existing `tests/skills.test.mjs`, `tests/v27_regression.test.mjs`, and `tests/card_runtime.test.mjs` continue to cover behavior regression.
+
+Verification completed for Phase 4C:
+
+- Targeted GREEN: `node tests/skill_runtime_hooks.test.mjs && npm run build && node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs && node tests/v27_regression.test.mjs && node tests/card_runtime.test.mjs && node tests/engine_modules.test.mjs`.
+- Full GREEN: `npm run verify`.
+- Direct-open smoke: `file:///Users/frankmei/.hermes/Workspace/sanguosha-html/index.html`, enter game succeeds, browser console has zero JavaScript errors.
+- Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
+- Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
+
+Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are selected `onPhaseStart`/`onPhaseEnd` automatic skills, then card-target/damage/response-window hooks once those side effects are isolated.
 
 Acceptance criteria:
 

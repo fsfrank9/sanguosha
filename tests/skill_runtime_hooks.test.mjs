@@ -94,3 +94,22 @@ test('game engine dispatches Keji through onBeforeDiscardPhase hook seam', () =>
   assert.match(finishPlayPhaseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onBeforeDiscardPhase['"]/, 'finishPlayPhase should dispatch onBeforeDiscardPhase before entering discard');
   assert.doesNotMatch(finishPlayPhaseSource, /hasSkill\(\s*state\s*,\s*['"]keji['"]/, 'finishPlayPhase should no longer directly own Keji skill detection');
 });
+
+test('game engine dispatches Jizhi through onCardUse hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const finishStart = source.indexOf('function finishTrickUse(game, actor, card, result, options)');
+  const finishEnd = source.indexOf('function removeCardFromHand(state, cardId)', finishStart);
+  const wuxieStart = source.indexOf('function consumeWuxie(game, actor, reason)');
+  const wuxieEnd = source.indexOf('function judge(game, actor, reason)', wuxieStart);
+  assert.ok(finishStart >= 0 && finishEnd > finishStart, 'finishTrickUse source should be extractable');
+  assert.ok(wuxieStart >= 0 && wuxieEnd > wuxieStart, 'consumeWuxie source should be extractable');
+  const finishTrickUseSource = source.slice(finishStart, finishEnd);
+  const consumeWuxieSource = source.slice(wuxieStart, wuxieEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]jizhi['"]/, 'Jizhi should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /onCardUse\s*:/, 'Jizhi should register an onCardUse hook');
+  assert.match(finishTrickUseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardUse['"]/, 'finishTrickUse should dispatch successful trick use through onCardUse');
+  assert.match(consumeWuxieSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardUse['"]/, 'consumeWuxie should dispatch response Wuxie through onCardUse');
+  assert.doesNotMatch(finishTrickUseSource, /triggerJizhi\(/, 'finishTrickUse should no longer directly trigger Jizhi');
+  assert.doesNotMatch(consumeWuxieSource, /triggerJizhi\(/, 'consumeWuxie should no longer directly trigger Jizhi');
+});

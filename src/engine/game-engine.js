@@ -66,6 +66,11 @@
           return triggerKejiBeforeDiscard(context.game, context.actor, context);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'jizhi', {
+        onCardUse: function (context) {
+          return triggerJizhi(context.game, context.actor, context.card, context.options);
+        }
+      });
 
       function isKongchengProtected(game, targetActor, cardType) {
         var target = game[targetActor];
@@ -137,7 +142,15 @@
       }
 
       function finishTrickUse(game, actor, card, result, options) {
-        if (result && result.ok) triggerJizhi(game, actor, card, options);
+        if (result && result.ok) {
+          SkillRuntime.runHook(skillRegistry, 'onCardUse', {
+            game: game,
+            actor: actor,
+            card: card,
+            result: result,
+            options: options || {}
+          });
+        }
         return result;
       }
 
@@ -320,7 +333,13 @@
         if (!card) return false;
         discardCard(game, card);
         log(game, actorName(game, actor) + '打出【无懈可击】抵消' + reason + '。');
-        triggerJizhi(game, actor, card, { response: true });
+        SkillRuntime.runHook(skillRegistry, 'onCardUse', {
+          game: game,
+          actor: actor,
+          card: card,
+          result: success('无懈可击响应成功。'),
+          options: { response: true }
+        });
         return true;
       }
 
