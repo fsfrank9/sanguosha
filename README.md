@@ -49,6 +49,7 @@ npm run build:check
   - `src/engine/skill-runtime.js`：技能 runtime 的第一层模块，当前承接技能状态标注，后续继续扩展 hook/注册表。
   - `src/engine/card-runtime.js`：卡牌 runtime 的第一层模块，负责测试卡生成、牌堆生成、【杀】/普通锦囊分类与虚拟牌实体牌解析。
   - `src/engine/state.js`：状态/角色 runtime 模块，负责角色名、对手、技能查询、距离/攻击范围、先手、手牌上限与状态文案等纯查询。
+  - `src/engine/phases.js`：阶段 runtime 模块，负责阶段历史记录、回合状态重置、阶段切换 helper 与摸牌后进入出牌/弃牌的判断。
   - `src/engine/game-engine.js`：纯游戏引擎源码，继续暴露 `window.SanguoshaEngine`。
   - `src/ui/dom-adapter.js`：DOM/UI 适配层源码。
 - `tools/build.mjs` 负责按 `data → engine runtime modules → engine → ui` 顺序把源码注入模板，生成可离线直开的单文件 HTML。
@@ -118,6 +119,7 @@ node tests/data_modules.test.mjs
 node tests/engine_modules.test.mjs
 node tests/card_runtime.test.mjs
 node tests/state_runtime.test.mjs
+node tests/phase_runtime.test.mjs
 node tests/game_engine.test.mjs
 node tests/skills.test.mjs
 node tests/official_source.test.mjs

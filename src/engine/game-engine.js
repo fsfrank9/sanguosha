@@ -6,7 +6,8 @@
       var SkillRuntime = MODULES.SkillRuntime;
       var CardRuntime = MODULES.CardRuntime;
       var StateRuntime = MODULES.StateRuntime;
-      if (!Runtime || !SkillRuntime || !CardRuntime || !StateRuntime) {
+      var PhaseRuntime = MODULES.PhaseRuntime;
+      if (!Runtime || !SkillRuntime || !CardRuntime || !StateRuntime || !PhaseRuntime) {
         throw new Error('Sanguosha engine runtime modules must be loaded before the game engine.');
       }
 
@@ -46,6 +47,10 @@
       var firstActorFromRoles = StateRuntime.firstActorFromRoles;
       var handLimit = StateRuntime.handLimit;
       var getActorStatus = StateRuntime.getActorStatus;
+      var setPhase = PhaseRuntime.setPhase;
+      var nextPlayablePhase = PhaseRuntime.nextPlayablePhase;
+      var resetActorTurnState = PhaseRuntime.resetActorTurnState;
+      var resetEndOfTurnState = PhaseRuntime.resetEndOfTurnState;
 
       SkillRuntime.annotateSkillStatus(HERO_CATALOG, IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS);
 
@@ -773,41 +778,22 @@
         return success('卡牌已使用。');
       }
 
-      function recordPhase(game, actor, phase) {
-        if (!game.turnHistory) game.turnHistory = [];
-        game.turnHistory.push({ actor: actor, phase: phase });
-      }
-
       function startTurn(game, actor) {
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         if (!game[actor]) return fail('未知角色。');
         game.turn = actor;
         var state = game[actor];
-        state.usedSha = false;
-        state.usedOrRespondedSha = false;
-        state.shaBonus = 0;
-        state.flags = state.flags || {};
-        state.flags.skipPlay = false;
-        state.flags.skipDraw = false;
-        state.flags.zhihengUsed = false;
-        state.flags.fanjianUsed = false;
-        state.flags.guanxingUsed = false;
-        state.flags.rendeGiven = 0;
-        state.flags.rendeHealed = false;
-        state.flags.aiKurouUsed = false;
+        resetActorTurnState(state);
 
-        game.phase = 'prepare';
-        recordPhase(game, actor, 'prepare');
+        setPhase(game, actor, 'prepare');
         log(game, actorName(game, actor) + '的准备阶段。');
 
-        game.phase = 'judge';
-        recordPhase(game, actor, 'judge');
+        setPhase(game, actor, 'judge');
         log(game, actorName(game, actor) + '的判定阶段。');
         processJudgeArea(game, actor);
         if (game.phase === 'gameover') return success('游戏结束。');
 
-        game.phase = 'draw';
-        recordPhase(game, actor, 'draw');
+        setPhase(game, actor, 'draw');
         log(game, actorName(game, actor) + '的摸牌阶段。');
         if (!state.flags.skipDraw) {
           performDrawPhase(game, actor);
@@ -815,13 +801,7 @@
           log(game, actorName(game, actor) + '跳过摸牌阶段。');
         }
 
-        if (state.flags.skipPlay) {
-          game.phase = 'discard';
-          recordPhase(game, actor, 'discard');
-        } else {
-          game.phase = 'play';
-          recordPhase(game, actor, 'play');
-        }
+        setPhase(game, actor, nextPlayablePhase(state));
         log(game, actorName(game, actor) + '进入' + (game.phase === 'play' ? '出牌' : '弃牌') + '阶段。');
         return success('回合开始。');
       }
@@ -831,13 +811,11 @@
         var actor = game.turn;
         var state = game[actor];
         if (state && hasSkill(state, 'keji') && !state.usedOrRespondedSha) {
-          game.phase = 'finish';
-          recordPhase(game, actor, 'finish');
+          setPhase(game, actor, 'finish');
           log(game, actorName(game, actor) + '发动【克己】，本回合未使用或打出【杀】，跳过弃牌阶段。');
           return success('克己跳过弃牌阶段。');
         }
-        game.phase = 'discard';
-        recordPhase(game, actor, 'discard');
+        setPhase(game, actor, 'discard');
         log(game, actorName(game, actor) + '结束出牌，进入弃牌阶段。');
         return success('进入弃牌阶段。');
       }
@@ -905,30 +883,26 @@
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         var actor = game.turn;
         if (game.phase === 'prepare') {
-          game.phase = 'judge';
-          recordPhase(game, actor, 'judge');
+          setPhase(game, actor, 'judge');
           log(game, actorName(game, actor) + '的判定阶段。');
           processJudgeArea(game, actor);
           return success('进入判定阶段。');
         }
         if (game.phase === 'judge') {
-          game.phase = 'draw';
-          recordPhase(game, actor, 'draw');
+          setPhase(game, actor, 'draw');
           log(game, actorName(game, actor) + '的摸牌阶段。');
           if (!game[actor].flags.skipDraw) performDrawPhase(game, actor);
           return success('进入摸牌阶段。');
         }
         if (game.phase === 'draw') {
-          game.phase = game[actor].flags.skipPlay ? 'discard' : 'play';
-          recordPhase(game, actor, game.phase);
+          setPhase(game, actor, nextPlayablePhase(game[actor]));
           log(game, actorName(game, actor) + '进入' + (game.phase === 'play' ? '出牌' : '弃牌') + '阶段。');
           return success('进入' + (game.phase === 'play' ? '出牌' : '弃牌') + '阶段。');
         }
         if (game.phase === 'play') return finishPlayPhase(game);
         if (game.phase === 'discard') {
           if (needsDiscard(game, actor)) return fail('需要先弃置 ' + getDiscardCount(game, actor) + ' 张牌。');
-          game.phase = 'finish';
-          recordPhase(game, actor, 'finish');
+          setPhase(game, actor, 'finish');
           log(game, actorName(game, actor) + '进入结束阶段。');
           return success('进入结束阶段。');
         }
@@ -936,21 +910,6 @@
           return completeTurn(game, actor);
         }
         return fail('未知阶段。');
-      }
-
-      function resetEndOfTurnState(state) {
-        if (!state) return;
-        state.usedSha = false;
-        state.usedOrRespondedSha = false;
-        state.shaBonus = 0;
-        state.flags = state.flags || {};
-        state.flags.zhihengUsed = false;
-        state.flags.fanjianUsed = false;
-        state.flags.guanxingUsed = false;
-        state.flags.rendeGiven = 0;
-        state.flags.rendeHealed = false;
-        state.flags.aiKurouUsed = false;
-        state.flags.biyueTriggered = false;
       }
 
       function triggerBiyue(game, actor) {
