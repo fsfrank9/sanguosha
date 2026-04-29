@@ -34,6 +34,8 @@
 - Replace those bodies in `src/index.template.html` with placeholders.
 - Build output must reproduce the same direct-open HTML behavior.
 
+**Status:** Completed in Phase 1.
+
 ### Task 3: Add build commands
 
 - Add `package.json` with:
@@ -53,11 +55,29 @@
 
 ## Phase 2 — Pure data extraction
 
-Future small TDD batches should move static data out of the engine script:
+**Status:** Completed. Static data now lives in dedicated source modules while the browser artifact remains a single direct-open HTML file.
 
-- `src/data/heroes.js` for `HERO_CATALOG` and skill implementation status.
-- `src/data/cards.js` for `CARD_CATALOG` and card helpers.
-- `src/data/official-specs/` for public structured skill specs.
+### Task 1: RED data-module architecture test
+
+- Create `tests/data_modules.test.mjs`.
+- Assert these files exist and are listed as build inputs:
+  - `src/data/heroes.js`
+  - `src/data/cards.js`
+  - `src/data/skill-status.js`
+- Assert `src/engine/game-engine.js` no longer declares the large `HERO_CATALOG`、`CARD_CATALOG`、`IMPLEMENTED_SKILL_IDS`、`ACTIVE_SKILL_IDS` data blocks.
+
+### Task 2: Extract pure data modules
+
+- `src/data/heroes.js` owns `HERO_CATALOG` and writes it to `window.SanguoshaData.HERO_CATALOG`.
+- `src/data/cards.js` owns `CARD_CATALOG`、`CARD_INFO` and `PHASES`.
+- `src/data/skill-status.js` owns implemented/active skill ID lists.
+- `src/engine/game-engine.js` reads `window.SanguoshaData` at startup and fails fast if required data modules are missing.
+
+### Task 3: Bundle data before engine
+
+- `tools/build.mjs` concatenates data modules before `src/engine/game-engine.js` inside `<script id="game-engine">`.
+- The build still writes byte-identical `index.html` and `dist/index.html`.
+- The built artifact does not rely on runtime `type="module"` imports, so `file://` direct-open remains supported.
 
 Acceptance criteria:
 

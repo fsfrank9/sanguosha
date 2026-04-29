@@ -42,9 +42,12 @@ npm run build:check
 - `src/` 模块化源码是当前开发入口：
   - `src/index.template.html`：HTML 模板。
   - `src/styles/main.css`：样式源码。
+  - `src/data/heroes.js`：武将 catalog 与技能元数据。
+  - `src/data/cards.js`：卡牌 catalog、牌类信息与阶段常量。
+  - `src/data/skill-status.js`：已实现技能与主动技能入口清单。
   - `src/engine/game-engine.js`：纯游戏引擎源码，继续暴露 `window.SanguoshaEngine`。
   - `src/ui/dom-adapter.js`：DOM/UI 适配层源码。
-- `tools/build.mjs` 负责把源码注入模板，生成可离线直开的单文件 HTML。
+- `tools/build.mjs` 负责按 `data → engine → ui` 顺序把源码注入模板，生成可离线直开的单文件 HTML。
 - `index.html` 与 `dist/index.html` 必须由构建脚本生成并保持一致。
 - 1v1 选将、主公/反贼身份与主公先手流程。
 - 标准包、风林火山、SP 武将池 catalog。
@@ -55,13 +58,13 @@ npm run build:check
 
 ## 架构路线
 
-v4.0 不是重写，而是第一步“安全拆源”：
+v4.0 不是重写，而是分批“安全拆源”：
 
 1. 保留根目录 `index.html` 作为可直接打开的稳定产物。
-2. 将 CSS、引擎、UI 适配层抽到 `src/`。
+2. 已将 CSS、数据模块、引擎、UI 适配层抽到 `src/`。
 3. 用 `tools/build.mjs` 生成 `index.html` 和 `dist/index.html`。
-4. 用 `tests/architecture_build.test.mjs` 防止源码与产物漂移。
-5. 后续再分批继续拆：`src/data/`、`src/engine/*`、`src/skills/*`、`src/ui/panels/*`。
+4. 用 `tests/architecture_build.test.mjs` 和 `tests/data_modules.test.mjs` 防止源码与产物漂移。
+5. 后续再分批继续拆：`src/engine/*`、`src/skills/*`、`src/ui/panels/*`。
 
 详细迁移计划见：
 
@@ -107,6 +110,7 @@ docs/plans/2026-04-29-sanguosha-v4-architecture.md
 
 ```bash
 node tests/architecture_build.test.mjs
+node tests/data_modules.test.mjs
 node tests/game_engine.test.mjs
 node tests/skills.test.mjs
 node tests/official_source.test.mjs

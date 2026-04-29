@@ -8,6 +8,11 @@ const checkOnly = process.argv.includes('--check');
 const paths = {
   template: path.join(root, 'src/index.template.html'),
   style: path.join(root, 'src/styles/main.css'),
+  dataModules: [
+    path.join(root, 'src/data/heroes.js'),
+    path.join(root, 'src/data/cards.js'),
+    path.join(root, 'src/data/skill-status.js'),
+  ],
   engine: path.join(root, 'src/engine/game-engine.js'),
   ui: path.join(root, 'src/ui/dom-adapter.js'),
   rootHtml: path.join(root, 'index.html'),
@@ -18,11 +23,18 @@ function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
+function buildEngineBundle() {
+  return [
+    ...paths.dataModules.map(read),
+    read(paths.engine),
+  ].join('\n\n');
+}
+
 function buildHtml() {
   let html = read(paths.template);
   const replacements = {
     __SANGUOSHA_STYLE__: read(paths.style),
-    __SANGUOSHA_ENGINE__: read(paths.engine),
+    __SANGUOSHA_ENGINE__: buildEngineBundle(),
     __SANGUOSHA_UI__: read(paths.ui),
   };
 

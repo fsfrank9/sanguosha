@@ -1092,8 +1092,10 @@
   </main>
 
   <script id="game-engine">
-    (function () {
-      'use strict';
+(function () {
+  'use strict';
+
+  var data = window.SanguoshaData || (window.SanguoshaData = {});
 
       var HERO_CATALOG = {
         liubei: { id: 'liubei', name: '刘备', camp: '蜀', title: '乱世的枭雄', maxHp: 4, quote: '惟贤惟德，能服于人。', pack: 'standard', skills: [
@@ -1210,36 +1212,20 @@
         { id: 'sp_sunshangxiang', name: 'SP 孙尚香', camp: '蜀', title: '梦醉良缘', maxHp: 3, quote: '夫君，身体要紧。', skills: [{ id: 'liangzhu', name: '良助', desc: '角色回复后可摸牌或令其摸牌。' }, { id: 'fanxiang', name: '返乡', desc: '觉醒技：获得枭姬。' }] }
       ]);
 
-      var IMPLEMENTED_SKILL_IDS = [
-        'zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing',
-        'paoxiao', 'wusheng', 'longdan', 'jianxiong', 'mashu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng',
-        'biyue', 'keji', 'jizhi'
-      ];
-      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing'];
-
-      function annotateSkillStatus() {
-        Object.keys(HERO_CATALOG).forEach(function (heroId) {
-          (HERO_CATALOG[heroId].skills || []).forEach(function (skill) {
-            if (IMPLEMENTED_SKILL_IDS.indexOf(skill.id) >= 0) {
-              skill.status = 'implemented';
-              skill.statusText = ACTIVE_SKILL_IDS.indexOf(skill.id) >= 0 ? '可主动发动' : '已实现：自动/锁定触发';
-            } else if (skill.lord) {
-              skill.status = 'display';
-              skill.statusText = '1v1 展示技';
-            } else {
-              skill.status = 'todo';
-              skill.statusText = '未实现';
-            }
-          });
-        });
-      }
-
-      annotateSkillStatus();
-
       var HEROES = {
         player: HERO_CATALOG.liubei,
         enemy: HERO_CATALOG.caocao
       };
+
+      data.HERO_CATALOG = HERO_CATALOG;
+      data.HEROES = HEROES;
+}());
+
+
+(function () {
+  'use strict';
+
+  var data = window.SanguoshaData || (window.SanguoshaData = {});
 
       var CARD_CATALOG = {
         sha: { name: '杀', family: 'basic', group: 'attack', label: '基本', symbol: '杀', desc: '出牌阶段使用。若目标没有【闪】，造成 1 点伤害。每回合限一次。' },
@@ -1284,6 +1270,64 @@
 
       var CARD_INFO = CARD_CATALOG;
       var PHASES = ['prepare', 'judge', 'draw', 'play', 'discard', 'finish'];
+
+      data.CARD_CATALOG = CARD_CATALOG;
+      data.CARD_INFO = CARD_INFO;
+      data.PHASES = PHASES;
+}());
+
+
+(function () {
+  'use strict';
+
+  var data = window.SanguoshaData || (window.SanguoshaData = {});
+
+      var IMPLEMENTED_SKILL_IDS = [
+        'zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing',
+        'paoxiao', 'wusheng', 'longdan', 'jianxiong', 'mashu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng',
+        'biyue', 'keji', 'jizhi'
+      ];
+      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing'];
+
+      data.IMPLEMENTED_SKILL_IDS = IMPLEMENTED_SKILL_IDS;
+      data.ACTIVE_SKILL_IDS = ACTIVE_SKILL_IDS;
+}());
+
+
+    (function () {
+      'use strict';
+
+      var DATA = window.SanguoshaData || {};
+      var HERO_CATALOG = DATA.HERO_CATALOG;
+      var HEROES = DATA.HEROES;
+      var IMPLEMENTED_SKILL_IDS = DATA.IMPLEMENTED_SKILL_IDS;
+      var ACTIVE_SKILL_IDS = DATA.ACTIVE_SKILL_IDS;
+      var CARD_CATALOG = DATA.CARD_CATALOG;
+      var CARD_INFO = DATA.CARD_INFO;
+      var PHASES = DATA.PHASES;
+
+      if (!HERO_CATALOG || !HEROES || !IMPLEMENTED_SKILL_IDS || !ACTIVE_SKILL_IDS || !CARD_CATALOG || !CARD_INFO || !PHASES) {
+        throw new Error('Sanguosha data modules must be loaded before the game engine.');
+      }
+
+      function annotateSkillStatus() {
+        Object.keys(HERO_CATALOG).forEach(function (heroId) {
+          (HERO_CATALOG[heroId].skills || []).forEach(function (skill) {
+            if (IMPLEMENTED_SKILL_IDS.indexOf(skill.id) >= 0) {
+              skill.status = 'implemented';
+              skill.statusText = ACTIVE_SKILL_IDS.indexOf(skill.id) >= 0 ? '可主动发动' : '已实现：自动/锁定触发';
+            } else if (skill.lord) {
+              skill.status = 'display';
+              skill.statusText = '1v1 展示技';
+            } else {
+              skill.status = 'todo';
+              skill.statusText = '未实现';
+            }
+          });
+        });
+      }
+
+      annotateSkillStatus();
 
       function clone(value) {
         return JSON.parse(JSON.stringify(value));
