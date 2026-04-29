@@ -81,3 +81,16 @@ test('game engine registers Biyue through the shared skill registry seam', () =>
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]biyue['"]/, 'Biyue should be registered with SkillRuntime.registerSkill');
   assert.match(source, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onTurnEnd['"]/, 'turn completion should dispatch the onTurnEnd hook through SkillRuntime.runHook');
 });
+
+test('game engine dispatches Keji through onBeforeDiscardPhase hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const finishStart = source.indexOf('function finishPlayPhase(game)');
+  const finishEnd = source.indexOf('function discardExcess(game, actor, cardIds)', finishStart);
+  assert.ok(finishStart >= 0 && finishEnd > finishStart, 'finishPlayPhase source should be extractable');
+  const finishPlayPhaseSource = source.slice(finishStart, finishEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]keji['"]/, 'Keji should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /onBeforeDiscardPhase\s*:/, 'Keji should register an onBeforeDiscardPhase hook');
+  assert.match(finishPlayPhaseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onBeforeDiscardPhase['"]/, 'finishPlayPhase should dispatch onBeforeDiscardPhase before entering discard');
+  assert.doesNotMatch(finishPlayPhaseSource, /hasSkill\(\s*state\s*,\s*['"]keji['"]/, 'finishPlayPhase should no longer directly own Keji skill detection');
+});

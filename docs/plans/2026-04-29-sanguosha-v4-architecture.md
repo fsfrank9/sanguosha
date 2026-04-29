@@ -165,12 +165,13 @@ Acceptance criteria:
 
 ## Phase 4 — Skill registry and hooks
 
-**Status:** In progress. Phase 4A is complete: a minimal SkillRegistry/hook seam exists and 【闭月】 now proves the path through `onTurnEnd` without changing gameplay behavior.
+**Status:** In progress. Phase 4A and Phase 4B are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, and 【克己】 now proves an entering-discard seam through `onBeforeDiscardPhase` without changing gameplay behavior.
 
 Introduce a hook-driven skill runtime before adding many more武将技能:
 
 - `onPhaseStart`
 - `onPhaseEnd`
+- `onBeforeDiscardPhase`
 - `onCardUse`
 - `onCardTarget`
 - `onDamageBefore`
@@ -202,7 +203,23 @@ Verification completed for Phase 4A:
 - Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
 - Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
 
-Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are `onPhaseStart`/`onPhaseEnd` for simple automatic skills, or a dedicated `onCardUse` path for `集智` once card-use completion side effects are ready.
+### Completed in Phase 4B
+
+- Registered `keji` through the shared registry with an `onBeforeDiscardPhase` handler.
+- Added `triggerKejiBeforeDiscard(game, actor, context)` as the behavior-preserving side-effect helper for the existing skip-discard logic.
+- Changed `finishPlayPhase(game)` to dispatch `SkillRuntime.runHook(skillRegistry, 'onBeforeDiscardPhase', { game, actor, ... })` before entering discard.
+- Preserved the existing 【克己】 behavior contract: no use/response【杀】 skips discard and returns `克己跳过弃牌阶段。`; active-use or response【杀】 enters discard normally.
+- Extended `tests/skill_runtime_hooks.test.mjs` to guard the 【克己】 seam while existing `tests/skills.test.mjs` continues to cover behavior regression.
+
+Verification completed for Phase 4B:
+
+- Targeted GREEN: `npm run build && node tests/engine_modules.test.mjs && node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs && node tests/phase_runtime.test.mjs`.
+- Full GREEN: `npm run verify`.
+- Direct-open smoke: `file:///Users/frankmei/.hermes/Workspace/sanguosha-html/index.html`, enter game succeeds, browser console has zero JavaScript errors.
+- Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
+- Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
+
+Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are a dedicated `onCardUse` path for `集智` once card-use completion side effects are ready, then selected `onPhaseStart`/`onPhaseEnd` automatic skills.
 
 Acceptance criteria:
 

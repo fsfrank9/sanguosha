@@ -1823,6 +1823,11 @@
           triggerBiyue(context.game, context.actor);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'keji', {
+        onBeforeDiscardPhase: function (context) {
+          return triggerKejiBeforeDiscard(context.game, context.actor, context);
+        }
+      });
 
       function isKongchengProtected(game, targetActor, cardType) {
         var target = game[targetActor];
@@ -2578,15 +2583,24 @@
         return success('回合开始。');
       }
 
+      function triggerKejiBeforeDiscard(game, actor, context) {
+        var state = game[actor];
+        if (!state || !hasSkill(state, 'keji') || state.usedOrRespondedSha) return false;
+        setPhase(game, actor, 'finish');
+        log(game, actorName(game, actor) + '发动【克己】，本回合未使用或打出【杀】，跳过弃牌阶段。');
+        if (context) {
+          context.handled = true;
+          context.result = success('克己跳过弃牌阶段。');
+        }
+        return true;
+      }
+
       function finishPlayPhase(game) {
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         var actor = game.turn;
-        var state = game[actor];
-        if (state && hasSkill(state, 'keji') && !state.usedOrRespondedSha) {
-          setPhase(game, actor, 'finish');
-          log(game, actorName(game, actor) + '发动【克己】，本回合未使用或打出【杀】，跳过弃牌阶段。');
-          return success('克己跳过弃牌阶段。');
-        }
+        var hookContext = { game: game, actor: actor, handled: false, result: null };
+        SkillRuntime.runHook(skillRegistry, 'onBeforeDiscardPhase', hookContext);
+        if (hookContext.handled) return hookContext.result || success('阶段已处理。');
         setPhase(game, actor, 'discard');
         log(game, actorName(game, actor) + '结束出牌，进入弃牌阶段。');
         return success('进入弃牌阶段。');
