@@ -4,7 +4,8 @@
       var MODULES = window.SanguoshaEngineModules || {};
       var Runtime = MODULES.Runtime;
       var SkillRuntime = MODULES.SkillRuntime;
-      if (!Runtime || !SkillRuntime) {
+      var CardRuntime = MODULES.CardRuntime;
+      if (!Runtime || !SkillRuntime || !CardRuntime) {
         throw new Error('Sanguosha engine runtime modules must be loaded before the game engine.');
       }
 
@@ -27,77 +28,15 @@
       var clone = Runtime.clone;
       var makeRng = Runtime.makeRng;
       var makePlayer = Runtime.makePlayer;
-      var colorOfSuit = Runtime.colorOfSuit;
-      var suitForIndex = Runtime.suitForIndex;
-      var rankForIndex = Runtime.rankForIndex;
+      var makeTestCard = CardRuntime.makeTestCard;
+      var buildDeck = CardRuntime.buildDeck;
+      var shuffle = CardRuntime.shuffle;
+      var isShaType = CardRuntime.isShaType;
+      var isShaCard = CardRuntime.isShaCard;
+      var isNormalTrickCard = CardRuntime.isNormalTrickCard;
+      var physicalCardOf = CardRuntime.physicalCardOf;
 
       SkillRuntime.annotateSkillStatus(HERO_CATALOG, IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS);
-
-      function makeTestCard(type, overrides) {
-        overrides = overrides || {};
-        var info = CARD_CATALOG[type];
-        if (!info) throw new Error('Unknown card type: ' + type);
-        var suit = overrides.suit || 'spade';
-        var card = {
-          id: overrides.id || type + '-test',
-          type: type,
-          name: info.name,
-          family: info.family,
-          group: info.group,
-          label: info.label,
-          symbol: info.symbol,
-          desc: info.desc,
-          slot: info.slot || null,
-          range: info.range || null,
-          suit: suit,
-          rank: overrides.rank || 'A',
-          color: overrides.color || colorOfSuit(suit)
-        };
-        Object.keys(overrides).forEach(function (key) { card[key] = overrides[key]; });
-        if (!card.color && card.suit) card.color = colorOfSuit(card.suit);
-        return card;
-      }
-
-      function makeCard(game, type) {
-        var nextIndex = game.nextId + 1;
-        var suit = suitForIndex(nextIndex);
-        var rank = rankForIndex(nextIndex);
-        game.nextId += 1;
-        return makeTestCard(type, {
-          id: type + '-' + game.nextId,
-          suit: suit,
-          rank: rank,
-          color: colorOfSuit(suit)
-        });
-      }
-
-      function shuffle(cards, random) {
-        for (var i = cards.length - 1; i > 0; i -= 1) {
-          var j = Math.floor(random() * (i + 1));
-          var tmp = cards[i];
-          cards[i] = cards[j];
-          cards[j] = tmp;
-        }
-        return cards;
-      }
-
-      function buildDeck(game, random) {
-        var recipe = [
-          ['sha', 22], ['fire_sha', 5], ['thunder_sha', 5], ['shan', 18], ['tao', 10], ['jiu', 6],
-          ['wuzhong', 4], ['juedou', 3], ['guohe', 6], ['shunshou', 5], ['jiedao', 2], ['taoyuan', 1], ['wugu', 2],
-          ['nanman', 3], ['wanjian', 2], ['wuxie', 6], ['huogong', 3], ['tiesuo', 6],
-          ['lebusishu', 3], ['bingliang', 2], ['shandian', 2],
-          ['zhuge', 2], ['qinggang', 1], ['cixiong', 1], ['qinglong', 1], ['zhangba', 1], ['guanshi', 1], ['fangtian', 1], ['qilin', 1],
-          ['bagua', 2], ['renwang', 1], ['tengjia', 1], ['baiyin', 1], ['minus_horse', 4], ['plus_horse', 4]
-        ];
-        var deck = [];
-        recipe.forEach(function (pair) {
-          for (var i = 0; i < pair[1]; i += 1) {
-            deck.push(makeCard(game, pair[0]));
-          }
-        });
-        return shuffle(deck, random);
-      }
 
       function actorName(game, actor) {
         return game[actor].name;
@@ -109,15 +48,6 @@
 
       function hasSkill(state, skillId) {
         return !!(state.skills || []).some(function (skill) { return skill.id === skillId; });
-      }
-
-      function isShaType(type) {
-        return type === 'sha' || type === 'fire_sha' || type === 'thunder_sha';
-      }
-
-      function isShaCard(card) {
-        if (!card) return false;
-        return isShaType(typeof card === 'string' ? card : card.type);
       }
 
       function canUseUnlimitedSha(state) {
@@ -201,10 +131,6 @@
         return drawn;
       }
 
-      function isNormalTrickCard(card) {
-        return !!card && card.family === 'trick';
-      }
-
       function shouldTriggerJizhi(card, options) {
         return isNormalTrickCard(card) && !(card.type === 'tiesuo' && options && options.mode === 'recast');
       }
@@ -235,10 +161,6 @@
 
       function removeFirstCardOfType(state, type) {
         return removeFirstMatchingCard(state, function (card) { return type === 'sha' ? isShaCard(card) : card.type === type; });
-      }
-
-      function physicalCardOf(card) {
-        return card && card.physicalCard ? card.physicalCard : card;
       }
 
       function discardCard(game, card) {

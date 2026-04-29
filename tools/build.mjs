@@ -16,6 +16,7 @@ const paths = {
   engineModules: [
     path.join(root, 'src/engine/runtime.js'),
     path.join(root, 'src/engine/skill-runtime.js'),
+    path.join(root, 'src/engine/card-runtime.js'),
   ],
   engine: path.join(root, 'src/engine/game-engine.js'),
   ui: path.join(root, 'src/ui/dom-adapter.js'),
