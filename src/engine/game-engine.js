@@ -1,7 +1,22 @@
     (function () {
       'use strict';
 
-      var DATA = window.SanguoshaData || {};
+      var MODULES = window.SanguoshaEngineModules || {};
+      var Runtime = MODULES.Runtime;
+      var SkillRuntime = MODULES.SkillRuntime;
+      if (!Runtime || !SkillRuntime) {
+        throw new Error('Sanguosha engine runtime modules must be loaded before the game engine.');
+      }
+
+      var DATA = Runtime.requireData([
+        'HERO_CATALOG',
+        'HEROES',
+        'IMPLEMENTED_SKILL_IDS',
+        'ACTIVE_SKILL_IDS',
+        'CARD_CATALOG',
+        'CARD_INFO',
+        'PHASES'
+      ]);
       var HERO_CATALOG = DATA.HERO_CATALOG;
       var HEROES = DATA.HEROES;
       var IMPLEMENTED_SKILL_IDS = DATA.IMPLEMENTED_SKILL_IDS;
@@ -9,75 +24,14 @@
       var CARD_CATALOG = DATA.CARD_CATALOG;
       var CARD_INFO = DATA.CARD_INFO;
       var PHASES = DATA.PHASES;
+      var clone = Runtime.clone;
+      var makeRng = Runtime.makeRng;
+      var makePlayer = Runtime.makePlayer;
+      var colorOfSuit = Runtime.colorOfSuit;
+      var suitForIndex = Runtime.suitForIndex;
+      var rankForIndex = Runtime.rankForIndex;
 
-      if (!HERO_CATALOG || !HEROES || !IMPLEMENTED_SKILL_IDS || !ACTIVE_SKILL_IDS || !CARD_CATALOG || !CARD_INFO || !PHASES) {
-        throw new Error('Sanguosha data modules must be loaded before the game engine.');
-      }
-
-      function annotateSkillStatus() {
-        Object.keys(HERO_CATALOG).forEach(function (heroId) {
-          (HERO_CATALOG[heroId].skills || []).forEach(function (skill) {
-            if (IMPLEMENTED_SKILL_IDS.indexOf(skill.id) >= 0) {
-              skill.status = 'implemented';
-              skill.statusText = ACTIVE_SKILL_IDS.indexOf(skill.id) >= 0 ? '可主动发动' : '已实现：自动/锁定触发';
-            } else if (skill.lord) {
-              skill.status = 'display';
-              skill.statusText = '1v1 展示技';
-            } else {
-              skill.status = 'todo';
-              skill.statusText = '未实现';
-            }
-          });
-        });
-      }
-
-      annotateSkillStatus();
-
-      function clone(value) {
-        return JSON.parse(JSON.stringify(value));
-      }
-
-      function makeRng(seed) {
-        var state = Math.floor(Math.abs(Number(seed) || 1)) % 2147483647;
-        if (state === 0) state = 1;
-        return function random() {
-          state = state * 16807 % 2147483647;
-          return (state - 1) / 2147483646;
-        };
-      }
-
-      function makePlayer(hero) {
-        return {
-          id: hero.id,
-          heroId: hero.id,
-          name: hero.name,
-          camp: hero.camp,
-          title: hero.title,
-          quote: hero.quote,
-          skills: clone(hero.skills || []),
-          maxHp: hero.maxHp,
-          hp: hero.maxHp,
-          hand: [],
-          equipment: { weapon: null, armor: null, horseMinus: null, horsePlus: null },
-          judgeArea: [],
-          flags: {},
-          usedSha: false,
-          usedOrRespondedSha: false,
-          shaBonus: 0
-        };
-      }
-
-      function colorOfSuit(suit) {
-        return suit === 'heart' || suit === 'diamond' ? 'red' : 'black';
-      }
-
-      function suitForIndex(index) {
-        return ['spade', 'heart', 'club', 'diamond'][index % 4];
-      }
-
-      function rankForIndex(index) {
-        return ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'][index % 13];
-      }
+      SkillRuntime.annotateSkillStatus(HERO_CATALOG, IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS);
 
       function makeTestCard(type, overrides) {
         overrides = overrides || {};

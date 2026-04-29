@@ -89,7 +89,25 @@ Acceptance criteria:
 
 ## Phase 3 — Engine runtime modules
 
-Future batches should split pure engine behavior into modules while keeping browser output bundled:
+**Status:** In progress. Phase 3A has introduced the first runtime-module seam without changing gameplay behavior.
+
+### Completed in Phase 3A
+
+- Added `src/engine/runtime.js` for shared engine helpers:
+  - required data validation,
+  - cloning,
+  - seeded RNG,
+  - player factory,
+  - suit/rank/color helpers.
+- Added `src/engine/skill-runtime.js` for skill runtime concerns, starting with skill-status annotation.
+- Updated `tools/build.mjs` so bundled direct-open order is now:
+  1. data modules,
+  2. engine runtime modules,
+  3. `src/engine/game-engine.js`,
+  4. UI adapter.
+- Added `tests/engine_modules.test.mjs` to guard module existence, build ordering, direct-open output, and `window.SanguoshaEngineModules` availability.
+
+Future batches should continue splitting pure engine behavior into modules while keeping browser output bundled:
 
 - `src/engine/state.js`
 - `src/engine/phases.js`

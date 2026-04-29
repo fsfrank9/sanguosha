@@ -13,6 +13,10 @@ const paths = {
     path.join(root, 'src/data/cards.js'),
     path.join(root, 'src/data/skill-status.js'),
   ],
+  engineModules: [
+    path.join(root, 'src/engine/runtime.js'),
+    path.join(root, 'src/engine/skill-runtime.js'),
+  ],
   engine: path.join(root, 'src/engine/game-engine.js'),
   ui: path.join(root, 'src/ui/dom-adapter.js'),
   rootHtml: path.join(root, 'index.html'),
@@ -26,6 +30,7 @@ function read(filePath) {
 function buildEngineBundle() {
   return [
     ...paths.dataModules.map(read),
+    ...paths.engineModules.map(read),
     read(paths.engine),
   ].join('\n\n');
 }
