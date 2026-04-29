@@ -41,6 +41,7 @@ function skillGame(playerHero, enemyHero = 'sunquan') {
     game[actor].equipment = { weapon: null, armor: null, horseMinus: null, horsePlus: null };
     game[actor].flags = {};
     game[actor].usedSha = false;
+    game[actor].usedOrRespondedSha = false;
     game[actor].shaBonus = 0;
     game[actor].hp = game[actor].maxHp;
   }
@@ -182,4 +183,188 @@ test('诸葛亮【空城】 prevents Sha and Duel targeting while he has no hand
   assert.equal(Engine.playCard(game, 'player', 'kongcheng-sha').ok, false);
   assert.equal(game.enemy.hp, game.enemy.maxHp);
   assert.deepEqual(ids(game.player.hand), ['kongcheng-sha', 'kongcheng-duel']);
+});
+
+test('貂蝉【闭月】 draws one card before the next turn via endTurn and advancePhase', () => {
+  const viaEndTurn = skillGame('diaochan', 'sunquan');
+  viaEndTurn.phase = 'finish';
+  viaEndTurn.deck = [c('sha', { id: 'biyue-endturn-draw' })];
+
+  const endResult = Engine.endTurn(viaEndTurn);
+
+  assert.equal(endResult.ok, true, endResult.message);
+  assert.equal(viaEndTurn.turn, 'enemy');
+  assert.deepEqual(ids(viaEndTurn.player.hand), ['biyue-endturn-draw']);
+  assert.deepEqual(ids(viaEndTurn.enemy.hand), [], 'opponent should not take the Biyue card before their turn starts');
+  assert.ok(viaEndTurn.log.some((entry) => /闭月/.test(entry)), 'Biyue trigger should be logged');
+
+  const viaAdvance = skillGame('diaochan', 'sunquan');
+  viaAdvance.phase = 'finish';
+  viaAdvance.deck = [c('shan', { id: 'biyue-advance-draw' })];
+
+  const advanceResult = Engine.advancePhase(viaAdvance);
+
+  assert.equal(advanceResult.ok, true, advanceResult.message);
+  assert.equal(viaAdvance.turn, 'enemy');
+  assert.deepEqual(ids(viaAdvance.player.hand), ['biyue-advance-draw']);
+  assert.deepEqual(ids(viaAdvance.enemy.hand), [], 'advancePhase should run Biyue before starting the opponent turn');
+});
+
+test('吕蒙【克己】 skips discard from finishPlayPhase and advancePhase if no Sha was used', () => {
+  const direct = skillGame('lvmeng', 'sunquan');
+  direct.turnHistory = [];
+  direct.player.hp = 2;
+  direct.player.hand = [
+    c('sha', { id: 'keji-direct-1' }),
+    c('shan', { id: 'keji-direct-2' }),
+    c('tao', { id: 'keji-direct-3' }),
+    c('jiu', { id: 'keji-direct-4' })
+  ];
+
+  const finishResult = Engine.finishPlayPhase(direct);
+
+  assert.equal(finishResult.ok, true, finishResult.message);
+  assert.equal(direct.phase, 'finish');
+  assert.equal(Engine.needsDiscard(direct, 'player'), true, 'hand remains over limit, so only Keji can skip discard');
+  assert.deepEqual(direct.turnHistory.map((entry) => entry.phase), ['finish']);
+  assert.ok(direct.log.some((entry) => /克己/.test(entry)), 'Keji skip should be logged');
+
+  const automatic = skillGame('lvmeng', 'sunquan');
+  automatic.player.hp = 2;
+  automatic.player.hand = [
+    c('sha', { id: 'keji-auto-1' }),
+    c('shan', { id: 'keji-auto-2' }),
+    c('tao', { id: 'keji-auto-3' }),
+    c('jiu', { id: 'keji-auto-4' })
+  ];
+
+  const advanceResult = Engine.advancePhase(automatic);
+
+  assert.equal(advanceResult.ok, true, advanceResult.message);
+  assert.equal(automatic.phase, 'finish');
+});
+
+test('吕蒙【克己】 does not skip discard after using Sha this turn', () => {
+  const game = skillGame('lvmeng', 'sunquan');
+  game.player.hp = 3;
+  game.player.hand = [
+    c('sha', { id: 'keji-used-sha' }),
+    c('shan', { id: 'keji-over-limit-1' }),
+    c('tao', { id: 'keji-over-limit-2' }),
+    c('jiu', { id: 'keji-over-limit-3' }),
+    c('shan', { id: 'keji-over-limit-4' })
+  ];
+  game.enemy.hand = [];
+
+  const shaResult = Engine.playCard(game, 'player', 'keji-used-sha');
+  const finishResult = Engine.finishPlayPhase(game);
+
+  assert.equal(shaResult.ok, true, shaResult.message);
+  assert.equal(game.player.usedSha, true);
+  assert.equal(finishResult.ok, true, finishResult.message);
+  assert.equal(game.phase, 'discard');
+  assert.equal(Engine.needsDiscard(game, 'player'), true);
+});
+
+test('吕蒙【克己】 does not skip discard after responding with Sha this turn', () => {
+  const game = skillGame('lvmeng', 'sunquan');
+  game.player.hp = 2;
+  game.player.hand = [
+    c('juedou', { id: 'keji-duel' }),
+    c('sha', { id: 'keji-response-sha' }),
+    c('shan', { id: 'keji-response-over-1' }),
+    c('tao', { id: 'keji-response-over-2' }),
+    c('jiu', { id: 'keji-response-over-3' })
+  ];
+  game.enemy.hand = [c('sha', { id: 'enemy-duel-sha' })];
+
+  const duelResult = Engine.playCard(game, 'player', 'keji-duel');
+  const finishResult = Engine.finishPlayPhase(game);
+
+  assert.equal(duelResult.ok, true, duelResult.message);
+  assert.equal(game.player.usedSha, false, 'responding with Sha should not consume the normal Sha usage limit');
+  assert.equal(game.player.usedOrRespondedSha, true, 'responding with Sha during your turn counts for Keji');
+  assert.equal(finishResult.ok, true, finishResult.message);
+  assert.equal(game.phase, 'discard');
+  assert.equal(Engine.needsDiscard(game, 'player'), true);
+});
+
+test('responding with Sha during your Duel does not block a later normal Sha use', () => {
+  const game = skillGame('sunquan', 'caocao');
+  game.player.hand = [
+    c('juedou', { id: 'duel-before-sha' }),
+    c('sha', { id: 'duel-response-sha' }),
+    c('sha', { id: 'normal-sha-after-response' })
+  ];
+  game.enemy.hand = [c('sha', { id: 'enemy-duel-response' })];
+
+  const duelResult = Engine.playCard(game, 'player', 'duel-before-sha');
+  const shaResult = Engine.playCard(game, 'player', 'normal-sha-after-response');
+
+  assert.equal(duelResult.ok, true, duelResult.message);
+  assert.equal(game.player.usedSha, true, 'normal Sha should consume the once-per-turn usage limit');
+  assert.equal(shaResult.ok, true, shaResult.message);
+  assert.equal(game.player.hand.length, 0);
+});
+
+test('黄月英【集智】 draws one extra card after a successful normal trick', () => {
+  const game = skillGame('huangyueying', 'sunquan');
+  game.player.hand = [c('wuzhong', { id: 'jizhi-wuzhong' })];
+  game.deck = [
+    c('shan', { id: 'wuzhong-draw-2' }),
+    c('sha', { id: 'wuzhong-draw-1' }),
+    c('tao', { id: 'jizhi-extra-draw' })
+  ];
+
+  const result = Engine.playCard(game, 'player', 'jizhi-wuzhong');
+
+  assert.equal(result.ok, true, result.message);
+  assert.deepEqual(ids(game.player.hand).sort(), ['jizhi-extra-draw', 'wuzhong-draw-1', 'wuzhong-draw-2'].sort());
+  assert.ok(game.log.some((entry) => /集智/.test(entry)), 'Jizhi trigger should be logged');
+});
+
+test('黄月英【集智】 triggers when she uses Wuxie as a response', () => {
+  const game = skillGame('sunquan', 'huangyueying');
+  game.player.hand = [c('guohe', { id: 'jizhi-wuxie-target-trick' })];
+  game.enemy.hand = [c('wuxie', { id: 'jizhi-wuxie-response' })];
+  game.deck = [c('tao', { id: 'jizhi-wuxie-draw' })];
+
+  const result = Engine.playCard(game, 'player', 'jizhi-wuxie-target-trick');
+
+  assert.equal(result.ok, true, result.message);
+  assert.deepEqual(ids(game.enemy.hand), ['jizhi-wuxie-draw']);
+  assert.ok(game.log.some((entry) => /集智/.test(entry)), 'Wuxie response should trigger Jizhi');
+});
+
+test('黄月英【集智】 does not trigger for basic, equipment, delayed, or failed card use', () => {
+  const basic = skillGame('huangyueying', 'sunquan');
+  basic.player.hand = [c('sha', { id: 'jizhi-basic-sha' })];
+  basic.enemy.hand = [];
+  basic.deck = [c('tao', { id: 'should-stay-basic' })];
+  assert.equal(Engine.playCard(basic, 'player', 'jizhi-basic-sha').ok, true);
+  assert.deepEqual(ids(basic.player.hand), []);
+  assert.equal(basic.deck.length, 1);
+
+  const equipment = skillGame('huangyueying', 'sunquan');
+  equipment.player.hand = [c('zhuge', { id: 'jizhi-equipment-zhuge' })];
+  equipment.deck = [c('tao', { id: 'should-stay-equipment' })];
+  assert.equal(Engine.playCard(equipment, 'player', 'jizhi-equipment-zhuge').ok, true);
+  assert.deepEqual(ids(equipment.player.hand), []);
+  assert.equal(equipment.deck.length, 1);
+
+  const delayed = skillGame('huangyueying', 'sunquan');
+  delayed.player.hand = [c('lebusishu', { id: 'jizhi-delayed-lebu' })];
+  delayed.deck = [c('tao', { id: 'should-stay-delayed' })];
+  assert.equal(Engine.playCard(delayed, 'player', 'jizhi-delayed-lebu').ok, true);
+  assert.deepEqual(ids(delayed.player.hand), []);
+  assert.equal(delayed.deck.length, 1);
+
+  const illegal = skillGame('huangyueying', 'zhugeliang');
+  illegal.player.hand = [c('juedou', { id: 'jizhi-illegal-duel' })];
+  illegal.enemy.hand = [];
+  illegal.deck = [c('tao', { id: 'should-stay-illegal' })];
+  const illegalResult = Engine.playCard(illegal, 'player', 'jizhi-illegal-duel');
+  assert.equal(illegalResult.ok, false);
+  assert.deepEqual(ids(illegal.player.hand), ['jizhi-illegal-duel']);
+  assert.equal(illegal.deck.length, 1);
 });

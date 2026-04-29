@@ -1211,7 +1211,8 @@
 
       var IMPLEMENTED_SKILL_IDS = [
         'zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing',
-        'paoxiao', 'wusheng', 'longdan', 'jianxiong', 'mashu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng'
+        'paoxiao', 'wusheng', 'longdan', 'jianxiong', 'mashu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng',
+        'biyue', 'keji', 'jizhi'
       ];
       var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing'];
 
@@ -1312,6 +1313,7 @@
           judgeArea: [],
           flags: {},
           usedSha: false,
+          usedOrRespondedSha: false,
           shaBonus: 0
         };
       }
@@ -1496,6 +1498,26 @@
         return drawn;
       }
 
+      function isNormalTrickCard(card) {
+        return !!card && card.family === 'trick';
+      }
+
+      function shouldTriggerJizhi(card, options) {
+        return isNormalTrickCard(card) && !(card.type === 'tiesuo' && options && options.mode === 'recast');
+      }
+
+      function triggerJizhi(game, actor, card, options) {
+        var state = game[actor];
+        if (!state || !hasSkill(state, 'jizhi') || !shouldTriggerJizhi(card, options) || game.phase === 'gameover') return;
+        log(game, actorName(game, actor) + '发动【集智】，使用普通锦囊后摸 1 张牌。');
+        drawCards(game, actor, 1);
+      }
+
+      function finishTrickUse(game, actor, card, result, options) {
+        if (result && result.ok) triggerJizhi(game, actor, card, options);
+        return result;
+      }
+
       function removeCardFromHand(state, cardId) {
         var index = state.hand.findIndex(function (card) { return card.id === cardId; });
         if (index < 0) return null;
@@ -1664,6 +1686,7 @@
       function consumeResponse(game, actor, type, reason) {
         var response = findResponseCard(game[actor], type);
         if (!response) return false;
+        if (type === 'sha' && actor === game.turn) game[actor].usedOrRespondedSha = true;
         discardCard(game, response.card);
         if (response.skillName) {
           log(game, actorName(game, actor) + '发动【' + response.skillName + '】，将【' + response.card.name + '】当【' + response.asName + '】响应' + reason + '。');
@@ -1678,6 +1701,7 @@
         if (!card) return false;
         discardCard(game, card);
         log(game, actorName(game, actor) + '打出【无懈可击】抵消' + reason + '。');
+        triggerJizhi(game, actor, card, { response: true });
         return true;
       }
 
@@ -1864,6 +1888,7 @@
         if (isKongchengProtected(game, targetActor, card.type)) return fail(actorName(game, targetActor) + '处于【空城】状态，不能成为【杀】目标。');
         if (!canReachWithSha(game, actor, targetActor)) return fail('距离不足，当前武器范围无法使用【杀】。');
         self.usedSha = true;
+        self.usedOrRespondedSha = true;
         var amount = 1 + (self.shaBonus || 0);
         self.shaBonus = 0;
         var weapon = self.equipment && self.equipment.weapon;
@@ -2033,40 +2058,40 @@
           discardCard(game, card);
           log(game, actorName(game, actor) + '使用【无中生有】。');
           drawCards(game, actor, 2);
-          return success('摸两张牌。');
+          return finishTrickUse(game, actor, card, success('摸两张牌。'), options);
         }
 
         if (card.type === 'juedou') {
           if (consumeWuxie(game, opponent(actor), '【决斗】')) {
             discardCard(game, card);
-            return success('决斗被无懈可击。');
+            return finishTrickUse(game, actor, card, success('决斗被无懈可击。'), options);
           }
-          return playDuel(game, actor, card);
+          return finishTrickUse(game, actor, card, playDuel(game, actor, card), options);
         }
-        if (card.type === 'nanman') return playAOE(game, actor, card, 'sha', '南蛮入侵');
-        if (card.type === 'wanjian') return playAOE(game, actor, card, 'shan', '万箭齐发');
+        if (card.type === 'nanman') return finishTrickUse(game, actor, card, playAOE(game, actor, card, 'sha', '南蛮入侵'), options);
+        if (card.type === 'wanjian') return finishTrickUse(game, actor, card, playAOE(game, actor, card, 'shan', '万箭齐发'), options);
 
         if (card.type === 'guohe') {
           var target = game[opponent(actor)];
           discardCard(game, card);
-          if (consumeWuxie(game, opponent(actor), '【过河拆桥】')) return success('过河拆桥被无懈可击。');
+          if (consumeWuxie(game, opponent(actor), '【过河拆桥】')) return finishTrickUse(game, actor, card, success('过河拆桥被无懈可击。'), options);
           var droppedInfo = removeTargetZoneCard(game, opponent(actor), options.targetZone, options.targetCardId);
           if (droppedInfo && droppedInfo.card) {
             discardCard(game, droppedInfo.card);
             log(game, actorName(game, actor) + '使用【过河拆桥】，弃置了' + actorName(game, opponent(actor)) + droppedInfo.zone + '的【' + droppedInfo.card.name + '】。');
           }
-          return success('弃置对方一张牌。');
+          return finishTrickUse(game, actor, card, success('弃置对方一张牌。'), options);
         }
 
         if (card.type === 'shunshou') {
           discardCard(game, card);
-          if (consumeWuxie(game, opponent(actor), '【顺手牵羊】')) return success('顺手牵羊被无懈可击。');
+          if (consumeWuxie(game, opponent(actor), '【顺手牵羊】')) return finishTrickUse(game, actor, card, success('顺手牵羊被无懈可击。'), options);
           var stolenInfo = removeTargetZoneCard(game, opponent(actor), options.targetZone, options.targetCardId);
           if (stolenInfo && stolenInfo.card) {
             self.hand.push(stolenInfo.card);
             log(game, actorName(game, actor) + '使用【顺手牵羊】，获得了' + actorName(game, opponent(actor)) + stolenInfo.zone + '的一张牌。');
           }
-          return success('获得对方一张牌。');
+          return finishTrickUse(game, actor, card, success('获得对方一张牌。'), options);
         }
 
         if (card.type === 'taoyuan') {
@@ -2075,7 +2100,7 @@
             game[side].hp = Math.min(game[side].maxHp, game[side].hp + 1);
           });
           log(game, actorName(game, actor) + '使用【桃园结义】，所有角色回复 1 点体力。');
-          return success('桃园结义结算完成。');
+          return finishTrickUse(game, actor, card, success('桃园结义结算完成。'), options);
         }
 
         if (card.type === 'wugu') {
@@ -2088,22 +2113,22 @@
               log(game, actorName(game, side) + '从【五谷丰登】获得【' + gained.name + '】。');
             }
           });
-          return success('五谷丰登结算完成。');
+          return finishTrickUse(game, actor, card, success('五谷丰登结算完成。'), options);
         }
 
         if (card.type === 'huogong') {
           var fireTarget = game[opponent(actor)];
           discardCard(game, card);
-          if (consumeWuxie(game, opponent(actor), '【火攻】')) return success('火攻被无懈可击。');
-          if (!fireTarget.hand.length) return success('目标没有手牌，火攻未造成伤害。');
+          if (consumeWuxie(game, opponent(actor), '【火攻】')) return finishTrickUse(game, actor, card, success('火攻被无懈可击。'), options);
+          if (!fireTarget.hand.length) return finishTrickUse(game, actor, card, success('目标没有手牌，火攻未造成伤害。'), options);
           var revealed = fireTarget.hand[0];
           log(game, actorName(game, opponent(actor)) + '展示【' + revealed.name + '】（' + revealed.suit + '）。');
           if (options.declineHuogong) {
             log(game, actorName(game, actor) + '选择不弃置同花色牌，【火攻】未造成伤害。');
-            return success('火攻未追加弃牌。');
+            return finishTrickUse(game, actor, card, success('火攻未追加弃牌。'), options);
           }
           var cost = options.huogongCostCardId ? removeCardFromHand(self, options.huogongCostCardId) : removeFirstMatchingCard(self, function (item) { return item.suit === revealed.suit; });
-          if (!cost) return success('没有同花色牌可弃，火攻未造成伤害。');
+          if (!cost) return finishTrickUse(game, actor, card, success('没有同花色牌可弃，火攻未造成伤害。'), options);
           if (cost.suit !== revealed.suit) {
             self.hand.push(cost);
             return fail('请选择与展示牌同花色的手牌。');
@@ -2111,7 +2136,7 @@
           discardCard(game, cost);
           log(game, actorName(game, actor) + '弃置同花色【' + cost.name + '】发动【火攻】。');
           damage(game, opponent(actor), 1, actor, '【火攻】', null, 'fire');
-          return success('火攻结算完成。');
+          return finishTrickUse(game, actor, card, success('火攻结算完成。'), options);
         }
 
         if (card.type === 'tiesuo') {
@@ -2129,24 +2154,24 @@
             game[side].chained = !game[side].chained;
             log(game, actorName(game, actor) + '使用【铁索连环】，' + actorName(game, side) + (game[side].chained ? '横置。' : '重置。'));
           });
-          return success('铁索连环结算完成。');
+          return finishTrickUse(game, actor, card, success('铁索连环结算完成。'), options);
         }
 
         if (card.type === 'jiedao') {
           var weaponOwner = game[opponent(actor)];
           discardCard(game, card);
-          if (consumeWuxie(game, opponent(actor), '【借刀杀人】')) return success('借刀杀人被无懈可击。');
-          if (!weaponOwner.equipment.weapon) return success('目标没有武器，借刀杀人无效果。');
+          if (consumeWuxie(game, opponent(actor), '【借刀杀人】')) return finishTrickUse(game, actor, card, success('借刀杀人被无懈可击。'), options);
+          if (!weaponOwner.equipment.weapon) return finishTrickUse(game, actor, card, success('目标没有武器，借刀杀人无效果。'), options);
           var borrowedSha = removeFirstCardOfType(weaponOwner, 'sha');
           if (borrowedSha) {
             log(game, actorName(game, opponent(actor)) + '被【借刀杀人】驱使使用【杀】。');
-            return playSha(game, opponent(actor), borrowedSha);
+            return finishTrickUse(game, actor, card, playSha(game, opponent(actor), borrowedSha), options);
           }
           var borrowedWeapon = weaponOwner.equipment.weapon;
           weaponOwner.equipment.weapon = null;
           self.hand.push(borrowedWeapon);
           log(game, actorName(game, actor) + '因【借刀杀人】获得【' + borrowedWeapon.name + '】，置入手牌。');
-          return success('借刀杀人获得武器。');
+          return finishTrickUse(game, actor, card, success('借刀杀人获得武器。'), options);
         }
 
         discardCard(game, card);
@@ -2175,6 +2200,7 @@
         game.turn = actor;
         var state = game[actor];
         state.usedSha = false;
+        state.usedOrRespondedSha = false;
         state.shaBonus = 0;
         state.flags = state.flags || {};
         state.flags.skipPlay = false;
@@ -2218,9 +2244,17 @@
 
       function finishPlayPhase(game) {
         if (game.phase === 'gameover') return fail('游戏已经结束。');
+        var actor = game.turn;
+        var state = game[actor];
+        if (state && hasSkill(state, 'keji') && !state.usedOrRespondedSha) {
+          game.phase = 'finish';
+          recordPhase(game, actor, 'finish');
+          log(game, actorName(game, actor) + '发动【克己】，本回合未使用或打出【杀】，跳过弃牌阶段。');
+          return success('克己跳过弃牌阶段。');
+        }
         game.phase = 'discard';
-        recordPhase(game, game.turn, 'discard');
-        log(game, actorName(game, game.turn) + '结束出牌，进入弃牌阶段。');
+        recordPhase(game, actor, 'discard');
+        log(game, actorName(game, actor) + '结束出牌，进入弃牌阶段。');
         return success('进入弃牌阶段。');
       }
 
@@ -2315,24 +2349,47 @@
           return success('进入结束阶段。');
         }
         if (game.phase === 'finish') {
-          return startTurn(game, opponent(actor));
+          return completeTurn(game, actor);
         }
         return fail('未知阶段。');
+      }
+
+      function resetEndOfTurnState(state) {
+        if (!state) return;
+        state.usedSha = false;
+        state.usedOrRespondedSha = false;
+        state.shaBonus = 0;
+        state.flags = state.flags || {};
+        state.flags.zhihengUsed = false;
+        state.flags.fanjianUsed = false;
+        state.flags.guanxingUsed = false;
+        state.flags.rendeGiven = 0;
+        state.flags.rendeHealed = false;
+        state.flags.aiKurouUsed = false;
+        state.flags.biyueTriggered = false;
+      }
+
+      function triggerBiyue(game, actor) {
+        var state = game[actor];
+        if (!state || !hasSkill(state, 'biyue') || game.phase === 'gameover') return;
+        state.flags = state.flags || {};
+        if (state.flags.biyueTriggered) return;
+        state.flags.biyueTriggered = true;
+        log(game, actorName(game, actor) + '发动【闭月】，结束阶段摸 1 张牌。');
+        drawCards(game, actor, 1);
+      }
+
+      function completeTurn(game, ending) {
+        triggerBiyue(game, ending);
+        resetEndOfTurnState(game[ending]);
+        log(game, actorName(game, ending) + '结束回合。');
+        return startTurn(game, opponent(ending));
       }
 
       function endTurn(game) {
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         var ending = game.turn;
-        game[ending].usedSha = false;
-        game[ending].shaBonus = 0;
-        game[ending].flags.zhihengUsed = false;
-        game[ending].flags.fanjianUsed = false;
-        game[ending].flags.guanxingUsed = false;
-        game[ending].flags.rendeGiven = 0;
-        game[ending].flags.rendeHealed = false;
-        game[ending].flags.aiKurouUsed = false;
-        log(game, actorName(game, ending) + '结束回合。');
-        return startTurn(game, opponent(ending));
+        return completeTurn(game, ending);
       }
 
       function playZhangbaSha(game, actor, cardIds) {

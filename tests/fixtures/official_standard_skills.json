@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "indexUrl": "https://www.sanguosha.com/hero",
+    "detailUrlPattern": "https://www.sanguosha.com/hero/{gid}",
+    "method": "Parsed Listdata from the official hero index and skill tab names from each official detail page."
+  },
+  "pack": "标准",
+  "includeFullSkillText": false,
+  "heroes": [
+    { "gid": 1, "name": "刘备", "detailUrl": "https://www.sanguosha.com/hero/1", "skills": ["仁德", "激将"] },
+    { "gid": 2, "name": "关羽", "detailUrl": "https://www.sanguosha.com/hero/2", "skills": ["武圣"] },
+    { "gid": 3, "name": "张飞", "detailUrl": "https://www.sanguosha.com/hero/3", "skills": ["咆哮"] },
+    { "gid": 4, "name": "诸葛亮", "detailUrl": "https://www.sanguosha.com/hero/4", "skills": ["观星", "空城"] },
+    { "gid": 5, "name": "赵云", "detailUrl": "https://www.sanguosha.com/hero/5", "skills": ["龙胆"] },
+    { "gid": 6, "name": "马超", "detailUrl": "https://www.sanguosha.com/hero/6", "skills": ["铁骑", "马术"] },
+    { "gid": 7, "name": "黄月英", "detailUrl": "https://www.sanguosha.com/hero/7", "skills": ["集智", "奇才"] },
+    { "gid": 8, "name": "孙权", "detailUrl": "https://www.sanguosha.com/hero/8", "skills": ["制衡", "救援"] },
+    { "gid": 9, "name": "甘宁", "detailUrl": "https://www.sanguosha.com/hero/9", "skills": ["奇袭"] },
+    { "gid": 10, "name": "吕蒙", "detailUrl": "https://www.sanguosha.com/hero/10", "skills": ["克己"] },
+    { "gid": 11, "name": "黄盖", "detailUrl": "https://www.sanguosha.com/hero/11", "skills": ["苦肉"] },
+    { "gid": 12, "name": "周瑜", "detailUrl": "https://www.sanguosha.com/hero/12", "skills": ["英姿", "反间"] },
+    { "gid": 13, "name": "大乔", "detailUrl": "https://www.sanguosha.com/hero/13", "skills": ["国色", "流离"] },
+    { "gid": 14, "name": "陆逊", "detailUrl": "https://www.sanguosha.com/hero/14", "skills": ["谦逊", "连营"] },
+    { "gid": 15, "name": "曹操", "detailUrl": "https://www.sanguosha.com/hero/15", "skills": ["奸雄", "护驾"] },
+    { "gid": 16, "name": "司马懿", "detailUrl": "https://www.sanguosha.com/hero/16", "skills": ["反馈", "鬼才"] },
+    { "gid": 17, "name": "夏侯惇", "detailUrl": "https://www.sanguosha.com/hero/17", "skills": ["刚烈"] },
+    { "gid": 18, "name": "张辽", "detailUrl": "https://www.sanguosha.com/hero/18", "skills": ["突袭"] },
+    { "gid": 19, "name": "许褚", "detailUrl": "https://www.sanguosha.com/hero/19", "skills": ["裸衣"] },
+    { "gid": 20, "name": "郭嘉", "detailUrl": "https://www.sanguosha.com/hero/20", "skills": ["天妒", "遗计"] },
+    { "gid": 21, "name": "甄姬", "detailUrl": "https://www.sanguosha.com/hero/21", "skills": ["洛神", "倾国"] },
+    { "gid": 22, "name": "华佗", "detailUrl": "https://www.sanguosha.com/hero/22", "skills": ["急救", "青囊"] },
+    { "gid": 23, "name": "吕布", "detailUrl": "https://www.sanguosha.com/hero/23", "skills": ["无双"] },
+    { "gid": 24, "name": "貂蝉", "detailUrl": "https://www.sanguosha.com/hero/24", "skills": ["闭月", "离间"] },
+    { "gid": 25, "name": "孙尚香", "detailUrl": "https://www.sanguosha.com/hero/25", "skills": ["枭姬", "结姻"] },
+    { "gid": 214, "name": "华雄", "detailUrl": "https://www.sanguosha.com/hero/214", "skills": ["耀武"] },
+    { "gid": 215, "name": "标袁术", "detailUrl": "https://www.sanguosha.com/hero/215", "skills": ["妄尊", "同疾"] }
+  ]
+}
