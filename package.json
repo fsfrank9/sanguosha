@@ -1,0 +1,14 @@
+{
+  "name": "sanguosha-html",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline 三国杀 browser game with modular source and single-file build artifact.",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "build:check": "node tools/build.mjs --check",
+    "test": "for f in tests/*.mjs; do printf '\\n===== %s\\n' \"$f\"; node \"$f\" || exit 1; done",
+    "verify": "npm run build:check && npm test"
+  },
+  "devDependencies": {}
+}
