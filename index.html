@@ -574,6 +574,8 @@
     .tiesuo-mode-panel[hidden],
     .target-zone-panel[hidden],
     .huogong-mode-panel[hidden],
+    .conversion-mode-panel[hidden],
+    .guanxing-mode-panel[hidden],
     .zhiheng-mode-panel[hidden] { display: none !important; }
 
     .setup-screen {
@@ -700,6 +702,8 @@
 
     .target-zone-panel,
     .huogong-mode-panel,
+    .conversion-mode-panel,
+    .guanxing-mode-panel,
     .zhiheng-mode-panel {
       display: flex;
       flex-wrap: wrap;
@@ -712,7 +716,8 @@
       background: rgba(0,0,0,.18);
     }
 
-    .target-card-choices {
+    .target-card-choices,
+    .guanxing-card-choices {
       flex: 1 0 100%;
       display: flex;
       flex-wrap: wrap;
@@ -791,6 +796,20 @@
       cursor: not-allowed;
       color: var(--muted);
       opacity: .58;
+    }
+
+    .skill-status-todo {
+      border-style: dashed;
+      color: #aeb7c9;
+    }
+
+    .skill-status-display {
+      color: #b7c5dd;
+      border-color: rgba(183,197,221,.28);
+    }
+
+    .skill-status-implemented {
+      box-shadow: inset 0 0 0 1px rgba(255,214,138,.08);
     }
 
     .discard-controls {
@@ -1046,6 +1065,21 @@
             <span class="mini-card">同花色牌可用于造成火焰伤害</span>
           </div>
         </div>
+        <div class="conversion-mode-panel" id="conversionModePanel" hidden>
+          <span class="badge" id="conversionHint">这张牌可按原牌使用，也可当【杀】使用</span>
+          <button class="btn small" id="conversionNormalBtn">按原牌使用</button>
+          <button class="btn small" id="conversionShaBtn">当【杀】使用</button>
+          <button class="btn small" id="conversionCancelBtn">取消</button>
+        </div>
+        <div class="guanxing-mode-panel" id="guanxingModePanel" hidden>
+          <span class="badge" id="guanxingHint">观星：预览牌堆顶牌</span>
+          <button class="btn small" id="guanxingReverseBtn">逆序调整</button>
+          <button class="btn small" id="guanxingConfirmBtn">确认观星</button>
+          <button class="btn small" id="guanxingCancelBtn">取消</button>
+          <div class="guanxing-card-choices" id="guanxingChoices" aria-live="polite">
+            <span class="mini-card">发动观星后显示牌堆顶牌</span>
+          </div>
+        </div>
         <div class="zhiheng-mode-panel" id="zhihengModePanel" hidden>
           <span class="badge" id="zhihengHint">制衡：点选任意张手牌</span>
           <button class="btn small" id="zhihengConfirmBtn">确认制衡</button>
@@ -1174,6 +1208,31 @@
         { id: 'sp_xiahoudun', name: 'SP 夏侯惇', camp: '魏', title: '啖睛的苍狼', maxHp: 4, quote: '以彼之道，还施彼身。', skills: [{ id: 'fenyong', name: '愤勇', desc: '受到伤害后防止下一次伤害。' }, { id: 'xuehen', name: '雪恨', desc: '准备阶段可弃置来源牌。' }] },
         { id: 'sp_sunshangxiang', name: 'SP 孙尚香', camp: '蜀', title: '梦醉良缘', maxHp: 3, quote: '夫君，身体要紧。', skills: [{ id: 'liangzhu', name: '良助', desc: '角色回复后可摸牌或令其摸牌。' }, { id: 'fanxiang', name: '返乡', desc: '觉醒技：获得枭姬。' }] }
       ]);
+
+      var IMPLEMENTED_SKILL_IDS = [
+        'zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing',
+        'paoxiao', 'wusheng', 'longdan', 'jianxiong', 'mashu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng'
+      ];
+      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing'];
+
+      function annotateSkillStatus() {
+        Object.keys(HERO_CATALOG).forEach(function (heroId) {
+          (HERO_CATALOG[heroId].skills || []).forEach(function (skill) {
+            if (IMPLEMENTED_SKILL_IDS.indexOf(skill.id) >= 0) {
+              skill.status = 'implemented';
+              skill.statusText = ACTIVE_SKILL_IDS.indexOf(skill.id) >= 0 ? '可主动发动' : '已实现：自动/锁定触发';
+            } else if (skill.lord) {
+              skill.status = 'display';
+              skill.statusText = '1v1 展示技';
+            } else {
+              skill.status = 'todo';
+              skill.statusText = '未实现';
+            }
+          });
+        });
+      }
+
+      annotateSkillStatus();
 
       var HEROES = {
         player: HERO_CATALOG.liubei,
@@ -1453,8 +1512,13 @@
         return removeFirstMatchingCard(state, function (card) { return type === 'sha' ? isShaCard(card) : card.type === type; });
       }
 
+      function physicalCardOf(card) {
+        return card && card.physicalCard ? card.physicalCard : card;
+      }
+
       function discardCard(game, card) {
-        if (card) game.discard.push(card);
+        var physicalCard = physicalCardOf(card);
+        if (physicalCard) game.discard.push(physicalCard);
       }
 
       function equipCard(game, actor, card) {
@@ -1554,9 +1618,10 @@
         }
         target.hp = Math.max(0, target.hp - amount);
         log(game, actorName(game, targetActor) + '因' + reason + '受到 ' + amount + ' 点伤害。');
-        if (sourceCard && hasSkill(target, 'jianxiong')) {
-          target.hand.push(sourceCard);
-          log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + sourceCard.name + '】。');
+        var physicalSourceCard = physicalCardOf(sourceCard);
+        if (sourceCard && physicalSourceCard && hasSkill(target, 'jianxiong')) {
+          target.hand.push(physicalSourceCard);
+          log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + physicalSourceCard.name + '】。');
         } else if (sourceCard) {
           discardCard(game, sourceCard);
         }
@@ -2116,6 +2181,7 @@
         state.flags.skipDraw = false;
         state.flags.zhihengUsed = false;
         state.flags.fanjianUsed = false;
+        state.flags.guanxingUsed = false;
         state.flags.rendeGiven = 0;
         state.flags.rendeHealed = false;
         state.flags.aiKurouUsed = false;
@@ -2261,6 +2327,7 @@
         game[ending].shaBonus = 0;
         game[ending].flags.zhihengUsed = false;
         game[ending].flags.fanjianUsed = false;
+        game[ending].flags.guanxingUsed = false;
         game[ending].flags.rendeGiven = 0;
         game[ending].flags.rendeHealed = false;
         game[ending].flags.aiKurouUsed = false;
@@ -2295,28 +2362,54 @@
         return playSha(game, actor, virtualSha);
       }
 
-      function playCardAs(game, actor, cardId, asType) {
-        var self = game[actor];
-        var original = self.hand.find(function (item) { return item.id === cardId; });
-        if (!original) return fail('找不到这张牌。');
-        if (asType !== 'sha') return fail('v2.1 只支持转化为【杀】。');
-        var allowed = false;
-        if (hasSkill(self, 'wusheng') && original.color === 'red') allowed = true;
-        if (hasSkill(self, 'longdan') && original.type === 'shan') allowed = true;
-        if (!allowed) return fail('当前武将不能这样转化。');
-        if (self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
-        var virtualSha = makeTestCard('sha', {
+      function virtualShaFromCard(original) {
+        return makeTestCard('sha', {
           id: original.id,
           suit: original.suit,
           rank: original.rank,
           color: original.color,
-          name: original.name + '（当杀）'
+          name: original.name + '（当杀）',
+          physicalCard: original
         });
-        var playable = canPlayCard(game, actor, virtualSha);
+      }
+
+      function canPlayCardAs(game, actor, cardOrId, asType) {
+        var self = game[actor];
+        if (!self) return fail('未知角色。');
+        var original = typeof cardOrId === 'string' ? self.hand.find(function (item) { return item.id === cardOrId; }) : cardOrId;
+        if (!original) return fail('找不到这张牌。');
+        if (asType !== 'sha') return fail('当前只支持转化为【杀】。');
+        var skillName = null;
+        if (hasSkill(self, 'wusheng') && original.color === 'red') skillName = '武圣';
+        if (hasSkill(self, 'longdan') && original.type === 'shan') skillName = '龙胆';
+        if (!skillName) return fail('当前武将不能这样转化。');
+        if (self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
+        var playable = canPlayCard(game, actor, virtualShaFromCard(original));
+        if (!playable.ok) return playable;
+        playable.skillName = skillName;
+        playable.message = '发动【' + skillName + '】，将【' + original.name + '】当【杀】使用。';
+        return playable;
+      }
+
+      function playCardAs(game, actor, cardId, asType) {
+        var self = game[actor];
+        if (!self) return fail('未知角色。');
+        var original = self.hand.find(function (item) { return item.id === cardId; });
+        var playable = canPlayCardAs(game, actor, original, asType);
         if (!playable.ok) return playable;
         removeCardFromHand(self, cardId);
-        log(game, actorName(game, actor) + '发动技能，将【' + original.name + '】当【杀】使用。');
-        return playSha(game, actor, virtualSha);
+        log(game, actorName(game, actor) + playable.message);
+        return playSha(game, actor, virtualShaFromCard(original));
+      }
+
+      function getGuanxingPreview(game, actor) {
+        var self = game[actor];
+        if (!self) return fail('未知角色。');
+        if (!hasSkill(self, 'guanxing')) return fail('没有【观星】。');
+        var count = Math.min(5, game.deck.length);
+        var preview = success('观星预览完成。');
+        preview.cards = game.deck.slice(game.deck.length - count);
+        return preview;
       }
 
       function useSkill(game, actor, skillId, cardIds, options) {
@@ -2386,8 +2479,12 @@
           return success('反间完成。');
         }
         if (skillId === 'guanxing') {
-          var count = Math.min(5, game.deck.length);
-          var top = game.deck.slice(game.deck.length - count);
+          if (self.flags.guanxingUsed) return fail('【观星】每回合限一次。');
+          var preview = getGuanxingPreview(game, actor);
+          if (!preview.ok) return preview;
+          var count = preview.cards.length;
+          var visibleCards = preview.cards.slice();
+          var top = preview.cards.slice();
           if (options.orderIds && options.orderIds.length) {
             var chosen = [];
             options.orderIds.forEach(function (id) {
@@ -2398,8 +2495,9 @@
             game.deck = game.deck.concat(top).concat(chosen);
           }
           log(game, actorName(game, actor) + '发动【观星】，观看牌堆顶 ' + count + ' 张牌。');
+          self.flags.guanxingUsed = true;
           var guanxingResult = success('观星完成。');
-          guanxingResult.cards = top;
+          guanxingResult.cards = visibleCards;
           return guanxingResult;
         }
         return fail('这个技能的主动效果尚未实现。');
@@ -2543,6 +2641,8 @@
       window.SanguoshaEngine = {
         HEROES: HEROES,
         HERO_CATALOG: HERO_CATALOG,
+        IMPLEMENTED_SKILL_IDS: IMPLEMENTED_SKILL_IDS.slice(),
+        ACTIVE_SKILL_IDS: ACTIVE_SKILL_IDS.slice(),
         CARD_INFO: CARD_INFO,
         CARD_CATALOG: CARD_CATALOG,
         PHASES: PHASES,
@@ -2553,9 +2653,11 @@
         loseEquipment: loseEquipment,
         getTargetZoneCards: getTargetZoneCards,
         getHuogongChoice: getHuogongChoice,
+        getGuanxingPreview: getGuanxingPreview,
         isShaCard: isShaCard,
         playZhangbaSha: playZhangbaSha,
         canPlayCard: canPlayCard,
+        canPlayCardAs: canPlayCardAs,
         playCard: playCard,
         playCardAs: playCardAs,
         useSkill: useSkill,
@@ -2591,6 +2693,8 @@
       var pendingTargetCardId = null;
       var pendingTargetZone = null;
       var pendingHuogongCardId = null;
+      var pendingConversionCardId = null;
+      var pendingGuanxingOrderIds = [];
       var skillSelectMode = null;
       var selectedSkillCardIds = [];
       var enemyActionDelay = 650;
@@ -2616,7 +2720,9 @@
           'tiesuoModePanel', 'tiesuoRecastBtn', 'tiesuoChainEnemyBtn', 'tiesuoChainSelfBtn',
           'tiesuoChainBothBtn', 'tiesuoCancelBtn', 'targetZonePanel', 'targetHandBtn',
           'targetEquipmentBtn', 'targetJudgeBtn', 'targetCancelBtn', 'targetCardChoices', 'huogongModePanel',
-          'huogongRevealText', 'huogongCostChoices', 'huogongDeclineBtn', 'huogongCancelBtn', 'zhihengModePanel',
+          'huogongRevealText', 'huogongCostChoices', 'huogongDeclineBtn', 'huogongCancelBtn', 'conversionModePanel',
+          'conversionHint', 'conversionNormalBtn', 'conversionShaBtn', 'conversionCancelBtn', 'guanxingModePanel',
+          'guanxingHint', 'guanxingChoices', 'guanxingReverseBtn', 'guanxingConfirmBtn', 'guanxingCancelBtn', 'zhihengModePanel',
           'zhihengConfirmBtn', 'zhihengCancelBtn', 'zhihengHint', 'roleDraftPanel',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
@@ -2660,20 +2766,43 @@
         if (els[actor + 'Ribbon']) els[actor + 'Ribbon'].textContent = state.camp;
         if (actor === 'player' && els.playerSkillBar) {
           els.playerSkillBar.innerHTML = (state.skills || []).map(function (skill) {
-            var active = game.turn === 'player' && game.phase === 'play' && !enemyThinking && !game.winner && (skill.id === 'zhiheng' || skill.id === 'kurou');
+            var isActiveSkill = Engine.ACTIVE_SKILL_IDS.indexOf(skill.id) >= 0;
+            var active = game.turn === 'player' && game.phase === 'play' && !enemyThinking && !game.winner && isActiveSkill && skill.status === 'implemented';
             if (skill.id === 'zhiheng' && state.flags && state.flags.zhihengUsed) active = false;
-            return '<button class="mini-card skill-button" data-skill-id="' + escapeHtml(skill.id) + '" ' + (active ? '' : 'disabled') + ' title="' + escapeHtml(skill.desc || '') + '">' + escapeHtml(skill.name) + '</button>';
+            if (skill.id === 'fanjian' && state.flags && state.flags.fanjianUsed) active = false;
+            if (skill.id === 'guanxing' && state.flags && state.flags.guanxingUsed) active = false;
+            if ((skill.id === 'rende' || skill.id === 'fanjian') && !state.hand.length) active = false;
+            if (skill.id === 'kurou' && state.hp <= 1) active = false;
+            var statusClass = skill.status ? ' skill-status-' + skill.status : '';
+            var statusText = skill.statusText || (skill.status === 'todo' ? '未实现' : '');
+            var label = skill.name + (skill.status === 'todo' ? '·未实现' : '');
+            var title = (skill.desc || '') + (statusText ? '｜' + statusText : '');
+            return '<button class="mini-card skill-button' + statusClass + '" data-skill-id="' + escapeHtml(skill.id) + '" ' + (active ? '' : 'disabled') + ' title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
           }).join('') || '<span class="mini-card">无技能</span>';
         }
+      }
+
+      function playerCardAction(card) {
+        var normal = Engine.canPlayCard(game, 'player', card);
+        var asSha = Engine.canPlayCardAs(game, 'player', card, 'sha');
+        if (normal.ok && asSha.ok) return { mode: 'choice', playable: { ok: true, message: '可按原牌使用，也可当【杀】使用。' }, normal: normal, asSha: asSha };
+        if (normal.ok) return { mode: 'normal', playable: normal };
+        if (asSha.ok) return { mode: 'asSha', playable: asSha };
+        return { mode: 'blocked', playable: normal };
+      }
+
+      function activeCardSkillConfig() {
+        return cardSkillConfig(skillSelectMode);
       }
 
       function cardButton(card) {
         var disabled = game.turn !== 'player' || game.phase === 'gameover' || enemyThinking;
         var discardMode = game.turn === 'player' && game.phase === 'discard' && Engine.needsDiscard(game, 'player') && !enemyThinking;
-        var zhihengMode = skillSelectMode === 'zhiheng' && game.turn === 'player' && game.phase === 'play' && !enemyThinking;
+        var cardSkill = game.turn === 'player' && game.phase === 'play' && !enemyThinking ? activeCardSkillConfig() : null;
         var selected = selectedDiscardIds.indexOf(card.id) >= 0 || selectedSkillCardIds.indexOf(card.id) >= 0;
-        var playable = discardMode || zhihengMode ? { ok: true, message: zhihengMode ? '选择这张牌用于制衡' : '选择这张牌作为弃牌' } : Engine.canPlayCard(game, 'player', card);
-        if (!discardMode && !zhihengMode && !playable.ok) disabled = true;
+        var action = playerCardAction(card);
+        var playable = discardMode || cardSkill ? { ok: true, message: cardSkill ? cardSkill.cardHint : '选择这张牌作为弃牌' } : action.playable;
+        if (!discardMode && !cardSkill && !playable.ok) disabled = true;
         return [
           '<button class="card ', card.group, selected ? ' discard-selected' : '', '" data-card-id="', escapeHtml(card.id), '" ', disabled ? 'disabled' : '', ' title="', escapeHtml(playable.message), '">',
           '<div class="card-name">【', escapeHtml(card.name), '】</div>',
@@ -2842,6 +2971,71 @@
         if (els.huogongCostChoices) els.huogongCostChoices.innerHTML = '<span class="mini-card">同花色牌可用于造成火焰伤害</span>';
       }
 
+      function showConversionPanel(cardId) {
+        pendingConversionCardId = cardId;
+        var card = findPlayerCard(cardId);
+        if (els.conversionModePanel) els.conversionModePanel.hidden = false;
+        if (els.conversionHint) els.conversionHint.textContent = card ? '【' + card.name + '】可按原牌使用，也可当【杀】使用' : '这张牌可按原牌使用，也可当【杀】使用';
+        if (els.handHint) els.handHint.textContent = '请选择：按原牌使用，或发动技能当【杀】使用';
+      }
+
+      function hideConversionPanel() {
+        pendingConversionCardId = null;
+        if (els.conversionModePanel) els.conversionModePanel.hidden = true;
+        if (els.conversionHint) els.conversionHint.textContent = '这张牌可按原牌使用，也可当【杀】使用';
+      }
+
+      function guanxingCardMarkup(card, index) {
+        return '<span class="mini-card" data-guanxing-card-id="' + escapeHtml(card.id) + '">' + (index + 1) + '.【' + escapeHtml(card.name) + '】' + escapeHtml(suitName(card.suit)) + '</span>';
+      }
+
+      function renderGuanxingChoices() {
+        if (!els.guanxingChoices || !game) return;
+        var preview = Engine.getGuanxingPreview(game, 'player');
+        if (!preview.ok) {
+          els.guanxingChoices.innerHTML = '<span class="mini-card">' + escapeHtml(preview.message) + '</span>';
+          return;
+        }
+        var byId = {};
+        preview.cards.forEach(function (card) { byId[card.id] = card; });
+        var ordered = pendingGuanxingOrderIds.map(function (id) { return byId[id]; }).filter(Boolean);
+        els.guanxingChoices.innerHTML = ordered.length ? ordered.map(guanxingCardMarkup).join('') : '<span class="mini-card">牌堆顶没有可观星的牌</span>';
+      }
+
+      function showGuanxingPanel() {
+        var preview = Engine.getGuanxingPreview(game, 'player');
+        if (!preview.ok) {
+          game.log.push(preview.message);
+          render();
+          return;
+        }
+        pendingGuanxingOrderIds = preview.cards.map(function (card) { return card.id; });
+        if (els.guanxingModePanel) els.guanxingModePanel.hidden = false;
+        if (els.guanxingHint) els.guanxingHint.textContent = '观星：当前显示牌堆顶 ' + preview.cards.length + ' 张，可逆序后确认';
+        renderGuanxingChoices();
+        if (els.handHint) els.handHint.textContent = '观星：查看牌堆顶牌，确认前可点“逆序调整”';
+      }
+
+      function hideGuanxingPanel() {
+        pendingGuanxingOrderIds = [];
+        if (els.guanxingModePanel) els.guanxingModePanel.hidden = true;
+        if (els.guanxingHint) els.guanxingHint.textContent = '观星：预览牌堆顶牌';
+        if (els.guanxingChoices) els.guanxingChoices.innerHTML = '<span class="mini-card">发动观星后显示牌堆顶牌</span>';
+      }
+
+      function reverseGuanxingOrder() {
+        pendingGuanxingOrderIds.reverse();
+        renderGuanxingChoices();
+      }
+
+      function confirmGuanxing() {
+        if (!game || !pendingGuanxingOrderIds.length) return;
+        var result = Engine.useSkill(game, 'player', 'guanxing', [], { orderIds: pendingGuanxingOrderIds });
+        hideGuanxingPanel();
+        if (!result.ok) game.log.push(result.message);
+        render();
+      }
+
       function suitName(suit) {
         var labels = { spade: '黑桃', heart: '红桃', club: '梅花', diamond: '方片' };
         return labels[suit] || suit || '未知花色';
@@ -2893,25 +3087,89 @@
         if (els.handHint) els.handHint.textContent = '已选' + label + '，现在点具体目标牌';
       }
 
-      function enterZhihengMode() {
-        skillSelectMode = 'zhiheng';
+      function cardSkillConfig(skillId) {
+        var configs = {
+          zhiheng: {
+            name: '制衡',
+            min: 1,
+            max: Infinity,
+            cardHint: '选择这张牌用于【制衡】',
+            startHint: '制衡：点选任意张手牌后确认',
+            selectedHint: function (count) { return '制衡：已选 ' + count + ' 张'; },
+            emptyMessage: '请选择至少一张牌发动【制衡】。'
+          },
+          rende: {
+            name: '仁德',
+            min: 1,
+            max: Infinity,
+            cardHint: '选择这张牌交给对方发动【仁德】',
+            startHint: '仁德：点选要交给对方的手牌后确认；累计两张可回复 1 点体力',
+            selectedHint: function (count) { return '仁德：已选 ' + count + ' 张'; },
+            emptyMessage: '请选择至少一张牌发动【仁德】。'
+          },
+          fanjian: {
+            name: '反间',
+            min: 1,
+            max: 1,
+            cardHint: '选择一张牌交给对方发动【反间】',
+            startHint: '反间：选择一张手牌交给对方；本版默认对方猜黑桃',
+            selectedHint: function (count) { return '反间：已选 ' + count + ' / 1 张'; },
+            emptyMessage: '请选择一张牌发动【反间】。',
+            options: { guessedSuit: 'spade' }
+          }
+        };
+        return configs[skillId] || null;
+      }
+
+      function enterCardSkillMode(skillId) {
+        var config = cardSkillConfig(skillId);
+        if (!config) return false;
+        skillSelectMode = skillId;
         selectedSkillCardIds = [];
         if (els.zhihengModePanel) els.zhihengModePanel.hidden = false;
-        if (els.zhihengHint) els.zhihengHint.textContent = '制衡：点选任意张手牌后确认';
+        if (els.zhihengHint) els.zhihengHint.textContent = config.startHint;
+        if (els.zhihengConfirmBtn) els.zhihengConfirmBtn.textContent = '确认' + config.name;
         render();
+        return true;
+      }
+
+      function enterZhihengMode() {
+        skillSelectMode = 'zhiheng';
+        return enterCardSkillMode(skillSelectMode);
       }
 
       function exitSkillSelectMode() {
         skillSelectMode = null;
         selectedSkillCardIds = [];
         if (els.zhihengModePanel) els.zhihengModePanel.hidden = true;
+        if (els.zhihengConfirmBtn) els.zhihengConfirmBtn.textContent = '确认制衡';
       }
 
       function toggleSkillCard(cardId) {
+        var config = activeCardSkillConfig();
+        if (!config) return;
         var index = selectedSkillCardIds.indexOf(cardId);
         if (index >= 0) selectedSkillCardIds.splice(index, 1);
+        else if (config.max === 1) selectedSkillCardIds = [cardId];
         else selectedSkillCardIds.push(cardId);
-        if (els.zhihengHint) els.zhihengHint.textContent = '制衡：已选 ' + selectedSkillCardIds.length + ' 张';
+        if (els.zhihengHint) els.zhihengHint.textContent = config.selectedHint(selectedSkillCardIds.length);
+        render();
+      }
+
+      function confirmCardSkill() {
+        var config = activeCardSkillConfig();
+        if (!game || !config) return;
+        if (selectedSkillCardIds.length < config.min) {
+          game.log.push(config.emptyMessage);
+          render();
+          return;
+        }
+        var cardIds = config.max === 1 ? selectedSkillCardIds.slice(0, 1) : selectedSkillCardIds;
+        var enemyHpBefore = game.enemy.hp;
+        var result = Engine.useSkill(game, 'player', skillSelectMode, cardIds, config.options || {});
+        exitSkillSelectMode();
+        if (!result.ok) game.log.push(result.message);
+        if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
         render();
       }
 
@@ -2951,6 +3209,24 @@
         render();
       }
 
+      function resolveConversion(asSha) {
+        if (!pendingConversionCardId || !game) return;
+        var cardId = pendingConversionCardId;
+        if (!asSha) {
+          hideConversionPanel();
+          resolveNormalPlayerCard(cardId);
+          return;
+        }
+        var enemyHpBefore = game.enemy.hp;
+        var playerHpBefore = game.player.hp;
+        var result = Engine.playCardAs(game, 'player', cardId, 'sha');
+        hideConversionPanel();
+        if (!result.ok) game.log.push(result.message);
+        if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
+        if (game.player.hp < playerHpBefore) flashHero('player');
+        render();
+      }
+
       function resolveTiesuo(options) {
         if (!pendingTiesuoCardId || !game) return;
         var playerHpBefore = game.player.hp;
@@ -2963,9 +3239,52 @@
         render();
       }
 
+      function resolveNormalPlayerCard(cardId) {
+        if (!game) return;
+        var clickedCard = findPlayerCard(cardId);
+        if (clickedCard && clickedCard.type === 'tiesuo' && game.phase === 'play') {
+          hideTargetZonePanel();
+          hideHuogongPanel();
+          hideConversionPanel();
+          hideGuanxingPanel();
+          showTiesuoPanel(cardId);
+          return;
+        }
+        if (clickedCard && (clickedCard.type === 'guohe' || clickedCard.type === 'shunshou') && game.phase === 'play') {
+          hideTiesuoPanel();
+          hideHuogongPanel();
+          hideConversionPanel();
+          hideGuanxingPanel();
+          showTargetZonePanel(cardId);
+          return;
+        }
+        if (clickedCard && clickedCard.type === 'huogong' && game.phase === 'play') {
+          hideTiesuoPanel();
+          hideTargetZonePanel();
+          hideConversionPanel();
+          hideGuanxingPanel();
+          showHuogongPanel(cardId);
+          return;
+        }
+        hideTiesuoPanel();
+        hideTargetZonePanel();
+        hideHuogongPanel();
+        hideGuanxingPanel();
+        hideConversionPanel();
+        var enemyHpBefore = game.enemy.hp;
+        var playerHpBefore = game.player.hp;
+        var result = Engine.playCard(game, 'player', cardId);
+        if (!result.ok) {
+          game.log.push(result.message);
+        }
+        if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
+        if (game.player.hp < playerHpBefore) flashHero('player');
+        render();
+      }
+
       function usePlayerCard(cardId) {
         if (!game || game.turn !== 'player' || enemyThinking) return;
-        if (skillSelectMode === 'zhiheng') {
+        if (activeCardSkillConfig()) {
           toggleSkillCard(cardId);
           return;
         }
@@ -2977,36 +3296,34 @@
           return;
         }
         var clickedCard = findPlayerCard(cardId);
-        if (clickedCard && clickedCard.type === 'tiesuo' && game.phase === 'play') {
-          hideTargetZonePanel();
-          hideHuogongPanel();
-          showTiesuoPanel(cardId);
-          return;
-        }
-        if (clickedCard && (clickedCard.type === 'guohe' || clickedCard.type === 'shunshou') && game.phase === 'play') {
-          hideTiesuoPanel();
-          hideHuogongPanel();
-          showTargetZonePanel(cardId);
-          return;
-        }
-        if (clickedCard && clickedCard.type === 'huogong' && game.phase === 'play') {
+        var action = clickedCard ? playerCardAction(clickedCard) : null;
+        if (action && action.mode === 'choice') {
           hideTiesuoPanel();
           hideTargetZonePanel();
-          showHuogongPanel(cardId);
+          hideHuogongPanel();
+          hideGuanxingPanel();
+          showConversionPanel(cardId);
+          render();
           return;
         }
-        hideTiesuoPanel();
-        hideTargetZonePanel();
-        hideHuogongPanel();
-        var enemyHpBefore = game.enemy.hp;
-        var playerHpBefore = game.player.hp;
-        var result = Engine.playCard(game, 'player', cardId);
-        if (!result.ok) {
-          game.log.push(result.message);
+        if (action && action.mode === 'asSha') {
+          hideTiesuoPanel();
+          hideTargetZonePanel();
+          hideHuogongPanel();
+          hideGuanxingPanel();
+          hideConversionPanel();
+          var enemyHpBefore = game.enemy.hp;
+          var playerHpBefore = game.player.hp;
+          var result = Engine.playCardAs(game, 'player', cardId, 'sha');
+          if (!result.ok) {
+            game.log.push(result.message);
+          }
+          if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
+          if (game.player.hp < playerHpBefore) flashHero('player');
+          render();
+          return;
         }
-        if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
-        if (game.player.hp < playerHpBefore) flashHero('player');
-        render();
+        resolveNormalPlayerCard(cardId);
       }
 
       function confirmDiscardSelection() {
@@ -3026,13 +3343,25 @@
 
       function usePlayerSkill(skillId) {
         if (!game || game.turn !== 'player' || game.phase !== 'play' || enemyThinking) return;
-        if (skillId === 'zhiheng') {
+        if (cardSkillConfig(skillId)) {
           hideTiesuoPanel();
           hideTargetZonePanel();
           hideHuogongPanel();
-          enterZhihengMode();
+          hideConversionPanel();
+          hideGuanxingPanel();
+          enterCardSkillMode(skillId);
           return;
         }
+        hideTiesuoPanel();
+        hideTargetZonePanel();
+        hideHuogongPanel();
+        hideConversionPanel();
+        if (skillId === 'guanxing') {
+          showGuanxingPanel();
+          render();
+          return;
+        }
+        hideGuanxingPanel();
         var cardIds = [];
         var playerHpBefore = game.player.hp;
         var result = Engine.useSkill(game, 'player', skillId, cardIds);
@@ -3182,6 +3511,8 @@
         hideTiesuoPanel();
         hideTargetZonePanel();
         hideHuogongPanel();
+        hideConversionPanel();
+        hideGuanxingPanel();
         exitSkillSelectMode();
         if (els.setupScreen) els.setupScreen.hidden = false;
         if (els.duelTable) els.duelTable.hidden = true;
@@ -3198,6 +3529,8 @@
         hideTiesuoPanel();
         hideTargetZonePanel();
         hideHuogongPanel();
+        hideConversionPanel();
+        hideGuanxingPanel();
         exitSkillSelectMode();
         ensureDistinctHeroes('player');
         var playerHero = els.playerHeroSelect ? els.playerHeroSelect.value : 'liubei';
@@ -3223,6 +3556,11 @@
           if (!game || game.turn !== 'player' || game.phase === 'gameover') return;
           selectedDiscardIds = [];
           hideTiesuoPanel();
+          hideTargetZonePanel();
+          hideHuogongPanel();
+          hideConversionPanel();
+          hideGuanxingPanel();
+          exitSkillSelectMode();
           if (game.phase === 'play') Engine.finishPlayPhase(game);
           if (game.phase === 'discard' && Engine.needsDiscard(game, 'player')) {
             render();
@@ -3259,8 +3597,14 @@
         });
         if (els.huogongDeclineBtn) els.huogongDeclineBtn.addEventListener('click', function () { resolveHuogong(null, true); });
         if (els.huogongCancelBtn) els.huogongCancelBtn.addEventListener('click', function () { hideHuogongPanel(); render(); });
+        if (els.conversionNormalBtn) els.conversionNormalBtn.addEventListener('click', function () { resolveConversion(false); });
+        if (els.conversionShaBtn) els.conversionShaBtn.addEventListener('click', function () { resolveConversion(true); });
+        if (els.conversionCancelBtn) els.conversionCancelBtn.addEventListener('click', function () { hideConversionPanel(); render(); });
+        if (els.guanxingReverseBtn) els.guanxingReverseBtn.addEventListener('click', reverseGuanxingOrder);
+        if (els.guanxingConfirmBtn) els.guanxingConfirmBtn.addEventListener('click', confirmGuanxing);
+        if (els.guanxingCancelBtn) els.guanxingCancelBtn.addEventListener('click', function () { hideGuanxingPanel(); render(); });
         if (els.targetCancelBtn) els.targetCancelBtn.addEventListener('click', function () { hideTargetZonePanel(); render(); });
-        if (els.zhihengConfirmBtn) els.zhihengConfirmBtn.addEventListener('click', confirmZhiheng);
+        if (els.zhihengConfirmBtn) els.zhihengConfirmBtn.addEventListener('click', confirmCardSkill);
         if (els.zhihengCancelBtn) els.zhihengCancelBtn.addEventListener('click', function () { exitSkillSelectMode(); render(); });
         if (els.playerSkillBar) els.playerSkillBar.addEventListener('click', function (event) {
           var skill = event.target.closest('[data-skill-id]');
