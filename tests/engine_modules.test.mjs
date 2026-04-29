@@ -35,6 +35,7 @@ test('v4 phase 3 introduces engine runtime modules before the game engine', () =
     'src/engine/runtime.js',
     'src/engine/skill-runtime.js',
     'src/engine/card-runtime.js',
+    'src/engine/state.js',
   ];
 
   for (const relativePath of requiredEngineModules) {
@@ -50,11 +51,15 @@ test('v4 phase 3 introduces engine runtime modules before the game engine', () =
   const runtimeSource = read('src/engine/runtime.js');
   const skillRuntimeSource = read('src/engine/skill-runtime.js');
   const cardRuntimeSource = read('src/engine/card-runtime.js');
+  const stateSource = read('src/engine/state.js');
   assert.match(runtimeSource, /window\.SanguoshaEngineModules/, 'runtime module should attach to SanguoshaEngineModules');
   assert.match(skillRuntimeSource, /window\.SanguoshaEngineModules/, 'skill runtime module should attach to SanguoshaEngineModules');
   assert.match(cardRuntimeSource, /window\.SanguoshaEngineModules/, 'card runtime module should attach to SanguoshaEngineModules');
+  assert.match(stateSource, /window\.SanguoshaEngineModules/, 'state runtime module should attach to SanguoshaEngineModules');
   assert.match(cardRuntimeSource, /makeTestCard/, 'card runtime should own test-card construction');
   assert.match(cardRuntimeSource, /isShaCard/, 'card runtime should own Sha classification');
+  assert.match(stateSource, /distanceBetween/, 'state runtime should own distance calculation');
+  assert.match(stateSource, /hasSkill/, 'state runtime should own skill lookup');
 
   const engineSource = read('src/engine/game-engine.js');
   assert.match(engineSource, /SanguoshaEngineModules/, 'game engine should consume runtime modules');
@@ -66,6 +71,12 @@ test('v4 phase 3 introduces engine runtime modules before the game engine', () =
   assert.doesNotMatch(engineSource, /function\s+isShaCard\s*\(/, 'Sha classification should live in card runtime module');
   assert.doesNotMatch(engineSource, /function\s+isNormalTrickCard\s*\(/, 'normal-trick classification should live in card runtime module');
   assert.doesNotMatch(engineSource, /function\s+physicalCardOf\s*\(/, 'physical-card resolution should live in card runtime module');
+  assert.doesNotMatch(engineSource, /function\s+actorName\s*\(/, 'actor name helper should live in state runtime module');
+  assert.doesNotMatch(engineSource, /function\s+opponent\s*\(/, 'opponent helper should live in state runtime module');
+  assert.doesNotMatch(engineSource, /function\s+hasSkill\s*\(/, 'skill lookup should live in state runtime module');
+  assert.doesNotMatch(engineSource, /function\s+distanceBetween\s*\(/, 'distance calculation should live in state runtime module');
+  assert.doesNotMatch(engineSource, /function\s+handLimit\s*\(/, 'hand-limit helper should live in state runtime module');
+  assert.doesNotMatch(engineSource, /function\s+getActorStatus\s*\(/, 'actor status helper should live in state runtime module');
 });
 
 test('engine runtime modules are bundled into the direct-open artifact', () => {
@@ -90,10 +101,13 @@ test('engine runtime modules are bundled into the direct-open artifact', () => {
   assert.ok(win.SanguoshaEngineModules.Runtime, 'built artifact should expose Runtime module');
   assert.ok(win.SanguoshaEngineModules.SkillRuntime, 'built artifact should expose SkillRuntime module');
   assert.ok(win.SanguoshaEngineModules.CardRuntime, 'built artifact should expose CardRuntime module');
+  assert.ok(win.SanguoshaEngineModules.StateRuntime, 'built artifact should expose StateRuntime module');
   assert.equal(typeof win.SanguoshaEngineModules.Runtime.requireData, 'function');
   assert.equal(typeof win.SanguoshaEngineModules.SkillRuntime.annotateSkillStatus, 'function');
   assert.equal(typeof win.SanguoshaEngineModules.CardRuntime.makeTestCard, 'function');
   assert.equal(typeof win.SanguoshaEngineModules.CardRuntime.isShaCard, 'function');
+  assert.equal(typeof win.SanguoshaEngineModules.StateRuntime.distanceBetween, 'function');
+  assert.equal(typeof win.SanguoshaEngineModules.StateRuntime.hasSkill, 'function');
   assert.ok(win.SanguoshaEngine, 'built artifact should still expose SanguoshaEngine');
   assert.equal(Object.keys(win.SanguoshaEngine.HERO_CATALOG).length, 68, 'engine should preserve all local heroes');
   assert.ok(win.SanguoshaEngine.IMPLEMENTED_SKILL_IDS.includes('jizhi'), 'skill implementation status should survive runtime extraction');

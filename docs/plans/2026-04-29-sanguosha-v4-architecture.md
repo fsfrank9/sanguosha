@@ -89,7 +89,7 @@ Acceptance criteria:
 
 ## Phase 3 — Engine runtime modules
 
-**Status:** In progress. Phase 3A and Phase 3B have introduced the first runtime-module seams without changing gameplay behavior.
+**Status:** In progress. Phase 3A–3C have introduced the first runtime-module seams without changing gameplay behavior.
 
 ### Completed in Phase 3A
 
@@ -118,9 +118,19 @@ Acceptance criteria:
 - `src/engine/game-engine.js` now consumes `window.SanguoshaEngineModules.CardRuntime` while preserving public exports such as `SanguoshaEngine.makeTestCard` and `SanguoshaEngine.isShaCard`.
 - Added `tests/card_runtime.test.mjs` for card helper behavior and expanded `tests/engine_modules.test.mjs` to guard `CardRuntime` build wiring.
 
+### Completed in Phase 3C
+
+- Added `src/engine/state.js` for pure actor/state helpers:
+  - `actorName` / `opponent`,
+  - skill lookup and unlimited-【杀】 checks,
+  - weapon range and distance calculation,
+  - first-actor resolution from roles,
+  - hand limit and actor status text.
+- `src/engine/game-engine.js` now consumes `window.SanguoshaEngineModules.StateRuntime` while preserving public exports such as `SanguoshaEngine.opponent`, `distanceBetween`, `handLimit`, and `getActorStatus`.
+- Added `tests/state_runtime.test.mjs` for state helper behavior and expanded `tests/engine_modules.test.mjs` to guard `StateRuntime` build wiring.
+
 Future batches should continue splitting pure engine behavior into modules while keeping browser output bundled:
 
-- `src/engine/state.js`
 - `src/engine/phases.js`
 - `src/engine/card-effects.js` or a later expansion of `src/engine/card-runtime.js` for gameplay card resolution
 - `src/engine/damage.js`

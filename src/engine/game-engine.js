@@ -5,7 +5,8 @@
       var Runtime = MODULES.Runtime;
       var SkillRuntime = MODULES.SkillRuntime;
       var CardRuntime = MODULES.CardRuntime;
-      if (!Runtime || !SkillRuntime || !CardRuntime) {
+      var StateRuntime = MODULES.StateRuntime;
+      if (!Runtime || !SkillRuntime || !CardRuntime || !StateRuntime) {
         throw new Error('Sanguosha engine runtime modules must be loaded before the game engine.');
       }
 
@@ -35,43 +36,18 @@
       var isShaCard = CardRuntime.isShaCard;
       var isNormalTrickCard = CardRuntime.isNormalTrickCard;
       var physicalCardOf = CardRuntime.physicalCardOf;
+      var actorName = StateRuntime.actorName;
+      var opponent = StateRuntime.opponent;
+      var hasSkill = StateRuntime.hasSkill;
+      var canUseUnlimitedSha = StateRuntime.canUseUnlimitedSha;
+      var weaponRange = StateRuntime.weaponRange;
+      var distanceBetween = StateRuntime.distanceBetween;
+      var canReachWithSha = StateRuntime.canReachWithSha;
+      var firstActorFromRoles = StateRuntime.firstActorFromRoles;
+      var handLimit = StateRuntime.handLimit;
+      var getActorStatus = StateRuntime.getActorStatus;
 
       SkillRuntime.annotateSkillStatus(HERO_CATALOG, IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS);
-
-      function actorName(game, actor) {
-        return game[actor].name;
-      }
-
-      function opponent(actor) {
-        return actor === 'player' ? 'enemy' : 'player';
-      }
-
-      function hasSkill(state, skillId) {
-        return !!(state.skills || []).some(function (skill) { return skill.id === skillId; });
-      }
-
-      function canUseUnlimitedSha(state) {
-        return hasSkill(state, 'paoxiao') || (state.equipment && state.equipment.weapon && state.equipment.weapon.type === 'zhuge');
-      }
-
-      function weaponRange(state) {
-        return state && state.equipment && state.equipment.weapon && state.equipment.weapon.range ? state.equipment.weapon.range : 1;
-      }
-
-      function distanceBetween(game, fromActor, toActor) {
-        var from = game[fromActor];
-        var to = game[toActor];
-        if (!from || !to) return Infinity;
-        var distance = 1;
-        if (to.equipment && to.equipment.horsePlus) distance += 1;
-        if (from.equipment && from.equipment.horseMinus) distance -= 1;
-        if (hasSkill(from, 'mashu')) distance -= 1;
-        return Math.max(1, distance);
-      }
-
-      function canReachWithSha(game, actor, targetActor) {
-        return distanceBetween(game, actor, targetActor) <= weaponRange(game[actor]);
-      }
 
       function isKongchengProtected(game, targetActor, cardType) {
         var target = game[targetActor];
@@ -373,12 +349,6 @@
             discardCard(game, trick);
           }
         });
-      }
-
-      function firstActorFromRoles(roles, fallback) {
-        if (roles.player === '主公') return 'player';
-        if (roles.enemy === '主公') return 'enemy';
-        return fallback || 'player';
       }
 
       function newGame(options) {
@@ -806,17 +776,6 @@
       function recordPhase(game, actor, phase) {
         if (!game.turnHistory) game.turnHistory = [];
         game.turnHistory.push({ actor: actor, phase: phase });
-      }
-
-      function handLimit(game, actor) {
-        var state = game[actor];
-        return Math.max(0, state.hp || 0);
-      }
-
-      function getActorStatus(game, actor) {
-        var state = game && game[actor];
-        if (!state) return '未知';
-        return state.chained ? '铁索横置' : '未横置';
       }
 
       function startTurn(game, actor) {
