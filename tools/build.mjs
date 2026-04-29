@@ -19,6 +19,7 @@ const paths = {
     path.join(root, 'src/engine/card-runtime.js'),
     path.join(root, 'src/engine/state.js'),
     path.join(root, 'src/engine/phases.js'),
+    path.join(root, 'src/engine/judgement.js'),
   ],
   engine: path.join(root, 'src/engine/game-engine.js'),
   ui: path.join(root, 'src/ui/dom-adapter.js'),

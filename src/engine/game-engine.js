@@ -7,7 +7,8 @@
       var CardRuntime = MODULES.CardRuntime;
       var StateRuntime = MODULES.StateRuntime;
       var PhaseRuntime = MODULES.PhaseRuntime;
-      if (!Runtime || !SkillRuntime || !CardRuntime || !StateRuntime || !PhaseRuntime) {
+      var JudgementRuntime = MODULES.JudgementRuntime;
+      if (!Runtime || !SkillRuntime || !CardRuntime || !StateRuntime || !PhaseRuntime || !JudgementRuntime) {
         throw new Error('Sanguosha engine runtime modules must be loaded before the game engine.');
       }
 
@@ -51,6 +52,7 @@
       var nextPlayablePhase = PhaseRuntime.nextPlayablePhase;
       var resetActorTurnState = PhaseRuntime.resetActorTurnState;
       var resetEndOfTurnState = PhaseRuntime.resetEndOfTurnState;
+      var evaluateDelayedTrick = JudgementRuntime.evaluateDelayedTrick;
 
       SkillRuntime.annotateSkillStatus(HERO_CATALOG, IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS);
 
@@ -320,39 +322,41 @@
         return card;
       }
 
+      function judgementReasonFor(trick) {
+        if (!trick) return null;
+        if (trick.type === 'lebusishu') return '【乐不思蜀】';
+        if (trick.type === 'bingliang') return '【兵粮寸断】';
+        if (trick.type === 'shandian') return '【闪电】';
+        return null;
+      }
+
       function processJudgeArea(game, actor) {
         var state = game[actor];
+        state.flags = state.flags || {};
         state.flags.skipPlay = false;
         state.flags.skipDraw = false;
         if (!state.judgeArea) state.judgeArea = [];
         var pending = state.judgeArea.splice(0);
         pending.forEach(function (trick) {
-          if (trick.type === 'lebusishu') {
-            var lebuJudge = judge(game, actor, '【乐不思蜀】');
-            if (!lebuJudge || lebuJudge.suit !== 'heart') {
-              state.flags.skipPlay = true;
-              log(game, actorName(game, actor) + '【乐不思蜀】判定失败，跳过出牌阶段。');
-            }
-            discardCard(game, trick);
-          } else if (trick.type === 'bingliang') {
-            var bingJudge = judge(game, actor, '【兵粮寸断】');
-            if (!bingJudge || bingJudge.suit !== 'club') {
-              state.flags.skipDraw = true;
-              log(game, actorName(game, actor) + '【兵粮寸断】判定失败，跳过摸牌阶段。');
-            }
-            discardCard(game, trick);
-          } else if (trick.type === 'shandian') {
-            var shanJudge = judge(game, actor, '【闪电】');
-            if (shanJudge && shanJudge.suit === 'spade' && ['2','3','4','5','6','7','8','9'].indexOf(String(shanJudge.rank)) >= 0) {
-              damage(game, actor, 3, opponent(actor), '【闪电】');
-              discardCard(game, trick);
-            } else {
-              game[opponent(actor)].judgeArea.push(trick);
-              log(game, '【闪电】移至' + actorName(game, opponent(actor)) + '的判定区。');
-            }
-          } else {
-            discardCard(game, trick);
+          var reason = judgementReasonFor(trick);
+          var judgementCard = reason ? judge(game, actor, reason) : null;
+          var outcome = evaluateDelayedTrick(trick, judgementCard);
+
+          if (outcome.skipPlay) {
+            state.flags.skipPlay = true;
+            log(game, actorName(game, actor) + '【乐不思蜀】判定失败，跳过出牌阶段。');
           }
+          if (outcome.skipDraw) {
+            state.flags.skipDraw = true;
+            log(game, actorName(game, actor) + '【兵粮寸断】判定失败，跳过摸牌阶段。');
+          }
+          if (trick.type === 'shandian' && outcome.hit) {
+            damage(game, actor, outcome.damage, opponent(actor), '【闪电】');
+          } else if (trick.type === 'shandian' && outcome.moveToNext) {
+            game[opponent(actor)].judgeArea.push(trick);
+            log(game, '【闪电】移至' + actorName(game, opponent(actor)) + '的判定区。');
+          }
+          if (outcome.discardTrick) discardCard(game, trick);
         });
       }
 

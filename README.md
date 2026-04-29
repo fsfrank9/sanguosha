@@ -50,6 +50,7 @@ npm run build:check
   - `src/engine/card-runtime.js`：卡牌 runtime 的第一层模块，负责测试卡生成、牌堆生成、【杀】/普通锦囊分类与虚拟牌实体牌解析。
   - `src/engine/state.js`：状态/角色 runtime 模块，负责角色名、对手、技能查询、距离/攻击范围、先手、手牌上限与状态文案等纯查询。
   - `src/engine/phases.js`：阶段 runtime 模块，负责阶段历史记录、回合状态重置、阶段切换 helper 与摸牌后进入出牌/弃牌的判断。
+  - `src/engine/judgement.js`：判定 runtime 模块，负责【乐不思蜀】、【兵粮寸断】、【闪电】等延时锦囊判定规则。
   - `src/engine/game-engine.js`：纯游戏引擎源码，继续暴露 `window.SanguoshaEngine`。
   - `src/ui/dom-adapter.js`：DOM/UI 适配层源码。
 - `tools/build.mjs` 负责按 `data → engine runtime modules → engine → ui` 顺序把源码注入模板，生成可离线直开的单文件 HTML。
@@ -69,7 +70,7 @@ v4.0 不是重写，而是分批“安全拆源”：
 2. 已将 CSS、数据模块、引擎、UI 适配层抽到 `src/`。
 3. 用 `tools/build.mjs` 生成 `index.html` 和 `dist/index.html`。
 4. 用 `tests/architecture_build.test.mjs`、`tests/data_modules.test.mjs` 和 `tests/engine_modules.test.mjs` 防止源码与产物漂移。
-5. 已开始拆 `src/engine/*` runtime seam；`runtime`、`skill-runtime`、`card-runtime`、`state` 已落地，后续继续拆 phases/damage/response-window/judgement/skills/UI panels。
+5. 已开始拆 `src/engine/*` runtime seam；`runtime`、`skill-runtime`、`card-runtime`、`state`、`phases`、`judgement` 已落地，后续继续拆 damage/response-window/skills/UI panels。
 
 详细迁移计划见：
 

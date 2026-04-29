@@ -89,7 +89,7 @@ Acceptance criteria:
 
 ## Phase 3 — Engine runtime modules
 
-**Status:** In progress. Phase 3A–3D have introduced the first runtime-module seams without changing gameplay behavior.
+**Status:** In progress. Phase 3A–3E have introduced the first runtime-module seams without changing gameplay behavior.
 
 ### Completed in Phase 3A
 
@@ -139,12 +139,20 @@ Acceptance criteria:
 - `src/engine/game-engine.js` now consumes `window.SanguoshaEngineModules.PhaseRuntime` while preserving public phase APIs such as `SanguoshaEngine.startTurn`, `advancePhase`, `finishPlayPhase`, and `endTurn`.
 - Added `tests/phase_runtime.test.mjs` for PhaseRuntime behavior and expanded `tests/engine_modules.test.mjs` to guard build ordering and built-artifact exposure.
 
+### Completed in Phase 3E
+
+- Added `src/engine/judgement.js` for pure delayed-trick judgement rules:
+  - 【乐不思蜀】 heart success / non-heart skip-play outcome,
+  - 【兵粮寸断】 club success / non-club skip-draw outcome,
+  - 【闪电】 spade 2–9 hit, damage, discard, and pass-to-next outcome.
+- `src/engine/game-engine.js` now consumes `window.SanguoshaEngineModules.JudgementRuntime` while keeping judgement draw/discard/damage side effects inside the engine.
+- Added `tests/judgement_runtime.test.mjs` for pure judgement rules and expanded `tests/engine_modules.test.mjs` to guard build wiring and built-artifact exposure.
+
 Future batches should continue splitting pure engine behavior into modules while keeping browser output bundled:
 
 - `src/engine/card-effects.js` or a later expansion of `src/engine/card-runtime.js` for gameplay card resolution
 - `src/engine/damage.js`
 - `src/engine/response-window.js`
-- `src/engine/judgement.js`
 - expanded `src/engine/skill-runtime.js`
 
 Acceptance criteria:
