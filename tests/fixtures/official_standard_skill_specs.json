@@ -1,0 +1,1007 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "indexUrl": "https://www.sanguosha.com/hero",
+    "detailUrlPattern": "https://www.sanguosha.com/hero/{gid}",
+    "rawCachePath": ".cache/sanguosha-official/official_standard_skill_texts.json",
+    "rawCachePolicy": "cache-first: keep official prose only in the gitignored local cache; regenerate this public spec fixture from cache and fetch official pages only when the cache is missing or stale.",
+    "sourceTextDigestAlgorithm": "sha256 prefix 12 hex chars over hero name, skill name, and local raw official text",
+    "publicContentPolicy": "This committed fixture stores paraphrased implementation specs and source references, not official prose."
+  },
+  "pack": "标准",
+  "includeFullSkillText": false,
+  "containsImplementationSpecs": true,
+  "heroes": [
+    {
+      "gid": 1,
+      "name": "刘备",
+      "detailUrl": "https://www.sanguosha.com/hero/1",
+      "localHeroId": "liubei",
+      "skills": [
+        {
+          "name": "仁德",
+          "localSkillId": "rende",
+          "sourceTextRef": "e7a4ebaa7caa",
+          "spec": {
+            "summary": "主动把手牌转交给其他角色；本阶段累计转交到阈值时可自我回复。",
+            "timing": "出牌阶段主动发动，可在同一出牌阶段多次选择。",
+            "condition": "发动者有手牌，目标为其他存活角色；回复奖励要求本阶段给牌累计首次达到两张。",
+            "cost": "选择并交出任意数量手牌给目标。",
+            "effect": "目标获得这些手牌；若本阶段仁德累计给出数首次达到两张且发动者已受伤，发动者回复1点体力。",
+            "frequency": "给牌不限次数；回复奖励每个出牌阶段最多一次。",
+            "engineHooks": [
+              "activeSkill.useSkill",
+              "handTransfer",
+              "phaseFlags.rendeGivenCount",
+              "recoverHp"
+            ]
+          }
+        },
+        {
+          "name": "激将",
+          "localSkillId": "jijiang",
+          "sourceTextRef": "c9939915c537",
+          "spec": {
+            "summary": "蜀势力主公在需要杀时可请求同势力角色代为响应。",
+            "timing": "需要使用或打出【杀】的窗口。",
+            "condition": "发动者具备主公身份且场上存在可响应的蜀势力队友。",
+            "cost": "发动者不交牌；被请求角色若同意则提供一张可用【杀】。",
+            "effect": "首个响应的蜀势力角色打出的【杀】视为由发动者用于当前窗口。",
+            "frequency": "每个合法【杀】请求窗口可询问一次。",
+            "engineHooks": [
+              "responseWindow.sha",
+              "lordSkillPrompt",
+              "proxyCardUse"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 2,
+      "name": "关羽",
+      "detailUrl": "https://www.sanguosha.com/hero/2",
+      "localHeroId": "guanyu",
+      "skills": [
+        {
+          "name": "武圣",
+          "localSkillId": "wusheng",
+          "sourceTextRef": "fb4f123a59ea",
+          "spec": {
+            "summary": "把红色牌转化为【杀】来使用或响应。",
+            "timing": "出牌阶段使用【杀】或任意需要打出【杀】的响应窗口。",
+            "condition": "发动者有红色手牌或装备牌，且按当前规则允许使用/打出【杀】。",
+            "cost": "选择一张红色实体牌作为转化牌。",
+            "effect": "所选实体牌按【杀】结算；移动牌时仍移动原实体牌。",
+            "frequency": "受普通【杀】次数与响应窗口限制。",
+            "engineHooks": [
+              "canPlayCardAs.sha",
+              "virtualCard.physicalCard",
+              "responseWindow.sha"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 3,
+      "name": "张飞",
+      "detailUrl": "https://www.sanguosha.com/hero/3",
+      "localHeroId": "zhangfei",
+      "skills": [
+        {
+          "name": "咆哮",
+          "localSkillId": "paoxiao",
+          "sourceTextRef": "9302da599963",
+          "spec": {
+            "summary": "出牌阶段不受通常的【杀】次数上限限制。",
+            "timing": "出牌阶段每次检查能否使用【杀】时。",
+            "condition": "发动者拥有该技能且当前处于自己的出牌阶段。",
+            "cost": "无主动成本。",
+            "effect": "跳过每回合一次【杀】的限制，仍需满足距离、目标等其他条件。",
+            "frequency": "锁定效果，持续适用。",
+            "engineHooks": [
+              "canUseShaLimit",
+              "playSha.validation"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 4,
+      "name": "诸葛亮",
+      "detailUrl": "https://www.sanguosha.com/hero/4",
+      "localHeroId": "zhugeliang",
+      "skills": [
+        {
+          "name": "观星",
+          "localSkillId": "guanxing",
+          "sourceTextRef": "fc3e7258d579",
+          "spec": {
+            "summary": "准备阶段预览牌堆顶若干牌，并决定这些牌回到牌堆顶/底的顺序。",
+            "timing": "准备阶段开始时。",
+            "condition": "牌堆存在可预览牌；预览数量通常按存活人数取上限。",
+            "cost": "无牌或体力成本；需要确认新的排列方案。",
+            "effect": "按玩家确认顺序调整牌堆顶和牌堆底，为后续摸牌/判定改变结果。",
+            "frequency": "每个自己的准备阶段一次。",
+            "engineHooks": [
+              "phase.prepare",
+              "deck.peekTop",
+              "deck.reorderTopBottom",
+              "skillPreview.guanxing"
+            ]
+          }
+        },
+        {
+          "name": "空城",
+          "localSkillId": "kongcheng",
+          "sourceTextRef": "7f0d9f8896d6",
+          "spec": {
+            "summary": "无手牌时免疫部分直接攻击/决斗类目标指定。",
+            "timing": "其他角色选择【杀】或【决斗】目标时。",
+            "condition": "诸葛亮没有手牌，且将被指定为【杀】或【决斗】目标。",
+            "cost": "无成本。",
+            "effect": "目标合法性检查失败，不能把空手的诸葛亮选为这些牌的目标。",
+            "frequency": "锁定效果，条件满足时持续适用。",
+            "engineHooks": [
+              "targetValidation.sha",
+              "targetValidation.juedou",
+              "handCountCheck"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 5,
+      "name": "赵云",
+      "detailUrl": "https://www.sanguosha.com/hero/5",
+      "localHeroId": "zhaoyun",
+      "skills": [
+        {
+          "name": "龙胆",
+          "localSkillId": "longdan",
+          "sourceTextRef": "e4826d4ecf53",
+          "spec": {
+            "summary": "在【杀】与【闪】之间双向转化实体牌。",
+            "timing": "需要使用/打出【杀】或【闪】的阶段与响应窗口。",
+            "condition": "发动者有对应可转化牌，且当前窗口允许转化后的牌类型。",
+            "cost": "选择一张【杀】或【闪】实体牌作为转换来源。",
+            "effect": "【杀】可当【闪】，【闪】可当【杀】结算；弃置/获得等移动仍作用于原实体牌。",
+            "frequency": "受当前牌类型的使用次数、距离和响应窗口限制。",
+            "engineHooks": [
+              "canPlayCardAs.sha",
+              "canRespondAs.shan",
+              "virtualCard.physicalCard"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 6,
+      "name": "马超",
+      "detailUrl": "https://www.sanguosha.com/hero/6",
+      "localHeroId": "machao",
+      "skills": [
+        {
+          "name": "铁骑",
+          "localSkillId": "tieqi",
+          "sourceTextRef": "e07f6093fef0",
+          "spec": {
+            "summary": "用【杀】指定目标后可通过判定压制目标的闪避。",
+            "timing": "发动者使用【杀】指定目标后、目标响应【闪】前。",
+            "condition": "本次【杀】有合法目标且发动者选择触发判定。",
+            "cost": "进行一次判定。",
+            "effect": "若判定结果满足技能要求，该目标本次不能用【闪】响应这张【杀】。",
+            "frequency": "每次【杀】指定目标时可结算。",
+            "engineHooks": [
+              "sha.onTargeted",
+              "judgement.start",
+              "responseWindow.shan.block"
+            ]
+          }
+        },
+        {
+          "name": "马术",
+          "localSkillId": "mashu",
+          "sourceTextRef": "849b85ef79bd",
+          "spec": {
+            "summary": "计算到其他角色距离时获得进攻距离修正。",
+            "timing": "任意需要计算发动者到其他角色距离时。",
+            "condition": "发动者拥有该技能。",
+            "cost": "无成本。",
+            "effect": "发动者到其他角色的距离减少1，最低按距离规则下限处理。",
+            "frequency": "锁定效果，持续适用。",
+            "engineHooks": [
+              "distance.fromActorModifier",
+              "targetRangeValidation"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 7,
+      "name": "黄月英",
+      "detailUrl": "https://www.sanguosha.com/hero/7",
+      "localHeroId": "huangyueying",
+      "skills": [
+        {
+          "name": "集智",
+          "localSkillId": "jizhi",
+          "sourceTextRef": "827855a6cba9",
+          "spec": {
+            "summary": "成功使用普通锦囊后获得一次摸牌收益。",
+            "timing": "普通锦囊牌被成功使用并进入结算流程时。",
+            "condition": "发动者使用的是普通锦囊；重铸、非法使用或非锦囊牌不触发。",
+            "cost": "无额外成本，可按实现设置为自动或可选。",
+            "effect": "发动者摸一张牌；响应使用【无懈可击】成功时也应按普通锦囊使用处理。",
+            "frequency": "每次成功使用普通锦囊均可触发。",
+            "engineHooks": [
+              "finishTrickUse",
+              "consumeWuxie",
+              "drawCards"
+            ]
+          }
+        },
+        {
+          "name": "奇才",
+          "localSkillId": "qicai",
+          "sourceTextRef": "0ce0db50f1e9",
+          "spec": {
+            "summary": "使用锦囊时忽略距离限制。",
+            "timing": "选择锦囊牌目标并校验距离时。",
+            "condition": "发动者拥有该技能，当前使用牌属于锦囊。",
+            "cost": "无成本。",
+            "effect": "锦囊牌目标距离视为合法；仍需满足牌面其他目标条件。",
+            "frequency": "锁定效果，持续适用。",
+            "engineHooks": [
+              "trickTargetRangeValidation",
+              "distance.ignoreForTrick"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 8,
+      "name": "孙权",
+      "detailUrl": "https://www.sanguosha.com/hero/8",
+      "localHeroId": "sunquan",
+      "skills": [
+        {
+          "name": "制衡",
+          "localSkillId": "zhiheng",
+          "sourceTextRef": "6f3274073730",
+          "spec": {
+            "summary": "弃置自选牌后摸取等量新牌。",
+            "timing": "出牌阶段主动发动。",
+            "condition": "发动者本阶段尚未发动过且至少选择一张自己的牌。",
+            "cost": "弃置任意数量手牌或装备区牌。",
+            "effect": "发动者从牌堆摸取与弃置数量相同的牌。",
+            "frequency": "每个出牌阶段限一次。",
+            "engineHooks": [
+              "activeSkill.useSkill",
+              "discardOwnCards",
+              "drawCards",
+              "phaseFlags.usedSkills"
+            ]
+          }
+        },
+        {
+          "name": "救援",
+          "localSkillId": "jiuyuan",
+          "sourceTextRef": "22083b4ebd65",
+          "spec": {
+            "summary": "吴势力角色救助主公孙权时提高回复量。",
+            "timing": "其他吴势力角色对濒死或受伤的主公孙权使用【桃】结算时。",
+            "condition": "孙权为主公，牌的使用者为其他吴势力角色，回复目标为孙权。",
+            "cost": "无额外成本。",
+            "effect": "本次【桃】对孙权的回复量增加1。",
+            "frequency": "锁定/身份效果，每次符合条件的【桃】结算适用。",
+            "engineHooks": [
+              "peach.resolve",
+              "lordSkillModifier",
+              "recoverHp.amount"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 9,
+      "name": "甘宁",
+      "detailUrl": "https://www.sanguosha.com/hero/9",
+      "localHeroId": "ganning",
+      "skills": [
+        {
+          "name": "奇袭",
+          "localSkillId": "qixi",
+          "sourceTextRef": "a56bb551f250",
+          "spec": {
+            "summary": "把黑色牌当作拆除类锦囊使用。",
+            "timing": "出牌阶段选择使用【过河拆桥】时。",
+            "condition": "发动者有黑色手牌或装备牌，且存在合法拆除目标。",
+            "cost": "选择一张黑色实体牌作为转化来源。",
+            "effect": "该牌按【过河拆桥】结算，可弃置目标区域中的一张牌；移动仍使用原实体牌。",
+            "frequency": "受锦囊使用与目标合法性限制，通常不限次数。",
+            "engineHooks": [
+              "canPlayCardAs.guohe",
+              "virtualCard.physicalCard",
+              "targetZoneSelection"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 10,
+      "name": "吕蒙",
+      "detailUrl": "https://www.sanguosha.com/hero/10",
+      "localHeroId": "lvmeng",
+      "skills": [
+        {
+          "name": "克己",
+          "localSkillId": "keji",
+          "sourceTextRef": "e01c26a6edf6",
+          "spec": {
+            "summary": "本回合未使用或打出【杀】时可不进入弃牌处理。",
+            "timing": "出牌阶段结束、进入弃牌阶段前。",
+            "condition": "吕蒙本回合没有使用、打出或响应过【杀】。",
+            "cost": "无牌成本；可按实现自动跳过或让玩家确认。",
+            "effect": "跳过本回合弃牌阶段，手牌上限不进行弃牌检查。",
+            "frequency": "每个自己的回合最多一次。",
+            "engineHooks": [
+              "finishPlayPhase",
+              "phaseTransition.discard",
+              "turnFlags.usedOrRespondedSha"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 11,
+      "name": "黄盖",
+      "detailUrl": "https://www.sanguosha.com/hero/11",
+      "localHeroId": "huanggai",
+      "skills": [
+        {
+          "name": "苦肉",
+          "localSkillId": "kurou",
+          "sourceTextRef": "a59f769d7f8e",
+          "spec": {
+            "summary": "主动失去体力来换取摸牌。",
+            "timing": "出牌阶段主动发动。",
+            "condition": "发动者存活且当前体力足以支付失去1点体力。",
+            "cost": "失去1点体力。",
+            "effect": "发动者摸两张牌；若体力降至0则进入濒死/失败流程。",
+            "frequency": "出牌阶段可重复发动，直到无法承担成本或玩家停止。",
+            "engineHooks": [
+              "activeSkill.useSkill",
+              "loseHp",
+              "drawCards",
+              "dyingCheck"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 12,
+      "name": "周瑜",
+      "detailUrl": "https://www.sanguosha.com/hero/12",
+      "localHeroId": "zhouyu",
+      "skills": [
+        {
+          "name": "英姿",
+          "localSkillId": "yingzi",
+          "sourceTextRef": "41daef9131a1",
+          "spec": {
+            "summary": "摸牌阶段额外多摸一张。",
+            "timing": "摸牌阶段开始结算摸牌数量时。",
+            "condition": "发动者拥有该技能。",
+            "cost": "无成本。",
+            "effect": "本次摸牌阶段摸牌数量增加1。",
+            "frequency": "锁定/自动效果，每个摸牌阶段适用一次。",
+            "engineHooks": [
+              "performDrawPhase",
+              "drawCountModifier"
+            ]
+          }
+        },
+        {
+          "name": "反间",
+          "localSkillId": "fanjian",
+          "sourceTextRef": "888a70e45dea",
+          "spec": {
+            "summary": "交给目标一张手牌并让其猜花色，猜错则受到伤害。",
+            "timing": "出牌阶段主动发动。",
+            "condition": "发动者本阶段尚未发动过且有手牌；目标为其他存活角色。",
+            "cost": "选择一张手牌交给目标，并让目标选择/声明一种花色。",
+            "effect": "目标获得该牌后核对花色；若猜错，目标受到发动者造成的1点伤害。",
+            "frequency": "每个出牌阶段限一次。",
+            "engineHooks": [
+              "activeSkill.useSkill",
+              "handTransfer",
+              "suitGuess",
+              "damage.resolve"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 13,
+      "name": "大乔",
+      "detailUrl": "https://www.sanguosha.com/hero/13",
+      "localHeroId": "daqiao",
+      "skills": [
+        {
+          "name": "国色",
+          "localSkillId": "guose",
+          "sourceTextRef": "80bd55daa2ab",
+          "spec": {
+            "summary": "把方片牌转化为延时控制牌使用。",
+            "timing": "出牌阶段选择使用【乐不思蜀】时。",
+            "condition": "发动者有方片牌，且目标判定区可放置该延时锦囊。",
+            "cost": "选择一张方片实体牌作为转化来源。",
+            "effect": "该牌按【乐不思蜀】置入目标判定区，后续在目标判定阶段结算。",
+            "frequency": "受延时锦囊区域唯一性与出牌阶段使用规则限制。",
+            "engineHooks": [
+              "canPlayCardAs.lebu",
+              "delayedTrick.place",
+              "judgementArea"
+            ]
+          }
+        },
+        {
+          "name": "流离",
+          "localSkillId": "liuli",
+          "sourceTextRef": "5b04e6bae5d7",
+          "spec": {
+            "summary": "被【杀】指定时弃牌把目标转移给另一名合法角色。",
+            "timing": "大乔成为【杀】目标后、该【杀】结算前。",
+            "condition": "大乔有可弃置牌，且存在攻击范围内可成为此【杀】新目标的其他角色。",
+            "cost": "弃置一张自己的牌。",
+            "effect": "取消大乔作为目标，并把这张【杀】改为指定选择的新目标。",
+            "frequency": "每次成为【杀】目标时可尝试一次。",
+            "engineHooks": [
+              "sha.onTargeted",
+              "discardOwnCard",
+              "retargetCardUse",
+              "targetValidation.sha"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 14,
+      "name": "陆逊",
+      "detailUrl": "https://www.sanguosha.com/hero/14",
+      "localHeroId": "luxun",
+      "skills": [
+        {
+          "name": "谦逊",
+          "localSkillId": "qianxun",
+          "sourceTextRef": "0e4a736cd150",
+          "spec": {
+            "summary": "避免成为特定控制/偷取牌的目标。",
+            "timing": "其他角色选择【顺手牵羊】或【乐不思蜀】目标时。",
+            "condition": "陆逊将被指定为这些牌的目标。",
+            "cost": "无成本。",
+            "effect": "目标合法性检查失败，相关牌不能选择陆逊。",
+            "frequency": "锁定效果，持续适用。",
+            "engineHooks": [
+              "targetValidation.shunshou",
+              "targetValidation.lebu"
+            ]
+          }
+        },
+        {
+          "name": "连营",
+          "localSkillId": "lianying",
+          "sourceTextRef": "2e72854d5cbe",
+          "spec": {
+            "summary": "失去最后一张手牌后补一张牌。",
+            "timing": "陆逊因使用、弃置、被获得等原因失去手牌后。",
+            "condition": "本次失去牌后陆逊手牌数变为0。",
+            "cost": "无成本，可按实现设置为自动触发。",
+            "effect": "陆逊摸一张牌。",
+            "frequency": "每次失去最后手牌的事件均可触发。",
+            "engineHooks": [
+              "cardLoss.after",
+              "handCountCheck",
+              "drawCards"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 15,
+      "name": "曹操",
+      "detailUrl": "https://www.sanguosha.com/hero/15",
+      "localHeroId": "caocao",
+      "skills": [
+        {
+          "name": "奸雄",
+          "localSkillId": "jianxiong",
+          "sourceTextRef": "01b0daf97847",
+          "spec": {
+            "summary": "受到伤害后获得造成伤害的实体牌。",
+            "timing": "曹操受到一次有来源牌的伤害结算后。",
+            "condition": "伤害事件记录了造成伤害的牌，且该实体牌仍可被获得。",
+            "cost": "无成本，可按实现自动或询问。",
+            "effect": "曹操获得造成伤害的原实体牌，而不是虚拟转化牌。",
+            "frequency": "每次受到符合条件的伤害后可触发。",
+            "engineHooks": [
+              "damage.after",
+              "physicalCardOf",
+              "gainCardFromDiscard"
+            ]
+          }
+        },
+        {
+          "name": "护驾",
+          "localSkillId": "hujia",
+          "sourceTextRef": "0fbe4063e7a0",
+          "spec": {
+            "summary": "魏势力主公在需要闪时可请求同势力角色代为响应。",
+            "timing": "曹操作为主公需要打出【闪】的响应窗口。",
+            "condition": "发动者具备主公身份且场上存在可响应的魏势力队友。",
+            "cost": "发动者不交牌；被请求角色若同意则提供一张可用【闪】。",
+            "effect": "首个响应的魏势力角色打出的【闪】视为替发动者响应该窗口。",
+            "frequency": "每个合法【闪】响应窗口可询问一次。",
+            "engineHooks": [
+              "responseWindow.shan",
+              "lordSkillPrompt",
+              "proxyCardUse"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 16,
+      "name": "司马懿",
+      "detailUrl": "https://www.sanguosha.com/hero/16",
+      "localHeroId": "simayi",
+      "skills": [
+        {
+          "name": "反馈",
+          "localSkillId": "fankui",
+          "sourceTextRef": "0da4d2e69c8e",
+          "spec": {
+            "summary": "受到伤害后从伤害来源处取得一张牌。",
+            "timing": "司马懿受到伤害结算后。",
+            "condition": "存在伤害来源，且来源有手牌、装备或其他可被获得的牌。",
+            "cost": "无成本；需要选择来源的一张可获得牌。",
+            "effect": "司马懿获得所选牌。",
+            "frequency": "每次受到伤害后可触发一次。",
+            "engineHooks": [
+              "damage.after",
+              "targetZoneSelection",
+              "gainCard"
+            ]
+          }
+        },
+        {
+          "name": "鬼才",
+          "localSkillId": "guicai",
+          "sourceTextRef": "b4d03097388a",
+          "spec": {
+            "summary": "用自己的牌替换即将生效的判定牌。",
+            "timing": "任意判定牌翻出后、判定结果生效前。",
+            "condition": "司马懿有可打出的手牌，且当前存在可被替换的判定牌。",
+            "cost": "打出一张手牌作为新的判定牌。",
+            "effect": "用打出的牌替换原判定牌，后续按新牌花色/点数/颜色计算判定结果。",
+            "frequency": "每个判定事件可发动一次。",
+            "engineHooks": [
+              "judgement.beforeResolve",
+              "replaceJudgementCard",
+              "discardOriginalJudgeCard"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 17,
+      "name": "夏侯惇",
+      "detailUrl": "https://www.sanguosha.com/hero/17",
+      "localHeroId": "xiahoudun",
+      "skills": [
+        {
+          "name": "刚烈",
+          "localSkillId": "ganglie",
+          "sourceTextRef": "964d9d48be27",
+          "spec": {
+            "summary": "受到伤害后通过判定逼迫伤害来源弃牌或受损。",
+            "timing": "夏侯惇受到一次伤害结算后。",
+            "condition": "存在伤害来源，且夏侯惇选择触发反制判定。",
+            "cost": "进行一次判定。",
+            "effect": "若判定未被免除，伤害来源选择弃置两张牌或承受1点伤害。",
+            "frequency": "每次受到伤害后可触发一次。",
+            "engineHooks": [
+              "damage.after",
+              "judgement.start",
+              "sourceChoice.discardOrDamage"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 18,
+      "name": "张辽",
+      "detailUrl": "https://www.sanguosha.com/hero/18",
+      "localHeroId": "zhangliao",
+      "skills": [
+        {
+          "name": "突袭",
+          "localSkillId": "tuxi",
+          "sourceTextRef": "3ab475a5ab32",
+          "spec": {
+            "summary": "用从其他角色手中取牌替代部分摸牌。",
+            "timing": "摸牌阶段摸牌前。",
+            "condition": "存在至多两个有手牌的其他角色，且发动者选择发动。",
+            "cost": "减少本阶段常规摸牌数量，选择目标角色。",
+            "effect": "从每名被选目标处获得一张手牌；未被替代的摸牌数量照常结算。",
+            "frequency": "每个摸牌阶段一次。",
+            "engineHooks": [
+              "performDrawPhase",
+              "drawReplacement",
+              "stealHandCard"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 19,
+      "name": "许褚",
+      "detailUrl": "https://www.sanguosha.com/hero/19",
+      "localHeroId": "xuchu",
+      "skills": [
+        {
+          "name": "裸衣",
+          "localSkillId": "luoyi",
+          "sourceTextRef": "668bf201fa57",
+          "spec": {
+            "summary": "少摸牌换取本回合杀/决斗伤害加成。",
+            "timing": "摸牌阶段开始时选择，效果持续到当前回合结束。",
+            "condition": "许褚处于自己的摸牌阶段并选择发动。",
+            "cost": "本次摸牌阶段少摸一张牌。",
+            "effect": "本回合许褚使用【杀】或【决斗】造成的伤害增加1点。",
+            "frequency": "每个摸牌阶段最多一次。",
+            "engineHooks": [
+              "performDrawPhase",
+              "turnFlags.luoyi",
+              "damageModifier.shaOrDuel"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 20,
+      "name": "郭嘉",
+      "detailUrl": "https://www.sanguosha.com/hero/20",
+      "localHeroId": "guojia",
+      "skills": [
+        {
+          "name": "天妒",
+          "localSkillId": "tiandu",
+          "sourceTextRef": "dfda8de6e268",
+          "spec": {
+            "summary": "判定牌完成结算后获得该判定牌。",
+            "timing": "郭嘉的判定牌生效并准备进入弃牌堆时。",
+            "condition": "该判定牌仍可被移动并且郭嘉选择获得。",
+            "cost": "无成本。",
+            "effect": "郭嘉获得本次判定牌。",
+            "frequency": "每次自己的判定事件后可触发。",
+            "engineHooks": [
+              "judgement.afterResolve",
+              "gainJudgementCard"
+            ]
+          }
+        },
+        {
+          "name": "遗计",
+          "localSkillId": "yiji",
+          "sourceTextRef": "b8e4c22c11be",
+          "spec": {
+            "summary": "每受到1点伤害后摸牌并分配给任意角色。",
+            "timing": "郭嘉受到伤害后，按伤害点数逐点处理。",
+            "condition": "郭嘉受到至少1点伤害且技能结算窗口可用。",
+            "cost": "无成本；需要为获得的牌选择分配目标。",
+            "effect": "每点伤害对应摸两张牌，然后可将这些牌分配给自己或其他角色。",
+            "frequency": "每受到1点伤害结算一次。",
+            "engineHooks": [
+              "damage.afterEachPoint",
+              "drawCards",
+              "cardDistribution"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 21,
+      "name": "甄姬",
+      "detailUrl": "https://www.sanguosha.com/hero/21",
+      "localHeroId": "zhenji",
+      "skills": [
+        {
+          "name": "洛神",
+          "localSkillId": "luoshen",
+          "sourceTextRef": "0c35db96b9e3",
+          "spec": {
+            "summary": "准备阶段连续判定，黑色牌加入手牌并可继续。",
+            "timing": "准备阶段开始时。",
+            "condition": "甄姬选择发动且牌堆可提供判定牌。",
+            "cost": "进行一次或多次判定；每次黑色结果后决定是否继续。",
+            "effect": "黑色判定牌由甄姬获得；出现红色或选择停止时结束。",
+            "frequency": "每个准备阶段一次启动，可连续多次判定。",
+            "engineHooks": [
+              "phase.prepare",
+              "judgement.loop",
+              "gainJudgementCard"
+            ]
+          }
+        },
+        {
+          "name": "倾国",
+          "localSkillId": "qingguo",
+          "sourceTextRef": "c0e902a93bf9",
+          "spec": {
+            "summary": "把黑色手牌作为【闪】使用或响应。",
+            "timing": "需要使用或打出【闪】的窗口。",
+            "condition": "甄姬有黑色手牌，且当前窗口允许【闪】。",
+            "cost": "选择一张黑色手牌作为转化来源。",
+            "effect": "该牌按【闪】结算；移动时仍处理原实体牌。",
+            "frequency": "受响应窗口限制，通常每个窗口按需使用。",
+            "engineHooks": [
+              "canRespondAs.shan",
+              "virtualCard.physicalCard",
+              "responseWindow.shan"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 22,
+      "name": "华佗",
+      "detailUrl": "https://www.sanguosha.com/hero/22",
+      "localHeroId": "huatuo",
+      "skills": [
+        {
+          "name": "急救",
+          "localSkillId": "jijiu",
+          "sourceTextRef": "601e6b1d0edd",
+          "spec": {
+            "summary": "回合外把红色牌转化为【桃】救治角色。",
+            "timing": "不在华佗回合内且需要使用【桃】的窗口。",
+            "condition": "华佗有红色手牌或装备牌，且当前允许使用【桃】。",
+            "cost": "选择一张红色实体牌作为转化来源。",
+            "effect": "该牌按【桃】结算，为濒死或受伤角色回复体力。",
+            "frequency": "回合外每个合法救治窗口可按可用牌响应。",
+            "engineHooks": [
+              "canPlayCardAs.tao",
+              "dyingResponseWindow",
+              "recoverHp"
+            ]
+          }
+        },
+        {
+          "name": "青囊",
+          "localSkillId": "qingnang",
+          "sourceTextRef": "05c99064927b",
+          "spec": {
+            "summary": "弃置一张手牌为一名角色回复体力。",
+            "timing": "出牌阶段主动发动。",
+            "condition": "发动者本阶段尚未发动过，有手牌可弃，且目标已受伤。",
+            "cost": "弃置一张手牌。",
+            "effect": "目标角色回复1点体力。",
+            "frequency": "每个出牌阶段限一次。",
+            "engineHooks": [
+              "activeSkill.useSkill",
+              "discardHandCard",
+              "recoverHp"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 23,
+      "name": "吕布",
+      "detailUrl": "https://www.sanguosha.com/hero/23",
+      "localHeroId": "lvbu",
+      "skills": [
+        {
+          "name": "无双",
+          "localSkillId": "wushuang",
+          "sourceTextRef": "8381a5a50ea0",
+          "spec": {
+            "summary": "提高敌方响应【杀】和【决斗】的牌数要求。",
+            "timing": "吕布的【杀】要求目标出【闪】时，以及【决斗】要求对方出【杀】时。",
+            "condition": "伤害牌或决斗结算由吕布发起，且目标进入对应响应窗口。",
+            "cost": "无成本。",
+            "effect": "目标需连续提供两张对应响应牌；不足则视为响应失败。",
+            "frequency": "锁定效果，每次相关响应窗口适用。",
+            "engineHooks": [
+              "responseWindow.requiredCount",
+              "sha.resolve",
+              "duel.resolve"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 24,
+      "name": "貂蝉",
+      "detailUrl": "https://www.sanguosha.com/hero/24",
+      "localHeroId": "diaochan",
+      "skills": [
+        {
+          "name": "闭月",
+          "localSkillId": "biyue",
+          "sourceTextRef": "78ec0ab8d2db",
+          "spec": {
+            "summary": "结束阶段额外摸一张牌。",
+            "timing": "貂蝉的结束阶段。",
+            "condition": "貂蝉存活并进入自己的结束阶段。",
+            "cost": "无成本。",
+            "effect": "貂蝉摸一张牌，然后正常结束回合。",
+            "frequency": "每个自己的结束阶段一次。",
+            "engineHooks": [
+              "phase.finish",
+              "completeTurn",
+              "drawCards"
+            ]
+          }
+        },
+        {
+          "name": "离间",
+          "localSkillId": "lijian",
+          "sourceTextRef": "43853582c276",
+          "spec": {
+            "summary": "弃一张牌令两名男性角色进行一次决斗式冲突。",
+            "timing": "出牌阶段主动发动。",
+            "condition": "貂蝉本阶段尚未发动过，有牌可弃，并能选择两名男性角色。",
+            "cost": "弃置一张自己的牌，选择两个合法男性目标。",
+            "effect": "其中一名目标视为对另一名目标发起【决斗】，按决斗响应与伤害规则结算。",
+            "frequency": "每个出牌阶段限一次。",
+            "engineHooks": [
+              "activeSkill.useSkill",
+              "discardOwnCard",
+              "duel.resolve",
+              "genderFilter"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 25,
+      "name": "孙尚香",
+      "detailUrl": "https://www.sanguosha.com/hero/25",
+      "localHeroId": "sunshangxiang",
+      "skills": [
+        {
+          "name": "枭姬",
+          "localSkillId": "xiaoji",
+          "sourceTextRef": "3c9808059e83",
+          "spec": {
+            "summary": "失去装备区里的牌后补摸两张。",
+            "timing": "孙尚香的装备区牌因弃置、移动、替换等原因离开后。",
+            "condition": "离开的牌原本位于孙尚香装备区。",
+            "cost": "无成本。",
+            "effect": "孙尚香摸两张牌。",
+            "frequency": "每次装备区失去牌事件后触发。",
+            "engineHooks": [
+              "equipmentLost.after",
+              "drawCards"
+            ]
+          }
+        },
+        {
+          "name": "结姻",
+          "localSkillId": "jieyin",
+          "sourceTextRef": "8cd545ef112a",
+          "spec": {
+            "summary": "弃两张手牌与一名受伤男性角色共同回复。",
+            "timing": "出牌阶段主动发动。",
+            "condition": "孙尚香本阶段尚未发动过，至少有两张手牌，且存在已受伤男性目标。",
+            "cost": "弃置两张手牌并选择一名合法男性目标。",
+            "effect": "孙尚香与目标各回复1点体力；已满体力者不超过上限。",
+            "frequency": "每个出牌阶段限一次。",
+            "engineHooks": [
+              "activeSkill.useSkill",
+              "discardHandCards",
+              "recoverHp",
+              "genderFilter"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 214,
+      "name": "华雄",
+      "detailUrl": "https://www.sanguosha.com/hero/214",
+      "localHeroId": null,
+      "skills": [
+        {
+          "name": "耀武",
+          "localSkillId": "yaowu",
+          "sourceTextRef": "ad0d24d170b5",
+          "spec": {
+            "summary": "受到红色【杀】伤害时让伤害来源获得回复或摸牌奖励。",
+            "timing": "华雄受到红色【杀】造成的伤害后。",
+            "condition": "伤害牌为红色【杀】，且存在伤害来源。",
+            "cost": "华雄无成本；伤害来源在两个收益中选择。",
+            "effect": "伤害来源选择回复1点体力或摸一张牌。",
+            "frequency": "锁定效果，每次符合条件的伤害后触发。",
+            "engineHooks": [
+              "damage.after",
+              "cardColorCheck",
+              "sourceChoice.recoverOrDraw"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 215,
+      "name": "标袁术",
+      "detailUrl": "https://www.sanguosha.com/hero/215",
+      "localHeroId": null,
+      "skills": [
+        {
+          "name": "妄尊",
+          "localSkillId": "wangzun",
+          "sourceTextRef": "434691e5018d",
+          "spec": {
+            "summary": "主公准备阶段摸牌，并降低主公本回合手牌上限。",
+            "timing": "主公角色的准备阶段。",
+            "condition": "袁术存活且场上主公进入准备阶段，可选择发动。",
+            "cost": "无牌成本。",
+            "effect": "袁术摸一张牌；该主公本回合手牌上限减少1。",
+            "frequency": "每个主公准备阶段一次。",
+            "engineHooks": [
+              "phase.prepare.otherActor",
+              "drawCards",
+              "turnModifiers.maxHandSize"
+            ]
+          }
+        },
+        {
+          "name": "同疾",
+          "localSkillId": "tongji",
+          "sourceTextRef": "f38ca52a74f0",
+          "spec": {
+            "summary": "手牌多于体力时强制影响攻击范围内角色的【杀】目标选择。",
+            "timing": "其他角色使用【杀】选择目标时。",
+            "condition": "袁术手牌数大于体力值，且该使用者攻击范围包含袁术。",
+            "cost": "无成本。",
+            "effect": "符合条件的使用者使用【杀】时不能绕开袁术去指定其他角色；目标合法性被限制。",
+            "frequency": "锁定效果，条件满足时持续适用。",
+            "engineHooks": [
+              "targetValidation.sha",
+              "attackRange.includesActor",
+              "handCountVsHp"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

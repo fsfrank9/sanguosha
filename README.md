@@ -14,7 +14,7 @@ index.html
 
 ## 当前版本
 
-`v3.1 技能状态与标准包技能补丁`
+`v3.2 官方资料缓存与技能规格`
 
 主要特性：
 
@@ -49,11 +49,15 @@ index.html
 - 【克己】：吕蒙本回合未使用/打出/响应过【杀】时，跳过弃牌阶段；主动使用【杀】与响应【杀】都会阻止触发。
 - 【集智】：黄月英成功使用普通锦囊后摸 1 张牌；响应使用【无懈可击】成功抵消锦囊时也会触发；非法使用或非普通锦囊不触发。
 
-## 官方资料对照
+## 官方资料对照与缓存
 
-`tests/fixtures/official_standard_skills.json` 保存了官网标准包武将/技能名的紧凑 fixture，用于校验本地 catalog 中当前批次技能名是否与官方资料源一致。
+本仓库现在把官网资料分成两层，避免后续补技能时每次都重新拉官网，也避免在公开仓库提交大段官网原文：
 
-注意：fixture 只保存必要字段和技能名，不保存完整技能正文。
+- `tests/fixtures/official_standard_skills.json`：官网标准包武将/技能名的紧凑 fixture，用于校验本地 catalog 中当前批次技能名是否与官方资料源一致。
+- `tests/fixtures/official_standard_skill_specs.json`：可提交的结构化实现规格 fixture。它包含来源 URL、`sourceTextRef` 摘要引用、技能触发时机/条件/成本/效果/频率/引擎 hook 等转述后的实现要点，不包含 `officialText` 原文字段。
+- `.cache/sanguosha-official/official_standard_skill_texts.json`：本地原文缓存，只用于开发参考和重新生成结构化规格；该目录已加入 `.gitignore`，不提交到仓库。
+
+后续继续实现技能时优先按 cache-first 流程工作：先读本地 `.cache/sanguosha-official/` 原文缓存与已提交的结构化 specs；只有缓存缺失、过期或需要刷新官方资料时，才重新请求 `https://www.sanguosha.com/hero` 与对应详情页。
 
 ## 测试
 
