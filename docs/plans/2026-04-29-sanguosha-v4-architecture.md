@@ -2,9 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development for future phases. Keep every phase TDD-first and preserve the direct-open artifact.
 
-**Goal:** Move the 三国杀 HTML game from single-source `index.html` to modular source files plus a reproducible single-file build artifact.
+**Goal:** Move the 三国杀 HTML game from single-source `index.html` to modular source files plus a reproducible single-file build artifact for the v4 transition.
 
-**Architecture:** `src/` becomes the source of truth. `tools/build.mjs` injects modular CSS/engine/UI sources into `src/index.template.html`, then writes both root `index.html` and `dist/index.html`. The root artifact remains directly openable through `file://` so existing browser smoke and user workflow do not regress.
+**Architecture:** `src/` becomes the source of truth. `tools/build.mjs` injects modular CSS/engine/UI sources into `src/index.template.html`, then writes both root `index.html` and `dist/index.html`. The root artifact remains directly openable through `file://` so existing browser smoke and user workflow do not regress during v4. The v5 direction is different: no all-in-one single HTML as the architecture target, no bundling every data/code detail into one file, and access through GitHub-hosted release/publish links with real modules.
 
 **Tech Stack:** Node ESM scripts, plain browser HTML/CSS/JavaScript, no runtime server, no external package dependencies.
 
@@ -165,6 +165,8 @@ Acceptance criteria:
 
 ## Phase 4 — Skill registry and hooks
 
+**Status:** In progress. Phase 4A is complete: a minimal SkillRegistry/hook seam exists and 【闭月】 now proves the path through `onTurnEnd` without changing gameplay behavior.
+
 Introduce a hook-driven skill runtime before adding many more武将技能:
 
 - `onPhaseStart`
@@ -178,6 +180,29 @@ Introduce a hook-driven skill runtime before adding many more武将技能:
 - `onJudgeResult`
 - `onDiscard`
 - `onDeath`
+
+### Completed in Phase 4A
+
+- Extended `src/engine/skill-runtime.js` with the minimal hook registry API:
+  - `createRegistry()`
+  - `registerSkill(registry, skillId, hooks)`
+  - `runHook(registry, hookName, context)`
+- Kept `annotateSkillStatus` and all existing `window.SanguoshaEngineModules.SkillRuntime` access compatible.
+- Registered `biyue` through the shared registry with an `onTurnEnd` handler.
+- Changed `completeTurn(game, ending)` to dispatch `SkillRuntime.runHook(skillRegistry, 'onTurnEnd', { game, actor: ending })` instead of calling `triggerBiyue` directly.
+- Kept the actual 【闭月】 side effect in the existing `triggerBiyue(game, actor)` helper so Phase 4A changes only the trigger seam, not the skill behavior.
+- Added `tests/skill_runtime_hooks.test.mjs` for registry exposure, no-op hooks, registration order, shared context, returned hook results, and the 【闭月】 seam.
+- Expanded `tests/engine_modules.test.mjs` to guard the built-artifact exports for `createRegistry` / `registerSkill` / `runHook`.
+
+Verification completed for Phase 4A:
+
+- Targeted GREEN: `npm run build && node tests/engine_modules.test.mjs && node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs && node tests/phase_runtime.test.mjs`.
+- Full GREEN: `npm run verify`.
+- Direct-open smoke: `file:///Users/frankmei/.hermes/Workspace/sanguosha-html/index.html`, start game succeeds, browser console has zero JavaScript errors.
+- Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
+- Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
+
+Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are `onPhaseStart`/`onPhaseEnd` for simple automatic skills, or a dedicated `onCardUse` path for `集智` once card-use completion side effects are ready.
 
 Acceptance criteria:
 

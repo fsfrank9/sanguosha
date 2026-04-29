@@ -20,7 +20,51 @@
     });
   }
 
+  function createRegistry() {
+    return {
+      skills: [],
+      hooks: {}
+    };
+  }
+
+  function registerSkill(registry, skillId, hooks) {
+    if (!registry) return null;
+    registry.skills = registry.skills || [];
+    registry.hooks = registry.hooks || {};
+    hooks = hooks || {};
+
+    var entry = {
+      id: skillId,
+      hooks: hooks
+    };
+    registry.skills.push(entry);
+
+    Object.keys(hooks).forEach(function (hookName) {
+      if (typeof hooks[hookName] !== 'function') return;
+      registry.hooks[hookName] = registry.hooks[hookName] || [];
+      registry.hooks[hookName].push({
+        skillId: skillId,
+        handler: hooks[hookName]
+      });
+    });
+
+    return entry;
+  }
+
+  function runHook(registry, hookName, context) {
+    if (!registry || !registry.hooks || !registry.hooks[hookName]) return [];
+    return registry.hooks[hookName].map(function (hook) {
+      return {
+        skillId: hook.skillId,
+        result: hook.handler(context || {})
+      };
+    });
+  }
+
   modules.SkillRuntime = {
-    annotateSkillStatus: annotateSkillStatus
+    annotateSkillStatus: annotateSkillStatus,
+    createRegistry: createRegistry,
+    registerSkill: registerSkill,
+    runHook: runHook
   };
 }());

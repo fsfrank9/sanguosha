@@ -1,6 +1,6 @@
 # 三国杀 · 模块化源码 + 单文件离线版
 
-一个可直接打开的离线 HTML 三国杀 1v1 原型。当前从 v4.0 开始采用专业化源码结构：开发时维护 `src/` 模块，发布/游玩仍保留可直接打开的单文件 `index.html`。
+一个可直接打开的离线 HTML 三国杀 1v1 原型。当前从 v4.0 开始采用专业化源码结构：开发时维护 `src/` 模块，发布/游玩仍保留可直接打开的单文件 `index.html`。v4 是迁移过渡版本；v5 计划不再把全部源码/数据塞进单 HTML，而是走 GitHub 托管发布链接访问和真正模块化架构。
 
 ## 运行
 
@@ -46,7 +46,7 @@ npm run build:check
   - `src/data/cards.js`：卡牌 catalog、牌类信息与阶段常量。
   - `src/data/skill-status.js`：已实现技能与主动技能入口清单。
   - `src/engine/runtime.js`：引擎通用 runtime/helper 模块，负责数据校验、克隆、随机数、玩家工厂等基础能力。
-  - `src/engine/skill-runtime.js`：技能 runtime 的第一层模块，当前承接技能状态标注，后续继续扩展 hook/注册表。
+  - `src/engine/skill-runtime.js`：技能 runtime 模块，当前承接技能状态标注、最小 SkillRegistry 与 hook 分发 API（`createRegistry` / `registerSkill` / `runHook`）。
   - `src/engine/card-runtime.js`：卡牌 runtime 的第一层模块，负责测试卡生成、牌堆生成、【杀】/普通锦囊分类与虚拟牌实体牌解析。
   - `src/engine/state.js`：状态/角色 runtime 模块，负责角色名、对手、技能查询、距离/攻击范围、先手、手牌上限与状态文案等纯查询。
   - `src/engine/phases.js`：阶段 runtime 模块，负责阶段历史记录、回合状态重置、阶段切换 helper 与摸牌后进入出牌/弃牌的判断。
@@ -70,7 +70,9 @@ v4.0 不是重写，而是分批“安全拆源”：
 2. 已将 CSS、数据模块、引擎、UI 适配层抽到 `src/`。
 3. 用 `tools/build.mjs` 生成 `index.html` 和 `dist/index.html`。
 4. 用 `tests/architecture_build.test.mjs`、`tests/data_modules.test.mjs` 和 `tests/engine_modules.test.mjs` 防止源码与产物漂移。
-5. 已开始拆 `src/engine/*` runtime seam；`runtime`、`skill-runtime`、`card-runtime`、`state`、`phases`、`judgement` 已落地，后续继续拆 damage/response-window/skills/UI panels。
+5. 已开始拆 `src/engine/*` runtime seam；`runtime`、`skill-runtime`、`card-runtime`、`state`、`phases`、`judgement` 已落地，其中 `skill-runtime` 已进入 Phase 4A 的最小 hook registry 形态。
+6. Phase 4A 已把【闭月】作为第一条证明链路迁入 `onTurnEnd` hook：`completeTurn` 统一派发 hook，具体技能效果仍复用原 `triggerBiyue`，避免行为漂移。
+7. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
 
 详细迁移计划见：
 
@@ -121,6 +123,7 @@ node tests/engine_modules.test.mjs
 node tests/card_runtime.test.mjs
 node tests/state_runtime.test.mjs
 node tests/phase_runtime.test.mjs
+node tests/skill_runtime_hooks.test.mjs
 node tests/game_engine.test.mjs
 node tests/skills.test.mjs
 node tests/official_source.test.mjs

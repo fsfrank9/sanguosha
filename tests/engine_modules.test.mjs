@@ -124,6 +124,9 @@ test('engine runtime modules are bundled into the direct-open artifact', () => {
   assert.ok(win.SanguoshaEngineModules.JudgementRuntime, 'built artifact should expose JudgementRuntime module');
   assert.equal(typeof win.SanguoshaEngineModules.Runtime.requireData, 'function');
   assert.equal(typeof win.SanguoshaEngineModules.SkillRuntime.annotateSkillStatus, 'function');
+  assert.equal(typeof win.SanguoshaEngineModules.SkillRuntime.createRegistry, 'function');
+  assert.equal(typeof win.SanguoshaEngineModules.SkillRuntime.registerSkill, 'function');
+  assert.equal(typeof win.SanguoshaEngineModules.SkillRuntime.runHook, 'function');
   assert.equal(typeof win.SanguoshaEngineModules.CardRuntime.makeTestCard, 'function');
   assert.equal(typeof win.SanguoshaEngineModules.CardRuntime.isShaCard, 'function');
   assert.equal(typeof win.SanguoshaEngineModules.StateRuntime.distanceBetween, 'function');

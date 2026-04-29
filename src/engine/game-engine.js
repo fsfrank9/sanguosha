@@ -55,6 +55,12 @@
       var evaluateDelayedTrick = JudgementRuntime.evaluateDelayedTrick;
 
       SkillRuntime.annotateSkillStatus(HERO_CATALOG, IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS);
+      var skillRegistry = SkillRuntime.createRegistry();
+      SkillRuntime.registerSkill(skillRegistry, 'biyue', {
+        onTurnEnd: function (context) {
+          triggerBiyue(context.game, context.actor);
+        }
+      });
 
       function isKongchengProtected(game, targetActor, cardType) {
         var target = game[targetActor];
@@ -927,7 +933,10 @@
       }
 
       function completeTurn(game, ending) {
-        triggerBiyue(game, ending);
+        SkillRuntime.runHook(skillRegistry, 'onTurnEnd', {
+          game: game,
+          actor: ending
+        });
         resetEndOfTurnState(game[ending]);
         log(game, actorName(game, ending) + '结束回合。');
         return startTurn(game, opponent(ending));
