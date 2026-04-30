@@ -71,6 +71,14 @@
           return triggerJizhi(context.game, context.actor, context.card, context.options);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'yingzi', {
+        onDrawPhase: function (context) {
+          var state = context.game[context.actor];
+          if (!state || !hasSkill(state, 'yingzi')) return;
+          context.drawCount += 1;
+          log(context.game, actorName(context.game, context.actor) + '发动【英姿】，摸牌阶段额外摸一张牌。');
+        }
+      });
 
       function isKongchengProtected(game, targetActor, cardType) {
         var target = game[targetActor];
@@ -90,8 +98,13 @@
 
       function performDrawPhase(game, actor) {
         var state = game[actor];
-        var drawCount = hasSkill(state, 'yingzi') ? 3 : 2;
-        if (hasSkill(state, 'yingzi')) log(game, actorName(game, actor) + '发动【英姿】，摸牌阶段额外摸一张牌。');
+        var drawContext = {
+          game: game,
+          actor: actor,
+          drawCount: 2
+        };
+        SkillRuntime.runHook(skillRegistry, 'onDrawPhase', drawContext);
+        var drawCount = drawContext.drawCount;
         if (hasSkill(state, 'tuxi') && game[opponent(actor)].hand.length > 0) {
           takeHandCard(game, opponent(actor), actor, '发动【突袭】，获得');
           drawCount = Math.max(0, drawCount - 1);

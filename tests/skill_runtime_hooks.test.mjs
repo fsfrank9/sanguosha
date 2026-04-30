@@ -113,3 +113,16 @@ test('game engine dispatches Jizhi through onCardUse hook seam', () => {
   assert.doesNotMatch(finishTrickUseSource, /triggerJizhi\(/, 'finishTrickUse should no longer directly trigger Jizhi');
   assert.doesNotMatch(consumeWuxieSource, /triggerJizhi\(/, 'consumeWuxie should no longer directly trigger Jizhi');
 });
+
+test('game engine dispatches Yingzi through onDrawPhase hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const drawStart = source.indexOf('function performDrawPhase(game, actor)');
+  const drawEnd = source.indexOf('function isArmorIgnoredBySha(game, sourceActor, card)', drawStart);
+  assert.ok(drawStart >= 0 && drawEnd > drawStart, 'performDrawPhase source should be extractable');
+  const performDrawPhaseSource = source.slice(drawStart, drawEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yingzi['"]/, 'Yingzi should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /onDrawPhase\s*:/, 'Yingzi should register an onDrawPhase hook');
+  assert.match(performDrawPhaseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDrawPhase['"]/, 'performDrawPhase should dispatch draw-stage skills through onDrawPhase');
+  assert.doesNotMatch(performDrawPhaseSource, /hasSkill\([^)]*['"]yingzi['"]/, 'performDrawPhase should no longer directly own Yingzi skill detection');
+});

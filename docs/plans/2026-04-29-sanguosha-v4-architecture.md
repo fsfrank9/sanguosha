@@ -165,12 +165,13 @@ Acceptance criteria:
 
 ## Phase 4 — Skill registry and hooks
 
-**Status:** In progress. Phase 4A–4C are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, 【克己】 proves `onBeforeDiscardPhase`, and 【集智】 proves `onCardUse` for successful normal-trick use and response-use paths without changing gameplay behavior.
+**Status:** In progress. Phase 4A–4D are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, 【克己】 proves `onBeforeDiscardPhase`, 【集智】 proves `onCardUse` for successful normal-trick use and response-use paths, and 【英姿】 proves the draw-phase `onDrawPhase` hook without changing gameplay behavior.
 
 Introduce a hook-driven skill runtime before adding many more武将技能:
 
 - `onPhaseStart`
 - `onPhaseEnd`
+- `onDrawPhase`
 - `onBeforeDiscardPhase`
 - `onCardUse`
 - `onCardTarget`
@@ -236,7 +237,25 @@ Verification completed for Phase 4C:
 - Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
 - Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
 
-Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are selected `onPhaseStart`/`onPhaseEnd` automatic skills, then card-target/damage/response-window hooks once those side effects are isolated.
+### Completed in Phase 4D
+
+- Registered `yingzi` through the shared registry with an `onDrawPhase` handler.
+- Changed `performDrawPhase(game, actor)` to dispatch `SkillRuntime.runHook(skillRegistry, 'onDrawPhase', drawContext)` before resolving draw-stage effects.
+- Kept the 【英姿】 behavior contract unchanged: actors with `yingzi` draw 3 during draw phase and log the original message; actors without `yingzi` draw 2.
+- Kept 【突袭】 on the existing draw-phase path for this batch so its steal-card/one-less-draw behavior remains unchanged while `onDrawPhase` proves the low-risk automatic draw hook seam.
+- Extended `tests/skill_runtime_hooks.test.mjs` to guard the 【英姿】 seam and ensure `performDrawPhase` no longer directly owns the `yingzi` skill check.
+
+Verification completed for Phase 4D:
+
+- RED confirmed: the new seam test failed before implementation with `Yingzi should be registered with SkillRuntime.registerSkill`.
+- Targeted GREEN: `node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs`.
+- Targeted verification: `npm run build && node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs && node tests/v27_regression.test.mjs && node tests/card_runtime.test.mjs && node tests/engine_modules.test.mjs`.
+- Full GREEN: `npm run verify`.
+- Direct-open smoke: `file:///Users/frankmei/.hermes/Workspace/sanguosha-html/index.html`, enter game succeeds, browser console has zero JavaScript errors.
+- Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
+- Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
+
+Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are selected `onPhaseStart`/`onPhaseEnd` automatic skills or the more complex 【突袭】 draw-phase path, then card-target/damage/response-window hooks once those side effects are isolated.
 
 Acceptance criteria:
 
@@ -269,6 +288,6 @@ Acceptance criteria:
 - `index.html` remains直接打开可运行.
 - `dist/index.html` is reproducible from `src/`.
 - No credentials or official prose caches are committed.
-- Preserve current implemented skill behavior: `仁德`、`反间`、`观星`、`武圣`、`龙胆`、`制衡`、`苦肉`、`闭月`、`克己`、`集智` and other existing engine skills.
+- Preserve current implemented skill behavior: `仁德`、`反间`、`观星`、`武圣`、`龙胆`、`制衡`、`苦肉`、`闭月`、`克己`、`集智`、`英姿` and other existing engine skills.
 - Keep `enterZhihengMode()` and `confirmZhiheng()` legacy UI helpers compatible.
 - Red dual-use cards such as red【火攻】 must still offer normal-vs-as-Sha choice before normal-use panels.
