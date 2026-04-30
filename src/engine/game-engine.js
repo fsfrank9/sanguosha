@@ -808,6 +808,9 @@
         if (card.type === 'shan' || card.type === 'wuxie') return fail('【' + card.name + '】只能用于响应，本版会自动打出。');
         var targetProtection = cardTargetProtection(game, actor, opponent(actor), card);
         if (targetProtection) return fail(targetProtection.message);
+        if ((card.type === 'shunshou' || card.type === 'bingliang') && !SkillRuntime.hasPassiveEffect(self, 'ignoreTrickDistance') && distanceBetween(game, actor, opponent(actor)) > 1) {
+          return fail('距离不足，当前距离无法使用【' + card.name + '】。');
+        }
         if (isShaCard(card) && !canReachWithSha(game, actor, opponent(actor))) return fail('距离不足，当前武器范围无法使用【杀】。');
         if (isShaCard(card) && self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
         if (card.type === 'tao' && self.hp >= self.maxHp) return fail('体力已满，不能使用【桃】。');

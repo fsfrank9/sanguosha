@@ -148,6 +148,7 @@ test('SkillRuntime exposes passive effect helpers for locked skill seams', () =>
   assert.equal(SkillRuntime.hasPassiveEffect({ skills: [] }, 'unlimitedSha'), false, 'missing Paoxiao should not grant unlimited Sha effect');
   assert.equal(SkillRuntime.sumPassiveEffect({ skills: [{ id: 'mashu' }] }, 'outgoingDistance'), -1, 'Mashu should reduce outgoing distance by 1');
   assert.equal(SkillRuntime.sumPassiveEffect({ skills: [] }, 'outgoingDistance'), 0, 'missing Mashu should not change outgoing distance');
+  assert.equal(SkillRuntime.hasPassiveEffect({ skills: [{ id: 'qicai' }] }, 'ignoreTrickDistance'), true, 'Qicai should ignore trick-card distance limits');
 });
 
 test('state runtime resolves Paoxiao and Mashu through SkillRuntime passive effect seam', () => {
@@ -157,6 +158,18 @@ test('state runtime resolves Paoxiao and Mashu through SkillRuntime passive effe
   assert.match(stateSource, /SkillRuntime\.sumPassiveEffect\(\s*from\s*,\s*['"]outgoingDistance['"]/, 'distanceBetween should query SkillRuntime passive distance modifiers');
   assert.doesNotMatch(stateSource, /hasSkill\([^)]*['"]paoxiao['"]/, 'StateRuntime should not directly hard-code Paoxiao detection');
   assert.doesNotMatch(stateSource, /hasSkill\([^)]*['"]mashu['"]/, 'StateRuntime should not directly hard-code Mashu detection');
+});
+
+test('game engine resolves Qicai trick-distance checks through SkillRuntime passive effect seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const canPlayStart = source.indexOf('function canPlayCard(game, actor, card)');
+  const canPlayEnd = source.indexOf('function triggerTieqiNeedResponse', canPlayStart);
+  assert.ok(canPlayStart >= 0 && canPlayEnd > canPlayStart, 'canPlayCard source should be extractable');
+  const canPlaySource = source.slice(canPlayStart, canPlayEnd);
+
+  assert.match(canPlaySource, /SkillRuntime\.hasPassiveEffect\(\s*self\s*,\s*['"]ignoreTrickDistance['"]/, 'canPlayCard should query Qicai through SkillRuntime passive effects');
+  assert.match(canPlaySource, /distanceBetween\(\s*game\s*,\s*actor\s*,\s*opponent\(actor\)\s*\)/, 'distance-limited trick validation should use the shared distance helper');
+  assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"]qicai['"]/, 'canPlayCard should not directly hard-code Qicai detection');
 });
 
 test('game engine dispatches Kongcheng through onCardTarget hook seam', () => {

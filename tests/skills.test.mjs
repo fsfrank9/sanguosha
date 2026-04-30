@@ -476,3 +476,33 @@ test('黄月英【集智】 does not trigger for basic, equipment, delayed, or f
   assert.deepEqual(ids(illegal.player.hand), ['jizhi-illegal-duel']);
   assert.equal(illegal.deck.length, 1);
 });
+
+test('黄月英【奇才】 ignores distance limits for distance-limited trick cards', () => {
+  const blocked = skillGame('sunquan', 'caocao');
+  blocked.player.hand = [c('shunshou', { id: 'blocked-shunshou' })];
+  blocked.enemy.hand = [c('tao', { id: 'blocked-target-tao' })];
+  blocked.enemy.equipment.horsePlus = c('plus_horse', { id: 'blocked-plus-horse' });
+
+  const blockedPreview = Engine.canPlayCard(blocked, 'player', blocked.player.hand[0]);
+
+  assert.equal(Engine.distanceBetween(blocked, 'player', 'enemy'), 2, 'target +1 horse should put Shunshou target out of normal distance');
+  assert.equal(blockedPreview.ok, false, 'non-Qicai actors should not use distance-limited tricks beyond distance 1');
+  assert.match(blockedPreview.message, /距离不足/);
+  assert.deepEqual(ids(blocked.player.hand), ['blocked-shunshou']);
+  assert.deepEqual(ids(blocked.enemy.hand), ['blocked-target-tao']);
+
+  const game = skillGame('huangyueying', 'caocao');
+  game.player.hand = [c('shunshou', { id: 'qicai-shunshou' })];
+  game.enemy.hand = [c('tao', { id: 'qicai-target-tao' })];
+  game.enemy.equipment.horsePlus = c('plus_horse', { id: 'qicai-plus-horse' });
+  game.deck = [c('sha', { id: 'qicai-jizhi-draw' })];
+
+  const preview = Engine.canPlayCard(game, 'player', game.player.hand[0]);
+  const result = Engine.playCard(game, 'player', 'qicai-shunshou', { targetZone: 'hand', targetCardId: 'qicai-target-tao' });
+
+  assert.equal(Engine.distanceBetween(game, 'player', 'enemy'), 2);
+  assert.equal(preview.ok, true, preview.message);
+  assert.equal(result.ok, true, result.message);
+  assert.deepEqual(ids(game.player.hand).sort(), ['qicai-jizhi-draw', 'qicai-target-tao'].sort());
+  assert.ok(game.log.some((entry) => /顺手牵羊/.test(entry)), 'Qicai-enabled Shunshou should still resolve as the original trick');
+});

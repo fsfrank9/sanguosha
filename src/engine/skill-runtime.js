@@ -26,6 +26,9 @@
     },
     mashu: {
       outgoingDistance: -1
+    },
+    qicai: {
+      ignoreTrickDistance: true
     }
   };
 
