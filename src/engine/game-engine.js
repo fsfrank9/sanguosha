@@ -104,6 +104,11 @@
           return triggerTieqiNeedResponse(context.game, context.actor, context.targetActor, context.responseType, context.card);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'jianxiong', {
+        onDamageAfter: function (context) {
+          return triggerJianxiongDamageAfter(context.game, context.targetActor, context.sourceCard);
+        }
+      });
 
       function cardTargetProtection(game, actor, targetActor, card, displayName) {
         var cardType = card && card.type ? card.type : card;
@@ -219,6 +224,15 @@
         if (physicalCard) game.discard.push(physicalCard);
       }
 
+      function triggerJianxiongDamageAfter(game, targetActor, sourceCard) {
+        var target = game[targetActor];
+        var physicalSourceCard = physicalCardOf(sourceCard);
+        if (!sourceCard || !physicalSourceCard || !target || !hasSkill(target, 'jianxiong')) return null;
+        target.hand.push(physicalSourceCard);
+        log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + physicalSourceCard.name + '】。');
+        return { claimedSourceCard: true };
+      }
+
       function equipCard(game, actor, card) {
         var self = game[actor];
         if (!self) return fail('未知角色。');
@@ -316,11 +330,23 @@
         }
         target.hp = Math.max(0, target.hp - amount);
         log(game, actorName(game, targetActor) + '因' + reason + '受到 ' + amount + ' 点伤害。');
-        var physicalSourceCard = physicalCardOf(sourceCard);
-        if (sourceCard && physicalSourceCard && hasSkill(target, 'jianxiong')) {
-          target.hand.push(physicalSourceCard);
-          log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + physicalSourceCard.name + '】。');
-        } else if (sourceCard) {
+        var damageContext = {
+          game: game,
+          targetActor: targetActor,
+          sourceActor: sourceActor,
+          reason: reason,
+          sourceCard: sourceCard,
+          amount: amount,
+          nature: damageNature
+        };
+        var damageResults = SkillRuntime.runHook(skillRegistry, 'onDamageAfter', damageContext);
+        var sourceCardClaimed = false;
+        for (var damageIndex = 0; damageIndex < damageResults.length; damageIndex += 1) {
+          if (damageResults[damageIndex].result && damageResults[damageIndex].result.claimedSourceCard) {
+            sourceCardClaimed = true;
+          }
+        }
+        if (sourceCard && !sourceCardClaimed) {
           discardCard(game, sourceCard);
         }
         if (target.hp <= 0) {

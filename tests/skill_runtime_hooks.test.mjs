@@ -192,3 +192,19 @@ test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
   assert.match(playShaSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onNeedResponse['"]/, 'playSha should dispatch the Shan response window through onNeedResponse');
   assert.doesNotMatch(playShaSource, /hasSkill\([^)]*['"]tieqi['"]|tieqiLocked/, 'playSha should no longer directly own Tieqi response locking');
 });
+
+test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
+  const damageEnd = source.indexOf('function findResponseCard(state, type)', damageStart);
+  assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
+  const damageSource = source.slice(damageStart, damageEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]jianxiong['"]/, 'Jianxiong should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]jianxiong['"][\s\S]*?onDamageAfter\s*:/, 'Jianxiong should register an onDamageAfter hook');
+  assert.match(source, /triggerJianxiongDamageAfter\(context\.game, context\.targetActor, context\.sourceCard\)/, 'Jianxiong hook should forward the damaged actor and damaging card');
+  assert.match(source, /function triggerJianxiongDamageAfter\(game, targetActor, sourceCard\)/, 'Jianxiong helper should isolate the damage-after side effect');
+  assert.match(damageSource, /var damageContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should build a complete damage-after context');
+  assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch through onDamageAfter');
+  assert.doesNotMatch(damageSource, /hasSkill\([^)]*['"]jianxiong['"]|发动【奸雄】/, 'damage should no longer directly own Jianxiong skill logic');
+});

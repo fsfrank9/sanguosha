@@ -131,6 +131,32 @@ test('曹操【奸雄】 gains the card that caused damage', () => {
   assert.ok(ids(game.enemy.hand).includes('jianxiong-sha'), 'Cao Cao should gain the damaging Sha');
 });
 
+test('曹操【奸雄】 only claims physical damaging cards from the damage-after flow', () => {
+  const noSkill = skillGame('sunquan', 'lvmeng');
+  noSkill.player.hand = [c('sha', { id: 'non-jianxiong-sha' })];
+
+  const noSkillResult = Engine.playCard(noSkill, 'player', 'non-jianxiong-sha');
+
+  assert.equal(noSkillResult.ok, true, noSkillResult.message);
+  assert.equal(noSkill.enemy.hp, noSkill.enemy.maxHp - 1);
+  assert.deepEqual(ids(noSkill.enemy.hand), [], 'non-Jianxiong targets should not gain the damaging card');
+  assert.ok(ids(noSkill.discard).includes('non-jianxiong-sha'), 'non-Jianxiong damaging cards should still be discarded');
+
+  const noPhysicalSource = skillGame('sunquan', 'caocao');
+  noPhysicalSource.player.hand = [
+    c('huogong', { id: 'jianxiong-huogong', suit: 'heart', color: 'red' }),
+    c('shan', { id: 'huogong-cost', suit: 'spade', color: 'black' })
+  ];
+  noPhysicalSource.enemy.hand = [c('sha', { id: 'revealed-spade', suit: 'spade', color: 'black' })];
+
+  const noPhysicalResult = Engine.playCard(noPhysicalSource, 'player', 'jianxiong-huogong', { huogongCostCardId: 'huogong-cost' });
+
+  assert.equal(noPhysicalResult.ok, true, noPhysicalResult.message);
+  assert.equal(noPhysicalSource.enemy.hp, noPhysicalSource.enemy.maxHp - 1);
+  assert.deepEqual(ids(noPhysicalSource.enemy.hand), ['revealed-spade'], 'Jianxiong should not gain cards when the damage event has no physical source card');
+  assert.ok(ids(noPhysicalSource.discard).includes('jianxiong-huogong'), 'the Huogong card itself should remain discarded');
+});
+
 test('马超【铁骑】 red judgment prevents target from playing Shan', () => {
   const game = skillGame('machao', 'sunquan');
   game.player.hand = [c('sha', { id: 'tieqi-sha' })];

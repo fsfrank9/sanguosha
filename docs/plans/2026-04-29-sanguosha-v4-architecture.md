@@ -165,7 +165,7 @@ Acceptance criteria:
 
 ## Phase 4 — Skill registry and hooks
 
-**Status:** In progress. Phase 4A–4G are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, 【克己】 proves `onBeforeDiscardPhase`, 【集智】 proves `onCardUse` for successful normal-trick use and response-use paths, 【英姿】/【突袭】 now share the draw-phase `onDrawPhase` hook, 【咆哮】/【马术】 use a `SkillRuntime` passive-effect seam, and 【空城】 now uses an `onCardTarget` target-validity seam without changing gameplay behavior.
+**Status:** In progress. Phase 4A–4I are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, 【克己】 proves `onBeforeDiscardPhase`, 【集智】 proves `onCardUse` for successful normal-trick use and response-use paths, 【英姿】/【突袭】 now share the draw-phase `onDrawPhase` hook, 【咆哮】/【马术】 use a `SkillRuntime` passive-effect seam, 【空城】 uses an `onCardTarget` target-validity seam, 【铁骑】 uses `onNeedResponse`, and 【奸雄】 uses `onDamageAfter` without changing gameplay behavior.
 
 Introduce a hook-driven skill runtime before adding many more武将技能:
 
@@ -310,7 +310,41 @@ Verification completed for Phase 4G:
 - Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
 - Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
 
-Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are selected `onPhaseStart`/`onPhaseEnd` automatic skills, then damage/response-window hooks once those side effects are isolated.
+### Completed in Phase 4H
+
+- Registered `tieqi` through the shared registry with an `onNeedResponse` handler.
+- Added `triggerTieqiNeedResponse(game, actor, targetActor, responseType, triggeringCard)` as the behavior-preserving helper for the existing response-lock logic.
+- Changed `playSha(game, actor, card)` to create a response-window context and dispatch `SkillRuntime.runHook(skillRegistry, 'onNeedResponse', responseContext)` before asking the target for 【闪】.
+- Preserved the existing 【铁骑】 behavior contract: 马超使用【杀】指定目标后判定，红色判定令目标不能打出【闪】，黑色判定不锁定响应，非【杀】/非【闪】响应窗口不触发。
+- Extended `tests/skill_runtime_hooks.test.mjs` to guard the 【铁骑】 seam and ensure `playSha` no longer directly owns `tieqi` / `tieqiLocked` logic, while `tests/skills.test.mjs` continues to cover behavior regression.
+
+Verification completed for Phase 4H:
+
+- RED confirmed: the new seam test failed before implementation because `tieqi` was not registered through `SkillRuntime.registerSkill` and `playSha` still directly owned the response-lock path.
+- Targeted GREEN: `node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs`.
+- Full GREEN: `npm run verify`.
+- Direct-open smoke: `file:///Users/frankmei/.hermes/Workspace/sanguosha-html/index.html`, enter game succeeds, browser console has zero JavaScript errors.
+- Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
+- Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
+
+### Completed in Phase 4I
+
+- Registered `jianxiong` through the shared registry with an `onDamageAfter` handler.
+- Added `triggerJianxiongDamageAfter(game, targetActor, sourceCard)` as the behavior-preserving helper for the existing damage-source-card gain logic.
+- Changed `damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)` to build a damage context and dispatch `SkillRuntime.runHook(skillRegistry, 'onDamageAfter', damageContext)` after HP loss and before source-card cleanup.
+- Preserved the existing 【奸雄】 behavior contract: 曹操受到有实体来源牌造成的伤害后获得该实体牌；没有【奸雄】的受伤目标仍把来源牌置入弃牌堆；无实体来源牌的伤害不会生成或获得牌。
+- Extended `tests/skill_runtime_hooks.test.mjs` to guard the 【奸雄】 seam and ensure `damage` no longer directly owns `jianxiong` detection, while `tests/skills.test.mjs` covers physical-source and no-source regression cases.
+
+Verification completed for Phase 4I:
+
+- RED confirmed: the new seam test failed before implementation because `jianxiong` was not registered through `SkillRuntime.registerSkill` and `damage` still directly owned the 【奸雄】 path.
+- Targeted GREEN: `node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs`.
+- Full GREEN: `npm run verify`.
+- Direct-open smoke: `file:///Users/frankmei/.hermes/Workspace/sanguosha-html/index.html`, enter game succeeds, browser console has zero JavaScript errors.
+- Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
+- Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
+
+Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are remaining direct active-skill dispatch paths such as 【武圣】/【龙胆】 conversion windows and selected `onPhaseStart`/`onPhaseEnd` automatic skills once those side effects are isolated.
 
 Acceptance criteria:
 
@@ -343,6 +377,6 @@ Acceptance criteria:
 - `index.html` remains直接打开可运行.
 - `dist/index.html` is reproducible from `src/`.
 - No credentials or official prose caches are committed.
-- Preserve current implemented skill behavior: `仁德`、`反间`、`观星`、`武圣`、`龙胆`、`制衡`、`苦肉`、`咆哮`、`马术`、`闭月`、`克己`、`集智`、`英姿`、`突袭`、`空城` and other existing engine skills.
+- Preserve current implemented skill behavior: `仁德`、`反间`、`观星`、`武圣`、`龙胆`、`制衡`、`苦肉`、`咆哮`、`马术`、`闭月`、`克己`、`集智`、`英姿`、`突袭`、`空城`、`铁骑`、`奸雄` and other existing engine skills.
 - Keep `enterZhihengMode()` and `confirmZhiheng()` legacy UI helpers compatible.
 - Red dual-use cards such as red【火攻】 must still offer normal-vs-as-Sha choice before normal-use panels.
