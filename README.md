@@ -86,7 +86,8 @@ v4.0 不是重写，而是分批“安全拆源”：
 18. Phase 4M 已把黄月英【奇才】接入被动效果 seam：距离受限锦囊（当前【顺手牵羊】/【兵粮寸断】）会正常校验距离，拥有【奇才】时忽略该距离限制。
 19. Phase 4N 已把陆逊【谦逊】接入 `SkillRuntime.onCardTarget` target-validity seam：陆逊不能成为【顺手牵羊】或【乐不思蜀】目标。
 20. Phase 4O 已把郭嘉【天妒】接入 `SkillRuntime.onJudgementAfterResolve` judgement-after-resolve seam：郭嘉自己的判定牌结算后、进入弃牌堆前会获得该判定牌。
-21. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
+21. Phase 4P 已把夏侯惇【刚烈】接入 `SkillRuntime.onDamageAfter` + judgement finalizer seam：夏侯惇受到伤害后进行判定，非红桃时伤害来源自动弃置两张手牌，否则受到 1 点伤害；判定牌统一走 `resolveJudgementCard`。
+22. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
 
 详细迁移计划见：
 
@@ -101,14 +102,14 @@ docs/plans/2026-04-29-sanguosha-v4-architecture.md
 - 武将：68 名。
 - 技能条目：123 条。
 - 唯一技能 ID：118 个。
-- 已接入引擎逻辑的技能：21 个。
+- 已接入引擎逻辑的技能：22 个。
 - 有主动按钮/交互入口的技能：5 个。
 - 未实现/仅展示技能会在 UI 中标记为不可用或未实现。
 
 已实现技能：
 
 - 主动/交互技能：孙权【制衡】、黄盖【苦肉】、刘备【仁德】、周瑜【反间】、诸葛亮【观星】。
-- 转化/被动/自动技能：张飞【咆哮】、关羽/SP 关羽【武圣】、赵云/SP 赵云【龙胆】、甄姬【倾国】、曹操【奸雄】、郭嘉【天妒】、马超/庞德/SP 庞德【马术】、马超【铁骑】、张辽【突袭】、周瑜【英姿】、诸葛亮【空城】、陆逊【谦逊】、貂蝉/SP 貂蝉【闭月】、吕蒙【克己】、黄月英【集智】、黄月英【奇才】。
+- 转化/被动/自动技能：张飞【咆哮】、关羽/SP 关羽【武圣】、赵云/SP 赵云【龙胆】、甄姬【倾国】、曹操【奸雄】、夏侯惇【刚烈】、郭嘉【天妒】、马超/庞德/SP 庞德【马术】、马超【铁骑】、张辽【突袭】、周瑜【英姿】、诸葛亮【空城】、陆逊【谦逊】、貂蝉/SP 貂蝉【闭月】、吕蒙【克己】、黄月英【集智】、黄月英【奇才】。
 
 近期补齐技能说明：
 
@@ -127,6 +128,7 @@ docs/plans/2026-04-29-sanguosha-v4-architecture.md
 - 【奇才】：黄月英使用距离受限锦囊时忽略距离限制；Phase 4M 将该锁定被动迁入 `SkillRuntime.hasPassiveEffect(..., 'ignoreTrickDistance')`，同时为普通角色补上【顺手牵羊】/【兵粮寸断】距离校验。
 - 【谦逊】：陆逊不能成为【顺手牵羊】或【乐不思蜀】目标；Phase 4N 将该目标保护迁入 `SkillRuntime.onCardTarget` seam，失败时不会消耗来源牌，也不会移动目标手牌/判定区。
 - 【天妒】：郭嘉自己的判定牌结算后、进入弃牌堆前获得该判定牌；Phase 4O 将判定牌结算后入口迁入 `SkillRuntime.onJudgementAfterResolve` seam，未被技能获得的判定牌仍会正常进入弃牌堆。
+- 【刚烈】：夏侯惇受到伤害后进行【刚烈】判定，非红桃时伤害来源若有至少两张手牌则自动弃置两张，否则受到 1 点伤害；Phase 4P 复用 `SkillRuntime.onDamageAfter` 并把【刚烈】判定牌接入共享 `resolveJudgementCard` finalizer。
 
 ## 官方资料对照与缓存
 

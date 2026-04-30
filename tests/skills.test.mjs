@@ -207,6 +207,78 @@ test('曹操【奸雄】 only claims physical damaging cards from the damage-aft
   assert.ok(ids(noPhysicalSource.discard).includes('jianxiong-huogong'), 'the Huogong card itself should remain discarded');
 });
 
+test('夏侯惇【刚烈】 non-heart judgment makes the damage source discard two hand cards', () => {
+  const game = skillGame('sunquan', 'xiahoudun');
+  game.player.hand = [
+    c('sha', { id: 'ganglie-discard-sha' }),
+    c('shan', { id: 'ganglie-source-card-1' }),
+    c('tao', { id: 'ganglie-source-card-2' })
+  ];
+  game.deck = [c('sha', { id: 'ganglie-black-judge', suit: 'club', color: 'black' })];
+
+  const result = Engine.playCard(game, 'player', 'ganglie-discard-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'original Sha damage should still land on Xiahou Dun');
+  assert.equal(game.player.hp, game.player.maxHp, 'source should avoid Ganglie damage by discarding two hand cards');
+  assert.deepEqual(ids(game.player.hand), [], 'Ganglie should discard the source\'s remaining two hand cards');
+  assert.ok(ids(game.discard).includes('ganglie-black-judge'), 'Ganglie judgment card should be finalized to discard');
+  assert.ok(ids(game.discard).includes('ganglie-source-card-1'), 'first source hand card should be discarded for Ganglie');
+  assert.ok(ids(game.discard).includes('ganglie-source-card-2'), 'second source hand card should be discarded for Ganglie');
+  assert.ok(game.log.some((entry) => /刚烈/.test(entry) && /弃置两张手牌/.test(entry)), 'Ganglie discard choice should be logged');
+});
+
+test('夏侯惇【刚烈】 non-heart judgment damages the source when two hand cards are unavailable', () => {
+  const game = skillGame('sunquan', 'xiahoudun');
+  game.player.hand = [c('sha', { id: 'ganglie-damage-sha' })];
+  game.deck = [c('shan', { id: 'ganglie-spade-judge', suit: 'spade', color: 'black' })];
+
+  const result = Engine.playCard(game, 'player', 'ganglie-damage-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'original Sha damage should still land before Ganglie retaliation');
+  assert.equal(game.player.hp, game.player.maxHp - 1, 'source should lose 1 HP when unable to discard two hand cards');
+  assert.ok(ids(game.discard).includes('ganglie-spade-judge'), 'Ganglie judgment card should be discarded after the result is used');
+  assert.ok(game.log.some((entry) => /刚烈/.test(entry) && /受到 1 点伤害/.test(entry)), 'Ganglie damage choice should be logged');
+});
+
+test('夏侯惇【刚烈】 lethal retaliation wins once and is not overwritten by the original damage', () => {
+  const game = skillGame('sunquan', 'xiahoudun');
+  game.player.hp = 1;
+  game.enemy.hp = 1;
+  game.player.hand = [c('sha', { id: 'ganglie-lethal-sha' })];
+  game.deck = [c('shan', { id: 'ganglie-lethal-judge', suit: 'spade', color: 'black' })];
+
+  const result = Engine.playCard(game, 'player', 'ganglie-lethal-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.phase, 'gameover');
+  assert.equal(game.winner, 'enemy', 'nested Ganglie lethal damage should not be overwritten by the outer damage winner check');
+  assert.equal(game.player.hp, 0);
+  assert.equal(game.enemy.hp, 0);
+  const victoryLogs = game.log.filter((entry) => /获胜/.test(entry));
+  assert.deepEqual(victoryLogs, ['夏侯惇获胜！'], 'Ganglie mutual lethal flow should log a single consistent winner');
+});
+
+test('夏侯惇【刚烈】 heart judgment does not punish the damage source', () => {
+  const game = skillGame('sunquan', 'xiahoudun');
+  game.player.hand = [
+    c('sha', { id: 'ganglie-heart-sha' }),
+    c('shan', { id: 'ganglie-heart-source-card-1' }),
+    c('tao', { id: 'ganglie-heart-source-card-2' })
+  ];
+  game.deck = [c('tao', { id: 'ganglie-heart-judge', suit: 'heart', color: 'red' })];
+
+  const result = Engine.playCard(game, 'player', 'ganglie-heart-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1);
+  assert.equal(game.player.hp, game.player.maxHp, 'heart judgment should not damage the source');
+  assert.deepEqual(ids(game.player.hand), ['ganglie-heart-source-card-1', 'ganglie-heart-source-card-2'], 'heart judgment should not discard source hand cards');
+  assert.ok(ids(game.discard).includes('ganglie-heart-judge'), 'heart Ganglie judgment should still be finalized');
+  assert.ok(game.log.some((entry) => /刚烈/.test(entry) && /红桃/.test(entry)), 'heart no-effect result should be logged');
+});
+
 test('马超【铁骑】 red judgment prevents target from playing Shan', () => {
   const game = skillGame('machao', 'sunquan');
   game.player.hand = [c('sha', { id: 'tieqi-sha' })];

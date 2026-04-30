@@ -119,6 +119,11 @@
           return triggerJianxiongDamageAfter(context.game, context.targetActor, context.sourceCard);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'ganglie', {
+        onDamageAfter: function (context) {
+          return triggerGanglieDamageAfter(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'longdan', {
         onCardAs: function (context) {
           return triggerLongdanCardAs(context);
@@ -325,6 +330,35 @@
         target.hand.push(physicalSourceCard);
         log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + physicalSourceCard.name + '】。');
         return { claimedSourceCard: true };
+      }
+
+      function triggerGanglieDamageAfter(context) {
+        var game = context.game;
+        var targetActor = context.targetActor;
+        var sourceActor = context.sourceActor;
+        var target = game[targetActor];
+        var source = game[sourceActor];
+        if (!target || !sourceActor || !source || !hasSkill(target, 'ganglie') || game.phase === 'gameover') return null;
+        var ganglieJudge = judge(game, targetActor, '【刚烈】');
+        var retaliates = !!(ganglieJudge && ganglieJudge.suit !== 'heart');
+        resolveJudgementCard(game, targetActor, target, '【刚烈】', ganglieJudge);
+        if (!ganglieJudge) {
+          log(game, actorName(game, targetActor) + '发动【刚烈】，但没有判定牌。');
+          return { triggeredGanglie: true, retaliated: false };
+        }
+        if (!retaliates) {
+          log(game, actorName(game, targetActor) + '发动【刚烈】，判定为红桃，未触发反制。');
+          return { triggeredGanglie: true, retaliated: false };
+        }
+        if (source.hand && source.hand.length >= 2) {
+          discardCard(game, source.hand.shift());
+          discardCard(game, source.hand.shift());
+          log(game, actorName(game, sourceActor) + '因【刚烈】弃置两张手牌。');
+          return { triggeredGanglie: true, retaliated: true, discardedCards: true };
+        }
+        log(game, actorName(game, sourceActor) + '无法因【刚烈】弃置两张手牌，受到 1 点伤害。');
+        damage(game, sourceActor, 1, targetActor, '【刚烈】', null, 'normal');
+        return { triggeredGanglie: true, retaliated: true, dealtDamage: true };
       }
 
       function triggerTianduJudgementAfterResolve(context) {
@@ -620,6 +654,7 @@
         if (sourceCard && !sourceCardClaimed) {
           discardCard(game, sourceCard);
         }
+        if (game.phase === 'gameover') return true;
         if (target.hp <= 0) {
           game.phase = 'gameover';
           game.winner = sourceActor || opponent(targetActor);

@@ -241,6 +241,27 @@ test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
   assert.doesNotMatch(damageSource, /hasSkill\([^)]*['"]jianxiong['"]|发动【奸雄】/, 'damage should no longer directly own Jianxiong skill logic');
 });
 
+test('game engine dispatches Ganglie through onDamageAfter and finalizes its judgment card', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
+  const damageEnd = source.indexOf('function findResponseCard(', damageStart);
+  const ganglieStart = source.indexOf('function triggerGanglieDamageAfter(context)');
+  const ganglieEnd = source.indexOf('function triggerTianduJudgementAfterResolve(context)', ganglieStart);
+  assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
+  assert.ok(ganglieStart >= 0 && ganglieEnd > ganglieStart, 'Ganglie helper source should be extractable');
+  const damageSource = source.slice(damageStart, damageEnd);
+  const ganglieSource = source.slice(ganglieStart, ganglieEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]ganglie['"]/, 'Ganglie should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]ganglie['"][\s\S]*?onDamageAfter\s*:/, 'Ganglie should register an onDamageAfter hook');
+  assert.match(source, /triggerGanglieDamageAfter\(context\)/, 'Ganglie hook should forward the damage context to an isolated helper');
+  assert.match(ganglieSource, /judge\(\s*game\s*,\s*targetActor\s*,\s*['"]【刚烈】['"]\s*\)/, 'Ganglie should perform a judgment owned by the damaged Xiahou Dun actor');
+  assert.match(ganglieSource, /resolveJudgementCard\(\s*game\s*,\s*targetActor\s*,\s*target\s*,\s*['"]【刚烈】['"]\s*,\s*ganglieJudge\s*\)/, 'Ganglie should route its judgment card through the shared finalizer');
+  assert.match(ganglieSource, /ganglieJudge\.suit\s*!==\s*['"]heart['"]/, 'Ganglie should only retaliate when the judgment is not heart');
+  assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch through onDamageAfter');
+  assert.doesNotMatch(damageSource, /hasSkill\([^)]*['"]ganglie['"]|发动【刚烈】/, 'damage should not directly own Ganglie skill logic');
+});
+
 test('game engine dispatches Wusheng, Longdan, and Qingguo card-as conversions through onCardAs hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const responseMatch = source.match(/function findResponseCard\([^)]*\)/);
