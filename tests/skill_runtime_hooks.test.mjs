@@ -262,6 +262,27 @@ test('game engine dispatches Ganglie through onDamageAfter and finalizes its jud
   assert.doesNotMatch(damageSource, /hasSkill\([^)]*['"]ganglie['"]|发动【刚烈】/, 'damage should not directly own Ganglie skill logic');
 });
 
+test('game engine dispatches Fankui through onDamageAfter and gains a source-area card', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
+  const damageEnd = source.indexOf('function findResponseCard(', damageStart);
+  const fankuiStart = source.indexOf('function triggerFankuiDamageAfter(context)');
+  const fankuiEnd = source.indexOf('function triggerGanglieDamageAfter(context)', fankuiStart);
+  assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
+  assert.ok(fankuiStart >= 0 && fankuiEnd > fankuiStart, 'Fankui helper source should be extractable');
+  const damageSource = source.slice(damageStart, damageEnd);
+  const fankuiSource = source.slice(fankuiStart, fankuiEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]fankui['"]/, 'Fankui should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]fankui['"][\s\S]*?onDamageAfter\s*:/, 'Fankui should register an onDamageAfter hook');
+  assert.match(source, /triggerFankuiDamageAfter\(context\)/, 'Fankui hook should forward the damage context to an isolated helper');
+  assert.match(fankuiSource, /sourceActor\s*===\s*targetActor|targetActor\s*===\s*sourceActor/, 'Fankui should ignore self-damage contexts instead of moving Sima Yi own cards');
+  assert.match(fankuiSource, /removeTargetZoneCard\(\s*game\s*,\s*sourceActor\s*\)/, 'Fankui should remove one gainable card from the damage source area');
+  assert.match(fankuiSource, /target\.hand\.push\(gained\.card\)/, 'Fankui should move the gained source card into Sima Yi hand');
+  assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch through onDamageAfter');
+  assert.doesNotMatch(damageSource, /hasSkill\([^)]*['"]fankui['"]|发动【反馈】/, 'damage should not directly own Fankui skill logic');
+});
+
 test('game engine dispatches Wusheng, Longdan, and Qingguo card-as conversions through onCardAs hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const responseMatch = source.match(/function findResponseCard\([^)]*\)/);

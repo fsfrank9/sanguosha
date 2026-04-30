@@ -5,7 +5,7 @@
 
       var IMPLEMENTED_SKILL_IDS = [
         'zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing',
-        'paoxiao', 'wusheng', 'longdan', 'qingguo', 'jianxiong', 'ganglie', 'mashu', 'qicai', 'qianxun', 'tiandu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng',
+        'paoxiao', 'wusheng', 'longdan', 'qingguo', 'jianxiong', 'ganglie', 'fankui', 'mashu', 'qicai', 'qianxun', 'tiandu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng',
         'biyue', 'keji', 'jizhi'
       ];
       var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing'];

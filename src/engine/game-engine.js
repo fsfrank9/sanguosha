@@ -119,6 +119,11 @@
           return triggerJianxiongDamageAfter(context.game, context.targetActor, context.sourceCard);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'fankui', {
+        onDamageAfter: function (context) {
+          return triggerFankuiDamageAfter(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'ganglie', {
         onDamageAfter: function (context) {
           return triggerGanglieDamageAfter(context);
@@ -330,6 +335,20 @@
         target.hand.push(physicalSourceCard);
         log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + physicalSourceCard.name + '】。');
         return { claimedSourceCard: true };
+      }
+
+      function triggerFankuiDamageAfter(context) {
+        var game = context.game;
+        var targetActor = context.targetActor;
+        var sourceActor = context.sourceActor;
+        var target = game[targetActor];
+        var source = game[sourceActor];
+        if (!target || !sourceActor || !source || sourceActor === targetActor || !hasSkill(target, 'fankui') || game.phase === 'gameover') return null;
+        var gained = removeTargetZoneCard(game, sourceActor);
+        if (!gained || !gained.card) return null;
+        target.hand.push(gained.card);
+        log(game, actorName(game, targetActor) + '发动【反馈】，获得' + actorName(game, sourceActor) + '的一张' + gained.zone + '牌。');
+        return { gainedSourceCard: true };
       }
 
       function triggerGanglieDamageAfter(context) {
@@ -763,7 +782,7 @@
             log(game, actorName(game, actor) + '【兵粮寸断】判定失败，跳过摸牌阶段。');
           }
           if (trick.type === 'shandian' && outcome.hit) {
-            damage(game, actor, outcome.damage, opponent(actor), '【闪电】');
+            damage(game, actor, outcome.damage, null, '【闪电】');
           } else if (trick.type === 'shandian' && outcome.moveToNext) {
             game[opponent(actor)].judgeArea.push(trick);
             log(game, '【闪电】移至' + actorName(game, opponent(actor)) + '的判定区。');

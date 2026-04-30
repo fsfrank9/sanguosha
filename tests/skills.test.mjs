@@ -207,6 +207,63 @@ test('曹操【奸雄】 only claims physical damaging cards from the damage-aft
   assert.ok(ids(noPhysicalSource.discard).includes('jianxiong-huogong'), 'the Huogong card itself should remain discarded');
 });
 
+test('司马懿【反馈】 gains a remaining hand card from the damage source', () => {
+  const game = skillGame('sunquan', 'simayi');
+  game.player.hand = [
+    c('sha', { id: 'fankui-sha' }),
+    c('tao', { id: 'fankui-source-hand' })
+  ];
+
+  const result = Engine.playCard(game, 'player', 'fankui-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1);
+  assert.deepEqual(ids(game.enemy.hand), ['fankui-source-hand'], 'Sima Yi should gain one card from the damage source');
+  assert.deepEqual(ids(game.player.hand), [], 'the gained source hand card should leave the source hand');
+  assert.ok(ids(game.discard).includes('fankui-sha'), 'Fankui should not claim the already-used damaging Sha itself');
+  assert.ok(game.log.some((entry) => /反馈/.test(entry) && /获得/.test(entry)), 'Fankui trigger should be logged');
+});
+
+test('司马懿【反馈】 can gain source equipment when the source has no remaining hand cards', () => {
+  const game = skillGame('sunquan', 'simayi');
+  game.player.hand = [c('sha', { id: 'fankui-equipment-sha' })];
+  game.player.equipment.weapon = c('zhuge', { id: 'fankui-source-weapon' });
+
+  const result = Engine.playCard(game, 'player', 'fankui-equipment-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.player.equipment.weapon, null, 'Fankui should remove the gained equipment from the source');
+  assert.deepEqual(ids(game.enemy.hand), ['fankui-source-weapon'], 'Sima Yi should gain source equipment if no hand card is available');
+  assert.ok(ids(game.discard).includes('fankui-equipment-sha'), 'the damaging Sha should still be discarded normally');
+});
+
+test('司马懿【反馈】 does not gain a card when the damage source has no gainable cards', () => {
+  const game = skillGame('sunquan', 'simayi');
+  game.player.hand = [c('sha', { id: 'fankui-no-source-card-sha' })];
+
+  const result = Engine.playCard(game, 'player', 'fankui-no-source-card-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.deepEqual(ids(game.enemy.hand), [], 'Fankui should not gain the already-used damaging Sha as a source-area card');
+  assert.ok(ids(game.discard).includes('fankui-no-source-card-sha'), 'damaging Sha should still be discarded when Fankui has no source card to gain');
+});
+
+test('司马懿【反馈】 does not trigger for source-less Shandian lightning damage', () => {
+  const game = skillGame('simayi', 'sunquan');
+  game.player.judgeArea = [c('shandian', { id: 'fankui-shandian' })];
+  game.enemy.hand = [c('tao', { id: 'fankui-lightning-enemy-hand' })];
+  game.deck = [c('sha', { id: 'fankui-lightning-judge', suit: 'spade', color: 'black', rank: '7' })];
+
+  const result = Engine.startTurn(game, 'player');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.player.hp, 0, 'Shandian should still deal thunder damage to Sima Yi');
+  assert.deepEqual(ids(game.player.hand), [], 'Fankui should not gain cards from an opponent when lightning has no damage source');
+  assert.deepEqual(ids(game.enemy.hand), ['fankui-lightning-enemy-hand'], 'source-less lightning should not move the opponent hand card');
+  assert.equal(game.player.judgeArea.length, 0, 'resolved lightning should leave Sima Yi judge area');
+  assert.equal(game.log.some((entry) => /反馈/.test(entry)), false, 'source-less lightning should not log a Fankui trigger');
+});
+
 test('夏侯惇【刚烈】 non-heart judgment makes the damage source discard two hand cards', () => {
   const game = skillGame('sunquan', 'xiahoudun');
   game.player.hand = [

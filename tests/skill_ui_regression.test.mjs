@@ -39,7 +39,7 @@ test('engine exposes explicit skill implementation status for every catalog skil
     assert.ok(Engine.ACTIVE_SKILL_IDS.includes(required), `${required} should be a clickable active skill`);
     assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes(required), `${required} should be marked implemented`);
   }
-  for (const required of ['wusheng', 'longdan', 'qingguo', 'paoxiao', 'jianxiong', 'ganglie', 'mashu', 'qicai', 'qianxun', 'tiandu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng']) {
+  for (const required of ['wusheng', 'longdan', 'qingguo', 'paoxiao', 'jianxiong', 'ganglie', 'fankui', 'mashu', 'qicai', 'qianxun', 'tiandu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng']) {
     assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes(required), `${required} should be marked implemented/passive`);
     assert.equal(Engine.ACTIVE_SKILL_IDS.includes(required), false, `${required} should not be a clickable active skill`);
   }
