@@ -79,6 +79,15 @@
           log(context.game, actorName(context.game, context.actor) + '发动【英姿】，摸牌阶段额外摸一张牌。');
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'tuxi', {
+        onDrawPhase: function (context) {
+          var state = context.game[context.actor];
+          if (!state || !hasSkill(state, 'tuxi')) return;
+          if (context.game[opponent(context.actor)].hand.length <= 0) return;
+          takeHandCard(context.game, opponent(context.actor), context.actor, '发动【突袭】，获得');
+          context.drawCount = Math.max(0, context.drawCount - 1);
+        }
+      });
 
       function isKongchengProtected(game, targetActor, cardType) {
         var target = game[targetActor];
@@ -97,19 +106,13 @@
       }
 
       function performDrawPhase(game, actor) {
-        var state = game[actor];
         var drawContext = {
           game: game,
           actor: actor,
           drawCount: 2
         };
         SkillRuntime.runHook(skillRegistry, 'onDrawPhase', drawContext);
-        var drawCount = drawContext.drawCount;
-        if (hasSkill(state, 'tuxi') && game[opponent(actor)].hand.length > 0) {
-          takeHandCard(game, opponent(actor), actor, '发动【突袭】，获得');
-          drawCount = Math.max(0, drawCount - 1);
-        }
-        return drawCards(game, actor, drawCount);
+        return drawCards(game, actor, drawContext.drawCount);
       }
 
       function isArmorIgnoredBySha(game, sourceActor, card) {

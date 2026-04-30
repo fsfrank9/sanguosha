@@ -165,7 +165,7 @@ Acceptance criteria:
 
 ## Phase 4 — Skill registry and hooks
 
-**Status:** In progress. Phase 4A–4D are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, 【克己】 proves `onBeforeDiscardPhase`, 【集智】 proves `onCardUse` for successful normal-trick use and response-use paths, and 【英姿】 proves the draw-phase `onDrawPhase` hook without changing gameplay behavior.
+**Status:** In progress. Phase 4A–4E are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, 【克己】 proves `onBeforeDiscardPhase`, 【集智】 proves `onCardUse` for successful normal-trick use and response-use paths, and 【英姿】/【突袭】 now share the draw-phase `onDrawPhase` hook without changing gameplay behavior.
 
 Introduce a hook-driven skill runtime before adding many more武将技能:
 
@@ -255,7 +255,24 @@ Verification completed for Phase 4D:
 - Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
 - Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
 
-Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are selected `onPhaseStart`/`onPhaseEnd` automatic skills or the more complex 【突袭】 draw-phase path, then card-target/damage/response-window hooks once those side effects are isolated.
+### Completed in Phase 4E
+
+- Registered `tuxi` through the shared registry with an `onDrawPhase` handler.
+- Kept the existing mutable draw context contract from Phase 4D: `performDrawPhase(game, actor)` creates `{ game, actor, drawCount: 2 }`, dispatches `SkillRuntime.runHook(skillRegistry, 'onDrawPhase', drawContext)`, then draws the final `drawContext.drawCount`.
+- Moved the existing 【突袭】 behavior into the hook without changing its contract: actors with `tuxi` steal 1 opponent hand card during draw phase when the opponent has cards, then draw 1 fewer card; actors without `tuxi` or with an empty-handed opponent draw normally.
+- Extended `tests/skill_runtime_hooks.test.mjs` to guard the 【突袭】 seam and ensure `performDrawPhase` no longer directly owns the `tuxi` skill check, while `tests/skills.test.mjs` continues to cover the steal-card plus one-less-draw behavior.
+
+Verification completed for Phase 4E:
+
+- RED confirmed: the new seam test failed before implementation because `tuxi` was not registered through `SkillRuntime.registerSkill` and `performDrawPhase` still directly owned the `tuxi` check.
+- Targeted GREEN: `node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs`.
+- Targeted verification: `npm run build && node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs && node tests/v27_regression.test.mjs && node tests/card_runtime.test.mjs && node tests/engine_modules.test.mjs`.
+- Full GREEN: `npm run verify`.
+- Direct-open smoke: `file:///Users/frankmei/.hermes/Workspace/sanguosha-html/index.html`, enter game succeeds, browser console has zero JavaScript errors.
+- Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
+- Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
+
+Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are selected `onPhaseStart`/`onPhaseEnd` automatic skills, simple state/distance adapters such as 【咆哮】/【马术】 only when their seams are explicit, then card-target/damage/response-window hooks once those side effects are isolated.
 
 Acceptance criteria:
 
@@ -288,6 +305,6 @@ Acceptance criteria:
 - `index.html` remains直接打开可运行.
 - `dist/index.html` is reproducible from `src/`.
 - No credentials or official prose caches are committed.
-- Preserve current implemented skill behavior: `仁德`、`反间`、`观星`、`武圣`、`龙胆`、`制衡`、`苦肉`、`闭月`、`克己`、`集智`、`英姿` and other existing engine skills.
+- Preserve current implemented skill behavior: `仁德`、`反间`、`观星`、`武圣`、`龙胆`、`制衡`、`苦肉`、`闭月`、`克己`、`集智`、`英姿`、`突袭` and other existing engine skills.
 - Keep `enterZhihengMode()` and `confirmZhiheng()` legacy UI helpers compatible.
 - Red dual-use cards such as red【火攻】 must still offer normal-vs-as-Sha choice before normal-use panels.
