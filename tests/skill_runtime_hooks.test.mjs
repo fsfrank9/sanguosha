@@ -196,7 +196,7 @@ test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
 test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
-  const damageEnd = source.indexOf('function findResponseCard(state, type)', damageStart);
+  const damageEnd = source.indexOf('function findResponseCard(', damageStart);
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
   const damageSource = source.slice(damageStart, damageEnd);
 
@@ -207,4 +207,28 @@ test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
   assert.match(damageSource, /var damageContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should build a complete damage-after context');
   assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch through onDamageAfter');
   assert.doesNotMatch(damageSource, /hasSkill\([^)]*['"]jianxiong['"]|发动【奸雄】/, 'damage should no longer directly own Jianxiong skill logic');
+});
+
+test('game engine dispatches Wusheng and Longdan card-as conversions through onCardAs hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const responseMatch = source.match(/function findResponseCard\([^)]*\)/);
+  const responseStart = responseMatch ? responseMatch.index : -1;
+  const responseEnd = source.indexOf('function consumeResponse(game, actor, type, reason)', responseStart);
+  const canPlayStart = source.indexOf('function canPlayCardAs(game, actor, cardOrId, asType)');
+  const canPlayEnd = source.indexOf('function playCardAs(game, actor, cardId, asType)', canPlayStart);
+  assert.ok(responseStart >= 0 && responseEnd > responseStart, 'findResponseCard source should be extractable');
+  assert.ok(canPlayStart >= 0 && canPlayEnd > canPlayStart, 'canPlayCardAs source should be extractable');
+  const responseSource = source.slice(responseStart, responseEnd);
+  const canPlaySource = source.slice(canPlayStart, canPlayEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]longdan['"]/, 'Longdan should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]wusheng['"]/, 'Wusheng should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]longdan['"][\s\S]*?onCardAs\s*:/, 'Longdan should register an onCardAs hook');
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]wusheng['"][\s\S]*?onCardAs\s*:/, 'Wusheng should register an onCardAs hook');
+  assert.match(source, /triggerLongdanCardAs\(context\)/, 'Longdan hook should delegate conversion decisions to an isolated helper');
+  assert.match(source, /triggerWushengCardAs\(context\)/, 'Wusheng hook should delegate conversion decisions to an isolated helper');
+  assert.match(responseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardAs['"]\s*,\s*responseContext\s*\)/, 'automatic response selection should dispatch conversion opportunities through onCardAs');
+  assert.match(canPlaySource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardAs['"]\s*,\s*cardAsContext\s*\)/, 'proactive card-as validation should dispatch through onCardAs');
+  assert.doesNotMatch(responseSource, /hasSkill\([^)]*['"](?:wusheng|longdan)['"]/, 'findResponseCard should no longer directly own Wusheng or Longdan detection');
+  assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"](?:wusheng|longdan)['"]/, 'canPlayCardAs should no longer directly own Wusheng or Longdan detection');
 });

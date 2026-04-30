@@ -80,7 +80,8 @@ v4.0 不是重写，而是分批“安全拆源”：
 12. Phase 4G 已把诸葛亮【空城】接入 `SkillRuntime.onCardTarget` target-validity seam：`canPlayCard` 与 `playSha` 通过统一目标保护 helper 派发 `onCardTarget`，不再直接持有 `kongcheng` 目标保护判断。
 13. Phase 4H 已把马超【铁骑】迁入 `SkillRuntime.onNeedResponse` response-window seam：`playSha` 只派发【闪】响应窗口，红色判定锁定响应的逻辑由【铁骑】hook 处理。
 14. Phase 4I 已把曹操【奸雄】迁入 `SkillRuntime.onDamageAfter` damage-after seam：`damage` 只负责伤害结算与统一派发，获得造成伤害实体牌的逻辑由【奸雄】hook 处理。
-15. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
+15. Phase 4J 已把关羽/SP 关羽【武圣】与赵云/SP 赵云【龙胆】迁入 `SkillRuntime.onCardAs` card-as/conversion seam：响应窗口与主动“当【杀】使用”入口统一派发转化 hook，原有红牌/【闪】/【杀】转化行为保持不变。
+16. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
 
 详细迁移计划见：
 
@@ -115,6 +116,7 @@ docs/plans/2026-04-29-sanguosha-v4-architecture.md
 - 【空城】：诸葛亮无手牌时不能成为【杀】或【决斗】目标；Phase 4G 将该目标合法性保护迁到 `SkillRuntime.onCardTarget` seam，`canPlayCard` 和 `playSha` 统一通过 target protection helper 派发，行为测试继续覆盖失败后手牌不被移除与目标不受伤。
 - 【铁骑】：马超使用【杀】指定目标后进行判定，红色判定令目标不能打出【闪】且保留原有伤害结算；Phase 4H 将该响应锁定逻辑迁到 `SkillRuntime.onNeedResponse` seam，`playSha` 不再直接持有 `tieqi` 判断或 `tieqiLocked` 状态。
 - 【奸雄】：曹操受到有实体来源牌造成的伤害后获得该牌；Phase 4I 将该伤害后触发迁到 `SkillRuntime.onDamageAfter` seam，`damage` 不再直接持有 `jianxiong` 判断，且无实体来源牌的伤害不会错误获得牌。
+- 【武圣】/【龙胆】：关羽/SP 关羽可将红色牌当【杀】使用/响应，赵云/SP 赵云可在【杀】/【闪】间互相转化；Phase 4J 将这些 card-as/conversion 入口迁到 `SkillRuntime.onCardAs` seam，`findResponseCard` 与 `canPlayCardAs` 不再直接持有 `wusheng` / `longdan` 判断，同时保留响应窗口、主动 UI affordance 与实体牌来源追踪。
 
 ## 官方资料对照与缓存
 

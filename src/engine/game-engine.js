@@ -109,6 +109,16 @@
           return triggerJianxiongDamageAfter(context.game, context.targetActor, context.sourceCard);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'longdan', {
+        onCardAs: function (context) {
+          return triggerLongdanCardAs(context);
+        }
+      });
+      SkillRuntime.registerSkill(skillRegistry, 'wusheng', {
+        onCardAs: function (context) {
+          return triggerWushengCardAs(context);
+        }
+      });
 
       function cardTargetProtection(game, actor, targetActor, card, displayName) {
         var cardType = card && card.type ? card.type : card;
@@ -219,6 +229,21 @@
         return removeFirstMatchingCard(state, function (card) { return type === 'sha' ? isShaCard(card) : card.type === type; });
       }
 
+      function firstMatchingCard(state, predicate) {
+        if (!state || !state.hand) return null;
+        return state.hand.find(predicate) || null;
+      }
+
+      function selectCardAsConversion(results) {
+        var selected = null;
+        for (var i = 0; i < results.length; i += 1) {
+          var conversion = results[i].result;
+          if (!conversion || !conversion.card) continue;
+          if (!selected || (conversion.priority || 0) > (selected.priority || 0)) selected = conversion;
+        }
+        return selected;
+      }
+
       function discardCard(game, card) {
         var physicalCard = physicalCardOf(card);
         if (physicalCard) game.discard.push(physicalCard);
@@ -231,6 +256,37 @@
         target.hand.push(physicalSourceCard);
         log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + physicalSourceCard.name + '】。');
         return { claimedSourceCard: true };
+      }
+
+      function triggerLongdanCardAs(context) {
+        var state = context.state;
+        if (!state || !hasSkill(state, 'longdan')) return null;
+        if (context.asType === 'shan' && context.mode === 'response') {
+          var shaCard = firstMatchingCard(state, function (item) { return isShaCard(item); });
+          return shaCard ? { card: shaCard, asName: '闪', skillName: '龙胆', priority: 20 } : null;
+        }
+        if (context.asType !== 'sha') return null;
+        if (context.mode === 'response') {
+          var shanCard = firstMatchingCard(state, function (item) { return item.type === 'shan'; });
+          return shanCard ? { card: shanCard, asName: '杀', skillName: '龙胆', priority: 20 } : null;
+        }
+        if (context.card && context.card.type === 'shan') {
+          return { card: context.card, asName: '杀', skillName: '龙胆', priority: 20 };
+        }
+        return null;
+      }
+
+      function triggerWushengCardAs(context) {
+        var state = context.state;
+        if (!state || !hasSkill(state, 'wusheng') || context.asType !== 'sha') return null;
+        if (context.mode === 'response') {
+          var redCard = firstMatchingCard(state, function (item) { return item.color === 'red'; });
+          return redCard ? { card: redCard, asName: '杀', skillName: '武圣', priority: 10 } : null;
+        }
+        if (context.card && context.card.color === 'red') {
+          return { card: context.card, asName: '杀', skillName: '武圣', priority: 10 };
+        }
+        return null;
       }
 
       function equipCard(game, actor, card) {
@@ -362,24 +418,16 @@
         if (type === 'shan') {
           card = removeFirstCardOfType(state, 'shan');
           if (card) return { card: card, asName: '闪', skillName: null };
-          if (hasSkill(state, 'longdan')) {
-            card = removeFirstMatchingCard(state, function (item) { return isShaCard(item); });
-            if (card) return { card: card, asName: '闪', skillName: '龙胆' };
-          }
-          return null;
+          var shanResponseContext = { mode: 'response', state: state, asType: 'shan' };
+          var shanConversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', shanResponseContext));
+          return shanConversion ? { card: removeCardFromHand(state, shanConversion.card.id), asName: shanConversion.asName, skillName: shanConversion.skillName } : null;
         }
         if (type === 'sha') {
           card = removeFirstCardOfType(state, 'sha');
           if (card) return { card: card, asName: '杀', skillName: null };
-          if (hasSkill(state, 'longdan')) {
-            card = removeFirstCardOfType(state, 'shan');
-            if (card) return { card: card, asName: '杀', skillName: '龙胆' };
-          }
-          if (hasSkill(state, 'wusheng')) {
-            card = removeFirstMatchingCard(state, function (item) { return item.color === 'red'; });
-            if (card) return { card: card, asName: '杀', skillName: '武圣' };
-          }
-          return null;
+          var responseContext = { mode: 'response', state: state, asType: 'sha' };
+          var conversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', responseContext));
+          return conversion ? { card: removeCardFromHand(state, conversion.card.id), asName: conversion.asName, skillName: conversion.skillName } : null;
         }
         card = removeFirstCardOfType(state, type);
         return card ? { card: card, asName: card.name, skillName: null } : null;
@@ -1114,15 +1162,14 @@
         var original = typeof cardOrId === 'string' ? self.hand.find(function (item) { return item.id === cardOrId; }) : cardOrId;
         if (!original) return fail('找不到这张牌。');
         if (asType !== 'sha') return fail('当前只支持转化为【杀】。');
-        var skillName = null;
-        if (hasSkill(self, 'wusheng') && original.color === 'red') skillName = '武圣';
-        if (hasSkill(self, 'longdan') && original.type === 'shan') skillName = '龙胆';
-        if (!skillName) return fail('当前武将不能这样转化。');
+        var cardAsContext = { mode: 'proactive', game: game, actor: actor, state: self, card: original, asType: asType };
+        var conversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', cardAsContext));
+        if (!conversion) return fail('当前武将不能这样转化。');
         if (self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
         var playable = canPlayCard(game, actor, virtualShaFromCard(original));
         if (!playable.ok) return playable;
-        playable.skillName = skillName;
-        playable.message = '发动【' + skillName + '】，将【' + original.name + '】当【杀】使用。';
+        playable.skillName = conversion.skillName;
+        playable.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【杀】使用。';
         return playable;
       }
 

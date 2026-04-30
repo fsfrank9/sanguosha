@@ -97,6 +97,41 @@ test('赵云【龙胆】 converts Sha to Shan as automatic response', () => {
   assert.deepEqual(ids(game.player.hand), [], 'response Sha should be consumed');
 });
 
+test('武圣/龙胆 converted Sha preserves the physical source card for damage-after skills', () => {
+  const guanyu = skillGame('guanyu', 'caocao');
+  guanyu.player.hand = [c('tao', { id: 'wusheng-physical-tao', suit: 'heart', color: 'red' })];
+
+  const wushengResult = Engine.playCardAs(guanyu, 'player', 'wusheng-physical-tao', 'sha');
+
+  assert.equal(wushengResult.ok, true, wushengResult.message);
+  assert.equal(guanyu.enemy.hp, guanyu.enemy.maxHp - 1);
+  assert.ok(ids(guanyu.enemy.hand).includes('wusheng-physical-tao'), 'Jianxiong should claim Wusheng\'s physical source card');
+  assert.equal(ids(guanyu.discard).includes('wusheng-physical-tao'), false, 'claimed Wusheng source card should not also remain in discard');
+
+  const zhaoyun = skillGame('zhaoyun', 'caocao');
+  zhaoyun.player.hand = [c('shan', { id: 'longdan-physical-shan' })];
+
+  const longdanResult = Engine.playCardAs(zhaoyun, 'player', 'longdan-physical-shan', 'sha');
+
+  assert.equal(longdanResult.ok, true, longdanResult.message);
+  assert.equal(zhaoyun.enemy.hp, zhaoyun.enemy.maxHp - 1);
+  assert.ok(ids(zhaoyun.enemy.hand).includes('longdan-physical-shan'), 'Jianxiong should claim Longdan\'s physical source card');
+});
+
+test('武圣/龙胆 card-as validation rejects missing skills or invalid source cards', () => {
+  const noSkill = skillGame('sunquan', 'caocao');
+  noSkill.player.hand = [c('tao', { id: 'red-tao-no-skill', suit: 'heart', color: 'red' })];
+  assert.equal(Engine.canPlayCardAs(noSkill, 'player', 'red-tao-no-skill', 'sha').ok, false, 'heroes without a conversion skill cannot card-as Sha');
+
+  const blackWusheng = skillGame('guanyu', 'caocao');
+  blackWusheng.player.hand = [c('tao', { id: 'black-tao-wusheng', suit: 'club', color: 'black' })];
+  assert.equal(Engine.canPlayCardAs(blackWusheng, 'player', 'black-tao-wusheng', 'sha').ok, false, 'Wusheng should only convert red cards');
+
+  const nonShanLongdan = skillGame('zhaoyun', 'caocao');
+  nonShanLongdan.player.hand = [c('tao', { id: 'tao-longdan', suit: 'heart', color: 'red' })];
+  assert.equal(Engine.canPlayCardAs(nonShanLongdan, 'player', 'tao-longdan', 'sha').ok, false, 'Longdan should only convert Shan to proactive Sha');
+});
+
 test('孙权【制衡】 discards selected cards and draws the same amount once per turn', () => {
   const game = skillGame('sunquan', 'caocao');
   game.player.hand = [c('sha', { id: 'old-1' }), c('shan', { id: 'old-2' })];

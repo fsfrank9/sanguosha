@@ -165,7 +165,7 @@ Acceptance criteria:
 
 ## Phase 4 — Skill registry and hooks
 
-**Status:** In progress. Phase 4A–4I are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, 【克己】 proves `onBeforeDiscardPhase`, 【集智】 proves `onCardUse` for successful normal-trick use and response-use paths, 【英姿】/【突袭】 now share the draw-phase `onDrawPhase` hook, 【咆哮】/【马术】 use a `SkillRuntime` passive-effect seam, 【空城】 uses an `onCardTarget` target-validity seam, 【铁骑】 uses `onNeedResponse`, and 【奸雄】 uses `onDamageAfter` without changing gameplay behavior.
+**Status:** In progress. Phase 4A–4J are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, 【克己】 proves `onBeforeDiscardPhase`, 【集智】 proves `onCardUse` for successful normal-trick use and response-use paths, 【英姿】/【突袭】 now share the draw-phase `onDrawPhase` hook, 【咆哮】/【马术】 use a `SkillRuntime` passive-effect seam, 【空城】 uses an `onCardTarget` target-validity seam, 【铁骑】 uses `onNeedResponse`, 【奸雄】 uses `onDamageAfter`, and 【武圣】/【龙胆】 use `onCardAs` without changing gameplay behavior.
 
 Introduce a hook-driven skill runtime before adding many more武将技能:
 
@@ -175,6 +175,7 @@ Introduce a hook-driven skill runtime before adding many more武将技能:
 - `onBeforeDiscardPhase`
 - `onCardUse`
 - `onCardTarget`
+- `onCardAs`
 - `onDamageBefore`
 - `onDamageAfter`
 - `onNeedResponse`
@@ -344,7 +345,25 @@ Verification completed for Phase 4I:
 - Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
 - Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
 
-Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are remaining direct active-skill dispatch paths such as 【武圣】/【龙胆】 conversion windows and selected `onPhaseStart`/`onPhaseEnd` automatic skills once those side effects are isolated.
+### Completed in Phase 4J
+
+- Registered `wusheng` and `longdan` through the shared registry with `onCardAs` handlers.
+- Added `triggerWushengCardAs(context)` and `triggerLongdanCardAs(context)` as behavior-preserving helpers for existing card-as/conversion logic.
+- Changed `findResponseCard(state, type)` to keep native response cards first, then dispatch `SkillRuntime.runHook(skillRegistry, 'onCardAs', responseContext)` for response-window conversions.
+- Changed `canPlayCardAs(game, actor, cardOrId, asType)` to dispatch `SkillRuntime.runHook(skillRegistry, 'onCardAs', cardAsContext)` for proactive card-as-Sha UI affordances instead of directly owning `wusheng` / `longdan` checks.
+- Preserved the existing conversion contract: 【武圣】 converts red cards to 【杀】, 【龙胆】 converts 【闪】 to 【杀】 and 【杀】 to 【闪】 in the appropriate windows, native response cards remain preferred, and virtual cards keep the original physical card for downstream ownership effects.
+- Extended `tests/skill_runtime_hooks.test.mjs` to guard the `onCardAs` seam and ensure response/proactive conversion paths no longer directly own `wusheng` / `longdan` checks, while `tests/skills.test.mjs` covers response-window conversion regression.
+
+Verification completed for Phase 4J:
+
+- RED confirmed: the new seam test failed before implementation because `longdan` / `wusheng` were not registered through `SkillRuntime.registerSkill` and conversion paths still directly owned those checks.
+- Targeted GREEN: `node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs`.
+- Full GREEN: `npm run verify`.
+- Direct-open smoke: `file:///Users/frankmei/.hermes/Workspace/sanguosha-html/index.html`, enter game succeeds, browser console has zero JavaScript errors.
+- Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
+- Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
+
+Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are remaining direct active-skill dispatch paths and selected `onPhaseStart`/`onPhaseEnd` automatic skills once those side effects are isolated.
 
 Acceptance criteria:
 
