@@ -158,3 +158,21 @@ test('state runtime resolves Paoxiao and Mashu through SkillRuntime passive effe
   assert.doesNotMatch(stateSource, /hasSkill\([^)]*['"]paoxiao['"]/, 'StateRuntime should not directly hard-code Paoxiao detection');
   assert.doesNotMatch(stateSource, /hasSkill\([^)]*['"]mashu['"]/, 'StateRuntime should not directly hard-code Mashu detection');
 });
+
+test('game engine dispatches Kongcheng through onCardTarget hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const canPlayStart = source.indexOf('function canPlayCard(game, actor, card)');
+  const canPlayEnd = source.indexOf('function playSha(game, actor, card)', canPlayStart);
+  const playShaStart = canPlayEnd;
+  const playShaEnd = source.indexOf('function playDuel(game, actor, card)', playShaStart);
+  assert.ok(canPlayStart >= 0 && canPlayEnd > canPlayStart, 'canPlayCard source should be extractable');
+  assert.ok(playShaStart >= 0 && playShaEnd > playShaStart, 'playSha source should be extractable');
+  const canPlaySource = source.slice(canPlayStart, canPlayEnd);
+  const playShaSource = source.slice(playShaStart, playShaEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]kongcheng['"]/, 'Kongcheng should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]kongcheng['"][\s\S]*?onCardTarget\s*:/, 'Kongcheng should register an onCardTarget hook');
+  assert.match(source, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardTarget['"]/, 'target validation should dispatch through onCardTarget');
+  assert.doesNotMatch(canPlaySource, /isKongchengProtected|hasSkill\([^)]*['"]kongcheng['"]/, 'canPlayCard should no longer directly own Kongcheng target protection');
+  assert.doesNotMatch(playShaSource, /isKongchengProtected|hasSkill\([^)]*['"]kongcheng['"]/, 'playSha should no longer directly own Kongcheng target protection');
+});

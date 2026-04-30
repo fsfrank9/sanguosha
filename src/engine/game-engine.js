@@ -88,10 +88,33 @@
           context.drawCount = Math.max(0, context.drawCount - 1);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'kongcheng', {
+        onCardTarget: function (context) {
+          var target = context.game[context.targetActor];
+          if (!target || !hasSkill(target, 'kongcheng') || target.hand.length !== 0) return null;
+          if (!isShaType(context.cardType) && context.cardType !== 'juedou') return null;
+          return {
+            protected: true,
+            message: actorName(context.game, context.targetActor) + '处于【空城】状态，不能成为【' + context.cardName + '】目标。'
+          };
+        }
+      });
 
-      function isKongchengProtected(game, targetActor, cardType) {
-        var target = game[targetActor];
-        return !!(target && hasSkill(target, 'kongcheng') && target.hand.length === 0 && (isShaType(cardType) || cardType === 'juedou'));
+      function cardTargetProtection(game, actor, targetActor, card, displayName) {
+        var cardType = card && card.type ? card.type : card;
+        var cardName = displayName || (card && card.name) || (CARD_INFO[cardType] && CARD_INFO[cardType].name) || cardType;
+        var results = SkillRuntime.runHook(skillRegistry, 'onCardTarget', {
+          game: game,
+          actor: actor,
+          targetActor: targetActor,
+          card: card,
+          cardType: cardType,
+          cardName: cardName
+        });
+        for (var i = 0; i < results.length; i += 1) {
+          if (results[i].result && results[i].result.protected) return results[i].result;
+        }
+        return null;
       }
 
       function takeHandCard(game, fromActor, toActor, reason) {
@@ -521,7 +544,8 @@
         if (game.phase !== 'play') return fail('当前不是出牌阶段。');
         var self = game[actor];
         if (card.type === 'shan' || card.type === 'wuxie') return fail('【' + card.name + '】只能用于响应，本版会自动打出。');
-        if (isKongchengProtected(game, opponent(actor), card.type)) return fail(actorName(game, opponent(actor)) + '处于【空城】状态，不能成为【' + card.name + '】目标。');
+        var targetProtection = cardTargetProtection(game, actor, opponent(actor), card);
+        if (targetProtection) return fail(targetProtection.message);
         if (isShaCard(card) && !canReachWithSha(game, actor, opponent(actor))) return fail('距离不足，当前武器范围无法使用【杀】。');
         if (isShaCard(card) && self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
         if (card.type === 'tao' && self.hp >= self.maxHp) return fail('体力已满，不能使用【桃】。');
@@ -535,7 +559,8 @@
         var self = game[actor];
         var targetActor = opponent(actor);
         var target = game[targetActor];
-        if (isKongchengProtected(game, targetActor, card.type)) return fail(actorName(game, targetActor) + '处于【空城】状态，不能成为【杀】目标。');
+        var targetProtection = cardTargetProtection(game, actor, targetActor, card, '杀');
+        if (targetProtection) return fail(targetProtection.message);
         if (!canReachWithSha(game, actor, targetActor)) return fail('距离不足，当前武器范围无法使用【杀】。');
         self.usedSha = true;
         self.usedOrRespondedSha = true;

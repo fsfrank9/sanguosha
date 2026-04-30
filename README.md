@@ -77,7 +77,8 @@ v4.0 不是重写，而是分批“安全拆源”：
 9. Phase 4D 已把周瑜【英姿】迁入 `onDrawPhase` hook：摸牌阶段统一派发 draw-phase hook，默认摸 2、【英姿】额外摸 1 的既有行为保持不变。
 10. Phase 4E 已把张辽【突袭】迁入同一个 `onDrawPhase` hook seam：对手有手牌时从对方获得 1 张手牌，并把本次摸牌数减少 1；`performDrawPhase` 不再直接持有 `tuxi` 技能判断。
 11. Phase 4F 已把张飞【咆哮】与马超/庞德/SP 庞德【马术】接入 `SkillRuntime` 被动效果 seam：`StateRuntime` 通过 `hasPassiveEffect` / `sumPassiveEffect` 查询无限【杀】与出距 -1，不再直接硬编码 `paoxiao` / `mashu` 判断。
-12. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
+12. Phase 4G 已把诸葛亮【空城】接入 `SkillRuntime.onCardTarget` target-validity seam：`canPlayCard` 与 `playSha` 通过统一目标保护 helper 派发 `onCardTarget`，不再直接持有 `kongcheng` 目标保护判断。
+13. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
 
 详细迁移计划见：
 
@@ -109,6 +110,7 @@ docs/plans/2026-04-29-sanguosha-v4-architecture.md
 - 【英姿】：周瑜摸牌阶段额外摸 1 张牌。该触发入口已迁到 Phase 4D 的 `onDrawPhase` hook seam，`performDrawPhase` 只负责派发 draw-phase hook 与执行摸牌。
 - 【突袭】：张辽摸牌阶段在对手有手牌时获得对手 1 张手牌，并少摸 1 张。该触发入口已迁到 Phase 4E 的 `onDrawPhase` hook seam，行为测试继续覆盖偷牌与少摸牌的回归。
 - 【咆哮】/【马术】：张飞【咆哮】提供无限使用【杀】效果，马超/庞德/SP 庞德【马术】提供出距 -1；Phase 4F 将这类锁定被动效果迁到 `SkillRuntime.hasPassiveEffect` / `sumPassiveEffect` seam，`StateRuntime` 继续负责距离与次数查询但不再直接硬编码对应技能 ID。
+- 【空城】：诸葛亮无手牌时不能成为【杀】或【决斗】目标；Phase 4G 将该目标合法性保护迁到 `SkillRuntime.onCardTarget` seam，`canPlayCard` 和 `playSha` 统一通过 target protection helper 派发，行为测试继续覆盖失败后手牌不被移除与目标不受伤。
 
 ## 官方资料对照与缓存
 

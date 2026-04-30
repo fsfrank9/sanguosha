@@ -165,7 +165,7 @@ Acceptance criteria:
 
 ## Phase 4 — Skill registry and hooks
 
-**Status:** In progress. Phase 4A–4F are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, 【克己】 proves `onBeforeDiscardPhase`, 【集智】 proves `onCardUse` for successful normal-trick use and response-use paths, 【英姿】/【突袭】 now share the draw-phase `onDrawPhase` hook, and 【咆哮】/【马术】 now use a `SkillRuntime` passive-effect seam without changing gameplay behavior.
+**Status:** In progress. Phase 4A–4G are complete: a minimal SkillRegistry/hook seam exists, 【闭月】 proves `onTurnEnd`, 【克己】 proves `onBeforeDiscardPhase`, 【集智】 proves `onCardUse` for successful normal-trick use and response-use paths, 【英姿】/【突袭】 now share the draw-phase `onDrawPhase` hook, 【咆哮】/【马术】 use a `SkillRuntime` passive-effect seam, and 【空城】 now uses an `onCardTarget` target-validity seam without changing gameplay behavior.
 
 Introduce a hook-driven skill runtime before adding many more武将技能:
 
@@ -292,7 +292,25 @@ Verification completed for Phase 4F:
 - Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
 - Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
 
-Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are selected `onPhaseStart`/`onPhaseEnd` automatic skills, card-target protection such as 【空城】, then damage/response-window hooks once those side effects are isolated.
+### Completed in Phase 4G
+
+- Registered `kongcheng` through the shared registry with an `onCardTarget` handler.
+- Replaced the direct `isKongchengProtected` path with a generic `cardTargetProtection(game, actor, targetActor, card, displayName)` helper that dispatches `SkillRuntime.runHook(skillRegistry, 'onCardTarget', context)` and consumes the first `{ protected: true, message }` result.
+- Changed both `canPlayCard(game, actor, card)` and `playSha(game, actor, card)` to use the shared target-protection seam instead of directly owning 【空城】 target checks.
+- Preserved the existing 【空城】 behavior contract: an empty-handed actor with `kongcheng` cannot be targeted by 【杀】 or 【决斗】; failed checks happen before hand removal; existing non-empty / non-Sha-Duel paths remain self-filtered by the hook.
+- Extended `tests/skill_runtime_hooks.test.mjs` to guard the 【空城】 seam and ensure `canPlayCard` / `playSha` no longer directly own Kongcheng target protection, while `tests/skills.test.mjs` continues to cover the Sha/Duel behavior regression.
+
+Verification completed for Phase 4G:
+
+- RED confirmed: the new seam test failed before implementation because `kongcheng` was not registered through `SkillRuntime.registerSkill` and the target checks still used the direct protection helper.
+- Targeted GREEN: `npm run build && node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs`.
+- Targeted verification: `npm run build && node tests/skill_runtime_hooks.test.mjs && node tests/skills.test.mjs && node tests/advanced_engine.test.mjs && node tests/skill_ui_regression.test.mjs && node tests/card_runtime.test.mjs && node tests/engine_modules.test.mjs`.
+- Full GREEN: `npm run verify`.
+- Direct-open smoke: `file:///Users/frankmei/.hermes/Workspace/sanguosha-html/index.html`, enter game succeeds, browser console has zero JavaScript errors.
+- Artifact parity: root `index.html` and `dist/index.html` are byte-identical after build.
+- Static review: `git diff --check`, added-line security scan, and independent read-only review found no blocking issue.
+
+Next Phase 4 batches should migrate one skill or one trigger family at a time. Good follow-ups are selected `onPhaseStart`/`onPhaseEnd` automatic skills, then damage/response-window hooks once those side effects are isolated.
 
 Acceptance criteria:
 
@@ -325,6 +343,6 @@ Acceptance criteria:
 - `index.html` remains直接打开可运行.
 - `dist/index.html` is reproducible from `src/`.
 - No credentials or official prose caches are committed.
-- Preserve current implemented skill behavior: `仁德`、`反间`、`观星`、`武圣`、`龙胆`、`制衡`、`苦肉`、`咆哮`、`马术`、`闭月`、`克己`、`集智`、`英姿`、`突袭` and other existing engine skills.
+- Preserve current implemented skill behavior: `仁德`、`反间`、`观星`、`武圣`、`龙胆`、`制衡`、`苦肉`、`咆哮`、`马术`、`闭月`、`克己`、`集智`、`英姿`、`突袭`、`空城` and other existing engine skills.
 - Keep `enterZhihengMode()` and `confirmZhiheng()` legacy UI helpers compatible.
 - Red dual-use cards such as red【火攻】 must still offer normal-vs-as-Sha choice before normal-use panels.
