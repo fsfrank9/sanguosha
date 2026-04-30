@@ -46,7 +46,7 @@ npm run build:check
   - `src/data/cards.js`：卡牌 catalog、牌类信息与阶段常量。
   - `src/data/skill-status.js`：已实现技能与主动技能入口清单。
   - `src/engine/runtime.js`：引擎通用 runtime/helper 模块，负责数据校验、克隆、随机数、玩家工厂等基础能力。
-  - `src/engine/skill-runtime.js`：技能 runtime 模块，当前承接技能状态标注、最小 SkillRegistry 与 hook 分发 API（`createRegistry` / `registerSkill` / `runHook`）。
+  - `src/engine/skill-runtime.js`：技能 runtime 模块，当前承接技能状态标注、被动效果查询 seam，以及最小 SkillRegistry 与 hook 分发 API（`createRegistry` / `registerSkill` / `runHook`）。
   - `src/engine/card-runtime.js`：卡牌 runtime 的第一层模块，负责测试卡生成、牌堆生成、【杀】/普通锦囊分类与虚拟牌实体牌解析。
   - `src/engine/state.js`：状态/角色 runtime 模块，负责角色名、对手、技能查询、距离/攻击范围、先手、手牌上限与状态文案等纯查询。
   - `src/engine/phases.js`：阶段 runtime 模块，负责阶段历史记录、回合状态重置、阶段切换 helper 与摸牌后进入出牌/弃牌的判断。
@@ -70,13 +70,14 @@ v4.0 不是重写，而是分批“安全拆源”：
 2. 已将 CSS、数据模块、引擎、UI 适配层抽到 `src/`。
 3. 用 `tools/build.mjs` 生成 `index.html` 和 `dist/index.html`。
 4. 用 `tests/architecture_build.test.mjs`、`tests/data_modules.test.mjs` 和 `tests/engine_modules.test.mjs` 防止源码与产物漂移。
-5. 已开始拆 `src/engine/*` runtime seam；`runtime`、`skill-runtime`、`card-runtime`、`state`、`phases`、`judgement` 已落地，其中 `skill-runtime` 正在 Phase 4 逐个迁移已实现技能的触发入口。
+5. 已开始拆 `src/engine/*` runtime seam；`runtime`、`skill-runtime`、`card-runtime`、`state`、`phases`、`judgement` 已落地，其中 `skill-runtime` 正在 Phase 4 逐个迁移已实现技能的触发入口与被动效果入口。
 6. Phase 4A 已把【闭月】作为第一条证明链路迁入 `onTurnEnd` hook：`completeTurn` 统一派发 hook，具体技能效果仍复用原 `triggerBiyue`，避免行为漂移。
 7. Phase 4B 已把吕蒙【克己】迁入 `onBeforeDiscardPhase` hook：`finishPlayPhase` 先派发进入弃牌前 hook，原有跳过弃牌行为与日志/返回值保持不变。
 8. Phase 4C 已把黄月英【集智】迁入 `onCardUse` hook：普通锦囊成功使用与响应【无懈可击】统一通过 `SkillRuntime.runHook` 派发，非普通锦囊、非法使用与【铁索连环】重铸仍不触发。
 9. Phase 4D 已把周瑜【英姿】迁入 `onDrawPhase` hook：摸牌阶段统一派发 draw-phase hook，默认摸 2、【英姿】额外摸 1 的既有行为保持不变。
 10. Phase 4E 已把张辽【突袭】迁入同一个 `onDrawPhase` hook seam：对手有手牌时从对方获得 1 张手牌，并把本次摸牌数减少 1；`performDrawPhase` 不再直接持有 `tuxi` 技能判断。
-11. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
+11. Phase 4F 已把张飞【咆哮】与马超/庞德/SP 庞德【马术】接入 `SkillRuntime` 被动效果 seam：`StateRuntime` 通过 `hasPassiveEffect` / `sumPassiveEffect` 查询无限【杀】与出距 -1，不再直接硬编码 `paoxiao` / `mashu` 判断。
+12. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
 
 详细迁移计划见：
 
@@ -107,6 +108,7 @@ docs/plans/2026-04-29-sanguosha-v4-architecture.md
 - 【集智】：黄月英成功使用普通锦囊后摸 1 张牌；响应使用【无懈可击】成功抵消锦囊时也会触发；非法使用、非普通锦囊或【铁索连环】重铸不触发。该触发入口已迁到 Phase 4C 的 `onCardUse` hook seam，实际摸牌效果仍复用原有行为 helper 以降低迁移风险。
 - 【英姿】：周瑜摸牌阶段额外摸 1 张牌。该触发入口已迁到 Phase 4D 的 `onDrawPhase` hook seam，`performDrawPhase` 只负责派发 draw-phase hook 与执行摸牌。
 - 【突袭】：张辽摸牌阶段在对手有手牌时获得对手 1 张手牌，并少摸 1 张。该触发入口已迁到 Phase 4E 的 `onDrawPhase` hook seam，行为测试继续覆盖偷牌与少摸牌的回归。
+- 【咆哮】/【马术】：张飞【咆哮】提供无限使用【杀】效果，马超/庞德/SP 庞德【马术】提供出距 -1；Phase 4F 将这类锁定被动效果迁到 `SkillRuntime.hasPassiveEffect` / `sumPassiveEffect` seam，`StateRuntime` 继续负责距离与次数查询但不再直接硬编码对应技能 ID。
 
 ## 官方资料对照与缓存
 

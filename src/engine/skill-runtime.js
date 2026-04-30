@@ -20,6 +20,34 @@
     });
   }
 
+  var PASSIVE_EFFECTS = {
+    paoxiao: {
+      unlimitedSha: true
+    },
+    mashu: {
+      outgoingDistance: -1
+    }
+  };
+
+  function skillEffectValue(skillId, effectName) {
+    var effects = PASSIVE_EFFECTS[skillId];
+    if (!effects) return undefined;
+    return effects[effectName];
+  }
+
+  function hasPassiveEffect(state, effectName) {
+    return !!(state && state.skills || []).some(function (skill) {
+      return !!skillEffectValue(skill.id, effectName);
+    });
+  }
+
+  function sumPassiveEffect(state, effectName) {
+    return (state && state.skills || []).reduce(function (total, skill) {
+      var value = skillEffectValue(skill.id, effectName);
+      return total + (typeof value === 'number' ? value : 0);
+    }, 0);
+  }
+
   function createRegistry() {
     return {
       skills: [],
@@ -63,6 +91,8 @@
 
   modules.SkillRuntime = {
     annotateSkillStatus: annotateSkillStatus,
+    hasPassiveEffect: hasPassiveEffect,
+    sumPassiveEffect: sumPassiveEffect,
     createRegistry: createRegistry,
     registerSkill: registerSkill,
     runHook: runHook

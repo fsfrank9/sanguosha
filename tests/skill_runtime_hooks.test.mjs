@@ -139,3 +139,22 @@ test('game engine dispatches Tuxi through onDrawPhase hook seam', () => {
   assert.match(performDrawPhaseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDrawPhase['"]/, 'performDrawPhase should dispatch draw-stage skills through onDrawPhase');
   assert.doesNotMatch(performDrawPhaseSource, /hasSkill\([^)]*['"]tuxi['"]/, 'performDrawPhase should no longer directly own Tuxi skill detection');
 });
+
+test('SkillRuntime exposes passive effect helpers for locked skill seams', () => {
+  assert.equal(typeof SkillRuntime.hasPassiveEffect, 'function', 'hasPassiveEffect should be exported');
+  assert.equal(typeof SkillRuntime.sumPassiveEffect, 'function', 'sumPassiveEffect should be exported');
+
+  assert.equal(SkillRuntime.hasPassiveEffect({ skills: [{ id: 'paoxiao' }] }, 'unlimitedSha'), true, 'Paoxiao should grant unlimited Sha effect');
+  assert.equal(SkillRuntime.hasPassiveEffect({ skills: [] }, 'unlimitedSha'), false, 'missing Paoxiao should not grant unlimited Sha effect');
+  assert.equal(SkillRuntime.sumPassiveEffect({ skills: [{ id: 'mashu' }] }, 'outgoingDistance'), -1, 'Mashu should reduce outgoing distance by 1');
+  assert.equal(SkillRuntime.sumPassiveEffect({ skills: [] }, 'outgoingDistance'), 0, 'missing Mashu should not change outgoing distance');
+});
+
+test('state runtime resolves Paoxiao and Mashu through SkillRuntime passive effect seam', () => {
+  const stateSource = fs.readFileSync(path.join(root, 'src/engine/state.js'), 'utf8');
+
+  assert.match(stateSource, /SkillRuntime\.hasPassiveEffect\(\s*state\s*,\s*['"]unlimitedSha['"]/, 'canUseUnlimitedSha should query SkillRuntime passive effects');
+  assert.match(stateSource, /SkillRuntime\.sumPassiveEffect\(\s*from\s*,\s*['"]outgoingDistance['"]/, 'distanceBetween should query SkillRuntime passive distance modifiers');
+  assert.doesNotMatch(stateSource, /hasSkill\([^)]*['"]paoxiao['"]/, 'StateRuntime should not directly hard-code Paoxiao detection');
+  assert.doesNotMatch(stateSource, /hasSkill\([^)]*['"]mashu['"]/, 'StateRuntime should not directly hard-code Mashu detection');
+});

@@ -2,6 +2,7 @@
   'use strict';
 
   var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
+  var SkillRuntime = modules.SkillRuntime;
 
   function actorName(game, actor) {
     return game[actor].name;
@@ -16,7 +17,7 @@
   }
 
   function canUseUnlimitedSha(state) {
-    return hasSkill(state, 'paoxiao') || (state.equipment && state.equipment.weapon && state.equipment.weapon.type === 'zhuge');
+    return SkillRuntime.hasPassiveEffect(state, 'unlimitedSha') || (state.equipment && state.equipment.weapon && state.equipment.weapon.type === 'zhuge');
   }
 
   function weaponRange(state) {
@@ -30,7 +31,7 @@
     var distance = 1;
     if (to.equipment && to.equipment.horsePlus) distance += 1;
     if (from.equipment && from.equipment.horseMinus) distance -= 1;
-    if (hasSkill(from, 'mashu')) distance -= 1;
+    distance += SkillRuntime.sumPassiveEffect(from, 'outgoingDistance');
     return Math.max(1, distance);
   }
 
