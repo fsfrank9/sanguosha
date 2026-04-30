@@ -1284,7 +1284,7 @@
 
       var IMPLEMENTED_SKILL_IDS = [
         'zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing',
-        'paoxiao', 'wusheng', 'longdan', 'qingguo', 'jianxiong', 'mashu', 'qicai', 'qianxun', 'tieqi', 'tuxi', 'yingzi', 'kongcheng',
+        'paoxiao', 'wusheng', 'longdan', 'qingguo', 'jianxiong', 'mashu', 'qicai', 'qianxun', 'tiandu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng',
         'biyue', 'keji', 'jizhi'
       ];
       var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing'];
@@ -1900,6 +1900,11 @@
           return triggerQianxunCardTarget(context);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'tiandu', {
+        onJudgementAfterResolve: function (context) {
+          return triggerTianduJudgementAfterResolve(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'tieqi', {
         onNeedResponse: function (context) {
           return triggerTieqiNeedResponse(context.game, context.actor, context.targetActor, context.responseType, context.card);
@@ -2116,6 +2121,18 @@
         target.hand.push(physicalSourceCard);
         log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + physicalSourceCard.name + '】。');
         return { claimedSourceCard: true };
+      }
+
+      function triggerTianduJudgementAfterResolve(context) {
+        var game = context.game;
+        var actor = context.actor;
+        var state = context.state || game[actor];
+        var physicalCard = physicalCardOf(context.card);
+        if (!state || !physicalCard || !hasSkill(state, 'tiandu')) return null;
+        state.hand.push(physicalCard);
+        context.claimed = true;
+        log(game, actorName(game, actor) + '发动【天妒】，获得了判定牌【' + physicalCard.name + '】。');
+        return { claimedJudgementCard: true };
       }
 
       function triggerLongdanCardAs(context) {
@@ -2459,9 +2476,23 @@
         reshuffleIfNeeded(game);
         var card = game.deck.pop();
         if (!card) return null;
-        discardCard(game, card);
         log(game, actorName(game, actor) + '进行' + reason + '判定：【' + card.name + '】' + card.suit + ' ' + card.rank + '。');
         return card;
+      }
+
+      function resolveJudgementCard(game, actor, state, reason, card) {
+        if (!card) return;
+        var judgementContext = {
+          game: game,
+          actor: actor,
+          state: state,
+          reason: reason,
+          card: card
+        };
+        SkillRuntime.runHook(skillRegistry, 'onJudgementAfterResolve', judgementContext);
+        if (!judgementContext.claimed) {
+          discardCard(game, card);
+        }
       }
 
       function judgementReasonFor(trick) {
@@ -2498,6 +2529,7 @@
             game[opponent(actor)].judgeArea.push(trick);
             log(game, '【闪电】移至' + actorName(game, opponent(actor)) + '的判定区。');
           }
+          resolveJudgementCard(game, actor, state, reason, judgementCard);
           if (outcome.discardTrick) discardCard(game, trick);
         });
       }
@@ -2634,12 +2666,14 @@
       function triggerTieqiNeedResponse(game, actor, targetActor, responseType, triggeringCard) {
         var source = game[actor];
         if (!source || responseType !== 'shan' || !isShaCard(triggeringCard) || !hasSkill(source, 'tieqi')) return null;
-        var tieqiJudge = judge(game, targetActor, '【铁骑】');
+        var tieqiJudge = judge(game, actor, '【铁骑】');
         if (tieqiJudge && tieqiJudge.color === 'red') {
           log(game, actorName(game, actor) + '发动【铁骑】，红色判定令' + actorName(game, targetActor) + '不能打出【闪】。');
+          resolveJudgementCard(game, actor, source, '【铁骑】', tieqiJudge);
           return { responseLocked: true };
         }
         log(game, actorName(game, actor) + '发动【铁骑】，判定未命中。');
+        resolveJudgementCard(game, actor, source, '【铁骑】', tieqiJudge);
         return null;
       }
 
@@ -2689,6 +2723,7 @@
             log(game, actorName(game, targetActor) + '的【八卦阵】判定为红色，视为打出【闪】。');
             dodged = true;
           }
+          resolveJudgementCard(game, targetActor, target, '【八卦阵】', baguaJudge);
         }
 
         if (dodged) {

@@ -305,3 +305,18 @@ test('game engine dispatches Guanxing preview through onSkillPreview hook seam',
   assert.match(previewSource, /selectActiveSkillResult\(\s*previewResults\s*,\s*['"]guanxing['"]\s*\)/, 'getGuanxingPreview should select Guanxing preview hook result');
   assert.doesNotMatch(previewSource, /hasSkill\([^)]*['"]guanxing['"]/, 'getGuanxingPreview should no longer directly own Guanxing skill detection');
 });
+
+test('game engine dispatches Tiandu judgement-card gain through onJudgementAfterResolve hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const judgeStart = source.indexOf('function judge(game, actor, reason)');
+  const processStart = source.indexOf('function processJudgeArea(game, actor)', judgeStart);
+  const processEnd = source.indexOf('function removeTargetZoneCard(game, targetActor, zone, cardId)', processStart);
+  assert.ok(judgeStart >= 0 && processStart > judgeStart && processEnd > processStart, 'judgement source should be extractable');
+  const judgementSource = source.slice(judgeStart, processEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tiandu['"][\s\S]*?onJudgementAfterResolve\s*:/, 'Tiandu should register an onJudgementAfterResolve hook');
+  assert.match(source, /triggerTianduJudgementAfterResolve\(context\)/, 'Tiandu hook should delegate to an isolated helper');
+  assert.match(judgementSource, /var judgementContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*state[\s\S]*reason:\s*reason[\s\S]*card:\s*card[\s\S]*\}/, 'judge should build a judgement context before discarding the judgement card');
+  assert.match(judgementSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onJudgementAfterResolve['"]\s*,\s*judgementContext\s*\)/, 'judge should dispatch judgement-card resolution through SkillRuntime');
+  assert.match(judgementSource, /if \(!judgementContext\.claimed\) \{[\s\S]*discardCard\(game, card\);[\s\S]*\}/, 'unclaimed judgement cards should still enter discard');
+});

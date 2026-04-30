@@ -218,6 +218,38 @@ test('马超【铁骑】 red judgment prevents target from playing Shan', () => 
   assert.equal(result.ok, true, result.message);
   assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'red Tieqi judgment should force Sha damage');
   assert.deepEqual(ids(game.enemy.hand), ['blocked-shan'], 'target should not consume Shan after red Tieqi');
+  assert.ok(ids(game.discard).includes('tieqi-red-judge'), 'non-Tiandu Tieqi judgment card should enter discard after the result is used');
+});
+
+test('郭嘉【天妒】 does not gain an opponent source\'s Tieqi judgment card', () => {
+  const game = skillGame('machao', 'guojia');
+  game.player.hand = [c('sha', { id: 'tiandu-tieqi-sha' })];
+  game.enemy.hand = [c('shan', { id: 'tiandu-tieqi-blocked-shan' })];
+  game.deck = [c('tao', { id: 'tiandu-tieqi-judge-heart', suit: 'heart', color: 'red' })];
+
+  const result = Engine.playCard(game, 'player', 'tiandu-tieqi-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'red Tieqi judgment should still force Sha damage');
+  assert.deepEqual(ids(game.enemy.hand), ['tiandu-tieqi-blocked-shan'], 'target Guo Jia should not claim the Tieqi source\'s judgment card');
+  assert.ok(ids(game.discard).includes('tiandu-tieqi-judge-heart'), 'source-owned Tieqi judgment should enter discard when the source has no Tiandu');
+  assert.equal(game.log.some((entry) => /天妒/.test(entry)), false, 'Tiandu should not trigger for another actor\'s Tieqi judgment');
+});
+
+test('郭嘉【天妒】 gains his own Tieqi judgment card before discard', () => {
+  const game = skillGame('machao', 'sunquan');
+  game.player.skills.push({ id: 'tiandu', name: '天妒' });
+  game.player.hand = [c('sha', { id: 'tiandu-own-tieqi-sha' })];
+  game.enemy.hand = [c('shan', { id: 'tiandu-own-tieqi-blocked-shan' })];
+  game.deck = [c('tao', { id: 'tiandu-own-tieqi-judge-heart', suit: 'heart', color: 'red' })];
+
+  const result = Engine.playCard(game, 'player', 'tiandu-own-tieqi-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'red Tieqi judgment should still force Sha damage');
+  assert.deepEqual(ids(game.player.hand), ['tiandu-own-tieqi-judge-heart'], 'Tiandu should claim the Tieqi source\'s own judgment card');
+  assert.equal(ids(game.discard).includes('tiandu-own-tieqi-judge-heart'), false, 'Tiandu-claimed Tieqi judgment should not enter discard');
+  assert.ok(game.log.some((entry) => /天妒/.test(entry)), 'Tiandu trigger should be logged for Tieqi judgment');
 });
 
 test('马超【铁骑】 non-red judgment keeps normal Shan response available', () => {
@@ -532,4 +564,51 @@ test('陆逊【谦逊】 prevents Shunshou and Le Bu Si Shu from targeting him',
   assert.equal(lebuResult.ok, false, 'failed Qianxun delayed-trick targeting should not consume the card');
   assert.deepEqual(ids(lebuGame.player.hand), ['qianxun-lebu']);
   assert.equal(lebuGame.enemy.judgeArea.length, 0);
+});
+
+test('郭嘉【天妒】 gains his resolved judgement card before it enters discard', () => {
+  const game = skillGame('guojia', 'sunquan');
+  const judgementCard = c('shan', { id: 'tiandu-judge-heart', suit: 'heart', color: 'red', rank: 'A' });
+  const delayedTrick = c('lebusishu', { id: 'tiandu-lebu' });
+  game.player.judgeArea.push(delayedTrick);
+  game.deck.push(judgementCard);
+  game.turn = 'player';
+  game.phase = 'prepare';
+
+  Engine.advancePhase(game);
+
+  assert.deepEqual(ids(game.player.hand), ['tiandu-judge-heart']);
+  assert.equal(ids(game.discard).includes('tiandu-judge-heart'), false, 'Tiandu should claim the judgement card instead of discarding it');
+  assert.ok(game.log.some((entry) => /天妒/.test(entry)), 'Tiandu trigger should be visible in the battle log');
+});
+
+test('【八卦阵】 non-Tiandu judgement card enters discard after auto Shan result', () => {
+  const game = skillGame('sunquan', 'liubei');
+  game.player.hand = [c('sha', { id: 'bagua-discard-sha' })];
+  game.enemy.hand = [];
+  game.enemy.equipment.armor = c('bagua', { id: 'bagua-discard-armor' });
+  game.deck = [c('tao', { id: 'bagua-red-judge-discard', suit: 'heart', color: 'red' })];
+
+  const result = Engine.playCard(game, 'player', 'bagua-discard-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp, 'red Bagua judgment should still dodge Sha');
+  assert.ok(ids(game.discard).includes('bagua-red-judge-discard'), 'non-Tiandu Bagua judgment card should enter discard after the result is used');
+});
+
+test('郭嘉【天妒】 gains his own Bagua judgement card after it provides Shan', () => {
+  const game = skillGame('sunquan', 'guojia');
+  game.player.hand = [c('sha', { id: 'tiandu-bagua-sha' })];
+  game.enemy.hand = [];
+  game.enemy.equipment.armor = c('bagua', { id: 'tiandu-bagua-armor' });
+  game.deck = [c('tao', { id: 'tiandu-bagua-judge-heart', suit: 'heart', color: 'red' })];
+
+  const result = Engine.playCard(game, 'player', 'tiandu-bagua-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp, 'red Bagua judgment should still dodge Sha before Tiandu claims it');
+  assert.deepEqual(ids(game.enemy.hand), ['tiandu-bagua-judge-heart'], 'Tiandu should claim Guo Jia\'s own Bagua judgment card');
+  assert.equal(ids(game.discard).includes('tiandu-bagua-judge-heart'), false, 'Tiandu-claimed Bagua judgment should not enter discard');
+  assert.ok(game.log.some((entry) => /八卦阵/.test(entry)), 'Bagua result should still be logged');
+  assert.ok(game.log.some((entry) => /天妒/.test(entry)), 'Tiandu trigger should be logged for Bagua judgment');
 });
