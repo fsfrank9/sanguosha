@@ -1892,6 +1892,11 @@
           };
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'tieqi', {
+        onNeedResponse: function (context) {
+          return triggerTieqiNeedResponse(context.game, context.actor, context.targetActor, context.responseType, context.card);
+        }
+      });
 
       function cardTargetProtection(game, actor, targetActor, card, displayName) {
         var cardType = card && card.type ? card.type : card;
@@ -2348,6 +2353,18 @@
         return success('可以使用。');
       }
 
+      function triggerTieqiNeedResponse(game, actor, targetActor, responseType, triggeringCard) {
+        var source = game[actor];
+        if (!source || responseType !== 'shan' || !isShaCard(triggeringCard) || !hasSkill(source, 'tieqi')) return null;
+        var tieqiJudge = judge(game, targetActor, '【铁骑】');
+        if (tieqiJudge && tieqiJudge.color === 'red') {
+          log(game, actorName(game, actor) + '发动【铁骑】，红色判定令' + actorName(game, targetActor) + '不能打出【闪】。');
+          return { responseLocked: true };
+        }
+        log(game, actorName(game, actor) + '发动【铁骑】，判定未命中。');
+        return null;
+      }
+
       function playSha(game, actor, card) {
         var self = game[actor];
         var targetActor = opponent(actor);
@@ -2371,19 +2388,24 @@
         }
 
         var dodged = false;
-        var tieqiLocked = false;
-        if (hasSkill(self, 'tieqi')) {
-          var tieqiJudge = judge(game, targetActor, '【铁骑】');
-          if (tieqiJudge && tieqiJudge.color === 'red') {
-            tieqiLocked = true;
-            log(game, actorName(game, actor) + '发动【铁骑】，红色判定令' + actorName(game, targetActor) + '不能打出【闪】。');
-          } else {
-            log(game, actorName(game, actor) + '发动【铁骑】，判定未命中。');
+        var responseContext = {
+          game: game,
+          actor: actor,
+          targetActor: targetActor,
+          responseType: 'shan',
+          reason: '【杀】',
+          card: card,
+          responseLocked: false
+        };
+        var responseResults = SkillRuntime.runHook(skillRegistry, 'onNeedResponse', responseContext);
+        for (var responseIndex = 0; responseIndex < responseResults.length; responseIndex += 1) {
+          if (responseResults[responseIndex].result && responseResults[responseIndex].result.responseLocked) {
+            responseContext.responseLocked = true;
           }
         }
-        if (!tieqiLocked && consumeResponse(game, targetActor, 'shan', '【杀】')) {
+        if (!responseContext.responseLocked && consumeResponse(game, targetActor, 'shan', '【杀】')) {
           dodged = true;
-        } else if (!tieqiLocked && armor && !ignoreArmor && armor.type === 'bagua') {
+        } else if (!responseContext.responseLocked && armor && !ignoreArmor && armor.type === 'bagua') {
           var baguaJudge = judge(game, targetActor, '【八卦阵】');
           if (baguaJudge && baguaJudge.color === 'red') {
             log(game, actorName(game, targetActor) + '的【八卦阵】判定为红色，视为打出【闪】。');

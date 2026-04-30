@@ -144,6 +144,38 @@ test('马超【铁骑】 red judgment prevents target from playing Shan', () => 
   assert.deepEqual(ids(game.enemy.hand), ['blocked-shan'], 'target should not consume Shan after red Tieqi');
 });
 
+test('马超【铁骑】 non-red judgment keeps normal Shan response available', () => {
+  const game = skillGame('machao', 'sunquan');
+  game.player.hand = [c('sha', { id: 'tieqi-black-sha' })];
+  game.enemy.hand = [c('shan', { id: 'tieqi-allowed-shan' })];
+  game.deck = [c('sha', { id: 'tieqi-black-judge', suit: 'spade', color: 'black' })];
+
+  const result = Engine.playCard(game, 'player', 'tieqi-black-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp, 'non-red Tieqi judgment should still allow Shan to dodge');
+  assert.deepEqual(ids(game.enemy.hand), [], 'target should consume Shan after non-red Tieqi');
+  assert.ok(game.log.some((entry) => /铁骑/.test(entry) && /判定未命中/.test(entry)), 'non-red Tieqi miss should be logged');
+});
+
+test('马超【铁骑】 red judgment suppresses Bagua automatic Shan', () => {
+  const game = skillGame('machao', 'sunquan');
+  game.player.hand = [c('sha', { id: 'tieqi-bagua-sha' })];
+  game.enemy.hand = [];
+  game.enemy.equipment.armor = c('bagua', { id: 'tieqi-bagua' });
+  game.deck = [
+    c('tao', { id: 'bagua-red-judge-would-dodge', suit: 'heart', color: 'red' }),
+    c('tao', { id: 'tieqi-red-judge-before-bagua', suit: 'heart', color: 'red' })
+  ];
+
+  const result = Engine.playCard(game, 'player', 'tieqi-bagua-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'red Tieqi should force damage before Bagua can provide Shan');
+  assert.deepEqual(game.deck.map((card) => card.id), ['bagua-red-judge-would-dodge'], 'Bagua should not consume a judgment after red Tieqi locks response');
+  assert.ok(!game.log.some((entry) => /八卦阵/.test(entry)), 'Bagua should not trigger after red Tieqi locks response');
+});
+
 test('张辽【突袭】 steals one enemy hand card and draws one fewer card during draw phase', () => {
   const game = skillGame('zhangliao', 'sunquan');
   game.enemy.hand = [c('shan', { id: 'stolen-by-tuxi' })];

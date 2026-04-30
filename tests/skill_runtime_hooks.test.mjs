@@ -176,3 +176,19 @@ test('game engine dispatches Kongcheng through onCardTarget hook seam', () => {
   assert.doesNotMatch(canPlaySource, /isKongchengProtected|hasSkill\([^)]*['"]kongcheng['"]/, 'canPlayCard should no longer directly own Kongcheng target protection');
   assert.doesNotMatch(playShaSource, /isKongchengProtected|hasSkill\([^)]*['"]kongcheng['"]/, 'playSha should no longer directly own Kongcheng target protection');
 });
+
+test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const playShaStart = source.indexOf('function playSha(game, actor, card)');
+  const playShaEnd = source.indexOf('function playDuel(game, actor, card)', playShaStart);
+  assert.ok(playShaStart >= 0 && playShaEnd > playShaStart, 'playSha source should be extractable');
+  const playShaSource = source.slice(playShaStart, playShaEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tieqi['"]/, 'Tieqi should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tieqi['"][\s\S]*?onNeedResponse\s*:/, 'Tieqi should register an onNeedResponse hook');
+  assert.match(source, /triggerTieqiNeedResponse\(context\.game, context\.actor, context\.targetActor, context\.responseType, context\.card\)/, 'Tieqi hook should forward the triggering card for narrow response-window filtering');
+  assert.match(source, /function triggerTieqiNeedResponse\(game, actor, targetActor, responseType, triggeringCard\)/, 'Tieqi response helper should accept the triggering card');
+  assert.match(source, /!isShaCard\(triggeringCard\)/, 'Tieqi response helper should self-filter to Sha response windows only');
+  assert.match(playShaSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onNeedResponse['"]/, 'playSha should dispatch the Shan response window through onNeedResponse');
+  assert.doesNotMatch(playShaSource, /hasSkill\([^)]*['"]tieqi['"]|tieqiLocked/, 'playSha should no longer directly own Tieqi response locking');
+});
