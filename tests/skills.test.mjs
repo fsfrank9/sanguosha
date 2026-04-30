@@ -97,6 +97,21 @@ test('赵云【龙胆】 converts Sha to Shan as automatic response', () => {
   assert.deepEqual(ids(game.player.hand), [], 'response Sha should be consumed');
 });
 
+test('甄姬【倾国】 converts a black hand card to Shan as automatic response', () => {
+  const game = skillGame('zhenji', 'sunquan');
+  game.turn = 'enemy';
+  game.enemy.hand = [c('sha', { id: 'incoming-sha' })];
+  game.player.hand = [c('guohe', { id: 'qingguo-black-card', suit: 'spade', color: 'black' })];
+
+  const result = Engine.playCard(game, 'enemy', 'incoming-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.player.hp, game.player.maxHp, 'Qingguo black-card-as-Shan should prevent Sha damage');
+  assert.deepEqual(ids(game.player.hand), [], 'Qingguo black card should be consumed');
+  assert.ok(ids(game.discard).includes('qingguo-black-card'), 'Qingguo physical card should go to discard');
+  assert.ok(game.log.some((entry) => /倾国/.test(entry) && /当【闪】响应【杀】/.test(entry)), 'Qingguo response should be logged');
+});
+
 test('武圣/龙胆 converted Sha preserves the physical source card for damage-after skills', () => {
   const guanyu = skillGame('guanyu', 'caocao');
   guanyu.player.hand = [c('tao', { id: 'wusheng-physical-tao', suit: 'heart', color: 'red' })];

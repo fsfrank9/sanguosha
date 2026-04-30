@@ -209,7 +209,7 @@ test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
   assert.doesNotMatch(damageSource, /hasSkill\([^)]*['"]jianxiong['"]|发动【奸雄】/, 'damage should no longer directly own Jianxiong skill logic');
 });
 
-test('game engine dispatches Wusheng and Longdan card-as conversions through onCardAs hook seam', () => {
+test('game engine dispatches Wusheng, Longdan, and Qingguo card-as conversions through onCardAs hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const responseMatch = source.match(/function findResponseCard\([^)]*\)/);
   const responseStart = responseMatch ? responseMatch.index : -1;
@@ -223,14 +223,17 @@ test('game engine dispatches Wusheng and Longdan card-as conversions through onC
 
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]longdan['"]/, 'Longdan should be registered with SkillRuntime.registerSkill');
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]wusheng['"]/, 'Wusheng should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qingguo['"]/, 'Qingguo should be registered with SkillRuntime.registerSkill');
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]longdan['"][\s\S]*?onCardAs\s*:/, 'Longdan should register an onCardAs hook');
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]wusheng['"][\s\S]*?onCardAs\s*:/, 'Wusheng should register an onCardAs hook');
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qingguo['"][\s\S]*?onCardAs\s*:/, 'Qingguo should register an onCardAs hook');
   assert.match(source, /triggerLongdanCardAs\(context\)/, 'Longdan hook should delegate conversion decisions to an isolated helper');
   assert.match(source, /triggerWushengCardAs\(context\)/, 'Wusheng hook should delegate conversion decisions to an isolated helper');
+  assert.match(source, /triggerQingguoCardAs\(context\)/, 'Qingguo hook should delegate conversion decisions to an isolated helper');
   assert.match(responseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardAs['"]\s*,\s*responseContext\s*\)/, 'automatic response selection should dispatch conversion opportunities through onCardAs');
   assert.match(canPlaySource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardAs['"]\s*,\s*cardAsContext\s*\)/, 'proactive card-as validation should dispatch through onCardAs');
-  assert.doesNotMatch(responseSource, /hasSkill\([^)]*['"](?:wusheng|longdan)['"]/, 'findResponseCard should no longer directly own Wusheng or Longdan detection');
-  assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"](?:wusheng|longdan)['"]/, 'canPlayCardAs should no longer directly own Wusheng or Longdan detection');
+  assert.doesNotMatch(responseSource, /hasSkill\([^)]*['"](?:wusheng|longdan|qingguo)['"]/, 'findResponseCard should no longer directly own Wusheng, Longdan, or Qingguo detection');
+  assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"](?:wusheng|longdan|qingguo)['"]/, 'canPlayCardAs should no longer directly own Wusheng, Longdan, or Qingguo detection');
 });
 
 test('game engine dispatches implemented active skills through onActiveSkill hook seam', () => {

@@ -119,6 +119,11 @@
           return triggerWushengCardAs(context);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'qingguo', {
+        onCardAs: function (context) {
+          return triggerQingguoCardAs(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'zhiheng', {
         onActiveSkill: function (context) {
           return triggerZhihengActiveSkill(context);
@@ -331,6 +336,14 @@
           return { card: context.card, asName: '杀', skillName: '武圣', priority: 10 };
         }
         return null;
+      }
+
+      function triggerQingguoCardAs(context) {
+        var state = context.state;
+        if (!state || !hasSkill(state, 'qingguo')) return null;
+        if (context.mode !== 'response' || context.asType !== 'shan') return null;
+        var blackCard = firstMatchingCard(state, function (item) { return item.color === 'black'; });
+        return blackCard ? { card: blackCard, asName: '闪', skillName: '倾国', priority: 10 } : null;
       }
 
       function triggerZhihengActiveSkill(context) {

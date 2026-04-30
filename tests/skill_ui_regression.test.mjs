@@ -39,8 +39,9 @@ test('engine exposes explicit skill implementation status for every catalog skil
     assert.ok(Engine.ACTIVE_SKILL_IDS.includes(required), `${required} should be a clickable active skill`);
     assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes(required), `${required} should be marked implemented`);
   }
-  for (const required of ['wusheng', 'longdan', 'paoxiao', 'jianxiong', 'mashu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng']) {
+  for (const required of ['wusheng', 'longdan', 'qingguo', 'paoxiao', 'jianxiong', 'mashu', 'tieqi', 'tuxi', 'yingzi', 'kongcheng']) {
     assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes(required), `${required} should be marked implemented/passive`);
+    assert.equal(Engine.ACTIVE_SKILL_IDS.includes(required), false, `${required} should not be a clickable active skill`);
   }
   const missingStatus = collectSkills().filter(({ skill }) => !skill.status);
   assert.deepEqual(missingStatus.map(({ hero, skill }) => `${hero.id}:${skill.id}`), [], 'every skill should be annotated as implemented/display/todo');
