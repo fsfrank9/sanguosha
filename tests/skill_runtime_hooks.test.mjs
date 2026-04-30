@@ -232,3 +232,41 @@ test('game engine dispatches Wusheng and Longdan card-as conversions through onC
   assert.doesNotMatch(responseSource, /hasSkill\([^)]*['"](?:wusheng|longdan)['"]/, 'findResponseCard should no longer directly own Wusheng or Longdan detection');
   assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"](?:wusheng|longdan)['"]/, 'canPlayCardAs should no longer directly own Wusheng or Longdan detection');
 });
+
+test('game engine dispatches implemented active skills through onActiveSkill hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const useStart = source.indexOf('function useSkill(game, actor, skillId, cardIds, options)');
+  const useEnd = source.indexOf('function scoreCardForAI(game, actor, card)', useStart);
+  assert.ok(useStart >= 0 && useEnd > useStart, 'useSkill source should be extractable');
+  const useSkillSource = source.slice(useStart, useEnd);
+
+  const activeSkills = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing'];
+  for (const skill of activeSkills) {
+    assert.match(source, new RegExp(`SkillRuntime\\.registerSkill\\(\\s*skillRegistry\\s*,\\s*['"]${skill}['"]`), `${skill} should be registered with SkillRuntime.registerSkill`);
+    assert.match(source, new RegExp(`SkillRuntime\\.registerSkill\\(\\s*skillRegistry\\s*,\\s*['"]${skill}['"][\\s\\S]*?onActiveSkill\\s*:`), `${skill} should register an onActiveSkill hook`);
+  }
+  assert.match(source, /triggerZhihengActiveSkill\(context\)/, 'Zhiheng active hook should delegate to an isolated helper');
+  assert.match(source, /triggerKurouActiveSkill\(context\)/, 'Kurou active hook should delegate to an isolated helper');
+  assert.match(source, /triggerRendeActiveSkill\(context\)/, 'Rende active hook should delegate to an isolated helper');
+  assert.match(source, /triggerFanjianActiveSkill\(context\)/, 'Fanjian active hook should delegate to an isolated helper');
+  assert.match(source, /triggerGuanxingActiveSkill\(context\)/, 'Guanxing active hook should delegate to an isolated helper');
+  assert.match(useSkillSource, /var activeSkillContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*self[\s\S]*targetActor:\s*opponent\(actor\)[\s\S]*skillId:\s*skillId[\s\S]*cardIds:\s*cardIds[\s\S]*options:\s*options[\s\S]*\}/, 'useSkill should build a complete active-skill context');
+  assert.match(useSkillSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onActiveSkill['"]\s*,\s*activeSkillContext\s*\)/, 'useSkill should dispatch active skills through onActiveSkill');
+  assert.match(useSkillSource, /selectActiveSkillResult\(\s*activeSkillResults\s*,\s*skillId\s*\)/, 'useSkill should select the matching active skill hook result');
+  assert.doesNotMatch(useSkillSource, /skillId\s*={2,3}\s*['"](?:zhiheng|kurou|rende|fanjian|guanxing)['"]/, 'useSkill should no longer directly branch on implemented active skill IDs');
+});
+
+test('game engine dispatches Guanxing preview through onSkillPreview hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const previewStart = source.indexOf('function getGuanxingPreview(game, actor)');
+  const previewEnd = source.indexOf('function useSkill(game, actor, skillId, cardIds, options)', previewStart);
+  assert.ok(previewStart >= 0 && previewEnd > previewStart, 'getGuanxingPreview source should be extractable');
+  const previewSource = source.slice(previewStart, previewEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]guanxing['"][\s\S]*?onSkillPreview\s*:/, 'Guanxing should register a non-consuming preview hook');
+  assert.match(source, /triggerGuanxingPreview\(context\)/, 'Guanxing preview hook should delegate to an isolated helper');
+  assert.match(previewSource, /var previewContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*self[\s\S]*skillId:\s*['"]guanxing['"][\s\S]*\}/, 'getGuanxingPreview should build a preview context');
+  assert.match(previewSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onSkillPreview['"]\s*,\s*previewContext\s*\)/, 'getGuanxingPreview should dispatch preview through onSkillPreview');
+  assert.match(previewSource, /selectActiveSkillResult\(\s*previewResults\s*,\s*['"]guanxing['"]\s*\)/, 'getGuanxingPreview should select Guanxing preview hook result');
+  assert.doesNotMatch(previewSource, /hasSkill\([^)]*['"]guanxing['"]/, 'getGuanxingPreview should no longer directly own Guanxing skill detection');
+});

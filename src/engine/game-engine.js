@@ -119,6 +119,41 @@
           return triggerWushengCardAs(context);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'zhiheng', {
+        onActiveSkill: function (context) {
+          return triggerZhihengActiveSkill(context);
+        }
+      });
+      SkillRuntime.registerSkill(skillRegistry, 'kurou', {
+        onActiveSkill: function (context) {
+          return triggerKurouActiveSkill(context);
+        }
+      });
+      SkillRuntime.registerSkill(skillRegistry, 'rende', {
+        onActiveSkill: function (context) {
+          return triggerRendeActiveSkill(context);
+        }
+      });
+      SkillRuntime.registerSkill(skillRegistry, 'fanjian', {
+        onActiveSkill: function (context) {
+          return triggerFanjianActiveSkill(context);
+        }
+      });
+      SkillRuntime.registerSkill(skillRegistry, 'guanxing', {
+        onActiveSkill: function (context) {
+          return triggerGuanxingActiveSkill(context);
+        },
+        onSkillPreview: function (context) {
+          return triggerGuanxingPreview(context);
+        }
+      });
+
+      var PLAY_PHASE_ACTIVE_SKILLS = {
+        zhiheng: true,
+        kurou: true,
+        rende: true,
+        fanjian: true
+      };
 
       function cardTargetProtection(game, actor, targetActor, card, displayName) {
         var cardType = card && card.type ? card.type : card;
@@ -244,6 +279,15 @@
         return selected;
       }
 
+      function selectActiveSkillResult(results, skillId) {
+        for (var i = 0; i < results.length; i += 1) {
+          if (results[i].skillId === skillId && results[i].result !== undefined && results[i].result !== null) {
+            return results[i].result;
+          }
+        }
+        return null;
+      }
+
       function discardCard(game, card) {
         var physicalCard = physicalCardOf(card);
         if (physicalCard) game.discard.push(physicalCard);
@@ -287,6 +331,132 @@
           return { card: context.card, asName: '杀', skillName: '武圣', priority: 10 };
         }
         return null;
+      }
+
+      function triggerZhihengActiveSkill(context) {
+        if (context.skillId !== 'zhiheng') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        var cardIds = context.cardIds || [];
+        if (!self || !hasSkill(self, 'zhiheng')) return null;
+        if (self.flags.zhihengUsed) return fail('【制衡】每回合限一次。');
+        if (!cardIds.length) return fail('请选择要弃置的牌。');
+        var discarded = [];
+        for (var i = 0; i < cardIds.length; i += 1) {
+          var card = removeCardFromHand(self, cardIds[i]);
+          if (card) {
+            discarded.push(card);
+            discardCard(game, card);
+          }
+        }
+        if (!discarded.length) return fail('没有成功弃置任何牌。');
+        self.flags.zhihengUsed = true;
+        log(game, actorName(game, actor) + '发动【制衡】，弃置 ' + discarded.length + ' 张牌并摸等量牌。');
+        drawCards(game, actor, discarded.length);
+        return success('制衡完成。');
+      }
+
+      function triggerKurouActiveSkill(context) {
+        if (context.skillId !== 'kurou') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        if (!self || !hasSkill(self, 'kurou')) return null;
+        if (self.hp <= 1) return fail('体力不足，不能发动【苦肉】。');
+        self.hp -= 1;
+        log(game, actorName(game, actor) + '发动【苦肉】，失去 1 点体力并摸两张牌。');
+        drawCards(game, actor, 2);
+        return success('苦肉完成。');
+      }
+
+      function triggerRendeActiveSkill(context) {
+        if (context.skillId !== 'rende') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        var cardIds = context.cardIds || [];
+        var target = game[context.targetActor];
+        if (!self || !target || !hasSkill(self, 'rende')) return null;
+        if (!cardIds.length) return fail('请选择要给出的牌。');
+        var given = [];
+        cardIds.forEach(function (id) {
+          var giveCard = removeCardFromHand(self, id);
+          if (giveCard) {
+            given.push(giveCard);
+            target.hand.push(giveCard);
+          }
+        });
+        if (!given.length) return fail('没有成功给出任何牌。');
+        self.flags.rendeGiven = (self.flags.rendeGiven || 0) + given.length;
+        log(game, actorName(game, actor) + '发动【仁德】，交给' + actorName(game, context.targetActor) + ' ' + given.length + ' 张牌。');
+        if (self.flags.rendeGiven >= 2 && !self.flags.rendeHealed && self.hp < self.maxHp) {
+          self.hp = Math.min(self.maxHp, self.hp + 1);
+          self.flags.rendeHealed = true;
+          log(game, actorName(game, actor) + '因【仁德】回复 1 点体力。');
+        }
+        return success('仁德完成。');
+      }
+
+      function triggerFanjianActiveSkill(context) {
+        if (context.skillId !== 'fanjian') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        var cardIds = context.cardIds || [];
+        var target = game[context.targetActor];
+        var options = context.options || {};
+        if (!self || !target || !hasSkill(self, 'fanjian')) return null;
+        if (self.flags.fanjianUsed) return fail('【反间】每回合限一次。');
+        if (!cardIds.length) return fail('请选择一张交给对方的牌。');
+        var fanjianCard = removeCardFromHand(self, cardIds[0]);
+        if (!fanjianCard) return fail('选择的牌不存在。');
+        target.hand.push(fanjianCard);
+        self.flags.fanjianUsed = true;
+        var guessedSuit = options.guessedSuit || 'spade';
+        log(game, actorName(game, actor) + '发动【反间】，' + actorName(game, context.targetActor) + '获得一张牌并猜测' + guessedSuit + '。');
+        if (guessedSuit !== fanjianCard.suit) damage(game, context.targetActor, 1, actor, '【反间】', null, 'normal');
+        return success('反间完成。');
+      }
+
+      function triggerGuanxingPreview(context) {
+        if (context.skillId !== 'guanxing') return null;
+        var game = context.game;
+        var self = context.state;
+        if (!self || !hasSkill(self, 'guanxing')) return fail('没有【观星】。');
+        var count = Math.min(5, game.deck.length);
+        var preview = success('观星预览完成。');
+        preview.cards = game.deck.slice(game.deck.length - count);
+        return preview;
+      }
+
+      function triggerGuanxingActiveSkill(context) {
+        if (context.skillId !== 'guanxing') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        var options = context.options || {};
+        if (!self || !hasSkill(self, 'guanxing')) return null;
+        if (self.flags.guanxingUsed) return fail('【观星】每回合限一次。');
+        var preview = triggerGuanxingPreview(context);
+        if (!preview.ok) return preview;
+        var count = preview.cards.length;
+        var visibleCards = preview.cards.slice();
+        var top = preview.cards.slice();
+        if (options.orderIds && options.orderIds.length) {
+          var chosen = [];
+          options.orderIds.forEach(function (id) {
+            var index = top.findIndex(function (card) { return card.id === id; });
+            if (index >= 0) chosen.push(top.splice(index, 1)[0]);
+          });
+          game.deck.splice(game.deck.length - count, count);
+          game.deck = game.deck.concat(top).concat(chosen);
+        }
+        log(game, actorName(game, actor) + '发动【观星】，观看牌堆顶 ' + count + ' 张牌。');
+        self.flags.guanxingUsed = true;
+        var guanxingResult = success('观星完成。');
+        guanxingResult.cards = visibleCards;
+        return guanxingResult;
       }
 
       function equipCard(game, actor, card) {
@@ -1187,11 +1357,15 @@
       function getGuanxingPreview(game, actor) {
         var self = game[actor];
         if (!self) return fail('未知角色。');
-        if (!hasSkill(self, 'guanxing')) return fail('没有【观星】。');
-        var count = Math.min(5, game.deck.length);
-        var preview = success('观星预览完成。');
-        preview.cards = game.deck.slice(game.deck.length - count);
-        return preview;
+        var previewContext = {
+          game: game,
+          actor: actor,
+          state: self,
+          skillId: 'guanxing'
+        };
+        var previewResults = SkillRuntime.runHook(skillRegistry, 'onSkillPreview', previewContext);
+        var previewResult = selectActiveSkillResult(previewResults, 'guanxing');
+        return previewResult || fail('没有【观星】。');
       }
 
       function useSkill(game, actor, skillId, cardIds, options) {
@@ -1202,86 +1376,20 @@
         if (!hasSkill(self, skillId)) return fail('没有这个技能。');
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         if (game.turn !== actor) return fail('还没有轮到你行动。');
-        if ((skillId === 'zhiheng' || skillId === 'kurou' || skillId === 'rende' || skillId === 'fanjian') && game.phase !== 'play') return fail('主动技能只能在出牌阶段发动。');
+        if (PLAY_PHASE_ACTIVE_SKILLS[skillId] && game.phase !== 'play') return fail('主动技能只能在出牌阶段发动。');
         self.flags = self.flags || {};
-        if (skillId === 'zhiheng') {
-          if (self.flags.zhihengUsed) return fail('【制衡】每回合限一次。');
-          if (!cardIds.length) return fail('请选择要弃置的牌。');
-          var discarded = [];
-          for (var i = 0; i < cardIds.length; i += 1) {
-            var card = removeCardFromHand(self, cardIds[i]);
-            if (card) {
-              discarded.push(card);
-              discardCard(game, card);
-            }
-          }
-          if (!discarded.length) return fail('没有成功弃置任何牌。');
-          self.flags.zhihengUsed = true;
-          log(game, actorName(game, actor) + '发动【制衡】，弃置 ' + discarded.length + ' 张牌并摸等量牌。');
-          drawCards(game, actor, discarded.length);
-          return success('制衡完成。');
-        }
-        if (skillId === 'kurou') {
-          if (self.hp <= 1) return fail('体力不足，不能发动【苦肉】。');
-          self.hp -= 1;
-          log(game, actorName(game, actor) + '发动【苦肉】，失去 1 点体力并摸两张牌。');
-          drawCards(game, actor, 2);
-          return success('苦肉完成。');
-        }
-        if (skillId === 'rende') {
-          if (!cardIds.length) return fail('请选择要给出的牌。');
-          var given = [];
-          cardIds.forEach(function (id) {
-            var giveCard = removeCardFromHand(self, id);
-            if (giveCard) {
-              given.push(giveCard);
-              game[opponent(actor)].hand.push(giveCard);
-            }
-          });
-          if (!given.length) return fail('没有成功给出任何牌。');
-          self.flags.rendeGiven = (self.flags.rendeGiven || 0) + given.length;
-          log(game, actorName(game, actor) + '发动【仁德】，交给' + actorName(game, opponent(actor)) + ' ' + given.length + ' 张牌。');
-          if (self.flags.rendeGiven >= 2 && !self.flags.rendeHealed && self.hp < self.maxHp) {
-            self.hp = Math.min(self.maxHp, self.hp + 1);
-            self.flags.rendeHealed = true;
-            log(game, actorName(game, actor) + '因【仁德】回复 1 点体力。');
-          }
-          return success('仁德完成。');
-        }
-        if (skillId === 'fanjian') {
-          if (self.flags.fanjianUsed) return fail('【反间】每回合限一次。');
-          if (!cardIds.length) return fail('请选择一张交给对方的牌。');
-          var fanjianCard = removeCardFromHand(self, cardIds[0]);
-          if (!fanjianCard) return fail('选择的牌不存在。');
-          game[opponent(actor)].hand.push(fanjianCard);
-          self.flags.fanjianUsed = true;
-          var guessedSuit = options.guessedSuit || 'spade';
-          log(game, actorName(game, actor) + '发动【反间】，' + actorName(game, opponent(actor)) + '获得一张牌并猜测' + guessedSuit + '。');
-          if (guessedSuit !== fanjianCard.suit) damage(game, opponent(actor), 1, actor, '【反间】', null, 'normal');
-          return success('反间完成。');
-        }
-        if (skillId === 'guanxing') {
-          if (self.flags.guanxingUsed) return fail('【观星】每回合限一次。');
-          var preview = getGuanxingPreview(game, actor);
-          if (!preview.ok) return preview;
-          var count = preview.cards.length;
-          var visibleCards = preview.cards.slice();
-          var top = preview.cards.slice();
-          if (options.orderIds && options.orderIds.length) {
-            var chosen = [];
-            options.orderIds.forEach(function (id) {
-              var index = top.findIndex(function (card) { return card.id === id; });
-              if (index >= 0) chosen.push(top.splice(index, 1)[0]);
-            });
-            game.deck.splice(game.deck.length - count, count);
-            game.deck = game.deck.concat(top).concat(chosen);
-          }
-          log(game, actorName(game, actor) + '发动【观星】，观看牌堆顶 ' + count + ' 张牌。');
-          self.flags.guanxingUsed = true;
-          var guanxingResult = success('观星完成。');
-          guanxingResult.cards = visibleCards;
-          return guanxingResult;
-        }
+        var activeSkillContext = {
+          game: game,
+          actor: actor,
+          state: self,
+          targetActor: opponent(actor),
+          skillId: skillId,
+          cardIds: cardIds,
+          options: options
+        };
+        var activeSkillResults = SkillRuntime.runHook(skillRegistry, 'onActiveSkill', activeSkillContext);
+        var activeSkillResult = selectActiveSkillResult(activeSkillResults, skillId);
+        if (activeSkillResult) return activeSkillResult;
         return fail('这个技能的主动效果尚未实现。');
       }
 
