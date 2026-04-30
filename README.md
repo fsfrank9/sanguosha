@@ -81,7 +81,11 @@ v4.0 不是重写，而是分批“安全拆源”：
 13. Phase 4H 已把马超【铁骑】迁入 `SkillRuntime.onNeedResponse` response-window seam：`playSha` 只派发【闪】响应窗口，红色判定锁定响应的逻辑由【铁骑】hook 处理。
 14. Phase 4I 已把曹操【奸雄】迁入 `SkillRuntime.onDamageAfter` damage-after seam：`damage` 只负责伤害结算与统一派发，获得造成伤害实体牌的逻辑由【奸雄】hook 处理。
 15. Phase 4J 已把关羽/SP 关羽【武圣】与赵云/SP 赵云【龙胆】迁入 `SkillRuntime.onCardAs` card-as/conversion seam：响应窗口与主动“当【杀】使用”入口统一派发转化 hook，原有红牌/【闪】/【杀】转化行为保持不变。
-16. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
+16. Phase 4K 已把孙权【制衡】、黄盖【苦肉】、刘备【仁德】、周瑜【反间】和诸葛亮【观星】迁入 `SkillRuntime.onActiveSkill` 主动技 dispatcher seam；【观星】预览额外走 `onSkillPreview`。
+17. Phase 4L 已把甄姬【倾国】接入 `SkillRuntime.onCardAs` 响应转化 seam：无真实【闪】时可将黑色手牌当【闪】响应。
+18. Phase 4M 已把黄月英【奇才】接入被动效果 seam：距离受限锦囊（当前【顺手牵羊】/【兵粮寸断】）会正常校验距离，拥有【奇才】时忽略该距离限制。
+19. Phase 4N 已把陆逊【谦逊】接入 `SkillRuntime.onCardTarget` target-validity seam：陆逊不能成为【顺手牵羊】或【乐不思蜀】目标。
+20. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
 
 详细迁移计划见：
 
@@ -96,14 +100,14 @@ docs/plans/2026-04-29-sanguosha-v4-architecture.md
 - 武将：68 名。
 - 技能条目：123 条。
 - 唯一技能 ID：118 个。
-- 已接入引擎逻辑的技能：17 个。
+- 已接入引擎逻辑的技能：20 个。
 - 有主动按钮/交互入口的技能：5 个。
 - 未实现/仅展示技能会在 UI 中标记为不可用或未实现。
 
 已实现技能：
 
 - 主动/交互技能：孙权【制衡】、黄盖【苦肉】、刘备【仁德】、周瑜【反间】、诸葛亮【观星】。
-- 转化/被动/自动技能：张飞【咆哮】、关羽/SP 关羽【武圣】、赵云/SP 赵云【龙胆】、曹操【奸雄】、马超/庞德/SP 庞德【马术】、马超【铁骑】、张辽【突袭】、周瑜【英姿】、诸葛亮【空城】、貂蝉/SP 貂蝉【闭月】、吕蒙【克己】、黄月英【集智】。
+- 转化/被动/自动技能：张飞【咆哮】、关羽/SP 关羽【武圣】、赵云/SP 赵云【龙胆】、甄姬【倾国】、曹操【奸雄】、马超/庞德/SP 庞德【马术】、马超【铁骑】、张辽【突袭】、周瑜【英姿】、诸葛亮【空城】、陆逊【谦逊】、貂蝉/SP 貂蝉【闭月】、吕蒙【克己】、黄月英【集智】、黄月英【奇才】。
 
 近期补齐技能说明：
 
@@ -117,6 +121,10 @@ docs/plans/2026-04-29-sanguosha-v4-architecture.md
 - 【铁骑】：马超使用【杀】指定目标后进行判定，红色判定令目标不能打出【闪】且保留原有伤害结算；Phase 4H 将该响应锁定逻辑迁到 `SkillRuntime.onNeedResponse` seam，`playSha` 不再直接持有 `tieqi` 判断或 `tieqiLocked` 状态。
 - 【奸雄】：曹操受到有实体来源牌造成的伤害后获得该牌；Phase 4I 将该伤害后触发迁到 `SkillRuntime.onDamageAfter` seam，`damage` 不再直接持有 `jianxiong` 判断，且无实体来源牌的伤害不会错误获得牌。
 - 【武圣】/【龙胆】：关羽/SP 关羽可将红色牌当【杀】使用/响应，赵云/SP 赵云可在【杀】/【闪】间互相转化；Phase 4J 将这些 card-as/conversion 入口迁到 `SkillRuntime.onCardAs` seam，`findResponseCard` 与 `canPlayCardAs` 不再直接持有 `wusheng` / `longdan` 判断，同时保留响应窗口、主动 UI affordance 与实体牌来源追踪。
+- 【制衡】/【苦肉】/【仁德】/【反间】/【观星】：Phase 4K 将这些主动技能统一迁入 `SkillRuntime.onActiveSkill` dispatcher seam；【观星】的非消耗预览迁入 `onSkillPreview`。
+- 【倾国】：甄姬无真实【闪】时可将黑色手牌当【闪】响应；Phase 4L 将该响应转化迁入 `SkillRuntime.onCardAs` seam，并保持真实【闪】优先。
+- 【奇才】：黄月英使用距离受限锦囊时忽略距离限制；Phase 4M 将该锁定被动迁入 `SkillRuntime.hasPassiveEffect(..., 'ignoreTrickDistance')`，同时为普通角色补上【顺手牵羊】/【兵粮寸断】距离校验。
+- 【谦逊】：陆逊不能成为【顺手牵羊】或【乐不思蜀】目标；Phase 4N 将该目标保护迁入 `SkillRuntime.onCardTarget` seam，失败时不会消耗来源牌，也不会移动目标手牌/判定区。
 
 ## 官方资料对照与缓存
 

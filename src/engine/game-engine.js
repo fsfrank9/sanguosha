@@ -99,6 +99,11 @@
           };
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'qianxun', {
+        onCardTarget: function (context) {
+          return triggerQianxunCardTarget(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'tieqi', {
         onNeedResponse: function (context) {
           return triggerTieqiNeedResponse(context.game, context.actor, context.targetActor, context.responseType, context.card);
@@ -175,6 +180,16 @@
           if (results[i].result && results[i].result.protected) return results[i].result;
         }
         return null;
+      }
+
+      function triggerQianxunCardTarget(context) {
+        var target = context.game[context.targetActor];
+        if (!target || !hasSkill(target, 'qianxun')) return null;
+        if (context.cardType !== 'shunshou' && context.cardType !== 'lebusishu') return null;
+        return {
+          protected: true,
+          message: actorName(context.game, context.targetActor) + '拥有【谦逊】，不能成为【' + context.cardName + '】目标。'
+        };
       }
 
       function takeHandCard(game, fromActor, toActor, reason) {

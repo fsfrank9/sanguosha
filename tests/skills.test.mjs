@@ -506,3 +506,30 @@ test('黄月英【奇才】 ignores distance limits for distance-limited trick c
   assert.deepEqual(ids(game.player.hand).sort(), ['qicai-jizhi-draw', 'qicai-target-tao'].sort());
   assert.ok(game.log.some((entry) => /顺手牵羊/.test(entry)), 'Qicai-enabled Shunshou should still resolve as the original trick');
 });
+
+test('陆逊【谦逊】 prevents Shunshou and Le Bu Si Shu from targeting him', () => {
+  const shunshouGame = skillGame('sunquan', 'luxun');
+  shunshouGame.player.hand = [c('shunshou', { id: 'qianxun-shunshou' })];
+  shunshouGame.enemy.hand = [c('tao', { id: 'qianxun-target-tao' })];
+
+  const shunshouPreview = Engine.canPlayCard(shunshouGame, 'player', shunshouGame.player.hand[0]);
+  const shunshouResult = Engine.playCard(shunshouGame, 'player', 'qianxun-shunshou', { targetZone: 'hand', targetCardId: 'qianxun-target-tao' });
+
+  assert.equal(shunshouPreview.ok, false, 'Shunshou should not be able to target Qianxun');
+  assert.match(shunshouPreview.message, /谦逊/);
+  assert.equal(shunshouResult.ok, false, 'failed Qianxun targeting should not consume the trick');
+  assert.deepEqual(ids(shunshouGame.player.hand), ['qianxun-shunshou']);
+  assert.deepEqual(ids(shunshouGame.enemy.hand), ['qianxun-target-tao']);
+
+  const lebuGame = skillGame('sunquan', 'luxun');
+  lebuGame.player.hand = [c('lebusishu', { id: 'qianxun-lebu' })];
+
+  const lebuPreview = Engine.canPlayCard(lebuGame, 'player', lebuGame.player.hand[0]);
+  const lebuResult = Engine.playCard(lebuGame, 'player', 'qianxun-lebu');
+
+  assert.equal(lebuPreview.ok, false, 'Le Bu Si Shu should not be able to target Qianxun');
+  assert.match(lebuPreview.message, /谦逊/);
+  assert.equal(lebuResult.ok, false, 'failed Qianxun delayed-trick targeting should not consume the card');
+  assert.deepEqual(ids(lebuGame.player.hand), ['qianxun-lebu']);
+  assert.equal(lebuGame.enemy.judgeArea.length, 0);
+});

@@ -190,6 +190,25 @@ test('game engine dispatches Kongcheng through onCardTarget hook seam', () => {
   assert.doesNotMatch(playShaSource, /isKongchengProtected|hasSkill\([^)]*['"]kongcheng['"]/, 'playSha should no longer directly own Kongcheng target protection');
 });
 
+test('game engine dispatches Qianxun through onCardTarget hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const canPlayStart = source.indexOf('function canPlayCard(game, actor, card)');
+  const canPlayEnd = source.indexOf('function triggerTieqiNeedResponse', canPlayStart);
+  const playCardStart = source.indexOf('function playCard(game, actor, cardId, options)');
+  const playCardEnd = source.indexOf('function startTurn(game, actor)', playCardStart);
+  assert.ok(canPlayStart >= 0 && canPlayEnd > canPlayStart, 'canPlayCard source should be extractable');
+  assert.ok(playCardStart >= 0 && playCardEnd > playCardStart, 'playCard source should be extractable');
+  const canPlaySource = source.slice(canPlayStart, canPlayEnd);
+  const playCardSource = source.slice(playCardStart, playCardEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qianxun['"]/, 'Qianxun should be registered with SkillRuntime.registerSkill');
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qianxun['"][\s\S]*?onCardTarget\s*:/, 'Qianxun should register an onCardTarget hook');
+  assert.match(source, /triggerQianxunCardTarget\(context\)/, 'Qianxun hook should delegate target-protection logic to an isolated helper');
+  assert.match(canPlaySource, /cardTargetProtection\(game, actor, opponent\(actor\), card\)/, 'canPlayCard should use shared target protection for Qianxun-protected cards');
+  assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"]qianxun['"]/, 'canPlayCard should not directly hard-code Qianxun detection');
+  assert.doesNotMatch(playCardSource, /hasSkill\([^)]*['"]qianxun['"]/, 'playCard should not directly hard-code Qianxun detection');
+});
+
 test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const playShaStart = source.indexOf('function playSha(game, actor, card)');
