@@ -117,6 +117,11 @@
           return triggerTianduJudgementAfterResolve(context);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'guicai', {
+        onJudgementBeforeResolve: function (context) {
+          return triggerGuicaiJudgementBeforeResolve(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'tieqi', {
         onNeedResponse: function (context) {
           return triggerTieqiNeedResponse(context.game, context.actor, context.targetActor, context.responseType, context.card);
@@ -441,6 +446,22 @@
         context.claimed = true;
         log(game, actorName(game, actor) + '发动【天妒】，获得了判定牌【' + physicalCard.name + '】。');
         return { claimedJudgementCard: true };
+      }
+
+      function triggerGuicaiJudgementBeforeResolve(context) {
+        var game = context.game;
+        var actor = context.actor;
+        var state = context.state || game[actor];
+        var originalCard = context.originalCard || context.card;
+        if (!game || !state || !originalCard || context.replaced || !hasSkill(state, 'guicai') || !state.hand || state.hand.length === 0) return null;
+        var replacement = state.hand[0];
+        var paidCard = removeCardFromHand(state, replacement.id);
+        if (!paidCard) return null;
+        discardCard(game, originalCard);
+        context.card = replacement;
+        context.replaced = true;
+        log(game, actorName(game, actor) + '发动【鬼才】，用【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）代替判定牌。');
+        return { replacedJudgementCard: true, originalCard: originalCard, replacementCard: replacement };
       }
 
       function triggerLongdanCardAs(context) {
@@ -798,7 +819,18 @@
         var card = game.deck.pop();
         if (!card) return null;
         log(game, actorName(game, actor) + '进行' + reason + '判定：【' + card.name + '】' + card.suit + ' ' + card.rank + '。');
-        return card;
+        var state = game[actor];
+        var judgementContext = {
+          game: game,
+          actor: actor,
+          state: state,
+          reason: reason,
+          card: card,
+          originalCard: card,
+          replaced: false
+        };
+        SkillRuntime.runHook(skillRegistry, 'onJudgementBeforeResolve', judgementContext);
+        return judgementContext.card;
       }
 
       function resolveJudgementCard(game, actor, state, reason, card) {

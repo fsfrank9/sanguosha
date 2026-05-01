@@ -402,3 +402,18 @@ test('game engine dispatches Luoyi through draw and damage-modifier hook seams',
   assert.ok(modifierIndex >= 0 && modifierIndex < hpLossIndex, 'damage should dispatch onDamageModify before HP loss');
   assert.match(phaseSource, /flags\.luoyi\s*=\s*false/, 'turn reset should clear Luoyi bonus flag');
 });
+
+test('game engine dispatches Guicai through judgement before-resolve hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const judgeStart = source.indexOf('function judge(game, actor, reason)');
+  const judgeEnd = source.indexOf('function resolveJudgementCard(game, actor, state, reason, card)', judgeStart);
+  assert.ok(judgeStart >= 0 && judgeEnd > judgeStart, 'judge source should be extractable');
+  const judgeSource = source.slice(judgeStart, judgeEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]guicai['"][\s\S]*?onJudgementBeforeResolve\s*:/, 'Guicai should register an onJudgementBeforeResolve hook');
+  assert.match(source, /triggerGuicaiJudgementBeforeResolve\(context\)/, 'Guicai hook should delegate to an isolated helper');
+  assert.match(source, /function triggerGuicaiJudgementBeforeResolve\(context\) \{[\s\S]*hasSkill\(state, ['"]guicai['"]\)[\s\S]*removeCardFromHand\(state, replacement\.id\)[\s\S]*discardCard\(game, originalCard\)[\s\S]*context\.card\s*=\s*replacement[\s\S]*context\.replaced\s*=\s*true/, 'Guicai helper should self-filter, pay a hand-card cost, discard the original judgement, and replace the context card');
+  assert.match(judgeSource, /var judgementContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*state[\s\S]*reason:\s*reason[\s\S]*card:\s*card[\s\S]*originalCard:\s*card[\s\S]*replaced:\s*false[\s\S]*\}/, 'judge should build a mutable before-resolve judgement context');
+  assert.match(judgeSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onJudgementBeforeResolve['"]\s*,\s*judgementContext\s*\)/, 'judge should dispatch before-resolve judgement replacement through SkillRuntime');
+  assert.match(judgeSource, /return judgementContext\.card/, 'judge should return the possibly replaced judgement card');
+});

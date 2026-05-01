@@ -866,3 +866,37 @@ test('郭嘉【天妒】 gains his own Bagua judgement card after it provides Sh
   assert.ok(game.log.some((entry) => /八卦阵/.test(entry)), 'Bagua result should still be logged');
   assert.ok(game.log.some((entry) => /天妒/.test(entry)), 'Tiandu trigger should be logged for Bagua judgment');
 });
+
+test('司马懿【鬼才】 replaces a black Bagua judgement with a red hand card before it takes effect', () => {
+  const game = skillGame('sunquan', 'simayi');
+  game.player.hand = [c('sha', { id: 'guicai-bagua-sha' })];
+  game.enemy.hand = [c('tao', { id: 'guicai-red-replacement', suit: 'heart', color: 'red', rank: '5' })];
+  game.enemy.equipment.armor = c('bagua', { id: 'guicai-bagua-armor' });
+  game.deck = [c('sha', { id: 'guicai-original-black-judge', suit: 'spade', color: 'black', rank: '7' })];
+
+  const result = Engine.playCard(game, 'player', 'guicai-bagua-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp, 'Guicai replacement should make Bagua red and dodge Sha');
+  assert.deepEqual(ids(game.enemy.hand), [], 'Guicai should consume Sima Yi\'s replacement hand card');
+  assert.ok(ids(game.discard).includes('guicai-original-black-judge'), 'original judgement card should be discarded after Guicai replaces it');
+  assert.ok(ids(game.discard).includes('guicai-red-replacement'), 'replacement card should become the final judgement card and then be finalized');
+  assert.ok(game.log.some((entry) => /鬼才/.test(entry) && /guicai-red-replacement/.test(entry)), 'Guicai replacement should be visible in the battle log');
+  assert.ok(game.log.some((entry) => /八卦阵】判定为红色/.test(entry)), 'Bagua should use the replaced red judgement result');
+});
+
+test('司马懿【鬼才】 does not replace a judgement when Sima Yi has no hand cards', () => {
+  const game = skillGame('sunquan', 'simayi');
+  game.player.hand = [c('sha', { id: 'guicai-no-hand-sha' })];
+  game.enemy.hand = [];
+  game.enemy.equipment.armor = c('bagua', { id: 'guicai-no-hand-bagua' });
+  game.deck = [c('sha', { id: 'guicai-no-hand-black-judge', suit: 'club', color: 'black', rank: '10' })];
+
+  const result = Engine.playCard(game, 'player', 'guicai-no-hand-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'without a replacement hand card, black Bagua judgement should not dodge Sha');
+  assert.deepEqual(ids(game.enemy.hand), [], 'empty Sima Yi hand should remain empty');
+  assert.ok(ids(game.discard).includes('guicai-no-hand-black-judge'), 'unreplaced judgement card should still be finalized');
+  assert.equal(game.log.some((entry) => /鬼才/.test(entry)), false, 'Guicai should not log when no replacement is available');
+});
