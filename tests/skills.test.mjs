@@ -491,6 +491,76 @@ test('周瑜【英姿】 draws three cards in draw phase', () => {
   assert.deepEqual(ids(game.player.hand), ['yingzi-1', 'yingzi-2', 'yingzi-3']);
 });
 
+test('许褚【裸衣】 draws one fewer card and boosts Sha damage this turn', () => {
+  const game = skillGame('xuchu', 'sunquan');
+  game.player.hand = [c('sha', { id: 'luoyi-sha' })];
+  game.deck = [c('tao', { id: 'luoyi-draw-2' }), c('shan', { id: 'luoyi-draw-1' })];
+
+  const startResult = Engine.startTurn(game, 'player');
+  const shaResult = Engine.playCard(game, 'player', 'luoyi-sha');
+
+  assert.equal(startResult.ok, true, startResult.message);
+  assert.equal(shaResult.ok, true, shaResult.message);
+  assert.deepEqual(ids(game.player.hand), ['luoyi-draw-1'], 'Luoyi should make Xu Chu draw one fewer card in draw phase');
+  assert.deepEqual(ids(game.deck), ['luoyi-draw-2'], 'one draw card should remain in deck after Luoyi cost');
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 2, 'Luoyi should add 1 damage to Sha caused this turn');
+  assert.ok(game.log.some((entry) => /裸衣/.test(entry) && /少摸一张牌/.test(entry)), 'Luoyi draw-phase trigger should be logged');
+  assert.ok(game.log.some((entry) => /裸衣/.test(entry) && /伤害 \+1/.test(entry)), 'Luoyi damage boost should be logged');
+});
+
+test('许褚【裸衣】 boosts Duel damage caused by Xu Chu this turn', () => {
+  const game = skillGame('xuchu', 'sunquan');
+  game.player.hand = [c('juedou', { id: 'luoyi-duel' })];
+  game.enemy.hand = [];
+  game.deck = [c('tao', { id: 'luoyi-duel-draw-2' }), c('shan', { id: 'luoyi-duel-draw-1' })];
+
+  const startResult = Engine.startTurn(game, 'player');
+  const duelResult = Engine.playCard(game, 'player', 'luoyi-duel');
+
+  assert.equal(startResult.ok, true, startResult.message);
+  assert.equal(duelResult.ok, true, duelResult.message);
+  assert.deepEqual(ids(game.player.hand), ['luoyi-duel-draw-1'], 'Luoyi should still cost one draw before Duel');
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 2, 'Luoyi should add 1 damage to Duel damage caused by Xu Chu');
+});
+
+test('许褚【裸衣】 does not boost non-Sha or non-Duel damage', () => {
+  const game = skillGame('xuchu', 'sunquan');
+  game.player.hand = [
+    c('huogong', { id: 'luoyi-huogong', suit: 'heart', color: 'red' }),
+    c('shan', { id: 'luoyi-huogong-cost', suit: 'spade', color: 'black' })
+  ];
+  game.enemy.hand = [c('sha', { id: 'luoyi-huogong-revealed', suit: 'spade', color: 'black' })];
+  game.deck = [c('tao', { id: 'luoyi-huogong-draw-2' }), c('shan', { id: 'luoyi-huogong-draw-1' })];
+
+  const startResult = Engine.startTurn(game, 'player');
+  const fireResult = Engine.playCard(game, 'player', 'luoyi-huogong', { huogongCostCardId: 'luoyi-huogong-cost' });
+
+  assert.equal(startResult.ok, true, startResult.message);
+  assert.equal(fireResult.ok, true, fireResult.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'Luoyi should not boost Fire Attack damage');
+});
+
+test('许褚【裸衣】 damage bonus expires after his turn ends', () => {
+  const game = skillGame('xuchu', 'sunquan');
+  game.player.hand = [c('sha', { id: 'luoyi-expire-response-sha' })];
+  game.deck = [
+    c('tao', { id: 'enemy-start-draw-2' }),
+    c('shan', { id: 'enemy-start-draw-1' }),
+    c('sha', { id: 'luoyi-expire-draw-1' })
+  ];
+
+  const startResult = Engine.startTurn(game, 'player');
+  const endResult = Engine.endTurn(game);
+  game.enemy.hand = [c('juedou', { id: 'luoyi-expire-duel' })];
+  game.player.hand = [c('sha', { id: 'luoyi-expire-response-sha' })];
+  const duelResult = Engine.playCard(game, 'enemy', 'luoyi-expire-duel');
+
+  assert.equal(startResult.ok, true, startResult.message);
+  assert.equal(endResult.ok, true, endResult.message);
+  assert.equal(duelResult.ok, true, duelResult.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'expired Luoyi should not boost Xu Chu response damage on another turn');
+});
+
 test('诸葛亮【空城】 prevents Sha and Duel targeting while he has no hand cards', () => {
   const game = skillGame('sunquan', 'zhugeliang');
   game.player.hand = [c('sha', { id: 'kongcheng-sha' }), c('juedou', { id: 'kongcheng-duel' })];

@@ -41,6 +41,7 @@
     flags.rendeGiven = 0;
     flags.rendeHealed = false;
     flags.aiKurouUsed = false;
+    flags.luoyi = false;
   }
 
   function resetEndOfTurnState(state) {
@@ -56,6 +57,7 @@
     flags.rendeHealed = false;
     flags.aiKurouUsed = false;
     flags.biyueTriggered = false;
+    flags.luoyi = false;
   }
 
   modules.PhaseRuntime = {

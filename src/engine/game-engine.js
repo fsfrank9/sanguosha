@@ -88,6 +88,14 @@
           context.drawCount = Math.max(0, context.drawCount - 1);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'luoyi', {
+        onDrawPhase: function (context) {
+          return triggerLuoyiDrawPhase(context);
+        },
+        onDamageModify: function (context) {
+          return triggerLuoyiDamageModify(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'kongcheng', {
         onCardTarget: function (context) {
           var target = context.game[context.targetActor];
@@ -231,6 +239,32 @@
         };
         SkillRuntime.runHook(skillRegistry, 'onDrawPhase', drawContext);
         return drawCards(game, actor, drawContext.drawCount);
+      }
+
+      function triggerLuoyiDrawPhase(context) {
+        var game = context.game;
+        var state = game[context.actor];
+        if (!state || !hasSkill(state, 'luoyi') || context.drawCount <= 0) return null;
+        state.flags = state.flags || {};
+        var flags = state.flags;
+        if (flags.luoyi) return null;
+        context.drawCount = Math.max(0, context.drawCount - 1);
+        flags.luoyi = true;
+        log(game, actorName(game, context.actor) + '发动【裸衣】，摸牌阶段少摸一张牌，本回合【杀】或【决斗】伤害 +1。');
+        return { triggeredLuoyi: true };
+      }
+
+      function triggerLuoyiDamageModify(context) {
+        var game = context.game;
+        var sourceActor = context.sourceActor;
+        var source = game[sourceActor];
+        if (!source || !hasSkill(source, 'luoyi') || !source.flags || !source.flags.luoyi || game.turn !== sourceActor) return null;
+        var isShaDamage = isShaCard(context.sourceCard);
+        var isDuelDamage = /决斗/.test(context.reason || '');
+        if (!isShaDamage && !isDuelDamage) return null;
+        context.amount += 1;
+        log(game, actorName(game, sourceActor) + '的【裸衣】令本次伤害 +1。');
+        return { modifiedDamage: true };
       }
 
       function isArmorIgnoredBySha(game, sourceActor, card) {
@@ -648,6 +682,18 @@
         if (sourceCard && sourceCard.type === 'thunder_sha') damageNature = 'thunder';
         if (/火攻/.test(reason || '')) damageNature = 'fire';
         if (/闪电|雷/.test(reason || '')) damageNature = 'thunder';
+
+        var damageModifyContext = {
+          game: game,
+          targetActor: targetActor,
+          sourceActor: sourceActor,
+          reason: reason,
+          sourceCard: sourceCard,
+          amount: amount,
+          nature: damageNature
+        };
+        SkillRuntime.runHook(skillRegistry, 'onDamageModify', damageModifyContext);
+        amount = Number(damageModifyContext.amount) || 0;
 
         if (armor && !ignoreArmor && armor.type === 'tengjia') {
           if (damageNature === 'fire') {

@@ -39,7 +39,7 @@ test('engine exposes explicit skill implementation status for every catalog skil
     assert.ok(Engine.ACTIVE_SKILL_IDS.includes(required), `${required} should be a clickable active skill`);
     assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes(required), `${required} should be marked implemented`);
   }
-  for (const required of ['wusheng', 'longdan', 'qingguo', 'paoxiao', 'jianxiong', 'ganglie', 'fankui', 'mashu', 'qicai', 'qianxun', 'tiandu', 'yiji', 'tieqi', 'tuxi', 'yingzi', 'kongcheng']) {
+  for (const required of ['wusheng', 'longdan', 'qingguo', 'paoxiao', 'jianxiong', 'ganglie', 'fankui', 'mashu', 'qicai', 'qianxun', 'tiandu', 'yiji', 'luoyi', 'tieqi', 'tuxi', 'yingzi', 'kongcheng']) {
     assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes(required), `${required} should be marked implemented/passive`);
     assert.equal(Engine.ACTIVE_SKILL_IDS.includes(required), false, `${required} should not be a clickable active skill`);
   }
@@ -50,7 +50,7 @@ test('engine exposes explicit skill implementation status for every catalog skil
 test('unimplemented skills are visible but explicitly disabled as todo, not silently clickable', () => {
   const todoSkills = collectSkills().filter(({ skill }) => skill.status === 'todo');
   assert.ok(todoSkills.length >= 80, 'expanded hero pool should still mark not-yet-implemented skills as todo');
-  assert.equal(Engine.HERO_CATALOG.xuchu.skills[0].status, 'todo');
+  assert.equal(Engine.HERO_CATALOG.xuchu.skills[0].status, 'implemented');
   assert.equal(Engine.HERO_CATALOG.liubei.skills.find((skill) => skill.id === 'jijiang').status, 'display');
   assert.match(html, /skill-status-todo/, 'UI should render a todo style for unimplemented skills');
   assert.match(html, /未实现/, 'UI should tell the player a skill is not implemented yet');

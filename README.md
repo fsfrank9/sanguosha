@@ -89,7 +89,8 @@ v4.0 不是重写，而是分批“安全拆源”：
 21. Phase 4P 已把夏侯惇【刚烈】接入 `SkillRuntime.onDamageAfter` + judgement finalizer seam：夏侯惇受到伤害后进行判定，非红桃时伤害来源自动弃置两张手牌，否则受到 1 点伤害；判定牌统一走 `resolveJudgementCard`。
 22. Phase 4Q 已把司马懿【反馈】接入 `SkillRuntime.onDamageAfter` source-card gain seam：司马懿受到伤害后从伤害来源的手牌/装备/判定区获得一张可获得牌，不会错误获得已经打出的伤害来源牌。
 23. Phase 4R 已把郭嘉【遗计】接入 `SkillRuntime.onDamageAfter` per-damage-point draw seam：郭嘉受到伤害后按伤害点数逐点摸两张牌，当前 1v1 最小实现默认分配给郭嘉自己。
-24. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
+24. Phase 4S 已把许褚【裸衣】接入 `SkillRuntime.onDrawPhase` + `onDamageModify` seam：摸牌阶段少摸一张并设置本回合标记，本回合许褚造成的【杀】/【决斗】伤害 +1。
+25. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
 
 详细迁移计划见：
 
@@ -104,14 +105,14 @@ docs/plans/2026-04-29-sanguosha-v4-architecture.md
 - 武将：68 名。
 - 技能条目：123 条。
 - 唯一技能 ID：118 个。
-- 已接入引擎逻辑的技能：24 个。
+- 已接入引擎逻辑的技能：25 个。
 - 有主动按钮/交互入口的技能：5 个。
 - 未实现/仅展示技能会在 UI 中标记为不可用或未实现。
 
 已实现技能：
 
 - 主动/交互技能：孙权【制衡】、黄盖【苦肉】、刘备【仁德】、周瑜【反间】、诸葛亮【观星】。
-- 转化/被动/自动技能：张飞【咆哮】、关羽/SP 关羽【武圣】、赵云/SP 赵云【龙胆】、甄姬【倾国】、曹操【奸雄】、夏侯惇【刚烈】、司马懿【反馈】、郭嘉【天妒】、郭嘉【遗计】、马超/庞德/SP 庞德【马术】、马超【铁骑】、张辽【突袭】、周瑜【英姿】、诸葛亮【空城】、陆逊【谦逊】、貂蝉/SP 貂蝉【闭月】、吕蒙【克己】、黄月英【集智】、黄月英【奇才】。
+- 转化/被动/自动技能：张飞【咆哮】、关羽/SP 关羽【武圣】、赵云/SP 赵云【龙胆】、甄姬【倾国】、曹操【奸雄】、夏侯惇【刚烈】、司马懿【反馈】、郭嘉【天妒】、郭嘉【遗计】、许褚【裸衣】、马超/庞德/SP 庞德【马术】、马超【铁骑】、张辽【突袭】、周瑜【英姿】、诸葛亮【空城】、陆逊【谦逊】、貂蝉/SP 貂蝉【闭月】、吕蒙【克己】、黄月英【集智】、黄月英【奇才】。
 
 近期补齐技能说明：
 
@@ -133,6 +134,7 @@ docs/plans/2026-04-29-sanguosha-v4-architecture.md
 - 【刚烈】：夏侯惇受到伤害后进行【刚烈】判定，非红桃时伤害来源若有至少两张手牌则自动弃置两张，否则受到 1 点伤害；Phase 4P 复用 `SkillRuntime.onDamageAfter` 并把【刚烈】判定牌接入共享 `resolveJudgementCard` finalizer。
 - 【反馈】：司马懿受到有来源且非自伤的伤害后，从伤害来源当前手牌/装备/判定区获得一张可获得牌；Phase 4Q 复用 `SkillRuntime.onDamageAfter`，并避免从无来源伤害或已经打出的伤害来源牌中错误获得牌。
 - 【遗计】：郭嘉每受到 1 点伤害后摸两张牌；Phase 4R 复用 `SkillRuntime.onDamageAfter`，当前 1v1 最小实现按伤害点数逐点结算并默认把摸到的牌分配给郭嘉自己。
+- 【裸衣】：许褚摸牌阶段自动少摸一张牌并获得本回合伤害加成；Phase 4S 接入 `SkillRuntime.onDrawPhase` 与 `onDamageModify`，只增强本回合许褚造成的【杀】或【决斗】伤害，火攻等其他伤害不受影响，回合结束会清除标记。
 
 ## 官方资料对照与缓存
 

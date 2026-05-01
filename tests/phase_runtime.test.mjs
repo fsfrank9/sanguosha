@@ -89,6 +89,7 @@ test('phase runtime resets actor turn state at the start of a turn', () => {
       rendeHealed: true,
       aiKurouUsed: true,
       biyueTriggered: true,
+      luoyi: true,
     },
   };
 
@@ -104,6 +105,7 @@ test('phase runtime resets actor turn state at the start of a turn', () => {
   assert.equal(state.flags.rendeGiven, 0);
   assert.equal(state.flags.rendeHealed, false);
   assert.equal(state.flags.aiKurouUsed, false);
+  assert.equal(state.flags.luoyi, false);
   assert.equal(state.flags.biyueTriggered, true, 'start-turn reset should not clear an unrelated end-stage guard');
 
   const missingFlags = { usedSha: true };
@@ -120,6 +122,7 @@ test('phase runtime resets actor turn state at the start of a turn', () => {
     rendeGiven: 0,
     rendeHealed: false,
     aiKurouUsed: false,
+    luoyi: false,
   });
 });
 
@@ -140,6 +143,7 @@ test('phase runtime resets end-of-turn state without clearing skip phase flags',
       rendeHealed: true,
       aiKurouUsed: true,
       biyueTriggered: true,
+      luoyi: true,
     },
   };
 
@@ -156,6 +160,7 @@ test('phase runtime resets end-of-turn state without clearing skip phase flags',
   assert.equal(state.flags.rendeHealed, false);
   assert.equal(state.flags.aiKurouUsed, false);
   assert.equal(state.flags.biyueTriggered, false);
+  assert.equal(state.flags.luoyi, false);
 });
 
 console.log('\nPhase runtime tests passed.');

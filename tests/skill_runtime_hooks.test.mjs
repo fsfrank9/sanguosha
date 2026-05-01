@@ -376,3 +376,29 @@ test('game engine dispatches Yiji per-damage-point draw through onDamageAfter ho
   assert.match(damageSource, /var damageContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should include damage amount in the hook context');
   assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch damage-after skills through SkillRuntime');
 });
+
+test('game engine dispatches Luoyi through draw and damage-modifier hook seams', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const phaseSource = fs.readFileSync(path.join(root, 'src/engine/phases.js'), 'utf8');
+  const drawStart = source.indexOf('function performDrawPhase(game, actor)');
+  const drawHelperStart = source.indexOf('function triggerLuoyiDrawPhase(context)', drawStart);
+  const drawEnd = drawHelperStart >= 0 ? drawHelperStart : source.indexOf('function isArmorIgnoredBySha(game, sourceActor, card)', drawStart);
+  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
+  const damageEnd = source.indexOf('function findResponseCard(state, type)', damageStart);
+  assert.ok(drawStart >= 0 && drawEnd > drawStart, 'draw phase source should be extractable');
+  assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
+  const drawSource = source.slice(drawStart, drawEnd);
+  const damageSource = source.slice(damageStart, damageEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]luoyi['"][\s\S]*?onDrawPhase\s*:[\s\S]*?onDamageModify\s*:/, 'Luoyi should register draw and damage modifier hooks');
+  assert.match(source, /triggerLuoyiDrawPhase\(context\)/, 'Luoyi draw hook should delegate to an isolated helper');
+  assert.match(source, /triggerLuoyiDamageModify\(context\)/, 'Luoyi damage hook should delegate to an isolated helper');
+  assert.doesNotMatch(drawSource, /hasSkill\([^)]*['"]luoyi['"]/, 'performDrawPhase should not directly own Luoyi skill detection');
+  assert.match(source, /function triggerLuoyiDrawPhase\(context\) \{[\s\S]*hasSkill\(state, ['"]luoyi['"]\)[\s\S]*context\.drawCount\s*=\s*Math\.max\(0, context\.drawCount - 1\)[\s\S]*flags\.luoyi\s*=\s*true/, 'Luoyi draw helper should self-filter, draw one fewer, and set a turn flag');
+  assert.match(source, /function triggerLuoyiDamageModify\(context\) \{[\s\S]*hasSkill\(source, ['"]luoyi['"]\)[\s\S]*source\.flags\.luoyi[\s\S]*isShaCard\(context\.sourceCard\)[\s\S]*\/决斗\/\.test\(context\.reason \|\| ['"]['"]\)[\s\S]*context\.amount\s*\+=\s*1/, 'Luoyi damage helper should self-filter and add one damage only for Sha or Duel damage');
+  assert.match(damageSource, /var damageModifyContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should build a mutable damage modifier context');
+  var modifierIndex = damageSource.indexOf("SkillRuntime.runHook(skillRegistry, 'onDamageModify', damageModifyContext)");
+  var hpLossIndex = damageSource.indexOf('target.hp =');
+  assert.ok(modifierIndex >= 0 && modifierIndex < hpLossIndex, 'damage should dispatch onDamageModify before HP loss');
+  assert.match(phaseSource, /flags\.luoyi\s*=\s*false/, 'turn reset should clear Luoyi bonus flag');
+});
