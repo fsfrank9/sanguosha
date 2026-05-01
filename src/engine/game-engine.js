@@ -124,6 +124,11 @@
           return triggerFankuiDamageAfter(context);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'yiji', {
+        onDamageAfter: function (context) {
+          return triggerYijiDamageAfter(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'ganglie', {
         onDamageAfter: function (context) {
           return triggerGanglieDamageAfter(context);
@@ -349,6 +354,18 @@
         target.hand.push(gained.card);
         log(game, actorName(game, targetActor) + '发动【反馈】，获得' + actorName(game, sourceActor) + '的一张' + gained.zone + '牌。');
         return { gainedSourceCard: true };
+      }
+
+      function triggerYijiDamageAfter(context) {
+        var game = context.game;
+        var targetActor = context.targetActor;
+        var target = game[targetActor];
+        if (!target || !hasSkill(target, 'yiji') || game.phase === 'gameover' || context.amount <= 0) return null;
+        for (var i = 0; i < context.amount; i += 1) {
+          drawCards(game, targetActor, 2);
+          log(game, actorName(game, targetActor) + '发动【遗计】，摸两张牌。');
+        }
+        return { triggeredYiji: true, drawPairs: context.amount };
       }
 
       function triggerGanglieDamageAfter(context) {

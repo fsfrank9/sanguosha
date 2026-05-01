@@ -362,3 +362,17 @@ test('game engine dispatches Tiandu judgement-card gain through onJudgementAfter
   assert.match(judgementSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onJudgementAfterResolve['"]\s*,\s*judgementContext\s*\)/, 'judge should dispatch judgement-card resolution through SkillRuntime');
   assert.match(judgementSource, /if \(!judgementContext\.claimed\) \{[\s\S]*discardCard\(game, card\);[\s\S]*\}/, 'unclaimed judgement cards should still enter discard');
 });
+
+test('game engine dispatches Yiji per-damage-point draw through onDamageAfter hook seam', () => {
+  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
+  const damageEnd = source.indexOf('function findResponseCard(state, type)', damageStart);
+  assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
+  const damageSource = source.slice(damageStart, damageEnd);
+
+  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yiji['"][\s\S]*?onDamageAfter\s*:/, 'Yiji should register an onDamageAfter hook');
+  assert.match(source, /triggerYijiDamageAfter\(context\)/, 'Yiji hook should delegate to an isolated helper');
+  assert.match(source, /function triggerYijiDamageAfter\(context\) \{[\s\S]*var target = game\[targetActor\][\s\S]*hasSkill\(target, ['"]yiji['"]\)[\s\S]*for \(var i = 0; i < context\.amount; i \+= 1\) \{[\s\S]*drawCards\(game, targetActor, 2\);[\s\S]*\}/, 'Yiji helper should self-filter and draw two cards once per damage point');
+  assert.match(damageSource, /var damageContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should include damage amount in the hook context');
+  assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch damage-after skills through SkillRuntime');
+});

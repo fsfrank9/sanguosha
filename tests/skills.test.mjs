@@ -264,6 +264,52 @@ test('司马懿【反馈】 does not trigger for source-less Shandian lightning 
   assert.equal(game.log.some((entry) => /反馈/.test(entry)), false, 'source-less lightning should not log a Fankui trigger');
 });
 
+test('郭嘉【遗计】 draws two cards into his hand after taking 1 damage', () => {
+  const game = skillGame('sunquan', 'guojia');
+  game.player.hand = [c('sha', { id: 'yiji-single-sha' })];
+  game.deck = [
+    c('tao', { id: 'yiji-single-draw-2' }),
+    c('shan', { id: 'yiji-single-draw-1' })
+  ];
+
+  const result = Engine.playCard(game, 'player', 'yiji-single-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1);
+  assert.deepEqual(ids(game.enemy.hand), ['yiji-single-draw-1', 'yiji-single-draw-2'], 'Yiji should draw two cards for the damaged Guo Jia by default');
+  assert.ok(ids(game.discard).includes('yiji-single-sha'), 'Yiji should not claim the damaging Sha source card');
+  assert.ok(game.log.some((entry) => /遗计/.test(entry) && /摸两张牌/.test(entry)), 'Yiji trigger should be logged');
+});
+
+test('郭嘉【遗计】 resolves once per damage point from boosted Sha damage', () => {
+  const game = skillGame('guojia', 'sunquan');
+  game.turn = 'enemy';
+  game.enemy.hand = [
+    c('jiu', { id: 'yiji-boost-jiu' }),
+    c('sha', { id: 'yiji-boost-sha' })
+  ];
+  game.deck = [
+    c('sha', { id: 'yiji-boost-draw-4' }),
+    c('tao', { id: 'yiji-boost-draw-3' }),
+    c('shan', { id: 'yiji-boost-draw-2' }),
+    c('jiu', { id: 'yiji-boost-draw-1' })
+  ];
+
+  const jiuResult = Engine.playCard(game, 'enemy', 'yiji-boost-jiu');
+  const shaResult = Engine.playCard(game, 'enemy', 'yiji-boost-sha');
+
+  assert.equal(jiuResult.ok, true, jiuResult.message);
+  assert.equal(shaResult.ok, true, shaResult.message);
+  assert.equal(game.player.hp, game.player.maxHp - 2, 'boosted Sha should deal 2 damage to Guo Jia');
+  assert.deepEqual(ids(game.player.hand), [
+    'yiji-boost-draw-1',
+    'yiji-boost-draw-2',
+    'yiji-boost-draw-3',
+    'yiji-boost-draw-4'
+  ], 'Yiji should draw two cards for each point of damage');
+  assert.equal(game.log.filter((entry) => /遗计/.test(entry)).length, 2, 'Yiji should log once per damage point');
+});
+
 test('夏侯惇【刚烈】 non-heart judgment makes the damage source discard two hand cards', () => {
   const game = skillGame('sunquan', 'xiahoudun');
   game.player.hand = [
@@ -354,13 +400,22 @@ test('郭嘉【天妒】 does not gain an opponent source\'s Tieqi judgment card
   const game = skillGame('machao', 'guojia');
   game.player.hand = [c('sha', { id: 'tiandu-tieqi-sha' })];
   game.enemy.hand = [c('shan', { id: 'tiandu-tieqi-blocked-shan' })];
-  game.deck = [c('tao', { id: 'tiandu-tieqi-judge-heart', suit: 'heart', color: 'red' })];
+  game.deck = [
+    c('tao', { id: 'tiandu-tieqi-yiji-draw-2' }),
+    c('shan', { id: 'tiandu-tieqi-yiji-draw-1' }),
+    c('tao', { id: 'tiandu-tieqi-judge-heart', suit: 'heart', color: 'red' })
+  ];
 
   const result = Engine.playCard(game, 'player', 'tiandu-tieqi-sha');
 
   assert.equal(result.ok, true, result.message);
   assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'red Tieqi judgment should still force Sha damage');
-  assert.deepEqual(ids(game.enemy.hand), ['tiandu-tieqi-blocked-shan'], 'target Guo Jia should not claim the Tieqi source\'s judgment card');
+  assert.deepEqual(ids(game.enemy.hand), [
+    'tiandu-tieqi-blocked-shan',
+    'tiandu-tieqi-yiji-draw-1',
+    'tiandu-tieqi-yiji-draw-2'
+  ], 'target Guo Jia may draw from Yiji but should not claim the Tieqi source\'s judgment card');
+  assert.equal(ids(game.enemy.hand).includes('tiandu-tieqi-judge-heart'), false, 'Yiji should not put the source-owned Tieqi judgment card directly into Guo Jia\'s hand');
   assert.ok(ids(game.discard).includes('tiandu-tieqi-judge-heart'), 'source-owned Tieqi judgment should enter discard when the source has no Tiandu');
   assert.equal(game.log.some((entry) => /天妒/.test(entry)), false, 'Tiandu should not trigger for another actor\'s Tieqi judgment');
 });
