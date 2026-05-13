@@ -234,28 +234,28 @@
           summary: '置于目标判定区；目标判定阶段判定，非红桃则跳过本回合出牌阶段。',
           timing: 'playPhase',
           targets: 'one-other',
-          effect: '置入目标判定区（每个角色判定区最多 1 张【乐不思蜀】）；判定花色非 heart → 跳过出牌阶段。',
+          effect: '置入目标判定区（v7 PR-6: 同判定区已有同名【乐不思蜀】时不合法）；判定花色非 heart → 跳过出牌阶段。',
           frequency: 'unlimited',
           responseWindow: ['wuxie'],
-          engineHooks: ['playLebusishu', 'evaluateDelayedTrick.lebusishu']
+          engineHooks: ['canPlayCard:delayed-trick-dedup', 'playLebusishu', 'evaluateDelayedTrick.lebusishu']
         },
         bingliang: {
           summary: '置于距离 1 内目标判定区；目标判定阶段判定，非梅花则跳过本回合摸牌阶段。',
           timing: 'playPhase',
           targets: 'distance-1',
-          effect: '置入目标判定区（每个角色判定区最多 1 张【兵粮寸断】）；判定花色非 club → 跳过摸牌阶段。',
+          effect: '置入目标判定区（v7 PR-6: 同判定区已有同名【兵粮寸断】时不合法）；判定花色非 club → 跳过摸牌阶段。',
           frequency: 'unlimited',
           responseWindow: ['wuxie'],
-          engineHooks: ['playBingliang', 'evaluateDelayedTrick.bingliang']
+          engineHooks: ['canPlayCard:delayed-trick-dedup', 'playBingliang', 'evaluateDelayedTrick.bingliang']
         },
         shandian: {
           summary: '置于自己判定区；判定阶段判定，黑桃 2-9 受 3 点雷电伤害，否则移至下家。',
           timing: 'playPhase',
           targets: 'self',
-          effect: '置入自己判定区；判定 spade 2-9 → 受 3 点雷电伤害并弃【闪电】；否则移至下家判定区。',
+          effect: '置入自己判定区（v7 PR-6: 自己判定区已有同名【闪电】时不合法）；判定 spade 2-9 → 受 3 点雷电伤害并弃【闪电】；否则移至下家判定区。',
           frequency: 'unlimited',
           responseWindow: ['wuxie'],
-          engineHooks: ['playShandian', 'evaluateDelayedTrick.shandian', 'damage:nature=thunder']
+          engineHooks: ['canPlayCard:delayed-trick-dedup', 'playShandian', 'evaluateDelayedTrick.shandian', 'damage:nature=thunder']
         },
 
         // ─── Equipment: weapons ───────────────────────────────────────
