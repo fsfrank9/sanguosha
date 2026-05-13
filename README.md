@@ -1,17 +1,27 @@
 # 三国杀 · 模块化 ES 源码 1v1 原型
 
-纯 HTML/CSS/JavaScript 实现的三国杀 1v1 原型。Phase 5C 起仓库已经从 v4 的「单文件 + IIFE 全局」过渡到 v5 的「原生 ES 模块 + 静态托管」：`src/` 是浏览器加载的源码本身，根 `index.html` 是手写的模块入口，没有打包步骤、没有 npm 运行时依赖。Phase 5D 将加 GitHub Pages 自动发布。
+纯 HTML/CSS/JavaScript 实现的三国杀 1v1 原型。Phase 5C 起仓库已经从 v4 的「单文件 + IIFE 全局」过渡到 v5 的「原生 ES 模块 + 静态托管」：`src/` 是浏览器加载的源码本身，根 `index.html` 是手写的模块入口，没有打包步骤、没有 npm 运行时依赖。Phase 5D 已加 GitHub Pages 自动发布。
 
 ## 运行
 
-Phase 5C 起 `index.html` 是手写的 ES 模块入口（`<script type="module" src="./src/main.js">`），原生模块在 `file://` 下被浏览器 CORS 拦截，所以**不再支持双击 `index.html` 直开**。在仓库根目录起一个本地 HTTP 服务器即可：
+### 线上（GitHub Pages）
+
+```
+https://fsfrank9.github.io/sanguosha/
+```
+
+仓库根目录在 `main` 分支每次更新后由 `.github/workflows/pages.yml` 自动发布。**首次使用需要仓库 owner 在 GitHub 仓库的 Settings → Pages 把 Source 切换成 "GitHub Actions"**，之后无需手动操作。
+
+### 本地开发
+
+`index.html` 是手写的 ES 模块入口（`<script type="module" src="./src/main.js">`），原生模块在 `file://` 下被浏览器 CORS 拦截，所以**不再支持双击 `index.html` 直开**。在仓库根目录起一个本地 HTTP 服务器即可：
 
 ```bash
 python3 -m http.server 8000
 # 然后浏览器访问 http://127.0.0.1:8000/
 ```
 
-不需要 npm install、不需要打包、不需要联网。Phase 5D 会加 GitHub Pages 自动发布，到时也可以直接用 https://&lt;owner&gt;.github.io/sanguosha/ 访问。
+不需要 npm install、不需要打包、不需要联网。
 
 检查仓库结构是否完整（必备源文件存在、入口 HTML 用模块标签、不再有 `dist/` / 模板残留）：
 

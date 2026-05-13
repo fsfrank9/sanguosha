@@ -78,9 +78,15 @@ test('single-file artifact and template are gone', () => {
   assert.equal(exists('src/index.template.html'), false, 'src/index.template.html should be removed in v5');
 });
 
-// Phase 5D will add `.github/workflows/pages.yml`; this test re-enables that
-// assertion at that point. Keeping it out of the default suite here so Phase
-// 5C can land with green CI.
+test('GitHub Pages deployment workflow exists', () => {
+  assert.ok(exists('.github/workflows/pages.yml'), '.github/workflows/pages.yml should exist');
+  const wf = read('.github/workflows/pages.yml');
+  assert.match(wf, /actions\/configure-pages/, 'workflow should configure Pages');
+  assert.match(wf, /actions\/upload-pages-artifact/, 'workflow should upload a Pages artifact');
+  assert.match(wf, /actions\/deploy-pages/, 'workflow should call deploy-pages');
+  assert.match(wf, /pages:\s*write/, 'workflow should grant pages:write permission');
+  assert.match(wf, /id-token:\s*write/, 'workflow should grant id-token:write for Pages deploy');
+});
 
 test('tools/build.mjs validates structure only and does not bundle', () => {
   const src = read('tools/build.mjs');
