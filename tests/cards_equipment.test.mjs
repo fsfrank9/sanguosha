@@ -194,9 +194,11 @@ test('Zhangba, Qinglong, Guanshi and Qilin weapon effects are playable', () => {
   qilin.enemy.hand = [];
   qilin.enemy.equipment.horsePlus = c('plus_horse', { id: 'horse-plus' });
   qilin.enemy.equipment.horseMinus = c('minus_horse', { id: 'horse-minus' });
+  // v7 PR-3: spec says 弃【一张】坐骑，not 两张。Source 用 auto 偏好直接弃 +1 马（默认启发式）。
+  qilin.player.skillPreferences.qilin = 'auto';
   assert.equal(Engine.playCard(qilin, 'player', 'qilin-sha').ok, true);
-  assert.equal(qilin.enemy.equipment.horsePlus, null);
-  assert.equal(qilin.enemy.equipment.horseMinus, null);
+  assert.equal(qilin.enemy.equipment.horsePlus, null, '+1 马 被弃');
+  assert.ok(qilin.enemy.equipment.horseMinus, '-1 马 保留（spec: 弃一张）');
 });
 
 test('delayed tricks: Shandian starts on self and moves or damages by judgement', () => {

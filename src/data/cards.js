@@ -309,11 +309,11 @@
           engineHooks: ['playSha:fangtianTargets']
         },
         qilin: {
-          summary: '【杀】对目标造成伤害后，可弃置目标的一匹坐骑。',
+          summary: '【杀】对目标造成伤害时，你可以弃置其装备区里的一张坐骑牌。',
           timing: 'passive',
-          effect: '【杀】成功造成伤害后，可弃置目标 +1/-1 马一匹。',
+          effect: 'v7 PR-3: 触发时机为造成伤害（applyWeaponHitEffects 内）；目标 0 匹马则不触发；1 匹马默认弃；2 匹马按 skillPreferences.qilin = auto/ask/decline 处理（auto 缺省弃 +1 马，ask 发起 pendingChoice "qilin-pick"）。',
           frequency: 'passive',
-          engineHooks: ['applyWeaponHitEffects:qilin']
+          engineHooks: ['applyWeaponHitEffects → applyQilinDiscard', 'resolveQilinPickChoice', 'pendingChoice:qilin-pick']
         },
 
         // ─── Equipment: armor ─────────────────────────────────────────
