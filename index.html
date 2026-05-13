@@ -248,6 +248,17 @@
           <span class="badge" id="fankuiPromptHint">反馈：选择获得对方的一张牌</span>
           <div class="fankui-zone" id="fankuiZones" aria-live="polite"></div>
         </div>
+        <div class="ganglie-fire-panel" id="gangliePromptPanel" hidden>
+          <span class="badge" id="gangliePromptHint">刚烈：是否对来源发动？</span>
+          <button class="btn small" id="ganglieFireBtn">发动判定</button>
+          <button class="btn small" id="ganglieDeclineBtn">不发动</button>
+        </div>
+        <div class="ganglie-source-panel" id="ganglieSourcePanel" hidden>
+          <span class="badge" id="ganglieSourceHint">刚烈：选择弃 2 张牌 或 受 1 点伤害</span>
+          <div class="ganglie-candidates" id="ganglieSourceCandidates" aria-live="polite"></div>
+          <button class="btn small" id="ganglieSourceConfirmBtn">确认弃 2 张</button>
+          <button class="btn small" id="ganglieSourceTakeDamageBtn">受 1 点伤害</button>
+        </div>
         <div class="hand" id="playerHand"></div>
       </section>
     </section>
