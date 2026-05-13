@@ -18,10 +18,10 @@ function test(name, fn) {
   }
 }
 
-test('v3.0 marks the deliverable as a direct-open offline single-file build', () => {
-  assert.match(html, /data-version="3\.0"/, 'body should expose the current v3.0 version');
-  assert.match(html, /v3\.0 正式流程扩展版/, 'header should show v3.0 official-flow status');
-  assert.match(html, /无需服务器/, 'copy should explicitly say no server is required');
+test('v6.1 marks the deliverable as the current spec-compliance version', () => {
+  assert.match(html, /data-version="6\.1"/, 'body should expose the current v6.1 version');
+  assert.match(html, /v6\.1 规则合规版/, 'header should show v6.1 spec-compliance status');
+  assert.match(html, /GitHub Pages/, 'copy should mention the static-hosted delivery channel');
 });
 
 test('visual polish adds official-style camp ribbons and animated combat feedback hooks', () => {

@@ -1,6 +1,6 @@
-# 三国杀 · 模块化 ES 源码 1v1 原型
+# 三国杀 · 1v1 规则合规版
 
-纯 HTML/CSS/JavaScript 实现的三国杀 1v1 原型。Phase 5C 起仓库已经从 v4 的「单文件 + IIFE 全局」过渡到 v5 的「原生 ES 模块 + 静态托管」：`src/` 是浏览器加载的源码本身，根 `index.html` 是手写的模块入口，没有打包步骤、没有 npm 运行时依赖。Phase 5D 已加 GitHub Pages 自动发布。
+纯 HTML/CSS/JavaScript 实现的三国杀 1v1。架构上从 v4 的「单文件 + IIFE 全局」演进到 v5 的「原生 ES 模块 + GitHub Pages 静态托管」；规则上 v6.0 完成"数据驱动技能 / 牌 / 装备"基础设施，v6.1 用 7 个 PR 把 26 个已实现技能与官方 spec 逐字段对齐。`src/` 是浏览器加载的源码本身，根 `index.html` 是手写的模块入口，没有打包步骤、没有 npm 运行时依赖。
 
 ## 运行
 
