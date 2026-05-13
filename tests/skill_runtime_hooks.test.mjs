@@ -4,7 +4,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 
 const root = path.resolve(import.meta.dirname, '..');
-const htmlPath = path.join(root, 'index.html');
+const htmlPath = path.join(root, 'dist/index.html');
 const html = fs.readFileSync(htmlPath, 'utf8');
 const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
 assert.ok(match, 'index.html should contain <script id="game-engine">');

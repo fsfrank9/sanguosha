@@ -31,20 +31,37 @@ function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
 
-function buildEngineBundle() {
-  return [
-    ...paths.dataModules.map(read),
-    ...paths.engineModules.map(read),
-    read(paths.engine),
-  ].join('\n\n');
+// v5 Phase 5A transition: source modules use real ES module syntax
+// (top-level `import` / `export`). The legacy single-file bundle in
+// `dist/index.html` is still produced for the existing vm-based test
+// harness; we strip the module syntax so the concatenated body remains
+// valid as a non-module <script>. Phase 5C drops this bundler.
+function stripModuleSyntax(src) {
+  return src
+    .replace(/^[ \t]*import\s*\{[^}]*\}\s*from\s*['"][^'"]+['"]\s*;?[ \t]*\n?/gm, '')
+    .replace(/^[ \t]*import\s+[^;{}\n]+\s+from\s*['"][^'"]+['"]\s*;?[ \t]*\n?/gm, '')
+    .replace(/^[ \t]*import\s*['"][^'"]+['"]\s*;?[ \t]*\n?/gm, '')
+    .replace(/^([ \t]*)export\s+(const|let|var|function|class)\s+/gm, '$1$2 ')
+    .replace(/^[ \t]*export\s*\{[^}]*\}\s*;?[ \t]*\n?/gm, '')
+    .replace(/^[ \t]*export\s+default\s+/gm, '');
 }
 
-function buildHtml() {
+function buildEngineBundle() {
+  const sources = [
+    ...paths.dataModules,
+    ...paths.engineModules,
+    paths.engine,
+  ];
+  return sources.map((p) => stripModuleSyntax(read(p))).join('\n\n');
+}
+
+function buildLegacyBundle() {
   let html = read(paths.template);
+  const uiBody = stripModuleSyntax(read(paths.ui));
   const replacements = {
     __SANGUOSHA_STYLE__: read(paths.style),
     __SANGUOSHA_ENGINE__: buildEngineBundle(),
-    __SANGUOSHA_UI__: read(paths.ui),
+    __SANGUOSHA_UI__: uiBody,
   };
 
   for (const [placeholder, content] of Object.entries(replacements)) {
@@ -62,7 +79,27 @@ function buildHtml() {
   return html;
 }
 
-function ensureGeneratedArtifact(filePath, expected) {
+const MODULE_ENTRY_REQUIREMENTS = [
+  { needle: '<script type="module" src="./src/main.js"></script>', message: 'index.html should load ./src/main.js as an ES module' },
+  { needle: '<link rel="stylesheet" href="./src/styles/main.css" />', message: 'index.html should reference ./src/styles/main.css' },
+];
+
+function ensureModuleEntry(filePath) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`${path.relative(root, filePath)} is missing; it is hand-written in v5 and must exist`);
+  }
+  const html = read(filePath);
+  for (const { needle, message } of MODULE_ENTRY_REQUIREMENTS) {
+    if (!html.includes(needle)) {
+      throw new Error(`${path.relative(root, filePath)}: ${message}`);
+    }
+  }
+  if (/__SANGUOSHA_[A-Z_]+__/.test(html)) {
+    throw new Error(`${path.relative(root, filePath)} still contains build placeholders`);
+  }
+}
+
+function ensureLegacyBundle(filePath, expected) {
   if (!fs.existsSync(filePath)) {
     throw new Error(`${path.relative(root, filePath)} is missing; run npm run build`);
   }
@@ -72,15 +109,15 @@ function ensureGeneratedArtifact(filePath, expected) {
   }
 }
 
-const built = buildHtml();
+const legacyBundle = buildLegacyBundle();
 
 if (checkOnly) {
-  ensureGeneratedArtifact(paths.rootHtml, built);
-  ensureGeneratedArtifact(paths.distHtml, built);
-  console.log('Build artifacts are up to date.');
+  ensureModuleEntry(paths.rootHtml);
+  ensureLegacyBundle(paths.distHtml, legacyBundle);
+  console.log('Module entry index.html and dist/index.html legacy bundle are up to date.');
 } else {
+  ensureModuleEntry(paths.rootHtml);
   fs.mkdirSync(path.dirname(paths.distHtml), { recursive: true });
-  fs.writeFileSync(paths.rootHtml, built, 'utf8');
-  fs.writeFileSync(paths.distHtml, built, 'utf8');
-  console.log('Built index.html and dist/index.html from src/.');
+  fs.writeFileSync(paths.distHtml, legacyBundle, 'utf8');
+  console.log('Wrote dist/index.html legacy bundle (root index.html is hand-written).');
 }

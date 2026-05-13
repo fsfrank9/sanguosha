@@ -17,7 +17,7 @@ function test(name, fn) {
 }
 
 function loadBuiltEngine() {
-  const html = read('index.html');
+  const html = read('dist/index.html');
   const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
   assert.ok(match, 'built root index.html should contain <script id="game-engine">');
 
@@ -68,10 +68,8 @@ test('data module build preserves direct-open single-file engine exports', () =>
     `node tools/build.mjs --check should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
   );
 
-  const rootHtml = read('index.html');
   const distHtml = read('dist/index.html');
-  assert.equal(distHtml, rootHtml, 'dist/index.html should stay byte-identical to root index.html');
-  assert.doesNotMatch(rootHtml, /<script\s+type="module"|import\s+\{/, 'direct-open artifact should not depend on runtime ES modules');
+  assert.doesNotMatch(distHtml, /^\s*(import|export)\s/m, 'legacy bundle should not contain unstripped ES module syntax');
 
   const { Data, Engine } = loadBuiltEngine();
   assert.ok(Data.HERO_CATALOG, 'built data bundle should expose HERO_CATALOG');

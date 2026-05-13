@@ -1,8 +1,3 @@
-(function () {
-  'use strict';
-
-  var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-
   function annotateSkillStatus(heroCatalog, implementedSkillIds, activeSkillIds) {
     Object.keys(heroCatalog).forEach(function (heroId) {
       (heroCatalog[heroId].skills || []).forEach(function (skill) {
@@ -92,7 +87,7 @@
     });
   }
 
-  modules.SkillRuntime = {
+  export const SkillRuntime = {
     annotateSkillStatus: annotateSkillStatus,
     hasPassiveEffect: hasPassiveEffect,
     sumPassiveEffect: sumPassiveEffect,
@@ -100,4 +95,8 @@
     registerSkill: registerSkill,
     runHook: runHook
   };
-}());
+
+  if (typeof window !== 'undefined') {
+    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
+    modules.SkillRuntime = SkillRuntime;
+  }

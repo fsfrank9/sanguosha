@@ -16,7 +16,7 @@ function test(name, fn) {
 }
 
 function loadBuiltWindow() {
-  const html = read('index.html');
+  const html = read('dist/index.html');
   const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
   assert.ok(match, 'built root index.html should contain <script id="game-engine">');
   const sandbox = { window: {}, console };

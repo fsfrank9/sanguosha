@@ -21,7 +21,7 @@ function test(name, fn) {
 }
 
 function loadBuiltEngineScript() {
-  const html = read('index.html');
+  const html = read('dist/index.html');
   const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
   assert.ok(match, 'built root index.html should contain <script id="game-engine">');
   const sandbox = { window: {}, console };
@@ -79,8 +79,8 @@ test('v4 phase 3 introduces engine runtime modules before the game engine', () =
   assert.match(judgementSource, /isShandianHit/, 'judgement runtime should own lightning-hit rules');
 
   const engineSource = read('src/engine/game-engine.js');
-  assert.match(engineSource, /SanguoshaEngineModules/, 'game engine should consume runtime modules');
-  assert.match(engineSource, /JudgementRuntime/, 'game engine should consume JudgementRuntime for delayed-trick rules');
+  assert.match(engineSource, /import\s*\{\s*Runtime\s*\}\s*from\s*['"]\.\/runtime\.js['"]/, 'game engine should import Runtime module');
+  assert.match(engineSource, /import\s*\{\s*JudgementRuntime\s*\}\s*from\s*['"]\.\/judgement\.js['"]/, 'game engine should import JudgementRuntime module');
   assert.doesNotMatch(engineSource, /function\s+annotateSkillStatus\s*\(/, 'skill status annotation should live outside the monolithic engine');
   assert.doesNotMatch(engineSource, /function\s+clone\s*\(/, 'generic clone helper should live in runtime module');
   assert.doesNotMatch(engineSource, /function\s+makeRng\s*\(/, 'generic RNG helper should live in runtime module');
@@ -108,10 +108,8 @@ test('engine runtime modules are bundled into the direct-open artifact', () => {
     `node tools/build.mjs --check should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
   );
 
-  const rootHtml = read('index.html');
   const distHtml = read('dist/index.html');
-  assert.equal(distHtml, rootHtml, 'dist/index.html should stay byte-identical to root index.html');
-  assert.doesNotMatch(rootHtml, /<script\s+type="module"|import\s+\{/, 'direct-open artifact should not depend on runtime ES modules');
+  assert.doesNotMatch(distHtml, /^\s*(import|export)\s/m, 'legacy bundle should not contain unstripped ES module syntax');
 
   const win = loadBuiltEngineScript();
   assert.ok(win.SanguoshaData, 'data bundle should still be available');

@@ -1,14 +1,5 @@
-(function () {
-  'use strict';
-
-  var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-  var Runtime = modules.Runtime;
-  var data = window.SanguoshaData || {};
-  var CARD_CATALOG = data.CARD_CATALOG;
-
-  if (!Runtime || !CARD_CATALOG) {
-    throw new Error('Sanguosha card runtime requires Runtime and card data modules to be loaded first.');
-  }
+  import { Runtime } from './runtime.js';
+  import { CARD_CATALOG } from '../data/cards.js';
 
   function makeTestCard(type, overrides) {
     overrides = overrides || {};
@@ -93,7 +84,7 @@
     return card && card.physicalCard ? card.physicalCard : card;
   }
 
-  modules.CardRuntime = {
+  export const CardRuntime = {
     makeTestCard: makeTestCard,
     makeCard: makeCard,
     shuffle: shuffle,
@@ -103,4 +94,8 @@
     isNormalTrickCard: isNormalTrickCard,
     physicalCardOf: physicalCardOf
   };
-}());
+
+  if (typeof window !== 'undefined') {
+    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
+    modules.CardRuntime = CardRuntime;
+  }

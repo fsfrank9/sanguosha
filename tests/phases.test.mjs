@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
 
-const htmlPath = path.resolve(import.meta.dirname, '../index.html');
+const htmlPath = path.resolve(import.meta.dirname, '../dist/index.html');
 const html = fs.readFileSync(htmlPath, 'utf8');
 const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
 assert.ok(match, 'index.html should contain <script id="game-engine">');

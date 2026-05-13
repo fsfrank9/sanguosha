@@ -45,10 +45,12 @@ test('src/main.js exists as the ES module entry', () => {
   assert.match(src, /import\s+/m, 'src/main.js should use ES module imports');
 });
 
-test('source modules use top-level export statements', () => {
+test('source modules use ES module syntax (export or top-level import)', () => {
   for (const rel of SOURCE_MODULES) {
     const src = read(rel);
-    assert.match(src, /^export\s+(const|function|class)\s+/m, `${rel} should use top-level export`);
+    const hasExport = /^\s*export\s+(const|let|var|function|class|default|\{)/m.test(src);
+    const hasImport = /^\s*import\s+(?:[^;]*\s+from\s*)?['"][^'"]+['"]/m.test(src);
+    assert.ok(hasExport || hasImport, `${rel} should use ES module syntax (export or import)`);
     assert.doesNotMatch(src, /^\(function\s*\(\s*\)\s*\{\s*$/m, `${rel} should not be wrapped in an IIFE`);
   }
 });

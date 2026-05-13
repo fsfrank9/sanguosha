@@ -7,7 +7,7 @@ const repoRoot = path.resolve(import.meta.dirname, '..');
 const fixturePath = path.join(repoRoot, 'tests/fixtures/official_standard_skills.json');
 const specFixturePath = path.join(repoRoot, 'tests/fixtures/official_standard_skill_specs.json');
 const gitignorePath = path.join(repoRoot, '.gitignore');
-const htmlPath = path.join(repoRoot, 'index.html');
+const htmlPath = path.join(repoRoot, 'dist/index.html');
 
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
 const html = fs.readFileSync(htmlPath, 'utf8');

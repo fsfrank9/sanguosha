@@ -37,7 +37,7 @@ test('v4 architecture has modular source files and build scripts', () => {
   assert.ok(pkg.scripts?.test?.includes('tests/*.mjs'), 'package.json should expose full Node test command');
 });
 
-test('build output is reproducible for root and dist single-file artifacts', () => {
+test('v5 Phase 5A: root index.html is a hand-written module entry; dist/index.html is the legacy bundle', () => {
   const result = spawnSync(process.execPath, ['tools/build.mjs', '--check'], {
     cwd: root,
     encoding: 'utf8',
@@ -51,10 +51,17 @@ test('build output is reproducible for root and dist single-file artifacts', () 
 
   const rootHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const distHtml = fs.readFileSync(path.join(root, 'dist/index.html'), 'utf8');
-  assert.equal(distHtml, rootHtml, 'dist/index.html should match the direct-open root artifact');
-  assert.match(rootHtml, /<script id="game-engine"[^>]*>/, 'built artifact keeps the engine marker used by tests');
-  assert.match(rootHtml, /window\.SanguoshaEngine/, 'built artifact exposes SanguoshaEngine');
-  assert.doesNotMatch(rootHtml, /__SANGUOSHA_/, 'built artifact should not leak template placeholders');
+
+  assert.match(rootHtml, /<script\s+type="module"\s+src="\.\/src\/main\.js"><\/script>/, 'root index.html should load ./src/main.js as a module');
+  assert.match(rootHtml, /<link\s+rel="stylesheet"\s+href="\.\/src\/styles\/main\.css"\s*\/>/, 'root index.html should reference ./src/styles/main.css');
+  assert.doesNotMatch(rootHtml, /<script id="game-engine"/, 'root index.html should no longer inline the bundled engine');
+  assert.doesNotMatch(rootHtml, /__SANGUOSHA_/, 'root index.html should not leak template placeholders');
+
+  assert.match(distHtml, /<script id="game-engine"[^>]*>/, 'legacy bundle keeps the engine marker used by vm-based tests');
+  assert.match(distHtml, /window\.SanguoshaEngine/, 'legacy bundle exposes SanguoshaEngine');
+  assert.doesNotMatch(distHtml, /__SANGUOSHA_/, 'legacy bundle should not leak template placeholders');
+  assert.doesNotMatch(distHtml, /^\s*import\s/m, 'legacy bundle should have module imports stripped');
+  assert.doesNotMatch(distHtml, /^\s*export\s+(const|let|var|function|class|\{|default)/m, 'legacy bundle should have module exports stripped');
 });
 
 console.log('\nArchitecture build tests passed.');

@@ -1,33 +1,13 @@
-    (function () {
-      'use strict';
+      import { Runtime } from './runtime.js';
+      import { SkillRuntime } from './skill-runtime.js';
+      import { CardRuntime } from './card-runtime.js';
+      import { StateRuntime } from './state.js';
+      import { PhaseRuntime } from './phases.js';
+      import { JudgementRuntime } from './judgement.js';
+      import { HERO_CATALOG, HEROES } from '../data/heroes.js';
+      import { CARD_CATALOG, CARD_INFO, PHASES } from '../data/cards.js';
+      import { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS } from '../data/skill-status.js';
 
-      var MODULES = window.SanguoshaEngineModules || {};
-      var Runtime = MODULES.Runtime;
-      var SkillRuntime = MODULES.SkillRuntime;
-      var CardRuntime = MODULES.CardRuntime;
-      var StateRuntime = MODULES.StateRuntime;
-      var PhaseRuntime = MODULES.PhaseRuntime;
-      var JudgementRuntime = MODULES.JudgementRuntime;
-      if (!Runtime || !SkillRuntime || !CardRuntime || !StateRuntime || !PhaseRuntime || !JudgementRuntime) {
-        throw new Error('Sanguosha engine runtime modules must be loaded before the game engine.');
-      }
-
-      var DATA = Runtime.requireData([
-        'HERO_CATALOG',
-        'HEROES',
-        'IMPLEMENTED_SKILL_IDS',
-        'ACTIVE_SKILL_IDS',
-        'CARD_CATALOG',
-        'CARD_INFO',
-        'PHASES'
-      ]);
-      var HERO_CATALOG = DATA.HERO_CATALOG;
-      var HEROES = DATA.HEROES;
-      var IMPLEMENTED_SKILL_IDS = DATA.IMPLEMENTED_SKILL_IDS;
-      var ACTIVE_SKILL_IDS = DATA.ACTIVE_SKILL_IDS;
-      var CARD_CATALOG = DATA.CARD_CATALOG;
-      var CARD_INFO = DATA.CARD_INFO;
-      var PHASES = DATA.PHASES;
       var clone = Runtime.clone;
       var makeRng = Runtime.makeRng;
       var makePlayer = Runtime.makePlayer;
@@ -1743,7 +1723,7 @@
         return done;
       }
 
-      window.SanguoshaEngine = {
+      export const SanguoshaEngine = {
         HEROES: HEROES,
         HERO_CATALOG: HERO_CATALOG,
         IMPLEMENTED_SKILL_IDS: IMPLEMENTED_SKILL_IDS.slice(),
@@ -1783,4 +1763,7 @@
         runAITurn: runAITurn,
         opponent: opponent
       };
-    }());
+
+      if (typeof window !== 'undefined') {
+        window.SanguoshaEngine = SanguoshaEngine;
+      }

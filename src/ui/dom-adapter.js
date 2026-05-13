@@ -1,7 +1,6 @@
-    (function () {
-      'use strict';
+      import { SanguoshaEngine } from '../engine/game-engine.js';
 
-      var Engine = window.SanguoshaEngine;
+      var Engine = SanguoshaEngine;
       var game = null;
       var enemyThinking = false;
       var selectedDiscardIds = [];
@@ -933,4 +932,3 @@
       populateHeroSelects();
       bindEvents();
       showSetup();
-    }());

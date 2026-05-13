@@ -1,10 +1,5 @@
-(function () {
-  'use strict';
-
-  var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-
   function requireData(requiredKeys) {
-    var data = window.SanguoshaData || {};
+    var data = (typeof window !== 'undefined' && window.SanguoshaData) || {};
     var missing = requiredKeys.filter(function (key) { return !data[key]; });
     if (missing.length) {
       throw new Error('Sanguosha data modules must be loaded before the game engine: ' + missing.join(', '));
@@ -58,7 +53,7 @@
     return ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'][index % 13];
   }
 
-  modules.Runtime = {
+  export const Runtime = {
     requireData: requireData,
     clone: clone,
     makeRng: makeRng,
@@ -67,4 +62,8 @@
     suitForIndex: suitForIndex,
     rankForIndex: rankForIndex
   };
-}());
+
+  if (typeof window !== 'undefined') {
+    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
+    modules.Runtime = Runtime;
+  }

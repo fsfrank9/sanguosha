@@ -1,8 +1,3 @@
-(function () {
-  'use strict';
-
-  var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-
   function ensureTurnHistory(game) {
     if (!game.turnHistory) game.turnHistory = [];
     return game.turnHistory;
@@ -60,7 +55,7 @@
     flags.luoyi = false;
   }
 
-  modules.PhaseRuntime = {
+  export const PhaseRuntime = {
     ensureTurnHistory: ensureTurnHistory,
     recordPhase: recordPhase,
     setPhase: setPhase,
@@ -68,4 +63,8 @@
     resetActorTurnState: resetActorTurnState,
     resetEndOfTurnState: resetEndOfTurnState
   };
-}());
+
+  if (typeof window !== 'undefined') {
+    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
+    modules.PhaseRuntime = PhaseRuntime;
+  }
