@@ -110,13 +110,13 @@
           engineHooks: ['playTao', 'options.taoTarget']
         },
         jiu: {
-          summary: '出牌阶段使用，本回合下一张【杀】伤害 +1；濒死时回复 1 点体力。',
+          summary: '出牌阶段限一次，本回合下一张【杀】伤害 +1；濒死时回复 1 点体力。',
           timing: 'playPhase+dying',
           targets: 'self',
-          effect: '设 shaBonus = +1（覆盖到本回合下一张【杀】）；濒死状态下当桃用回 1 体力。',
+          effect: 'v7 PR-8: 出牌阶段限一次 (flags.jiuUsedThisTurn) — canPlayCard 检查 + resolve 时设标记；shaBonus = 1 (不累加)；shaBonus 在 resetActorTurnState / resetEndOfTurnState 时清零，spec "此回合内使用的下一张【杀】" 通过 turn-bound 状态实现。Method II (濒死) 在 PR-13 加。',
           frequency: 'oncePerTurn',
           responseWindow: [],
-          engineHooks: ['playJiu']
+          engineHooks: ['canPlayCard:jiu-once-per-turn', 'playJiu', 'flags.jiuUsedThisTurn', 'resetActorTurnState/resetEndOfTurnState']
         },
 
         // ─── Trick cards (instant) ────────────────────────────────────

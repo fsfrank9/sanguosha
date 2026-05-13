@@ -2163,6 +2163,15 @@
           var taoFoeWounded = game[opponent(actor)].hp < game[opponent(actor)].maxHp;
           if (!taoSelfWounded && !taoFoeWounded) return fail('体力已满，不能使用【桃】。');
         }
+        if (card.type === 'jiu') {
+          // v7 PR-8: gltjk 基本牌·酒 使用方法Ⅰ —— "出牌阶段。每回合限一次。"
+          // flags.jiuUsedThisTurn 在 resetActorTurnState / resetEndOfTurnState
+          // 时复位，spec 的"此回合内"绑回合 已由 shaBonus 在 turn-start /
+          // turn-end 复位实现。
+          if (self.flags && self.flags.jiuUsedThisTurn) {
+            return fail('本回合已经使用过【酒】。');
+          }
+        }
         if ((card.type === 'guohe' || card.type === 'shunshou') && !hasAnyTargetableCard(game[opponent(actor)])) {
           return fail('对方没有可操作的牌。');
         }
@@ -2440,9 +2449,13 @@
         }
 
         if (card.type === 'jiu') {
+          // v7 PR-8: 标记已用 + shaBonus = 1（不累加，spec "下一张【杀】"
+          // 即下一次结算 +1，不是叠加多次酒）
           discardCard(game, card);
-          self.shaBonus = (self.shaBonus || 0) + 1;
-          log(game, actorName(game, actor) + '饮下【酒】，下一张【杀】伤害 +1。');
+          if (!self.flags) self.flags = {};
+          self.flags.jiuUsedThisTurn = true;
+          self.shaBonus = 1;
+          log(game, actorName(game, actor) + '饮下【酒】，本回合下一张【杀】伤害 +1。');
           return success('下一张杀伤害提升。');
         }
 
