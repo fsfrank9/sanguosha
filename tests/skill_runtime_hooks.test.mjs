@@ -91,7 +91,7 @@ test('game engine dispatches Jizhi through onCardUse hook seam', () => {
   const finishStart = source.indexOf('function finishTrickUse(game, actor, card, result, options)');
   const finishEnd = source.indexOf('function removeCardFromHand(state, cardId)', finishStart);
   const wuxieStart = source.indexOf('function consumeWuxie(game, actor, reason)');
-  const wuxieEnd = source.indexOf('function judge(game, actor, reason)', wuxieStart);
+  const wuxieEnd = source.indexOf('function judge(game, actor, reason, opts)', wuxieStart);
   assert.ok(finishStart >= 0 && finishEnd > finishStart, 'finishTrickUse source should be extractable');
   assert.ok(wuxieStart >= 0 && wuxieEnd > wuxieStart, 'consumeWuxie source should be extractable');
   const finishTrickUseSource = source.slice(finishStart, finishEnd);
@@ -341,7 +341,7 @@ test('game engine dispatches Guanxing preview through onSkillPreview hook seam',
 
 test('game engine dispatches Tiandu judgement-card gain through onJudgementAfterResolve hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const judgeStart = source.indexOf('function judge(game, actor, reason)');
+  const judgeStart = source.indexOf('function judge(game, actor, reason, opts)');
   const processStart = source.indexOf('function processJudgeArea(game, actor)', judgeStart);
   const processEnd = source.indexOf('function removeTargetZoneCard(game, targetActor, zone, cardId)', processStart);
   assert.ok(judgeStart >= 0 && processStart > judgeStart && processEnd > processStart, 'judgement source should be extractable');
@@ -396,14 +396,17 @@ test('game engine dispatches Luoyi through draw and damage-modifier hook seams',
 
 test('game engine dispatches Guicai through judgement before-resolve hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const judgeStart = source.indexOf('function judge(game, actor, reason)');
+  const judgeStart = source.indexOf('function judge(game, actor, reason, opts)');
   const judgeEnd = source.indexOf('function resolveJudgementCard(game, actor, state, reason, card)', judgeStart);
   assert.ok(judgeStart >= 0 && judgeEnd > judgeStart, 'judge source should be extractable');
   const judgeSource = source.slice(judgeStart, judgeEnd);
 
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]guicai['"][\s\S]*?onJudgementBeforeResolve\s*:/, 'Guicai should register an onJudgementBeforeResolve hook');
   assert.match(source, /triggerGuicaiJudgementBeforeResolve\(context\)/, 'Guicai hook should delegate to an isolated helper');
-  assert.match(source, /function triggerGuicaiJudgementBeforeResolve\(context\) \{[\s\S]*hasSkill\(state, ['"]guicai['"]\)[\s\S]*removeCardFromHand\(state, replacement\.id\)[\s\S]*discardCard\(game, originalCard\)[\s\S]*context\.card\s*=\s*replacement[\s\S]*context\.replaced\s*=\s*true/, 'Guicai helper should self-filter, pay a hand-card cost, discard the original judgement, and replace the context card');
+  // v6.1 (cross-actor fix): the holder may be either the judgement actor
+  // (own-judgement case) or the opponent (司马懿 replacing opponent's
+  // judgement). We accept `state` or `holderState` as the variable name.
+  assert.match(source, /function triggerGuicaiJudgementBeforeResolve\(context\) \{[\s\S]*hasSkill\(\s*\w+\s*,\s*['"]guicai['"]\)[\s\S]*removeCardFromHand\(\s*\w+\s*,\s*replacement\.id\s*\)[\s\S]*discardCard\(game, originalCard\)[\s\S]*context\.card\s*=\s*replacement[\s\S]*context\.replaced\s*=\s*true/, 'Guicai helper should self-filter, pay a hand-card cost, discard the original judgement, and replace the context card');
   assert.match(judgeSource, /var judgementContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*state[\s\S]*reason:\s*reason[\s\S]*card:\s*card[\s\S]*originalCard:\s*card[\s\S]*replaced:\s*false[\s\S]*\}/, 'judge should build a mutable before-resolve judgement context');
   assert.match(judgeSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onJudgementBeforeResolve['"]\s*,\s*judgementContext\s*\)/, 'judge should dispatch before-resolve judgement replacement through SkillRuntime');
   assert.match(judgeSource, /return judgementContext\.card/, 'judge should return the possibly replaced judgement card');
