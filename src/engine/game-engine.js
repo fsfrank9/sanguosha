@@ -62,10 +62,21 @@
       });
       SkillRuntime.registerSkill(skillRegistry, 'tuxi', {
         onDrawPhase: function (context) {
-          var state = context.game[context.actor];
+          var game = context.game;
+          var actor = context.actor;
+          var state = game[actor];
           if (!state || !hasSkill(state, 'tuxi')) return;
-          if (context.game[opponent(context.actor)].hand.length <= 0) return;
-          takeHandCard(context.game, opponent(context.actor), context.actor, '发动【突袭】，获得');
+          if (game[opponent(actor)].hand.length <= 0) return;
+          // v6.1: spec condition is "发动者**选择**发动". Read
+          // skillPreferences.tuxi to honor the choice: 'decline' skips
+          // entirely. Default is auto-fire (preserves v5/v6 behavior so
+          // existing tests + AI continue to work without per-turn toggles).
+          var pref = state.skillPreferences && state.skillPreferences.tuxi;
+          if (pref === 'decline') {
+            log(game, actorName(game, actor) + '选择本回合不发动【突袭】。');
+            return;
+          }
+          takeHandCard(game, opponent(actor), actor, '发动【突袭】，获得');
           context.drawCount = Math.max(0, context.drawCount - 1);
         }
       });
@@ -538,14 +549,14 @@
         return success('反馈完成。');
       }
 
-      // 遗计 (Phase 6C-bis): the cache spec lets 郭嘉 distribute the drawn
-      // cards to any actor. In 1v1 the only "other" is the opponent, which
-      // is dominated for most cards but legitimate strategy for low-value
-      // hands (e.g. discarding 杀 to a 桃-rich opponent does nothing for
-      // them, and frees deck space). We surface the choice when the
-      // skillPreferences.yiji preference is explicitly 'ask'; default is
-      // 'auto' (keep all to self), matching v5/v6B behavior. AI never opts
-      // into 'ask'.
+      // 遗计 — spec: "**按伤害点数逐点处理**；每点伤害对应摸两张牌，然后
+      // 可将这些牌分配给自己或其他角色". The v5/v6 engine batched all damage
+      // points into a single pendingChoice. v6.1 honors "逐点" by iterating
+      // one point at a time when the player is making decisions ('ask'
+      // preference): draw 2, set pendingChoice listing those 2 cards, wait
+      // for the player's giveIds decision, then advance to the next point.
+      // AI / 'auto' preference keeps the batched draw-and-keep behavior since
+      // every point's distribution is the same trivial "keep all to self".
       function triggerYijiDamageAfter(context) {
         var game = context.game;
         var targetActor = context.targetActor;
@@ -556,30 +567,57 @@
           log(game, actorName(game, targetActor) + '选择不发动【遗计】。');
           return { declinedYiji: true };
         }
-        var drawnIds = [];
-        for (var i = 0; i < context.amount; i += 1) {
-          var batch = drawCards(game, targetActor, 2);
-          for (var j = 0; j < batch.length; j += 1) drawnIds.push(batch[j].id);
-          log(game, actorName(game, targetActor) + '发动【遗计】，摸两张牌。');
-        }
-        if (pref === 'ask' && drawnIds.length > 0) {
-          // Snapshot the drawn cards (their current shape — they live in
-          // target.hand right now) so the UI can render them and the
-          // resolver can move chosen IDs to the opponent.
-          var cards = [];
-          for (var k = 0; k < drawnIds.length; k += 1) {
-            var found = target.hand.find(function (c) { return c.id === drawnIds[k]; });
-            if (found) cards.push({ id: found.id, name: found.name, type: found.type, suit: found.suit, rank: found.rank });
-          }
-          game.pendingChoice = {
-            kind: 'yiji-distribute',
-            actor: targetActor,
-            drawnIds: drawnIds,
-            cards: cards
+        if (pref === 'ask') {
+          // Start per-point iteration. pauseState tracks remaining points
+          // so resolveYijiDistributeChoice can fire the next point after
+          // each prompt resolves.
+          game.pauseState = game.pauseState || {};
+          game.pauseState.yiji = {
+            targetActor: targetActor,
+            remainingPoints: context.amount,
+            totalPoints: context.amount
           };
-          return { suspendedForYiji: true };
+          return fireNextYijiPoint(game);
+        }
+        // Auto path: batched single-shot — draw 2 × amount, keep all.
+        for (var i = 0; i < context.amount; i += 1) {
+          drawCards(game, targetActor, 2);
+          log(game, actorName(game, targetActor) + '发动【遗计】（第 ' + (i + 1) + ' / ' + context.amount + ' 点），摸两张牌。');
         }
         return { triggeredYiji: true, drawPairs: context.amount };
+      }
+
+      function fireNextYijiPoint(game) {
+        var saved = game.pauseState && game.pauseState.yiji;
+        if (!saved || saved.remainingPoints <= 0) {
+          if (game.pauseState) game.pauseState.yiji = null;
+          return { ok: true, message: '遗计完成。' };
+        }
+        var targetActor = saved.targetActor;
+        var target = game[targetActor];
+        if (!target) return fail('未知角色。');
+        var currentPoint = saved.totalPoints - saved.remainingPoints + 1;
+        var batch = drawCards(game, targetActor, 2);
+        log(game, actorName(game, targetActor) + '发动【遗计】（第 ' + currentPoint + ' / ' + saved.totalPoints + ' 点），摸两张牌。');
+        if (batch.length === 0) {
+          // Deck exhausted; advance without prompting.
+          saved.remainingPoints -= 1;
+          return fireNextYijiPoint(game);
+        }
+        var drawnIds = batch.map(function (c) { return c.id; });
+        var cards = drawnIds.map(function (id) {
+          var c = target.hand.find(function (item) { return item.id === id; });
+          return c ? { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank } : null;
+        }).filter(Boolean);
+        game.pendingChoice = {
+          kind: 'yiji-distribute',
+          actor: targetActor,
+          drawnIds: drawnIds,
+          cards: cards,
+          currentPoint: currentPoint,
+          totalPoints: saved.totalPoints
+        };
+        return { suspendedForYiji: true };
       }
 
       // 刚烈 — spec has two distinct player-choice points the v5/v6 engine
@@ -1562,22 +1600,31 @@
         var giveIds = Array.isArray(decision.giveIds) ? decision.giveIds : [];
         var validIds = giveIds.filter(function (id) { return pending.drawnIds.indexOf(id) >= 0; });
         if (validIds.length === 0) {
-          log(game, actorName(game, actor) + '将【遗计】所摸的牌全部留给自己。');
-          return success('遗计：全部留己。');
+          log(game, actorName(game, actor) + '将【遗计】本点所摸的牌全部留给自己。');
+        } else {
+          var opp = opponent(actor);
+          var oppState = game[opp];
+          var moved = [];
+          for (var i = 0; i < validIds.length; i += 1) {
+            var idx = state.hand.findIndex(function (c) { return c.id === validIds[i]; });
+            if (idx < 0) continue;
+            var card = state.hand.splice(idx, 1)[0];
+            oppState.hand.push(card);
+            moved.push(card.name);
+          }
+          if (moved.length > 0) {
+            log(game, actorName(game, actor) + '将【遗计】本点所摸的 ' + moved.length + ' 张牌交给' + actorName(game, opp) + '：' + moved.join('、') + '。');
+          }
         }
-        var opp = opponent(actor);
-        var oppState = game[opp];
-        var moved = [];
-        for (var i = 0; i < validIds.length; i += 1) {
-          var idx = state.hand.findIndex(function (c) { return c.id === validIds[i]; });
-          if (idx < 0) continue;
-          var card = state.hand.splice(idx, 1)[0];
-          oppState.hand.push(card);
-          moved.push(card.name);
+        // v6.1: per-point iteration. If pauseState has more points to
+        // process, fire the next one (re-sets pendingChoice for the new
+        // batch). Otherwise we're done.
+        var saved = game.pauseState && game.pauseState.yiji;
+        if (saved && saved.remainingPoints > 1) {
+          saved.remainingPoints -= 1;
+          return fireNextYijiPoint(game);
         }
-        if (moved.length > 0) {
-          log(game, actorName(game, actor) + '将【遗计】所摸的 ' + moved.length + ' 张牌交给' + actorName(game, opp) + '：' + moved.join('、') + '。');
-        }
+        if (game.pauseState) game.pauseState.yiji = null;
         return success('遗计：分配完成。');
       }
 

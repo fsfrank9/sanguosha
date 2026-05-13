@@ -193,6 +193,14 @@
               title = formatSkillTooltip(skill, statusText) + '｜点击切换：摸完后是否弹出分配面板';
               dataAttrs = ' data-skill-toggle="yiji"';
               if (yijiAsk) statusClass += ' skill-toggle-on';
+            } else if (skill.id === 'tuxi' && skill.status === 'implemented') {
+              var tuxiPref = state.skillPreferences && state.skillPreferences.tuxi;
+              var tuxiDeclined = tuxiPref === 'decline';
+              active = !enemyThinking && !game.winner && game.turn === 'player';
+              label = skill.name + '·' + (tuxiDeclined ? '不发动' : '自动发动');
+              title = formatSkillTooltip(skill, statusText) + '｜点击切换本回合摸牌阶段是否发动';
+              dataAttrs = ' data-skill-toggle="tuxi"';
+              if (tuxiDeclined) statusClass += ' skill-toggle-off';
             }
             return '<button class="mini-card skill-button' + statusClass + '" data-skill-id="' + escapeHtml(skill.id) + '"' + dataAttrs + ' ' + (active ? '' : 'disabled') + ' title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
           }).join('') || '<span class="mini-card">无技能</span>';
