@@ -175,13 +175,13 @@
           engineHooks: ['playTaoyuan']
         },
         wugu: {
-          summary: '亮出 N 张牌（N=存活角色数），所有存活角色依次选 1 张作为手牌。',
+          summary: '亮出 X 张牌（X=目标数=存活角色数），从发动者起按逆时针每人选 1 张获得，结束后剩余入弃牌堆。',
           timing: 'playPhase',
           targets: 'all-living',
-          effect: '从牌堆亮出 N 张；按座次依次选 1 张加入手牌，剩余进弃牌堆。',
+          effect: 'v7 PR-7: reveal-then-pick 完整结算。X = aliveActorCount；牌堆不足以亮出 X 张时按 spec 终止；多张可选时按 skillPreferences.wugu (auto/ask) 处理（ask → pendingChoice "wugu-pick"，pauseState.wugu 保留 pool / order / idx 续算）。结算结束后剩余牌进弃牌堆。',
           frequency: 'unlimited',
           responseWindow: ['wuxie'],
-          engineHooks: ['playWugu']
+          engineHooks: ['playWugu', 'processWuguPick', 'resolveWuguPickChoice', 'pendingChoice:wugu-pick', 'pauseState.wugu']
         },
         nanman: {
           summary: '所有其他角色须各打出 1 张【杀】，否则受到 1 点伤害。',

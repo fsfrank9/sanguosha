@@ -1437,6 +1437,90 @@
         return resumePlayShaAfterCixiong(game);
       }
 
+      // v7 PR-7: 五谷丰登 — 顺序选牌循环。每个 picker：pool 仅余 1 张时强制
+      // 取走（无可选项）；多张时按 skillPreferences.wugu 决定 auto/ask。
+      // 暂停时 pauseState.wugu 保存 sourceActor / wuguCard / pool / order /
+      // idx / options，由 resolveWuguPickChoice 续算。
+      function processWuguPick(game, sourceActor, wuguCard, pool, order, idx, options) {
+        while (idx < order.length) {
+          var picker = order[idx];
+          if (!pool.length) break;
+          if (pool.length === 1) {
+            var only = pool.shift();
+            game[picker].hand.push(only);
+            log(game, actorName(game, picker) + '从【五谷丰登】获得【' + only.name + '】。');
+            idx += 1;
+            continue;
+          }
+          var pickerState = game[picker];
+          var pref = (pickerState && pickerState.skillPreferences && pickerState.skillPreferences.wugu)
+            || (picker === 'player' ? 'ask' : 'auto');
+          if (pref === 'auto') {
+            var picked = pool.shift();
+            pickerState.hand.push(picked);
+            log(game, actorName(game, picker) + '从【五谷丰登】获得【' + picked.name + '】。');
+            idx += 1;
+            continue;
+          }
+          if (!game.pauseState) game.pauseState = {};
+          game.pauseState.wugu = {
+            sourceActor: sourceActor,
+            wuguCardId: wuguCard && wuguCard.id,
+            pool: pool,
+            order: order,
+            idx: idx,
+            options: options
+          };
+          game.pendingChoice = {
+            kind: 'wugu-pick',
+            actor: picker,
+            sourceActor: sourceActor,
+            cards: pool.map(function (c) {
+              return { id: c.id, name: c.name, suit: c.suit, color: c.color, rank: c.rank };
+            })
+          };
+          return success('【五谷丰登】等待 ' + actorName(game, picker) + ' 选牌…');
+        }
+        // 全部选完，剩余进弃牌堆
+        if (pool.length) {
+          pool.forEach(function (rem) {
+            discardCard(game, rem);
+            log(game, '【五谷丰登】剩余【' + rem.name + '】置入弃牌堆。');
+          });
+          pool.length = 0;
+        }
+        return success('五谷丰登结算完成。');
+      }
+
+      function resolveWuguPickChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.wugu;
+        if (!saved) return fail('找不到【五谷丰登】的暂停状态。');
+        var picker = pending.actor;
+        var cardId = decision && decision.cardId;
+        if (!cardId) {
+          game.pendingChoice = pending;
+          return fail('请从亮出的牌中选择一张（用 cardId 指定）。');
+        }
+        var pool = saved.pool;
+        var poolIdx = pool.findIndex(function (c) { return c.id === cardId; });
+        if (poolIdx < 0) {
+          game.pendingChoice = pending;
+          return fail('该牌不在【五谷丰登】的亮出池中。');
+        }
+        var picked = pool.splice(poolIdx, 1)[0];
+        game[picker].hand.push(picked);
+        log(game, actorName(game, picker) + '从【五谷丰登】选择获得【' + picked.name + '】。');
+        // 清掉旧 pauseState；processWuguPick 会按需重新设置
+        var nextOrder = saved.order;
+        var nextIdx = saved.idx + 1;
+        var sourceActor = saved.sourceActor;
+        // wuguCard 已经在使用阶段被 discardCard 处理过，这里只需占位
+        var wuguCard = { id: saved.wuguCardId };
+        var savedOptions = saved.options;
+        game.pauseState.wugu = null;
+        return processWuguPick(game, sourceActor, wuguCard, pool, nextOrder, nextIdx, savedOptions);
+      }
+
       // v7 PR-5: 借刀杀人 — 两次合法性检测中的第二次（An 决定是否用杀时）。
       // 在 1v1 中 An = opponent，Bn = source。 流程:
       //   1) 若 opponent 手牌没 杀 → 强制交武器 (transferWeaponToSource);
@@ -1843,6 +1927,9 @@
         }
         if (pending.kind === 'jiedao-decision') {
           return resolveJiedaoDecisionChoice(game, pending, decision || {});
+        }
+        if (pending.kind === 'wugu-pick') {
+          return resolveWuguPickChoice(game, pending, decision || {});
         }
         return fail('未知的选择类型：' + pending.kind);
       }
@@ -2420,16 +2507,26 @@
         }
 
         if (card.type === 'wugu') {
+          // v7 PR-7: gltjk card__scroll.md 五谷丰登 —
+          //   "执行动作：当此牌指定目标后，你亮出牌堆顶的 X 张牌（X 为目标数）。"
+          //   "作用效果：目标角色获得这些牌中（剩余）的一张牌。"
+          //   "若你未将执行动作完整执行完毕，终止此牌的使用结算。"
+          //   "使用结算结束后，将这些牌中剩余的牌置入弃牌堆。"
           discardCard(game, card);
-          [actor, opponent(actor)].forEach(function (side) {
+          var wuguTargetCount = StateRuntime.aliveActorCount(game);
+          // 多次重洗以尽可能凑齐 X 张
+          for (var rs = 0; rs < 3 && game.deck.length < wuguTargetCount; rs++) {
             reshuffleIfNeeded(game);
-            if (game.deck.length) {
-              var gained = game.deck.pop();
-              game[side].hand.push(gained);
-              log(game, actorName(game, side) + '从【五谷丰登】获得【' + gained.name + '】。');
-            }
-          });
-          return finishTrickUse(game, actor, card, success('五谷丰登结算完成。'), options);
+          }
+          if (game.deck.length < wuguTargetCount) {
+            log(game, '【五谷丰登】牌堆不足以亮出 ' + wuguTargetCount + ' 张牌，结算终止。');
+            return finishTrickUse(game, actor, card, success('五谷丰登终止（牌堆不足）。'), options);
+          }
+          var wuguPool = [];
+          for (var wi = 0; wi < wuguTargetCount; wi++) wuguPool.push(game.deck.pop());
+          log(game, actorName(game, actor) + '使用【五谷丰登】，亮出 ' + wuguPool.map(function (c) { return '【' + c.name + '】'; }).join(' / ') + '。');
+          // 多角色结算顺序原则：从当前回合角色起按逆时针 → 1v1 即 [actor, opponent(actor)]
+          return finishTrickUse(game, actor, card, processWuguPick(game, actor, card, wuguPool, [actor, opponent(actor)], 0, options), options);
         }
 
         if (card.type === 'huogong') {

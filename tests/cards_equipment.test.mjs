@@ -144,6 +144,8 @@ test('core trick cards resolve: Taoyuan, Wugu, Huogong, Tiesuo and Jiedao', () =
 
   const beforePlayerHand = game.player.hand.length;
   const beforeEnemyHand = game.enemy.hand.length;
+  // v7 PR-7: 五谷 默认 player='ask' 会 pause；本基础用例切到 auto 走旧的"按顺序自动取"路径
+  game.player.skillPreferences.wugu = 'auto';
   assert.equal(Engine.playCard(game, 'player', 'wugu').ok, true);
   assert.equal(game.player.hand.length, beforePlayerHand); // spent wugu, gained one revealed card
   assert.equal(game.enemy.hand.length, beforeEnemyHand + 1);
