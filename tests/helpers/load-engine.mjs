@@ -10,5 +10,5 @@ export { StateRuntime } from '../../src/engine/state.js';
 export { PhaseRuntime } from '../../src/engine/phases.js';
 export { JudgementRuntime } from '../../src/engine/judgement.js';
 export { HERO_CATALOG, HEROES, SKILL_METADATA } from '../../src/data/heroes.js';
-export { CARD_CATALOG, CARD_INFO, PHASES } from '../../src/data/cards.js';
+export { CARD_CATALOG, CARD_INFO, PHASES, CARD_RULES } from '../../src/data/cards.js';
 export { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS } from '../../src/data/skill-status.js';

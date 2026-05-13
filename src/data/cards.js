@@ -42,4 +42,332 @@
       var CARD_INFO = CARD_CATALOG;
       var PHASES = ['prepare', 'judge', 'draw', 'play', 'discard', 'finish'];
 
-      export { CARD_CATALOG, CARD_INFO, PHASES };
+      // v6E: paraphrased standard-pack rules for every catalog entry, used as
+      // the source of truth for the card-rule audit (tests/card_rules.test.mjs)
+      // and as a reference for future implementation fixes. Schema:
+      //   summary        — one-sentence description (always required)
+      //   timing         — when the card can be used / take effect
+      //                    'playPhase' / 'response' / 'judgement' / 'passive' /
+      //                    'playPhase+response' / 'dying'
+      //   targets        — who it can be used on (omitted for passives)
+      //                    'self' / 'opponent' / 'one-other' / 'all-others' /
+      //                    'all-living' / 'one-target-card' / 'distance-1' /
+      //                    'weapon-range' / 'dying-actor' / 'response-target'
+      //   effect         — paraphrased rule effect on resolution / when equipped
+      //   frequency      — 'oncePerTurn' / 'unlimited' / 'oncePerGame' /
+      //                    'passive' / 'response-window'
+      //   responseWindow — possible responses target/others can make
+      //                    (e.g. ['shan'] for 杀; ['wuxie'] for tricks; []
+      //                    for un-respondable like 桃 / 闪 / 酒). 'wuxie' is
+      //                    always implicit for tricks; we list it anyway.
+      //   engineHooks    — engine functions / SkillRuntime hooks that drive
+      //                    the card's behavior, for cross-checking
+      var CARD_RULES = {
+        // ─── Basic cards ──────────────────────────────────────────────
+        sha: {
+          summary: '出牌阶段对距离内一名其他角色使用；目标须打出【闪】，否则受到 1 点伤害。',
+          timing: 'playPhase',
+          targets: 'weapon-range',
+          effect: '目标须打出 1 张【闪】响应；未打出则受到发动者造成的 1 点普通伤害。',
+          frequency: 'oncePerTurn',
+          responseWindow: ['shan'],
+          engineHooks: ['playSha', 'onNeedResponse', 'damage', 'consumeResponse']
+        },
+        fire_sha: {
+          summary: '【杀】的火焰属性变种，伤害为火焰类型。',
+          timing: 'playPhase',
+          targets: 'weapon-range',
+          effect: '同【杀】，伤害属性 = fire；藤甲受到时伤害 +1。',
+          frequency: 'oncePerTurn',
+          responseWindow: ['shan'],
+          engineHooks: ['playSha', 'damage:nature=fire']
+        },
+        thunder_sha: {
+          summary: '【杀】的雷电属性变种，伤害为雷电类型。',
+          timing: 'playPhase',
+          targets: 'weapon-range',
+          effect: '同【杀】，伤害属性 = thunder；与铁索连锁可传导。',
+          frequency: 'oncePerTurn',
+          responseWindow: ['shan'],
+          engineHooks: ['playSha', 'damage:nature=thunder']
+        },
+        shan: {
+          summary: '仅作响应，抵消【杀】或【万箭齐发】对自己的效果。',
+          timing: 'response',
+          targets: 'self',
+          effect: '在被指定为【杀】或【万箭齐发】目标的响应窗口中打出，抵消该牌对自己的伤害。',
+          frequency: 'response-window',
+          responseWindow: [],
+          engineHooks: ['consumeResponse']
+        },
+        tao: {
+          summary: '出牌阶段对自己使用回复 1 体力；濒死阶段任意角色可对濒死者使用。',
+          timing: 'playPhase+dying',
+          targets: 'self-or-dying',
+          effect: '回复 1 点体力，不能超过体力上限。',
+          frequency: 'unlimited',
+          responseWindow: [],
+          engineHooks: ['playTao']
+        },
+        jiu: {
+          summary: '出牌阶段使用，本回合下一张【杀】伤害 +1；濒死时回复 1 点体力。',
+          timing: 'playPhase+dying',
+          targets: 'self',
+          effect: '设 shaBonus = +1（覆盖到本回合下一张【杀】）；濒死状态下当桃用回 1 体力。',
+          frequency: 'oncePerTurn',
+          responseWindow: [],
+          engineHooks: ['playJiu']
+        },
+
+        // ─── Trick cards (instant) ────────────────────────────────────
+        wuzhong: {
+          summary: '立即摸 2 张牌。',
+          timing: 'playPhase',
+          targets: 'self',
+          effect: '从牌堆摸 2 张牌。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie'],
+          engineHooks: ['playWuzhong']
+        },
+        juedou: {
+          summary: '对一名其他角色使用；双方轮流打出【杀】，先打不出的一方受到对方造成的 1 点伤害。',
+          timing: 'playPhase',
+          targets: 'one-other',
+          effect: '目标先弃【杀】，发动者后弃，轮流到一方放弃；放弃方受到对方造成的 1 点普通伤害。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie', 'sha'],
+          engineHooks: ['playJuedou', 'damage']
+        },
+        guohe: {
+          summary: '弃置距离 1 内一名其他角色的一张牌（手牌、装备区、判定区皆可）。',
+          timing: 'playPhase',
+          targets: 'distance-1',
+          effect: '从目标选定区域中弃置 1 张牌；手牌随机或按 targetCardId 指定。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie'],
+          engineHooks: ['playGuohe', 'removeTargetZoneCard']
+        },
+        shunshou: {
+          summary: '获得距离 1 内一名其他角色的一张牌（手牌、装备区、判定区皆可）。',
+          timing: 'playPhase',
+          targets: 'distance-1',
+          effect: '从目标选定区域中获得 1 张牌；不能对距离 > 1 使用（除非有【奇才】等无视距离效果）。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie'],
+          engineHooks: ['playShunshou', 'removeTargetZoneCard']
+        },
+        jiedao: {
+          summary: '令一名装备武器的其他角色对其武器距离内的另一名角色使用【杀】；不出则发动者获得其武器。',
+          timing: 'playPhase',
+          targets: 'one-other-with-weapon',
+          effect: '目标对第三方使用【杀】；目标不出【杀】则发动者获得目标的武器。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie'],
+          engineHooks: ['playJiedao']
+        },
+        taoyuan: {
+          summary: '所有存活角色依次回复 1 点体力。',
+          timing: 'playPhase',
+          targets: 'all-living',
+          effect: '按座次依次结算，每名存活角色回复 1 体力（不超上限）。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie'],
+          engineHooks: ['playTaoyuan']
+        },
+        wugu: {
+          summary: '亮出 N 张牌（N=存活角色数），所有存活角色依次选 1 张作为手牌。',
+          timing: 'playPhase',
+          targets: 'all-living',
+          effect: '从牌堆亮出 N 张；按座次依次选 1 张加入手牌，剩余进弃牌堆。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie'],
+          engineHooks: ['playWugu']
+        },
+        nanman: {
+          summary: '所有其他角色须各打出 1 张【杀】，否则受到 1 点伤害。',
+          timing: 'playPhase',
+          targets: 'all-others',
+          effect: '依次结算；每名其他角色不出【杀】则受到 1 点普通伤害。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie', 'sha'],
+          engineHooks: ['playNanman', 'damage']
+        },
+        wanjian: {
+          summary: '所有其他角色须各打出 1 张【闪】，否则受到 1 点伤害。',
+          timing: 'playPhase',
+          targets: 'all-others',
+          effect: '依次结算；每名其他角色不出【闪】则受到 1 点普通伤害。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie', 'shan'],
+          engineHooks: ['playWanjian', 'damage']
+        },
+        wuxie: {
+          summary: '抵消一张即将生效的锦囊牌（含延时锦囊判定）。',
+          timing: 'response',
+          targets: 'one-target-card',
+          effect: '抵消一张锦囊对一名角色的效果；【无懈】可以抵消【无懈】（链式）。',
+          frequency: 'response-window',
+          responseWindow: [],
+          engineHooks: ['consumeWuxie']
+        },
+        huogong: {
+          summary: '对手牌不为空的一名其他角色使用；目标展示一张手牌，发动者可弃同花色手牌对其造成 1 点火焰伤害。',
+          timing: 'playPhase',
+          targets: 'one-other-with-hand',
+          effect: '目标展示 1 张手牌；发动者可弃同花色手牌造成 1 点火焰伤害（若选择不弃则无效）。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie'],
+          engineHooks: ['playHuogong', 'getHuogongChoice', 'damage:nature=fire']
+        },
+        tiesuo: {
+          summary: '横置或重置 1-2 名角色；或弃此牌重铸（弃铁索并摸 1 张）。',
+          timing: 'playPhase',
+          targets: 'one-or-two-actors-or-self-recast',
+          effect: '横置/重置选定 1-2 名角色（链状态翻转）；重铸：弃【铁索连环】并摸 1 张牌。横置角色受到属性伤害时连锁触发。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie'],
+          engineHooks: ['playTiesuo', 'reforge']
+        },
+
+        // ─── Delayed tricks ───────────────────────────────────────────
+        lebusishu: {
+          summary: '置于目标判定区；目标判定阶段判定，非红桃则跳过本回合出牌阶段。',
+          timing: 'playPhase',
+          targets: 'one-other',
+          effect: '置入目标判定区（每个角色判定区最多 1 张【乐不思蜀】）；判定花色非 heart → 跳过出牌阶段。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie'],
+          engineHooks: ['playLebusishu', 'evaluateDelayedTrick.lebusishu']
+        },
+        bingliang: {
+          summary: '置于距离 1 内目标判定区；目标判定阶段判定，非梅花则跳过本回合摸牌阶段。',
+          timing: 'playPhase',
+          targets: 'distance-1',
+          effect: '置入目标判定区（每个角色判定区最多 1 张【兵粮寸断】）；判定花色非 club → 跳过摸牌阶段。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie'],
+          engineHooks: ['playBingliang', 'evaluateDelayedTrick.bingliang']
+        },
+        shandian: {
+          summary: '置于自己判定区；判定阶段判定，黑桃 2-9 受 3 点雷电伤害，否则移至下家。',
+          timing: 'playPhase',
+          targets: 'self',
+          effect: '置入自己判定区；判定 spade 2-9 → 受 3 点雷电伤害并弃【闪电】；否则移至下家判定区。',
+          frequency: 'unlimited',
+          responseWindow: ['wuxie'],
+          engineHooks: ['playShandian', 'evaluateDelayedTrick.shandian', 'damage:nature=thunder']
+        },
+
+        // ─── Equipment: weapons ───────────────────────────────────────
+        zhuge: {
+          summary: '装备后【杀】无次数限制。',
+          timing: 'passive',
+          effect: '出牌阶段使用【杀】不再受每回合一次限制。',
+          frequency: 'passive',
+          engineHooks: ['StateRuntime.hasEquipmentEffect:unlimitedSha', 'canPlayCard']
+        },
+        qinggang: {
+          summary: '【杀】无视目标防具。',
+          timing: 'passive',
+          effect: '装备者使用【杀】时无视目标的防具效果（八卦、仁王、藤甲等都失效）。',
+          frequency: 'passive',
+          engineHooks: ['StateRuntime.hasEquipmentEffect:ignoreArmorOnSha', 'isArmorIgnoredBySha']
+        },
+        cixiong: {
+          summary: '对异性目标使用【杀】后，可令目标弃 1 张手牌；目标不弃则发动者摸 1 张。',
+          timing: 'passive',
+          effect: '【杀】指定异性目标后触发；目标二选一：弃 1 手牌 或 让发动者摸 1 张。当前 1v1 引擎尚未实现性别属性区分。',
+          frequency: 'passive',
+          engineHooks: ['playSha:cixiongBranch']
+        },
+        qinglong: {
+          summary: '【杀】被【闪】抵消后，可立即对同目标再次使用【杀】（不算次数）。',
+          timing: 'passive',
+          effect: '【杀】被【闪】抵消后，立即追加 1 张【杀】对同目标（不消耗每回合次数）。',
+          frequency: 'passive',
+          engineHooks: ['playSha:qinglongChain']
+        },
+        zhangba: {
+          summary: '装备后，可将 2 张手牌当作 1 张【杀】使用或打出。',
+          timing: 'passive',
+          effect: '激活时弃 2 张手牌作为 1 张虚拟【杀】使用/打出，仍受所有【杀】限制。',
+          frequency: 'passive',
+          engineHooks: ['playZhangbaSha']
+        },
+        guanshi: {
+          summary: '【杀】被【闪】抵消后，可弃 2 张牌令此【杀】强制命中。',
+          timing: 'passive',
+          effect: '【杀】被【闪】抵消后，发动者可弃 2 张牌（手牌/装备）使本次【杀】伤害仍然结算。',
+          frequency: 'passive',
+          engineHooks: ['playSha:guanshiForce']
+        },
+        fangtian: {
+          summary: '使用【杀】时若手牌仅余此【杀】，可额外指定 1 个目标。',
+          timing: 'passive',
+          effect: '出牌阶段若【杀】是当前手牌唯一一张，方天画戟允许该【杀】指定 +1 目标。当前 1v1 引擎尚未实现多目标【杀】。',
+          frequency: 'passive',
+          engineHooks: ['playSha:fangtianTargets']
+        },
+        qilin: {
+          summary: '【杀】对目标造成伤害后，可弃置目标的一匹坐骑。',
+          timing: 'passive',
+          effect: '【杀】成功造成伤害后，可弃置目标 +1/-1 马一匹。',
+          frequency: 'passive',
+          engineHooks: ['applyWeaponHitEffects:qilin']
+        },
+
+        // ─── Equipment: armor ─────────────────────────────────────────
+        bagua: {
+          summary: '需要打出【闪】时，可判定，红色视为打出了【闪】。',
+          timing: 'passive',
+          effect: '【杀】等需要响应【闪】的窗口中触发判定；判定为红色（heart/diamond）则视为打出【闪】。',
+          frequency: 'passive',
+          engineHooks: ['playSha:baguaAutoShan']
+        },
+        renwang: {
+          summary: '黑色【杀】对你无效。',
+          timing: 'passive',
+          effect: '黑色【杀】被仁王盾直接抵消（不经过响应窗口），除非攻击者装备【青釭剑】穿透。',
+          frequency: 'passive',
+          engineHooks: ['StateRuntime.hasEquipmentEffect:blockBlackSha']
+        },
+        tengjia: {
+          summary: '普通【杀】、【南蛮入侵】、【万箭齐发】对你无效；火焰伤害 +1。',
+          timing: 'passive',
+          effect: '普通属性的【杀】（不含火/雷）、【南蛮】、【万箭】对装备者无效；受到火焰伤害 +1 点。',
+          frequency: 'passive',
+          engineHooks: ['damage:tengjiaBranch']
+        },
+        baiyin: {
+          summary: '受到大于 1 点伤害时防止至 1 点；离开装备区时回复 1 点体力。',
+          timing: 'passive',
+          effect: '受到 ≥ 2 点的单次伤害被防止至 1；从装备区被弃置时立即回复 1 点体力。',
+          frequency: 'passive',
+          engineHooks: ['damage:baiyinDampen', 'card-runtime:baiyinRecover']
+        },
+
+        // ─── Equipment: horses ────────────────────────────────────────
+        minus_horse: {
+          summary: '装备 -1 马：你计算与其他角色的距离 -1。',
+          timing: 'passive',
+          effect: '装备者计算与其他角色距离时 -1，最低为 1。',
+          frequency: 'passive',
+          engineHooks: ['StateRuntime.distanceBetween:horseMinus']
+        },
+        plus_horse: {
+          summary: '装备 +1 马：其他角色计算与你的距离 +1。',
+          timing: 'passive',
+          effect: '其他角色计算与装备者距离时 +1。',
+          frequency: 'passive',
+          engineHooks: ['StateRuntime.distanceBetween:horsePlus']
+        }
+      };
+
+      for (var _cardId in CARD_CATALOG) {
+        if (Object.prototype.hasOwnProperty.call(CARD_CATALOG, _cardId)) {
+          var _rule = CARD_RULES[_cardId];
+          if (_rule) CARD_CATALOG[_cardId].rule = _rule;
+        }
+      }
+
+      export { CARD_CATALOG, CARD_INFO, PHASES, CARD_RULES };

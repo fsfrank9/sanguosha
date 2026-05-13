@@ -299,26 +299,51 @@
 
 ---
 
-## Phase 6E — Card-rule audit against official rules
+## Phase 6E — Card-rule audit (metadata + coverage)
 
-**Status:** 待启动。
+**Status:** ✅ 已完成（首批，audit-only）。
 
-### 设计要点
+### 修订说明
 
-- 按牌族分子 PR：基本牌（杀/闪/桃/酒） → 即时锦囊（无中生有/借刀杀人/过河拆桥/顺手牵羊/决斗/南蛮/万箭/桃园/五谷/无懈/火攻/铁索/雷杀/火杀）→ 延时锦囊（乐不思蜀/兵粮寸断/闪电）。
-- 每张牌新增 fixture 驱动测试：从 `tests/fixtures/official_card_rules.json`（新增）读官方规则要点，断言引擎行为符合。
-- 修复时如果触及描述文案，同步更新 `src/data/cards.js` 的 `desc` 字段。
+最初的设计是「按牌族分子 PR 修 mismatch + 删 game-engine.js 硬编码」。落地时把 6E 的范围明确为「先把官方规则文档化 + audit harness 上线」，**不在本 phase 改任何引擎行为**。原因：
 
-### 任务
+- 引擎本身没有现成的 official-card cache（Hermes 只做了 skills），需要先把规则写下来才有"标准"做比对；
+- 之前几个 phase 的经验是：先把数据/审计基建建好，再做 mismatch 修复，分摊 review 面比塞一个大 PR 健康。
 
-- Task 1: 新增 `tests/fixtures/official_card_rules.json`，覆盖现有 40 个 CARD_CATALOG 条目。
-- Task 2: 按牌族分子 PR 修复 mismatch。
-- Task 3: 删除 `game-engine.js` 里对特定牌名的零散硬编码，改为查 metadata。
+具体 mismatch 修复（火攻属性变种与铁索连环传导、雌雄/方天等暂未实现装备的标注、距离-1 与坐骑组合）放到后续 6E-A / 6E-B 子 phase，由 audit harness 报出来再批量收。
 
-### 验收标准
+### 落地范围
 
-- `npm test` 全绿；新增至少 20 条卡牌规则对照测试。
-- 浏览器 smoke：常用对局流程（杀/闪/桃 → 锦囊 → 延时锦囊判定 → 装备）行为符合官方。
+- `src/data/cards.js`:
+    * 新增 `CARD_RULES` 表，覆盖全部 35 个 CARD_CATALOG 条目（6 基本 + 12 即时锦囊 + 3 延时锦囊 + 14 装备）。每条至少含 `summary` / `timing` / `effect` / `frequency` / `engineHooks`；动作牌额外含 `targets` 和 `responseWindow`。
+    * 在模块加载尾部把 `CARD_RULES[id]` merge 到 `CARD_CATALOG[id].rule`，与 6A 的 `SKILL_METADATA` 合并策略一致。
+    * 导出新增 `CARD_RULES`。
+- `tests/helpers/load-engine.mjs`:
+    * re-export `CARD_RULES`，便于测试访问。
+- `tests/card_rules.test.mjs`（新增）：6 条断言覆盖
+    1. 每条 catalog 都有对应 rule
+    2. 没有 orphan rule
+    3. 每条 rule 字段齐全且 timing/frequency 在枚举集中
+    4. 动作牌必须有 targets，装备可省略
+    5. 合并到 catalog.rule 字段后保持一致
+    6. responseWindow 取值在 canonical set 内
+- 测试自动跑（不需要 env var）。
+
+### 验收
+
+- `npm test` 全绿（33 个测试文件）。
+- `node tests/card_rules.test.mjs` 6/6 ✅，35 条 rule 全部通过 schema 校验。
+
+### 后续待办（在 6E-A / 6E-B 处理）
+
+由 CARD_RULES 与现有 `game-engine.js` 行为对照，已识别的潜在 mismatch / 未实现项：
+
+- **【雌雄双股剑】**：当前 1v1 引擎未引入性别属性，cixiong 的"对异性目标弃牌/摸牌"分支未实现；rule 已显式标注 "尚未实现"。
+- **【方天画戟】**：附加 +1 目标的【杀】当前 1v1 引擎未实现（永远只有 1 个目标）。
+- **【火攻】属性传导**：火攻造成的伤害已是 fire，但与铁索连环的连锁传导未经过系统测试。
+- **【铁索连环】**：横置状态在 1v1 实现，但属性伤害的"连锁传导"需要与 fire_sha / thunder_sha / shandian / huogong 联合 audit。
+- **【借刀杀人】对距离的处理**：当前实现是否检查"目标武器距离内有合法第三方"需 audit。
+- **【五谷丰登】/【桃园结义】**：1v1 只有 2 名存活角色，结算顺序与官方应一致，但需要测试明确覆盖。
 
 ---
 
