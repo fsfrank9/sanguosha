@@ -99,6 +99,12 @@ v4.0 不是重写，而是分批“安全拆源”：
 docs/plans/2026-04-29-sanguosha-v4-architecture.md
 ```
 
+v5 方向的迁移计划见：
+
+```text
+docs/plans/2026-05-13-sanguosha-v5-architecture.md
+```
+
 ## 武将技能实现状态
 
 当前 catalog 统计：
