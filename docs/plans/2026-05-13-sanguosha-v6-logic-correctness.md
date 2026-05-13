@@ -385,14 +385,22 @@
 - `node tests/ai_skill_awareness.test.mjs` 11/11 ✅。
 - 浏览器选 AI = 诸葛亮/刘备/周瑜，AI 回合开始时会按上述条件分别使用观星/仁德/反间。
 
-### 后续 — Phase 6F-bis (待启动)
+### Phase 6F-bis — Card-as conversions for AI
 
-转化技 AI：当 AI 控制关羽/赵云/甄姬等且手里没有 sha/shan 而有红色/黑色牌时，扩展 `aiChooseCard` 与 `findResponseCard`，让 AI 通过 `playCardAs` / `canRespondAs` 走转化路径。具体改动:
+**Status:** ✅ 已完成（play-phase 转化）。
 
-- `aiChooseCard`：除了原 hand 牌型，再扫一遍 hand 看哪些可通过 `canPlayCardAs(game, actor, card, 'sha')` 转化成杀；按转化后的价值评分。
-- `findResponseCard` (或等效): AI 应该自动用倾国把黑色手牌当闪。
+落地范围 = 让 AI 控制关羽/SP 关羽/赵云/SP 赵云时，在没有真【杀】但有可转化手牌时，主动走 `playCardAs` 路径出杀。具体：
 
-预计代码量 ~50 行 + 5-8 条新测试。
+- `aiChooseCard` 重构成返回 `{ card, mode }`，其中 `mode ∈ {'normal', 'asSha'}`。同一评分池里同时考察「原牌使用」与「武圣/龙胆 转化为杀」，挑总分最高者。
+- AI 关羽满血+一张红桃 → 选 `asSha`（红桃当杀打掉对手 1 HP，而桃满血时 score = -100 没用）；AI 关羽受伤时若对方有闪 → 选 `normal` 回血（heal 100 > as-Sha 45）。
+- AI 赵云 手牌只有闪 → 龙胆转化为杀；手牌有真【杀】+ 闪 → AI 直接打杀（任一路径都伤害）。
+- AI 甄姬 黑色手牌不会触发 play-phase `asSha`（倾国是响应路径）。
+- 响应路径（倾国把黑色手牌当闪、龙胆把杀当闪）已经由现有 `consumeResponse` / `findResponseCard` chain 自动处理，AI 不需要额外决策代码。
+- `aiTakeAction` 根据 `choice.mode` dispatch：`'asSha'` → `playCardAs(actor, cardId, 'sha')`，`'normal'` → `playCard(...)`。
+
+`tests/ai_card_as.test.mjs` 9 条覆盖：返回 shape / null / 关羽满血红桃转化 / 关羽受伤选 heal / 端到端打 1 点伤害 + 武圣 log / 赵云只剩闪转化 / 赵云有杀照常打 / 甄姬不滥用倾国 / 无武圣武将不转化。
+
+至此 26 个已实现技能里 AI 真正需要决策的部分（5 个 active + 武圣/龙胆 转化）全部覆盖。
 
 ---
 
