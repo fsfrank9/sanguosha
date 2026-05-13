@@ -348,6 +348,51 @@
         return state.hand.splice(index, 1)[0];
       }
 
+      // v6.1: helpers that treat a player's hand AND equipment as one "own
+      // cards" pool. Used by 制衡 (cost: "弃置任意数量手牌或装备区牌") and
+      // 武圣 (condition: "发动者有红色手牌或装备牌"). The equipment slot is
+      // cleared when the card is removed.
+      var EQUIPMENT_SLOTS = ['weapon', 'armor', 'horseMinus', 'horsePlus'];
+
+      function findOwnCardById(state, cardId) {
+        if (!state) return null;
+        var handHit = (state.hand || []).find(function (c) { return c.id === cardId; });
+        if (handHit) return { card: handHit, zone: 'hand' };
+        if (state.equipment) {
+          for (var i = 0; i < EQUIPMENT_SLOTS.length; i += 1) {
+            var slot = EQUIPMENT_SLOTS[i];
+            var card = state.equipment[slot];
+            if (card && card.id === cardId) return { card: card, zone: 'equipment', slot: slot };
+          }
+        }
+        return null;
+      }
+
+      function removeOwnCardFromAnyZone(state, cardId) {
+        var hit = findOwnCardById(state, cardId);
+        if (!hit) return null;
+        if (hit.zone === 'hand') {
+          return removeCardFromHand(state, cardId);
+        }
+        // equipment
+        state.equipment[hit.slot] = null;
+        return hit.card;
+      }
+
+      function firstMatchingOwnCard(state, predicate) {
+        // Scans hand first, then equipment slots, in deterministic order.
+        if (!state) return null;
+        var handHit = (state.hand || []).find(predicate);
+        if (handHit) return handHit;
+        if (state.equipment) {
+          for (var i = 0; i < EQUIPMENT_SLOTS.length; i += 1) {
+            var card = state.equipment[EQUIPMENT_SLOTS[i]];
+            if (card && predicate(card)) return card;
+          }
+        }
+        return null;
+      }
+
       function removeFirstMatchingCard(state, predicate) {
         var index = state.hand.findIndex(predicate);
         if (index < 0) return null;
@@ -857,7 +902,9 @@
         var state = context.state;
         if (!state || !hasSkill(state, 'wusheng') || context.asType !== 'sha') return null;
         if (context.mode === 'response') {
-          var redCard = firstMatchingCard(state, function (item) { return item.color === 'red'; });
+          // v6.1: spec condition is "发动者有红色手牌**或装备牌**" — scan
+          // both zones for a red card to use as 杀.
+          var redCard = firstMatchingOwnCard(state, function (item) { return item.color === 'red'; });
           return redCard ? { card: redCard, asName: '杀', skillName: '武圣', priority: 10 } : null;
         }
         if (context.card && context.card.color === 'red') {
@@ -883,9 +930,12 @@
         if (!self || !hasSkill(self, 'zhiheng')) return null;
         if (self.flags.zhihengUsed) return fail('【制衡】每回合限一次。');
         if (!cardIds.length) return fail('请选择要弃置的牌。');
+        // v6.1: spec cost is "弃置任意数量手牌**或装备区牌**". We accept ids
+        // from either zone via removeOwnCardFromAnyZone; equipment slots are
+        // cleared when a card is taken from them.
         var discarded = [];
         for (var i = 0; i < cardIds.length; i += 1) {
-          var card = removeCardFromHand(self, cardIds[i]);
+          var card = removeOwnCardFromAnyZone(self, cardIds[i]);
           if (card) {
             discarded.push(card);
             discardCard(game, card);
@@ -904,10 +954,21 @@
         var actor = context.actor;
         var self = context.state;
         if (!self || !hasSkill(self, 'kurou')) return null;
-        if (self.hp <= 1) return fail('体力不足，不能发动【苦肉】。');
+        // v6.1: spec condition is "发动者存活" — hp must be > 0, not > 1.
+        // Allow hp=1 → 0; this 1v1-minimal engine treats hp≤0 as immediate
+        // game-over (the multi-player 濒死/桃 救援 flow isn't modeled here).
+        // Effect order per spec: "失去 1 点体力，然后摸两张牌". We draw the
+        // 2 cards before tripping the game-over branch so 黄盖's hand still
+        // reflects the spec sequence in any log readback.
+        if (self.hp < 1) return fail('体力不足，不能发动【苦肉】。');
         self.hp -= 1;
         log(game, actorName(game, actor) + '发动【苦肉】，失去 1 点体力并摸两张牌。');
         drawCards(game, actor, 2);
+        if (self.hp <= 0 && game.phase !== 'gameover') {
+          game.phase = 'gameover';
+          game.winner = opponent(actor);
+          log(game, actorName(game, actor) + '因【苦肉】力竭，' + actorName(game, game.winner) + '获胜！');
+        }
         return success('苦肉完成。');
       }
 
@@ -1261,14 +1322,19 @@
           if (card) return { card: card, asName: '闪', skillName: null };
           var shanResponseContext = { mode: 'response', state: state, asType: 'shan' };
           var shanConversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', shanResponseContext));
-          return shanConversion ? { card: removeCardFromHand(state, shanConversion.card.id), asName: shanConversion.asName, skillName: shanConversion.skillName } : null;
+          // v6.1: convert through hand-or-equipment so 武圣 can pull a red
+          // weapon (cardAs may return an equipment card). Skills that only
+          // operate on hand (倾国 / 龙胆) won't return equipment cards in
+          // the first place, so this is a strict superset.
+          return shanConversion ? { card: removeOwnCardFromAnyZone(state, shanConversion.card.id), asName: shanConversion.asName, skillName: shanConversion.skillName } : null;
         }
         if (type === 'sha') {
           card = removeFirstCardOfType(state, 'sha');
           if (card) return { card: card, asName: '杀', skillName: null };
           var responseContext = { mode: 'response', state: state, asType: 'sha' };
           var conversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', responseContext));
-          return conversion ? { card: removeCardFromHand(state, conversion.card.id), asName: conversion.asName, skillName: conversion.skillName } : null;
+          // Same: support equipment-zone sources for 武圣 's response path.
+          return conversion ? { card: removeOwnCardFromAnyZone(state, conversion.card.id), asName: conversion.asName, skillName: conversion.skillName } : null;
         }
         card = removeFirstCardOfType(state, type);
         return card ? { card: card, asName: card.name, skillName: null } : null;
@@ -2282,7 +2348,15 @@
       function canPlayCardAs(game, actor, cardOrId, asType) {
         var self = game[actor];
         if (!self) return fail('未知角色。');
-        var original = typeof cardOrId === 'string' ? self.hand.find(function (item) { return item.id === cardOrId; }) : cardOrId;
+        // v6.1: accept either a card object OR an id; the id may refer to a
+        // hand card OR an equipment slot (e.g. 关羽 卸下红色武器当 杀).
+        var original = null;
+        if (typeof cardOrId === 'string') {
+          var hit = findOwnCardById(self, cardOrId);
+          if (hit) original = hit.card;
+        } else {
+          original = cardOrId;
+        }
         if (!original) return fail('找不到这张牌。');
         if (asType !== 'sha') return fail('当前只支持转化为【杀】。');
         var cardAsContext = { mode: 'proactive', game: game, actor: actor, state: self, card: original, asType: asType };
@@ -2299,10 +2373,14 @@
       function playCardAs(game, actor, cardId, asType) {
         var self = game[actor];
         if (!self) return fail('未知角色。');
-        var original = self.hand.find(function (item) { return item.id === cardId; });
+        var hit = findOwnCardById(self, cardId);
+        if (!hit) return fail('找不到这张牌。');
+        var original = hit.card;
         var playable = canPlayCardAs(game, actor, original, asType);
         if (!playable.ok) return playable;
-        removeCardFromHand(self, cardId);
+        // Remove from whichever zone the source card lived in. The slot is
+        // cleared if it came from equipment (relevant for 关羽 卸下武器当杀).
+        removeOwnCardFromAnyZone(self, cardId);
         log(game, actorName(game, actor) + playable.message);
         return playSha(game, actor, virtualShaFromCard(original));
       }
