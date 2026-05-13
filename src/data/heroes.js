@@ -119,9 +119,3 @@
       };
 
       export { HERO_CATALOG, HEROES };
-
-      if (typeof window !== 'undefined') {
-        var data = window.SanguoshaData || (window.SanguoshaData = {});
-        data.HERO_CATALOG = HERO_CATALOG;
-        data.HEROES = HEROES;
-      }

@@ -28,7 +28,7 @@ function test(name, fn) {
   console.log(`✓ ${name}`);
 }
 
-test('v4 phase 3 introduces engine runtime modules before the game engine', () => {
+test('engine runtime modules exist as separate ES modules with their own exports', () => {
   const requiredEngineModules = [
     'src/engine/runtime.js',
     'src/engine/skill-runtime.js',
@@ -42,30 +42,18 @@ test('v4 phase 3 introduces engine runtime modules before the game engine', () =
     assert.ok(exists(relativePath), `${relativePath} should exist`);
   }
 
-  const buildSource = read('tools/build.mjs');
-  assert.match(buildSource, /engineModules\s*:/, 'build script should have an explicit engineModules input list');
-  for (const relativePath of requiredEngineModules) {
-    assert.match(buildSource, new RegExp(relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${relativePath} should be part of the build input list`);
-  }
-  var lastBuildIndex = -1;
-  for (const relativePath of requiredEngineModules.concat(['src/engine/game-engine.js'])) {
-    const nextBuildIndex = buildSource.indexOf(relativePath);
-    assert.ok(nextBuildIndex > lastBuildIndex, `${relativePath} should be bundled after the previous engine source`);
-    lastBuildIndex = nextBuildIndex;
-  }
-
   const runtimeSource = read('src/engine/runtime.js');
   const skillRuntimeSource = read('src/engine/skill-runtime.js');
   const cardRuntimeSource = read('src/engine/card-runtime.js');
   const stateSource = read('src/engine/state.js');
   const phaseSource = read('src/engine/phases.js');
   const judgementSource = read('src/engine/judgement.js');
-  assert.match(runtimeSource, /window\.SanguoshaEngineModules/, 'runtime module should attach to SanguoshaEngineModules');
-  assert.match(skillRuntimeSource, /window\.SanguoshaEngineModules/, 'skill runtime module should attach to SanguoshaEngineModules');
-  assert.match(cardRuntimeSource, /window\.SanguoshaEngineModules/, 'card runtime module should attach to SanguoshaEngineModules');
-  assert.match(stateSource, /window\.SanguoshaEngineModules/, 'state runtime module should attach to SanguoshaEngineModules');
-  assert.match(phaseSource, /window\.SanguoshaEngineModules/, 'phase runtime module should attach to SanguoshaEngineModules');
-  assert.match(judgementSource, /window\.SanguoshaEngineModules/, 'judgement runtime module should attach to SanguoshaEngineModules');
+  assert.match(runtimeSource, /export\s+const\s+Runtime\s*=/, 'runtime module should export Runtime');
+  assert.match(skillRuntimeSource, /export\s+const\s+SkillRuntime\s*=/, 'skill runtime module should export SkillRuntime');
+  assert.match(cardRuntimeSource, /export\s+const\s+CardRuntime\s*=/, 'card runtime module should export CardRuntime');
+  assert.match(stateSource, /export\s+const\s+StateRuntime\s*=/, 'state runtime module should export StateRuntime');
+  assert.match(phaseSource, /export\s+const\s+PhaseRuntime\s*=/, 'phase runtime module should export PhaseRuntime');
+  assert.match(judgementSource, /export\s+const\s+JudgementRuntime\s*=/, 'judgement runtime module should export JudgementRuntime');
   assert.match(cardRuntimeSource, /makeTestCard/, 'card runtime should own test-card construction');
   assert.match(cardRuntimeSource, /isShaCard/, 'card runtime should own Sha classification');
   assert.match(stateSource, /distanceBetween/, 'state runtime should own distance calculation');
@@ -78,6 +66,10 @@ test('v4 phase 3 introduces engine runtime modules before the game engine', () =
 
   const engineSource = read('src/engine/game-engine.js');
   assert.match(engineSource, /import\s*\{\s*Runtime\s*\}\s*from\s*['"]\.\/runtime\.js['"]/, 'game engine should import Runtime module');
+  assert.match(engineSource, /import\s*\{\s*SkillRuntime\s*\}\s*from\s*['"]\.\/skill-runtime\.js['"]/, 'game engine should import SkillRuntime module');
+  assert.match(engineSource, /import\s*\{\s*CardRuntime\s*\}\s*from\s*['"]\.\/card-runtime\.js['"]/, 'game engine should import CardRuntime module');
+  assert.match(engineSource, /import\s*\{\s*StateRuntime\s*\}\s*from\s*['"]\.\/state\.js['"]/, 'game engine should import StateRuntime module');
+  assert.match(engineSource, /import\s*\{\s*PhaseRuntime\s*\}\s*from\s*['"]\.\/phases\.js['"]/, 'game engine should import PhaseRuntime module');
   assert.match(engineSource, /import\s*\{\s*JudgementRuntime\s*\}\s*from\s*['"]\.\/judgement\.js['"]/, 'game engine should import JudgementRuntime module');
   assert.doesNotMatch(engineSource, /function\s+annotateSkillStatus\s*\(/, 'skill status annotation should live outside the monolithic engine');
   assert.doesNotMatch(engineSource, /function\s+clone\s*\(/, 'generic clone helper should live in runtime module');
@@ -95,7 +87,7 @@ test('v4 phase 3 introduces engine runtime modules before the game engine', () =
   assert.doesNotMatch(engineSource, /function\s+getActorStatus\s*\(/, 'actor status helper should live in state runtime module');
 });
 
-test('engine runtime modules are bundled into the direct-open artifact', () => {
+test('engine runtime modules import cleanly through ES module loader', () => {
   const result = spawnSync(process.execPath, ['tools/build.mjs', '--check'], {
     cwd: root,
     encoding: 'utf8',
@@ -106,16 +98,14 @@ test('engine runtime modules are bundled into the direct-open artifact', () => {
     `node tools/build.mjs --check should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
   );
 
-  const distHtml = read('dist/index.html');
-  assert.doesNotMatch(distHtml, /^\s*(import|export)\s/m, 'legacy bundle should not contain unstripped ES module syntax');
-
   assert.ok(Runtime, 'Runtime should be importable as an ES module');
   assert.ok(SkillRuntime, 'SkillRuntime should be importable as an ES module');
   assert.ok(CardRuntime, 'CardRuntime should be importable as an ES module');
   assert.ok(StateRuntime, 'StateRuntime should be importable as an ES module');
   assert.ok(PhaseRuntime, 'PhaseRuntime should be importable as an ES module');
   assert.ok(JudgementRuntime, 'JudgementRuntime should be importable as an ES module');
-  assert.equal(typeof Runtime.requireData, 'function');
+  assert.equal(typeof Runtime.clone, 'function');
+  assert.equal(typeof Runtime.makePlayer, 'function');
   assert.equal(typeof SkillRuntime.annotateSkillStatus, 'function');
   assert.equal(typeof SkillRuntime.createRegistry, 'function');
   assert.equal(typeof SkillRuntime.registerSkill, 'function');

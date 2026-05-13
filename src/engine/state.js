@@ -64,8 +64,3 @@
     handLimit: handLimit,
     getActorStatus: getActorStatus
   };
-
-  if (typeof window !== 'undefined') {
-    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-    modules.StateRuntime = StateRuntime;
-  }

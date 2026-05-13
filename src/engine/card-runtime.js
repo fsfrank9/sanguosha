@@ -94,8 +94,3 @@
     isNormalTrickCard: isNormalTrickCard,
     physicalCardOf: physicalCardOf
   };
-
-  if (typeof window !== 'undefined') {
-    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-    modules.CardRuntime = CardRuntime;
-  }

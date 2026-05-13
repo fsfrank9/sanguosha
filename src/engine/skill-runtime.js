@@ -95,8 +95,3 @@
     registerSkill: registerSkill,
     runHook: runHook
   };
-
-  if (typeof window !== 'undefined') {
-    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-    modules.SkillRuntime = SkillRuntime;
-  }

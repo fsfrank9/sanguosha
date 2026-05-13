@@ -61,8 +61,3 @@
     isShandianHit: isShandianHit,
     evaluateDelayedTrick: evaluateDelayedTrick
   };
-
-  if (typeof window !== 'undefined') {
-    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-    modules.JudgementRuntime = JudgementRuntime;
-  }

@@ -1,37 +1,27 @@
-# 三国杀 · 模块化源码 + 单文件离线版
+# 三国杀 · 模块化 ES 源码 1v1 原型
 
-一个可直接打开的离线 HTML 三国杀 1v1 原型。当前从 v4.0 开始采用专业化源码结构：开发时维护 `src/` 模块，发布/游玩仍保留可直接打开的单文件 `index.html`。v4 是迁移过渡版本；v5 计划不再把全部源码/数据塞进单 HTML，而是走 GitHub 托管发布链接访问和真正模块化架构。
+纯 HTML/CSS/JavaScript 实现的三国杀 1v1 原型。Phase 5C 起仓库已经从 v4 的「单文件 + IIFE 全局」过渡到 v5 的「原生 ES 模块 + 静态托管」：`src/` 是浏览器加载的源码本身，根 `index.html` 是手写的模块入口，没有打包步骤、没有 npm 运行时依赖。Phase 5D 将加 GitHub Pages 自动发布。
 
 ## 运行
 
-最简单方式仍然是直接用浏览器打开：
-
-```text
-index.html
-```
-
-不需要服务器，也不需要联网。
-
-如果修改了 `src/` 源码，先重新生成单文件产物：
+Phase 5C 起 `index.html` 是手写的 ES 模块入口（`<script type="module" src="./src/main.js">`），原生模块在 `file://` 下被浏览器 CORS 拦截，所以**不再支持双击 `index.html` 直开**。在仓库根目录起一个本地 HTTP 服务器即可：
 
 ```bash
-node tools/build.mjs
-# 或
-npm run build
+python3 -m http.server 8000
+# 然后浏览器访问 http://127.0.0.1:8000/
 ```
 
-构建会同时写入：
+不需要 npm install、不需要打包、不需要联网。Phase 5D 会加 GitHub Pages 自动发布，到时也可以直接用 https://&lt;owner&gt;.github.io/sanguosha/ 访问。
 
-- `index.html`：根目录直开版本，保持原来的使用习惯。
-- `dist/index.html`：构建产物副本，便于后续发布/分发。
-
-检查构建产物是否与源码一致：
+检查仓库结构是否完整（必备源文件存在、入口 HTML 用模块标签、不再有 `dist/` / 模板残留）：
 
 ```bash
 node tools/build.mjs --check
 # 或
 npm run build:check
 ```
+
+`npm run build` 在 v5 不再产出文件——所有源码本身就是浏览器要加载的资产。
 
 ## 当前版本
 
