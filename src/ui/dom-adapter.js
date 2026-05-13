@@ -9,7 +9,13 @@
       var pendingTargetZone = null;
       var pendingHuogongCardId = null;
       var pendingConversionCardId = null;
-      var pendingGuanxingOrderIds = [];
+      // v6.1 guanxing pendingChoice tracking: three queues (unassigned / top /
+      // bottom). `guanxingSelected` is the currently highlighted card id from
+      // any zone; clicking 顶/底/取回 buttons moves it accordingly.
+      var guanxingUnassignedIds = [];
+      var guanxingTopIds = [];
+      var guanxingBottomIds = [];
+      var guanxingSelected = null;
       var skillSelectMode = null;
       var selectedSkillCardIds = [];
       var enemyActionDelay = 650;
@@ -37,7 +43,9 @@
           'targetEquipmentBtn', 'targetJudgeBtn', 'targetCancelBtn', 'targetCardChoices', 'huogongModePanel',
           'huogongRevealText', 'huogongCostChoices', 'huogongDeclineBtn', 'huogongCancelBtn', 'conversionModePanel',
           'conversionHint', 'conversionNormalBtn', 'conversionShaBtn', 'conversionCancelBtn', 'guanxingModePanel',
-          'guanxingHint', 'guanxingChoices', 'guanxingReverseBtn', 'guanxingConfirmBtn', 'guanxingCancelBtn', 'zhihengModePanel',
+          'guanxingHint', 'guanxingUnassigned', 'guanxingTopZone', 'guanxingBottomZone',
+          'guanxingTopBtn', 'guanxingBottomBtn', 'guanxingReturnBtn', 'guanxingConfirmBtn', 'guanxingDeclineBtn',
+          'zhihengModePanel',
           'zhihengConfirmBtn', 'zhihengCancelBtn', 'zhihengHint', 'roleDraftPanel',
           'guicaiPromptPanel', 'guicaiPromptHint', 'guicaiOriginalCard', 'guicaiCandidates', 'guicaiDeclineBtn',
           'yijiPromptPanel', 'yijiPromptHint', 'yijiCandidates', 'yijiKeepAllBtn', 'yijiConfirmBtn',
@@ -384,6 +392,19 @@
             yijiGiveSelection = [];
           }
         }
+        if (els.guanxingModePanel) {
+          if (kind === 'guanxing-reorder' && pending.actor === 'player') {
+            // Open the panel if this is a new pendingChoice (different cards
+            // than the last we rendered). Otherwise keep current zone state.
+            var pendingIds = pending.cards.map(function (c) { return c.id; }).sort().join(',');
+            var localIds = guanxingUnassignedIds.concat(guanxingTopIds, guanxingBottomIds).sort().join(',');
+            if (pendingIds !== localIds) showGuanxingPanelFromPending();
+            else renderGuanxingZones();
+          } else if (guanxingUnassignedIds.length || guanxingTopIds.length || guanxingBottomIds.length) {
+            // pendingChoice cleared (resolved or declined) — close panel.
+            hideGuanxingPanel();
+          }
+        }
       }
 
       function flashHero(actor, label) {
@@ -451,52 +472,99 @@
         if (els.conversionHint) els.conversionHint.textContent = '这张牌可按原牌使用，也可当【杀】使用';
       }
 
-      function guanxingCardMarkup(card, index) {
-        return '<span class="mini-card" data-guanxing-card-id="' + escapeHtml(card.id) + '">' + (index + 1) + '.【' + escapeHtml(card.name) + '】' + escapeHtml(suitName(card.suit)) + '</span>';
+      function guanxingCardMarkup(card, zone) {
+        var selected = guanxingSelected === card.id ? ' selected' : '';
+        return '<button class="mini-card guanxing-card' + selected +
+          '" data-guanxing-card-id="' + escapeHtml(card.id) +
+          '" data-guanxing-zone="' + escapeHtml(zone) +
+          '">【' + escapeHtml(card.name) + '】' + escapeHtml(suitName(card.suit)) + ' ' + escapeHtml(String(card.rank || '')) + '</button>';
       }
 
-      function renderGuanxingChoices() {
-        if (!els.guanxingChoices || !game) return;
-        var preview = Engine.getGuanxingPreview(game, 'player');
-        if (!preview.ok) {
-          els.guanxingChoices.innerHTML = '<span class="mini-card">' + escapeHtml(preview.message) + '</span>';
-          return;
+      function guanxingFindCard(id) {
+        var pending = game && Engine.getPendingChoice(game);
+        if (!pending || pending.kind !== 'guanxing-reorder') return null;
+        for (var i = 0; i < pending.cards.length; i += 1) {
+          if (pending.cards[i].id === id) return pending.cards[i];
         }
-        var byId = {};
-        preview.cards.forEach(function (card) { byId[card.id] = card; });
-        var ordered = pendingGuanxingOrderIds.map(function (id) { return byId[id]; }).filter(Boolean);
-        els.guanxingChoices.innerHTML = ordered.length ? ordered.map(guanxingCardMarkup).join('') : '<span class="mini-card">牌堆顶没有可观星的牌</span>';
+        return null;
       }
 
-      function showGuanxingPanel() {
-        var preview = Engine.getGuanxingPreview(game, 'player');
-        if (!preview.ok) {
-          game.log.push(preview.message);
-          render();
+      function renderGuanxingZones() {
+        var unassignedHtml = guanxingUnassignedIds.length
+          ? guanxingUnassignedIds.map(function (id) { var c = guanxingFindCard(id); return c ? guanxingCardMarkup(c, 'unassigned') : ''; }).join('')
+          : '<span class="mini-card">已全部分配</span>';
+        var topHtml = guanxingTopIds.length
+          ? guanxingTopIds.map(function (id, idx) { var c = guanxingFindCard(id); return c ? ('<span class="mini-card guanxing-position-tag">' + (idx + 1) + '</span>' + guanxingCardMarkup(c, 'top')) : ''; }).join('')
+          : '<span class="mini-card">尚无</span>';
+        var bottomHtml = guanxingBottomIds.length
+          ? guanxingBottomIds.map(function (id, idx) { var c = guanxingFindCard(id); return c ? ('<span class="mini-card guanxing-position-tag">' + (idx + 1) + '</span>' + guanxingCardMarkup(c, 'bottom')) : ''; }).join('')
+          : '<span class="mini-card">尚无</span>';
+        if (els.guanxingUnassigned) els.guanxingUnassigned.innerHTML = unassignedHtml;
+        if (els.guanxingTopZone) els.guanxingTopZone.innerHTML = topHtml;
+        if (els.guanxingBottomZone) els.guanxingBottomZone.innerHTML = bottomHtml;
+        if (els.guanxingConfirmBtn) els.guanxingConfirmBtn.disabled = guanxingUnassignedIds.length > 0;
+      }
+
+      function showGuanxingPanelFromPending() {
+        var pending = game && Engine.getPendingChoice(game);
+        if (!pending || pending.kind !== 'guanxing-reorder' || pending.actor !== 'player') {
+          hideGuanxingPanel();
           return;
         }
-        pendingGuanxingOrderIds = preview.cards.map(function (card) { return card.id; });
+        guanxingUnassignedIds = pending.cards.map(function (c) { return c.id; });
+        guanxingTopIds = [];
+        guanxingBottomIds = [];
+        guanxingSelected = null;
         if (els.guanxingModePanel) els.guanxingModePanel.hidden = false;
-        if (els.guanxingHint) els.guanxingHint.textContent = '观星：当前显示牌堆顶 ' + preview.cards.length + ' 张，可逆序后确认';
-        renderGuanxingChoices();
-        if (els.handHint) els.handHint.textContent = '观星：查看牌堆顶牌，确认前可点“逆序调整”';
+        if (els.guanxingHint) {
+          els.guanxingHint.textContent =
+            '观星（准备阶段）：' + pending.cards.length + ' 张待分配。先点一张牌再点 ↑顶 / ↓底 / ↩取回。';
+        }
+        if (els.handHint) els.handHint.textContent = '观星：请把每张牌分配到牌堆顶或牌堆底';
+        renderGuanxingZones();
       }
 
       function hideGuanxingPanel() {
-        pendingGuanxingOrderIds = [];
+        guanxingUnassignedIds = [];
+        guanxingTopIds = [];
+        guanxingBottomIds = [];
+        guanxingSelected = null;
         if (els.guanxingModePanel) els.guanxingModePanel.hidden = true;
-        if (els.guanxingHint) els.guanxingHint.textContent = '观星：预览牌堆顶牌';
-        if (els.guanxingChoices) els.guanxingChoices.innerHTML = '<span class="mini-card">发动观星后显示牌堆顶牌</span>';
+        if (els.guanxingHint) els.guanxingHint.textContent = '观星：准备阶段开始时分配预览牌';
       }
 
-      function reverseGuanxingOrder() {
-        pendingGuanxingOrderIds.reverse();
-        renderGuanxingChoices();
+      function guanxingMoveSelectedTo(targetZone) {
+        if (!guanxingSelected) return;
+        var id = guanxingSelected;
+        var sources = [
+          { name: 'unassigned', list: guanxingUnassignedIds },
+          { name: 'top', list: guanxingTopIds },
+          { name: 'bottom', list: guanxingBottomIds }
+        ];
+        for (var i = 0; i < sources.length; i += 1) {
+          var pos = sources[i].list.indexOf(id);
+          if (pos >= 0) sources[i].list.splice(pos, 1);
+        }
+        var target = targetZone === 'top' ? guanxingTopIds : targetZone === 'bottom' ? guanxingBottomIds : guanxingUnassignedIds;
+        target.push(id);
+        guanxingSelected = null;
+        renderGuanxingZones();
       }
 
       function confirmGuanxing() {
-        if (!game || !pendingGuanxingOrderIds.length) return;
-        var result = Engine.useSkill(game, 'player', 'guanxing', [], { orderIds: pendingGuanxingOrderIds });
+        if (!game || guanxingUnassignedIds.length > 0) return;
+        var result = Engine.resolvePendingChoice(game, {
+          topIds: guanxingTopIds.slice(),
+          bottomIds: guanxingBottomIds.slice()
+        });
+        hideGuanxingPanel();
+        if (!result.ok) game.log.push(result.message);
+        render();
+      }
+
+      function declineGuanxing() {
+        if (!game) return;
+        var result = Engine.resolvePendingChoice(game, { decline: true });
         hideGuanxingPanel();
         if (!result.ok) game.log.push(result.message);
         render();
@@ -822,8 +890,15 @@
         hideTargetZonePanel();
         hideHuogongPanel();
         hideConversionPanel();
+        // v6.1: 观星 no longer fires on play-phase click — it auto-triggers
+        // in the prepare phase via pendingChoice. Clicking the (typically
+        // disabled) button now just re-opens an in-progress panel if there
+        // happens to be a pending guanxing-reorder choice.
         if (skillId === 'guanxing') {
-          showGuanxingPanel();
+          var pending = game && Engine.getPendingChoice(game);
+          if (pending && pending.kind === 'guanxing-reorder' && pending.actor === 'player') {
+            showGuanxingPanelFromPending();
+          }
           render();
           return;
         }
@@ -1066,9 +1141,22 @@
         if (els.conversionNormalBtn) els.conversionNormalBtn.addEventListener('click', function () { resolveConversion(false); });
         if (els.conversionShaBtn) els.conversionShaBtn.addEventListener('click', function () { resolveConversion(true); });
         if (els.conversionCancelBtn) els.conversionCancelBtn.addEventListener('click', function () { hideConversionPanel(); render(); });
-        if (els.guanxingReverseBtn) els.guanxingReverseBtn.addEventListener('click', reverseGuanxingOrder);
+        if (els.guanxingTopBtn) els.guanxingTopBtn.addEventListener('click', function () { guanxingMoveSelectedTo('top'); });
+        if (els.guanxingBottomBtn) els.guanxingBottomBtn.addEventListener('click', function () { guanxingMoveSelectedTo('bottom'); });
+        if (els.guanxingReturnBtn) els.guanxingReturnBtn.addEventListener('click', function () { guanxingMoveSelectedTo('unassigned'); });
         if (els.guanxingConfirmBtn) els.guanxingConfirmBtn.addEventListener('click', confirmGuanxing);
-        if (els.guanxingCancelBtn) els.guanxingCancelBtn.addEventListener('click', function () { hideGuanxingPanel(); render(); });
+        if (els.guanxingDeclineBtn) els.guanxingDeclineBtn.addEventListener('click', declineGuanxing);
+        // Card-click within any guanxing zone — set the highlight.
+        ['guanxingUnassigned', 'guanxingTopZone', 'guanxingBottomZone'].forEach(function (zoneKey) {
+          var el = els[zoneKey];
+          if (!el) return;
+          el.addEventListener('click', function (event) {
+            var btn = event.target.closest('[data-guanxing-card-id]');
+            if (!btn) return;
+            guanxingSelected = btn.getAttribute('data-guanxing-card-id');
+            renderGuanxingZones();
+          });
+        });
         if (els.targetCancelBtn) els.targetCancelBtn.addEventListener('click', function () { hideTargetZonePanel(); render(); });
         if (els.zhihengConfirmBtn) els.zhihengConfirmBtn.addEventListener('click', confirmCardSkill);
         if (els.zhihengCancelBtn) els.zhihengCancelBtn.addEventListener('click', function () { exitSkillSelectMode(); render(); });

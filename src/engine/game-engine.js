@@ -670,17 +670,28 @@
         return success('反间完成。');
       }
 
+      // v6.1: count = min(aliveActorCount, 5, deckSize). 1v1 ⇒ 2 (was hardcoded 5).
       function triggerGuanxingPreview(context) {
         if (context.skillId !== 'guanxing') return null;
         var game = context.game;
         var self = context.state;
         if (!self || !hasSkill(self, 'guanxing')) return fail('没有【观星】。');
-        var count = Math.min(5, game.deck.length);
+        var alive = StateRuntime.aliveActorCount(game);
+        var count = Math.min(alive || 0, 5, game.deck.length);
         var preview = success('观星预览完成。');
-        preview.cards = game.deck.slice(game.deck.length - count);
+        preview.cards = count > 0 ? game.deck.slice(game.deck.length - count) : [];
         return preview;
       }
 
+      // v6.1: new API `{ topIds, bottomIds }` lets the player put any subset of
+      // previewed cards at the deck top (in given order) and the rest at the
+      // deck bottom (in given order). topIds[0] is drawn first; bottomIds[0]
+      // is the first drawn of the bottom pile (after the existing deck below
+      // the preview is exhausted); bottomIds[last] is the very bottom of the
+      // deck. Cards not mentioned in either list stay on top, in their
+      // original preview order, below any explicit topCards. The legacy
+      // `orderIds` field is treated as an alias for `topIds` with the same
+      // top-first semantic.
       function triggerGuanxingActiveSkill(context) {
         if (context.skillId !== 'guanxing') return null;
         var game = context.game;
@@ -693,20 +704,56 @@
         if (!preview.ok) return preview;
         var count = preview.cards.length;
         var visibleCards = preview.cards.slice();
-        var top = preview.cards.slice();
-        if (options.orderIds && options.orderIds.length) {
-          var chosen = [];
-          options.orderIds.forEach(function (id) {
-            var index = top.findIndex(function (card) { return card.id === id; });
-            if (index >= 0) chosen.push(top.splice(index, 1)[0]);
-          });
-          game.deck.splice(game.deck.length - count, count);
-          game.deck = game.deck.concat(top).concat(chosen);
+
+        var topIds = options.topIds || options.orderIds || null;
+        var bottomIds = options.bottomIds || null;
+
+        if (count > 0 && (topIds || bottomIds)) {
+          var idToCard = {};
+          preview.cards.forEach(function (card) { idToCard[card.id] = card; });
+          var remaining = preview.cards.slice();
+          var topCards = [];
+          var bottomCards = [];
+
+          if (topIds) {
+            for (var i = 0; i < topIds.length; i += 1) {
+              var idx = remaining.findIndex(function (c) { return c.id === topIds[i]; });
+              if (idx >= 0) topCards.push(remaining.splice(idx, 1)[0]);
+            }
+          }
+          if (bottomIds) {
+            for (var j = 0; j < bottomIds.length; j += 1) {
+              var bidx = remaining.findIndex(function (c) { return c.id === bottomIds[j]; });
+              if (bidx >= 0) bottomCards.push(remaining.splice(bidx, 1)[0]);
+            }
+          }
+
+          var below = game.deck.slice(0, game.deck.length - count);
+          // Final deck array (index 0 = bottom of deck, last = top via pop):
+          //   [bottomCards.reverse(), ...below, ...remaining, ...topCards.reverse()]
+          // bottomCards[0] ends up at the END of the bottom segment (popped
+          // first among the bottom pile, after existing deck-below exhausts).
+          // bottomCards[last] ends up at index 0 of the array = absolute
+          // bottom of the deck. topCards[0] ends up at the END of the array,
+          // popped first. Remaining preview cards (unassigned by either list)
+          // stay in preview order on top of `below`, BELOW the explicit
+          // topCards in the top region.
+          game.deck = bottomCards.slice().reverse()
+            .concat(below)
+            .concat(remaining)
+            .concat(topCards.slice().reverse());
         }
-        log(game, actorName(game, actor) + '发动【观星】，观看牌堆顶 ' + count + ' 张牌。');
+
+        if (count > 0) {
+          log(game, actorName(game, actor) + '发动【观星】，观看牌堆顶 ' + count + ' 张牌。');
+        } else {
+          log(game, actorName(game, actor) + '发动【观星】，但牌堆已无可观看的牌。');
+        }
         self.flags.guanxingUsed = true;
         var guanxingResult = success('观星完成。');
         guanxingResult.cards = visibleCards;
+        guanxingResult.topIds = (topIds || []).slice();
+        guanxingResult.bottomIds = (bottomIds || []).slice();
         return guanxingResult;
       }
 
@@ -1007,16 +1054,22 @@
       }
 
       // Resolve a pending player prompt. Decision shape depends on kind:
-      //   guicai-replace:  { cardId }              — picks the hand card used
-      //                                              as the new judgement
-      //                                              card. cardId === null
-      //                                              means decline.
-      //   yiji-distribute: { giveIds: [<cardId>] } — drawn cards in giveIds
-      //                                              are transferred to the
-      //                                              opponent. Cards not in
-      //                                              giveIds stay in hand.
-      //                                              giveIds === undefined or
-      //                                              empty means keep all.
+      //   guicai-replace:    { cardId }
+      //                        Picks the hand card used as the new judgement
+      //                        card. cardId === null means decline.
+      //   yiji-distribute:   { giveIds: [<cardId>] }
+      //                        Drawn cards in giveIds are transferred to the
+      //                        opponent. giveIds undefined or empty = keep all.
+      //   guanxing-reorder:  { topIds: [<cardId>], bottomIds: [<cardId>] }
+      //                        Cards listed in topIds end up at the deck top
+      //                        in given order (topIds[0] = drawn first).
+      //                        Cards listed in bottomIds end up at the deck
+      //                        bottom in given order (bottomIds[0] = first
+      //                        drawn of bottom pile; bottomIds[last] = very
+      //                        bottom of deck). Cards not in either list stay
+      //                        on top in original preview order, below any
+      //                        explicit topIds. decision.decline === true skips
+      //                        the reorder entirely (skill still consumed).
       function resolvePendingChoice(game, decision) {
         var pending = game && game.pendingChoice;
         if (!pending) return fail('没有待处理的选择。');
@@ -1027,7 +1080,31 @@
         if (pending.kind === 'yiji-distribute') {
           return resolveYijiDistributeChoice(game, pending, decision || {});
         }
+        if (pending.kind === 'guanxing-reorder') {
+          return resolveGuanxingChoice(game, pending, decision || {});
+        }
         return fail('未知的选择类型：' + pending.kind);
+      }
+
+      function resolveGuanxingChoice(game, pending, decision) {
+        var actor = pending.actor;
+        var state = game[actor];
+        if (!state) return fail('未知角色。');
+        if (decision.decline) {
+          state.flags.guanxingUsed = true;
+          log(game, actorName(game, actor) + '选择不发动【观星】。');
+        } else {
+          var result = useSkill(game, actor, 'guanxing', [], {
+            topIds: decision.topIds || [],
+            bottomIds: decision.bottomIds || []
+          });
+          if (!result.ok) {
+            // Restore so the UI can re-render the panel.
+            game.pendingChoice = pending;
+            return result;
+          }
+        }
+        return continueTurnAfterPreparePhase(game, actor);
       }
 
       function resolveYijiDistributeChoice(game, pending, decision) {
@@ -1564,6 +1641,52 @@
         setPhase(game, actor, 'prepare');
         log(game, actorName(game, actor) + '的准备阶段。');
 
+        var prepareResult = processPreparePhase(game, actor);
+        if (prepareResult && prepareResult.suspended) {
+          return success('回合在准备阶段暂停，等待玩家选择。');
+        }
+
+        return continueTurnAfterPreparePhase(game, actor);
+      }
+
+      // v6.1: prepare-phase hooks. Currently only 观星 has prepare-phase
+      // behavior; the function leaves room for future skills that fire here.
+      // For 观星 specifically: the player gets a pendingChoice prompt
+      // ('guanxing-reorder'); AI auto-fires with no reorder (preserves
+      // visible top cards in their natural order).
+      function processPreparePhase(game, actor) {
+        var state = game[actor];
+        if (!state) return null;
+        state.flags = state.flags || {};
+        if (hasSkill(state, 'guanxing') && !state.flags.guanxingUsed && game.deck.length > 0) {
+          var pref = (state.skillPreferences && state.skillPreferences.guanxing) || null;
+          if (pref === 'decline') {
+            state.flags.guanxingUsed = true;
+            log(game, actorName(game, actor) + '选择不发动【观星】。');
+            return null;
+          }
+          if (actor === 'player') {
+            var preview = triggerGuanxingPreview({ game: game, state: state, skillId: 'guanxing' });
+            if (!preview.ok || !preview.cards.length) {
+              state.flags.guanxingUsed = true;
+              return null;
+            }
+            game.pendingChoice = {
+              kind: 'guanxing-reorder',
+              actor: actor,
+              cards: preview.cards.map(function (c) {
+                return { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank };
+              })
+            };
+            return { suspended: true };
+          }
+          // AI: auto-fire with default ordering (no reorder).
+          useSkill(game, actor, 'guanxing', [], {});
+        }
+        return null;
+      }
+
+      function continueTurnAfterPreparePhase(game, actor) {
         setPhase(game, actor, 'judge');
         log(game, actorName(game, actor) + '的判定阶段。');
         var judgeResult = processJudgeArea(game, actor);
@@ -1571,7 +1694,6 @@
           return success('回合暂停，等待玩家选择。');
         }
         if (game.phase === 'gameover') return success('游戏结束。');
-
         return continueTurnAfterJudgeArea(game, actor);
       }
 

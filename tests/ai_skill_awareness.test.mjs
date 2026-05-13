@@ -28,14 +28,39 @@ function buildGame(playerHero, enemyHero) {
 }
 
 // ─── 观星 (zhugeliang) ─────────────────────────────────────────────────
+// v6.1: 观星 now fires automatically in the prepare phase (matching official
+// rule "准备阶段"). AI auto-fires with no reorder; player gets a pendingChoice.
+// aiChooseSkillAction still returns 'guanxing' during play phase as a
+// fallback path (e.g. if startTurn was bypassed in tests) so the legacy
+// programmatic flow keeps working.
 
-test('AI fires 观星 when available — free information action', () => {
+test('AI fires 观星 automatically in the prepare phase when startTurn runs', () => {
+  const game = buildGame('sunquan', 'zhugeliang');
+  game.deck = [
+    c('sha', { id: 'extra-1' }),
+    c('sha', { id: 'extra-2' }),
+    c('sha', { id: 'gx-top-1' }),
+    c('sha', { id: 'gx-top-2' })
+  ];
+
+  Engine.startTurn(game, 'enemy');
+
+  assert.equal(game.enemy.flags.guanxingUsed, true, '准备阶段自动 fire after startTurn');
+  assert.equal(Engine.getPendingChoice(game), null, 'AI never sets pendingChoice for guanxing');
+  assert.ok(
+    game.log.some(l => /发动【观星】/.test(l)),
+    'guanxing fire is logged',
+  );
+});
+
+test('AI 观星 play-phase fallback still works when aiChooseSkillAction is called directly', () => {
   const game = buildGame('sunquan', 'zhugeliang');
   game.enemy.hand = [];
   game.deck = [c('sha', { id: 'top-1' }), c('sha', { id: 'top-2' })];
+  // No startTurn called — game.phase manually set to 'play' by buildGame.
   const action = Engine.aiChooseSkillAction(game, 'enemy');
   assert.ok(action, 'AI should pick a skill action');
-  assert.equal(action.skillId, 'guanxing', 'AI should choose 观星 first when available');
+  assert.equal(action.skillId, 'guanxing', 'fallback play-phase trigger still surfaces guanxing');
 });
 
 test('AI does NOT fire 观星 twice in a single turn (flag set)', () => {
