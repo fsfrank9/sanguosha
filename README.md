@@ -108,6 +108,12 @@ v5.0 迁移计划与完成状态见：
 docs/plans/2026-05-13-sanguosha-v5-architecture.md  [已完成]
 ```
 
+v6.0 游戏逻辑正确性与重构计划见：
+
+```text
+docs/plans/2026-05-13-sanguosha-v6-logic-correctness.md  [进行中]
+```
+
 ## 武将技能实现状态
 
 当前 catalog 统计：
