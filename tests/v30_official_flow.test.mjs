@@ -7,7 +7,13 @@ assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module expor
 import fs from 'node:fs';
 import path from 'node:path';
 
-const html = fs.readFileSync(path.resolve(import.meta.dirname, '../dist/index.html'), 'utf8');
+const root = path.resolve(import.meta.dirname, '..');
+const html = [
+  fs.readFileSync(path.join(root, 'index.html'), 'utf8'),
+  fs.readFileSync(path.join(root, 'src/styles/main.css'), 'utf8'),
+  fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8'),
+  fs.readFileSync(path.join(root, 'src/data/cards.js'), 'utf8'),
+].join('\n');
 
 function test(name, fn) {
   try {

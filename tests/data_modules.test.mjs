@@ -22,7 +22,7 @@ function test(name, fn) {
   console.log(`✓ ${name}`);
 }
 
-test('v4 phase 2 keeps catalog and skill-status data in dedicated source modules', () => {
+test('catalog and skill-status data live in dedicated source modules outside the engine', () => {
   const requiredFiles = [
     'src/data/heroes.js',
     'src/data/cards.js',
@@ -33,24 +33,24 @@ test('v4 phase 2 keeps catalog and skill-status data in dedicated source modules
     assert.ok(fs.existsSync(path.join(root, relativePath)), `${relativePath} should exist`);
   }
 
-  const buildSource = read('tools/build.mjs');
-  for (const relativePath of requiredFiles) {
-    assert.match(buildSource, new RegExp(relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${relativePath} should be part of the build input list`);
-  }
-
   const engineSource = read('src/engine/game-engine.js');
   assert.doesNotMatch(engineSource, /var\s+HERO_CATALOG\s*=\s*\{/, 'hero catalog data should live outside the engine source');
   assert.doesNotMatch(engineSource, /var\s+CARD_CATALOG\s*=\s*\{/, 'card catalog data should live outside the engine source');
   assert.doesNotMatch(engineSource, /var\s+IMPLEMENTED_SKILL_IDS\s*=\s*\[/, 'implemented skill status data should live outside the engine source');
   assert.doesNotMatch(engineSource, /var\s+ACTIVE_SKILL_IDS\s*=\s*\[/, 'active skill status data should live outside the engine source');
+  assert.match(engineSource, /import\s*\{[^}]*HERO_CATALOG[^}]*\}\s*from\s*['"]\.\.\/data\/heroes\.js['"]/, 'game engine should import HERO_CATALOG from data module');
+  assert.match(engineSource, /import\s*\{[^}]*CARD_CATALOG[^}]*\}\s*from\s*['"]\.\.\/data\/cards\.js['"]/, 'game engine should import CARD_CATALOG from data module');
+  assert.match(engineSource, /import\s*\{[^}]*IMPLEMENTED_SKILL_IDS[^}]*\}\s*from\s*['"]\.\.\/data\/skill-status\.js['"]/, 'game engine should import skill status from data module');
 
   assert.match(read('src/data/heroes.js'), /var\s+HERO_CATALOG\s*=\s*\{/, 'heroes data module should declare HERO_CATALOG');
+  assert.match(read('src/data/heroes.js'), /export\s*\{[^}]*HERO_CATALOG[^}]*\}/, 'heroes data module should export HERO_CATALOG');
   assert.match(read('src/data/cards.js'), /var\s+CARD_CATALOG\s*=\s*\{/, 'cards data module should declare CARD_CATALOG');
+  assert.match(read('src/data/cards.js'), /export\s*\{[^}]*CARD_CATALOG[^}]*\}/, 'cards data module should export CARD_CATALOG');
   assert.match(read('src/data/skill-status.js'), /var\s+IMPLEMENTED_SKILL_IDS\s*=\s*\[/, 'skill status module should declare IMPLEMENTED_SKILL_IDS');
-  assert.match(read('src/data/skill-status.js'), /var\s+ACTIVE_SKILL_IDS\s*=\s*\[/, 'skill status module should declare ACTIVE_SKILL_IDS');
+  assert.match(read('src/data/skill-status.js'), /export\s*\{[^}]*IMPLEMENTED_SKILL_IDS[^}]*\}/, 'skill status module should export IMPLEMENTED_SKILL_IDS');
 });
 
-test('data module build preserves direct-open single-file engine exports', () => {
+test('data module ES exports reach the engine identity-equal', () => {
   const result = spawnSync(process.execPath, ['tools/build.mjs', '--check'], {
     cwd: root,
     encoding: 'utf8',
@@ -60,9 +60,6 @@ test('data module build preserves direct-open single-file engine exports', () =>
     0,
     `node tools/build.mjs --check should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
   );
-
-  const distHtml = read('dist/index.html');
-  assert.doesNotMatch(distHtml, /^\s*(import|export)\s/m, 'legacy bundle should not contain unstripped ES module syntax');
 
   assert.ok(HERO_CATALOG, 'data module should export HERO_CATALOG');
   assert.ok(CARD_CATALOG, 'data module should export CARD_CATALOG');

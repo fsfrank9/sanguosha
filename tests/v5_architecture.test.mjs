@@ -3,12 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// v5 architecture scaffold. Default-skip until Phase 5A flips to enforce.
-// Run explicitly with SANGUOSHA_V5=1 to track migration progress.
-if (process.env.SANGUOSHA_V5 !== '1') {
-  console.log('• v5 architecture test skipped (set SANGUOSHA_V5=1 to enforce)');
-  process.exit(0);
-}
+// v5 architecture enforcement. Phase 5C flipped this from default-skip to
+// default-enforced. The GitHub Pages workflow assertion is deferred until
+// Phase 5D adds the workflow.
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -83,10 +80,17 @@ test('single-file artifact and template are gone', () => {
 
 test('GitHub Pages deployment workflow exists', () => {
   assert.ok(exists('.github/workflows/pages.yml'), '.github/workflows/pages.yml should exist');
+  const wf = read('.github/workflows/pages.yml');
+  assert.match(wf, /actions\/configure-pages/, 'workflow should configure Pages');
+  assert.match(wf, /actions\/upload-pages-artifact/, 'workflow should upload a Pages artifact');
+  assert.match(wf, /actions\/deploy-pages/, 'workflow should call deploy-pages');
+  assert.match(wf, /pages:\s*write/, 'workflow should grant pages:write permission');
+  assert.match(wf, /id-token:\s*write/, 'workflow should grant id-token:write for Pages deploy');
 });
 
-test('tools/build.mjs --check validates module structure only', () => {
+test('tools/build.mjs validates structure only and does not bundle', () => {
   const src = read('tools/build.mjs');
   assert.doesNotMatch(src, /__SANGUOSHA_[A-Z_]+__/, 'build.mjs should not reference template placeholders');
   assert.doesNotMatch(src, /writeFileSync\(.*['"]dist/, 'build.mjs should not write dist artifacts');
+  assert.doesNotMatch(src, /buildEngineBundle|buildLegacyBundle|stripModuleSyntax/, 'build.mjs should not concatenate or strip module syntax');
 });

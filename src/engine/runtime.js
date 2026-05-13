@@ -1,12 +1,3 @@
-  function requireData(requiredKeys) {
-    var data = (typeof window !== 'undefined' && window.SanguoshaData) || {};
-    var missing = requiredKeys.filter(function (key) { return !data[key]; });
-    if (missing.length) {
-      throw new Error('Sanguosha data modules must be loaded before the game engine: ' + missing.join(', '));
-    }
-    return data;
-  }
-
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
   }
@@ -54,7 +45,6 @@
   }
 
   export const Runtime = {
-    requireData: requireData,
     clone: clone,
     makeRng: makeRng,
     makePlayer: makePlayer,
@@ -62,8 +52,3 @@
     suitForIndex: suitForIndex,
     rankForIndex: rankForIndex
   };
-
-  if (typeof window !== 'undefined') {
-    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-    modules.Runtime = Runtime;
-  }

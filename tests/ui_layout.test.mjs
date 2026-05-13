@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const htmlPath = path.resolve(import.meta.dirname, '../dist/index.html');
-const html = fs.readFileSync(htmlPath, 'utf8');
+const root = path.resolve(import.meta.dirname, '..');
+const html = [
+  fs.readFileSync(path.join(root, 'index.html'), 'utf8'),
+  fs.readFileSync(path.join(root, 'src/styles/main.css'), 'utf8'),
+].join('\n');
 
 function test(name, fn) {
   try {

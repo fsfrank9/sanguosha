@@ -63,8 +63,3 @@
     resetActorTurnState: resetActorTurnState,
     resetEndOfTurnState: resetEndOfTurnState
   };
-
-  if (typeof window !== 'undefined') {
-    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-    modules.PhaseRuntime = PhaseRuntime;
-  }

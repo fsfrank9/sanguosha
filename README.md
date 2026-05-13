@@ -1,31 +1,29 @@
-# 三国杀 · 模块化源码 + 单文件离线版
+# 三国杀 · 模块化 ES 源码 1v1 原型
 
-一个可直接打开的离线 HTML 三国杀 1v1 原型。当前从 v4.0 开始采用专业化源码结构：开发时维护 `src/` 模块，发布/游玩仍保留可直接打开的单文件 `index.html`。v4 是迁移过渡版本；v5 计划不再把全部源码/数据塞进单 HTML，而是走 GitHub 托管发布链接访问和真正模块化架构。
+纯 HTML/CSS/JavaScript 实现的三国杀 1v1 原型。Phase 5C 起仓库已经从 v4 的「单文件 + IIFE 全局」过渡到 v5 的「原生 ES 模块 + 静态托管」：`src/` 是浏览器加载的源码本身，根 `index.html` 是手写的模块入口，没有打包步骤、没有 npm 运行时依赖。Phase 5D 已加 GitHub Pages 自动发布。
 
 ## 运行
 
-最简单方式仍然是直接用浏览器打开：
+### 线上（GitHub Pages）
 
-```text
-index.html
+```
+https://fsfrank9.github.io/sanguosha/
 ```
 
-不需要服务器，也不需要联网。
+仓库根目录在 `main` 分支每次更新后由 `.github/workflows/pages.yml` 自动发布。**首次使用需要仓库 owner 在 GitHub 仓库的 Settings → Pages 把 Source 切换成 "GitHub Actions"**，之后无需手动操作。
 
-如果修改了 `src/` 源码，先重新生成单文件产物：
+### 本地开发
+
+`index.html` 是手写的 ES 模块入口（`<script type="module" src="./src/main.js">`），原生模块在 `file://` 下被浏览器 CORS 拦截，所以**不再支持双击 `index.html` 直开**。在仓库根目录起一个本地 HTTP 服务器即可：
 
 ```bash
-node tools/build.mjs
-# 或
-npm run build
+python3 -m http.server 8000
+# 然后浏览器访问 http://127.0.0.1:8000/
 ```
 
-构建会同时写入：
+不需要 npm install、不需要打包、不需要联网。
 
-- `index.html`：根目录直开版本，保持原来的使用习惯。
-- `dist/index.html`：构建产物副本，便于后续发布/分发。
-
-检查构建产物是否与源码一致：
+检查仓库结构是否完整（必备源文件存在、入口 HTML 用模块标签、不再有 `dist/` / 模板残留）：
 
 ```bash
 node tools/build.mjs --check
@@ -33,38 +31,43 @@ node tools/build.mjs --check
 npm run build:check
 ```
 
+`npm run build` 在 v5 不再产出文件——所有源码本身就是浏览器要加载的资产。
+
 ## 当前版本
 
-`v4.0 模块化源码与单文件构建`
+`v5.0 原生 ES 模块 + GitHub Pages 托管`
 
 主要特性：
 
-- `src/` 模块化源码是当前开发入口：
-  - `src/index.template.html`：HTML 模板。
+- `src/` 是浏览器直接加载的 ES 模块源码，无打包步骤：
+  - `src/main.js`：浏览器 ES 模块入口，按依赖顺序装配各子模块。
   - `src/styles/main.css`：样式源码。
   - `src/data/heroes.js`：武将 catalog 与技能元数据。
   - `src/data/cards.js`：卡牌 catalog、牌类信息与阶段常量。
   - `src/data/skill-status.js`：已实现技能与主动技能入口清单。
   - `src/engine/runtime.js`：引擎通用 runtime/helper 模块，负责数据校验、克隆、随机数、玩家工厂等基础能力。
-  - `src/engine/skill-runtime.js`：技能 runtime 模块，当前承接技能状态标注、被动效果查询 seam，以及最小 SkillRegistry 与 hook 分发 API（`createRegistry` / `registerSkill` / `runHook`）。
-  - `src/engine/card-runtime.js`：卡牌 runtime 的第一层模块，负责测试卡生成、牌堆生成、【杀】/普通锦囊分类与虚拟牌实体牌解析。
+  - `src/engine/skill-runtime.js`：技能 runtime 模块，承接技能状态标注、被动效果查询 seam，以及最小 SkillRegistry 与 hook 分发 API（`createRegistry` / `registerSkill` / `runHook`）。
+  - `src/engine/card-runtime.js`：卡牌 runtime 模块，负责测试卡生成、牌堆生成、【杀】/普通锦囊分类与虚拟牌实体牌解析。
   - `src/engine/state.js`：状态/角色 runtime 模块，负责角色名、对手、技能查询、距离/攻击范围、先手、手牌上限与状态文案等纯查询。
   - `src/engine/phases.js`：阶段 runtime 模块，负责阶段历史记录、回合状态重置、阶段切换 helper 与摸牌后进入出牌/弃牌的判断。
   - `src/engine/judgement.js`：判定 runtime 模块，负责【乐不思蜀】、【兵粮寸断】、【闪电】等延时锦囊判定规则。
-  - `src/engine/game-engine.js`：纯游戏引擎源码，继续暴露 `window.SanguoshaEngine`。
-  - `src/ui/dom-adapter.js`：DOM/UI 适配层源码。
-- `tools/build.mjs` 负责按 `data → engine runtime modules → engine → ui` 顺序把源码注入模板，生成可离线直开的单文件 HTML。
-- `index.html` 与 `dist/index.html` 必须由构建脚本生成并保持一致。
+  - `src/engine/game-engine.js`：纯游戏引擎，通过 `import` 聚合所有 runtime 模块，`export const SanguoshaEngine`。
+  - `src/ui/dom-adapter.js`：DOM/UI 适配层，`import { SanguoshaEngine }` 后绑定事件与渲染。
+- `index.html` 是手写的 ES 模块入口（`<script type=”module” src=”./src/main.js”>`），不由构建脚本生成。
+- `tools/build.mjs --check` 只做结构校验：必需源文件存在、入口 HTML 用模块标签、不再有 `dist/` 残留。
+- `.github/workflows/pages.yml` 在每次推送 `main` 后自动验证并发布到 GitHub Pages。
 - 1v1 选将、主公/反贼身份与主公先手流程。
 - 标准包、风林火山、SP 武将池 catalog。
 - 标准 + 军争核心牌组。
 - 阶段、装备区、判定区、延时锦囊、部分武将技能和 AI 行动。
 - 火攻、铁索连环、顺手牵羊、过河拆桥等交互选择流程。
-- 技能实现状态可见：已实现技能可用；仅展示/待实现技能会明确标记为“未实现”，避免看起来有技能但实际无法触发。
+- 技能实现状态可见：已实现技能可用；仅展示/待实现技能会明确标记为”未实现”，避免看起来有技能但实际无法触发。
 
 ## 架构路线
 
-v4.0 不是重写，而是分批“安全拆源”：
+> **[已冻结 · v5.0 起不再维护]** 以下条目记录 v4 各 Phase 迁移历史，仅供参考。v5.0（Phase 5A–5E）已完成「单文件 IIFE + window globals → 原生 ES 模块 + GitHub Pages」全量迁移，后续新技能开发直接在 v5 基础上进行。详见 `docs/plans/2026-05-13-sanguosha-v5-architecture.md`。
+
+v4.0 不是重写，而是分批”安全拆源”：
 
 1. 保留根目录 `index.html` 作为可直接打开的稳定产物。
 2. 已将 CSS、数据模块、引擎、UI 适配层抽到 `src/`。
@@ -91,18 +94,18 @@ v4.0 不是重写，而是分批“安全拆源”：
 23. Phase 4R 已把郭嘉【遗计】接入 `SkillRuntime.onDamageAfter` per-damage-point draw seam：郭嘉受到伤害后按伤害点数逐点摸两张牌，当前 1v1 最小实现默认分配给郭嘉自己。
 24. Phase 4S 已把许褚【裸衣】接入 `SkillRuntime.onDrawPhase` + `onDamageModify` seam：摸牌阶段少摸一张并设置本回合标记，本回合许褚造成的【杀】/【决斗】伤害 +1。
 25. Phase 4T 已把司马懿【鬼才】接入 `SkillRuntime.onJudgementBeforeResolve` judgement replacement seam：判定牌翻出后、生效前可用一张手牌替换，原判定牌进入弃牌堆，后续判定结果按替换牌结算。
-26. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。
+26. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。（**v5.0 已完成，此条已过时。**）
 
-详细迁移计划见：
+v4 详细迁移历史见：
 
 ```text
-docs/plans/2026-04-29-sanguosha-v4-architecture.md
+docs/plans/2026-04-29-sanguosha-v4-architecture.md  [已冻结]
 ```
 
-v5 方向的迁移计划见：
+v5.0 迁移计划与完成状态见：
 
 ```text
-docs/plans/2026-05-13-sanguosha-v5-architecture.md
+docs/plans/2026-05-13-sanguosha-v5-architecture.md  [已完成]
 ```
 
 ## 武将技能实现状态

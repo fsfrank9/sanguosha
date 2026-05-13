@@ -43,10 +43,3 @@
       var PHASES = ['prepare', 'judge', 'draw', 'play', 'discard', 'finish'];
 
       export { CARD_CATALOG, CARD_INFO, PHASES };
-
-      if (typeof window !== 'undefined') {
-        var data = window.SanguoshaData || (window.SanguoshaData = {});
-        data.CARD_CATALOG = CARD_CATALOG;
-        data.CARD_INFO = CARD_INFO;
-        data.PHASES = PHASES;
-      }
