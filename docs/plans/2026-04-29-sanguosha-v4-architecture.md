@@ -1,5 +1,7 @@
 # v4.0 Modular Architecture Migration Plan
 
+> **[已冻结 · Frozen]** v5.0（Phase 5A–5E）已于 2026-05 完成「原生 ES 模块 + GitHub Pages」全量迁移，v4 架构不再演进。后续新技能开发直接在 v5 基础上进行。
+
 > **For Hermes:** Use subagent-driven-development for future phases. Keep every phase TDD-first and preserve the direct-open artifact.
 
 **Goal:** Move the 三国杀 HTML game from single-source `index.html` to modular source files plus a reproducible single-file build artifact for the v4 transition.
