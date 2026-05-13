@@ -673,13 +673,31 @@
         return success('仁德完成。');
       }
 
+      // 反间 — spec: source picks a hand card and gives it to target; **the
+      // TARGET then guesses the card's suit**. If wrong, target takes 1
+      // damage from the source. The v5/v6 engine took the guess from the
+      // source's options (default 'spade') — that's the source effectively
+      // guessing for the target, which inverts the rule.
+      //
+      // v6.1 flow:
+      // 1. Source uses 反间, picks a hand card, transfers to target.
+      // 2. Set game.pendingChoice = { kind: 'fanjian-guess', actor: target,
+      //    sourceActor, cardName, cardId } so the target's UI / AI can pick
+      //    a suit blindly.
+      // 3. resolveFanjianGuessChoice validates suit and applies damage if
+      //    the target's guess doesn't match the card's actual suit.
+      //
+      // Backward compat: if options.guessedSuit is provided (legacy test
+      // paths), skip the prompt and apply the guess directly so existing
+      // assertions keep working without modification.
       function triggerFanjianActiveSkill(context) {
         if (context.skillId !== 'fanjian') return null;
         var game = context.game;
         var actor = context.actor;
         var self = context.state;
         var cardIds = context.cardIds || [];
-        var target = game[context.targetActor];
+        var targetActor = context.targetActor;
+        var target = game[targetActor];
         var options = context.options || {};
         if (!self || !target || !hasSkill(self, 'fanjian')) return null;
         if (self.flags.fanjianUsed) return fail('【反间】每回合限一次。');
@@ -688,10 +706,62 @@
         if (!fanjianCard) return fail('选择的牌不存在。');
         target.hand.push(fanjianCard);
         self.flags.fanjianUsed = true;
-        var guessedSuit = options.guessedSuit || 'spade';
-        log(game, actorName(game, actor) + '发动【反间】，' + actorName(game, context.targetActor) + '获得一张牌并猜测' + guessedSuit + '。');
-        if (guessedSuit !== fanjianCard.suit) damage(game, context.targetActor, 1, actor, '【反间】', null, 'normal');
+        log(game, actorName(game, actor) + '发动【反间】，将【' + fanjianCard.name + '】交给' + actorName(game, targetActor) + '。');
+
+        // Backward-compat override: explicit guess from caller skips the prompt.
+        if (options.guessedSuit) {
+          return applyFanjianGuess(game, actor, targetActor, fanjianCard, options.guessedSuit);
+        }
+
+        if (targetActor === 'player') {
+          // Set pendingChoice; the player UI shows the card NAME but not
+          // suit, then 4 suit buttons.
+          game.pendingChoice = {
+            kind: 'fanjian-guess',
+            actor: targetActor,
+            sourceActor: actor,
+            cardId: fanjianCard.id,
+            cardName: fanjianCard.name
+          };
+          return { suspendedForFanjian: true };
+        }
+        // AI target: blind random guess from {spade, heart, club, diamond}.
+        return applyFanjianGuess(game, actor, targetActor, fanjianCard, randomSuit(game));
+      }
+
+      function randomSuit(game) {
+        var suits = ['spade', 'heart', 'club', 'diamond'];
+        var r = (game.random && typeof game.random === 'function') ? game.random() : Math.random();
+        var idx = Math.floor(r * 4) % 4;
+        if (idx < 0 || idx >= 4) idx = 0;
+        return suits[idx];
+      }
+
+      function applyFanjianGuess(game, sourceActor, targetActor, fanjianCard, guessedSuit) {
+        log(game, actorName(game, targetActor) + '猜测【' + fanjianCard.name + '】的花色为「' + guessedSuit + '」（实际：' + fanjianCard.suit + '）。');
+        if (guessedSuit !== fanjianCard.suit) {
+          log(game, '猜错，' + actorName(game, targetActor) + '受到 1 点伤害。');
+          damage(game, targetActor, 1, sourceActor, '【反间】', null, 'normal');
+        } else {
+          log(game, '猜对，无伤害。');
+        }
         return success('反间完成。');
+      }
+
+      function resolveFanjianGuessChoice(game, pending, decision) {
+        var targetActor = pending.actor;
+        var sourceActor = pending.sourceActor;
+        var target = game[targetActor];
+        if (!target) return fail('未知角色。');
+        var fanjianCard = target.hand.find(function (c) { return c.id === pending.cardId; });
+        if (!fanjianCard) return fail('找不到【反间】所交的牌。');
+        var guess = decision && decision.suit;
+        if (['spade', 'heart', 'club', 'diamond'].indexOf(guess) < 0) {
+          // Restore pending so UI can keep prompting on invalid input.
+          game.pendingChoice = pending;
+          return fail('请选择有效的花色（spade/heart/club/diamond）。');
+        }
+        return applyFanjianGuess(game, sourceActor, targetActor, fanjianCard, guess);
       }
 
       // v6.1: count = min(aliveActorCount, 5, deckSize). 1v1 ⇒ 2 (was hardcoded 5).
@@ -1101,6 +1171,9 @@
       //                        on top in original preview order, below any
       //                        explicit topIds. decision.decline === true skips
       //                        the reorder entirely (skill still consumed).
+      //   fanjian-guess:     { suit: 'spade'|'heart'|'club'|'diamond' }
+      //                        Target's blind guess of the 反间 card's suit.
+      //                        Wrong guess → 1 damage from source actor.
       function resolvePendingChoice(game, decision) {
         var pending = game && game.pendingChoice;
         if (!pending) return fail('没有待处理的选择。');
@@ -1113,6 +1186,9 @@
         }
         if (pending.kind === 'guanxing-reorder') {
           return resolveGuanxingChoice(game, pending, decision || {});
+        }
+        if (pending.kind === 'fanjian-guess') {
+          return resolveFanjianGuessChoice(game, pending, decision || {});
         }
         return fail('未知的选择类型：' + pending.kind);
       }

@@ -49,6 +49,8 @@
           'zhihengConfirmBtn', 'zhihengCancelBtn', 'zhihengHint', 'roleDraftPanel',
           'guicaiPromptPanel', 'guicaiPromptHint', 'guicaiOriginalCard', 'guicaiCandidates', 'guicaiDeclineBtn',
           'yijiPromptPanel', 'yijiPromptHint', 'yijiCandidates', 'yijiKeepAllBtn', 'yijiConfirmBtn',
+          'fanjianPromptPanel', 'fanjianPromptHint',
+          'fanjianSpadeBtn', 'fanjianHeartBtn', 'fanjianClubBtn', 'fanjianDiamondBtn',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -408,6 +410,18 @@
           } else if (guanxingUnassignedIds.length || guanxingTopIds.length || guanxingBottomIds.length) {
             // pendingChoice cleared (resolved or declined) — close panel.
             hideGuanxingPanel();
+          }
+        }
+        if (els.fanjianPromptPanel) {
+          if (kind === 'fanjian-guess' && pending.actor === 'player') {
+            els.fanjianPromptPanel.hidden = false;
+            if (els.fanjianPromptHint) {
+              // Show only the card NAME — suit is what the player must guess.
+              els.fanjianPromptHint.textContent =
+                '反间：对方给你一张【' + pending.cardName + '】，请猜花色（猜错你受 1 点伤害）。';
+            }
+          } else {
+            els.fanjianPromptPanel.hidden = true;
           }
         }
       }
@@ -1179,6 +1193,17 @@
           var result = Engine.resolvePendingChoice(game, { cardId: null });
           if (!result.ok) renderLog();
           render();
+        });
+        // 反间 (v6.1): 4 suit buttons. Each emits a fanjian-guess resolve.
+        ['fanjianSpadeBtn', 'fanjianHeartBtn', 'fanjianClubBtn', 'fanjianDiamondBtn'].forEach(function (key) {
+          var el = els[key];
+          if (!el) return;
+          el.addEventListener('click', function () {
+            var suit = el.getAttribute('data-fanjian-suit');
+            var result = Engine.resolvePendingChoice(game, { suit: suit });
+            if (!result.ok) renderLog();
+            render();
+          });
         });
         if (els.yijiCandidates) els.yijiCandidates.addEventListener('click', function (event) {
           var btn = event.target.closest('[data-yiji-card-id]');
