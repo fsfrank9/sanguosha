@@ -1852,13 +1852,36 @@
         return 0;
       }
 
+      // Phase 6F-bis: returns the best card+mode for AI to play, where mode
+      // is 'normal' (use the card as itself) or 'asSha' (convert via 武圣 /
+      // 龙胆 to a 杀). Considers both normal plays and conversions in the
+      // same scoring pool so e.g. AI 关羽 with [red 桃, no 杀] at full HP
+      // picks the 桃→杀 conversion (positive score) over the 桃 (negative
+      // when full HP).
       function aiChooseCard(game, actor) {
         if (game.turn !== actor || game.phase === 'gameover') return null;
-        var candidates = game[actor].hand
-          .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
-          .filter(function (item) { return item.score > 0 && canPlayCard(game, actor, item.card).ok; })
-          .sort(function (a, b) { return b.score - a.score; });
-        return candidates.length ? candidates[0].card : null;
+        var self = game[actor];
+        var candidates = [];
+        self.hand.forEach(function (card) {
+          // Original-card use.
+          if (canPlayCard(game, actor, card).ok) {
+            var normalScore = scoreCardForAI(game, actor, card);
+            if (normalScore > 0) candidates.push({ card: card, mode: 'normal', score: normalScore });
+          }
+          // As-Sha conversion (武圣 / 龙胆). Skip cards that are already
+          // 杀 — no conversion needed.
+          if (!isShaType(card.type)) {
+            if (canPlayCardAs(game, actor, card, 'sha').ok) {
+              // Score it as if it were a (virtual) sha so the comparison
+              // against normal plays is on the same scale.
+              var virtual = { type: 'sha', family: 'basic', color: card.color };
+              var asScore = scoreCardForAI(game, actor, virtual);
+              if (asScore > 0) candidates.push({ card: card, mode: 'asSha', score: asScore });
+            }
+          }
+        });
+        candidates.sort(function (a, b) { return b.score - a.score; });
+        return candidates.length ? { card: candidates[0].card, mode: candidates[0].mode } : null;
       }
 
       function aiChooseSkillAction(game, actor) {
@@ -1945,21 +1968,30 @@
           return skillResult;
         }
 
-        var card = aiChooseCard(game, actor);
-        if (!card) {
+        var choice = aiChooseCard(game, actor);
+        if (!choice) {
           var idle = success('没有可执行的行动。');
           idle.action = 'none';
           return idle;
         }
-        var cardOptions;
-        if (card.type === 'tiesuo') cardOptions = { mode: 'chain', targets: [opponent(actor)] };
-        if (card.type === 'huogong') {
-          var fireChoice = getHuogongChoice(game, actor);
-          cardOptions = fireChoice.ok && fireChoice.usableCostIds.length ? { huogongCostCardId: fireChoice.usableCostIds[0] } : { declineHuogong: true };
+        var card = choice.card;
+        var cardResult;
+        if (choice.mode === 'asSha') {
+          // 武圣 / 龙胆 conversion path: engine routes through playCardAs →
+          // playSha so the virtual 杀 is properly resolved.
+          cardResult = playCardAs(game, actor, card.id, 'sha');
+        } else {
+          var cardOptions;
+          if (card.type === 'tiesuo') cardOptions = { mode: 'chain', targets: [opponent(actor)] };
+          if (card.type === 'huogong') {
+            var fireChoice = getHuogongChoice(game, actor);
+            cardOptions = fireChoice.ok && fireChoice.usableCostIds.length ? { huogongCostCardId: fireChoice.usableCostIds[0] } : { declineHuogong: true };
+          }
+          cardResult = playCard(game, actor, card.id, cardOptions);
         }
-        var cardResult = playCard(game, actor, card.id, cardOptions);
         cardResult.action = 'card';
         cardResult.cardId = card.id;
+        cardResult.mode = choice.mode;
         return cardResult;
       }
 
