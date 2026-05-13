@@ -1794,7 +1794,13 @@
         }
         if (isShaCard(card) && !canReachWithSha(game, actor, opponent(actor))) return fail('距离不足，当前武器范围无法使用【杀】。');
         if (isShaCard(card) && self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
-        if (card.type === 'tao' && self.hp >= self.maxHp) return fail('体力已满，不能使用【桃】。');
+        if (card.type === 'tao') {
+          // v7 PR-1: gltjk 基本牌·桃 使用方法Ⅰ —— 使用目标"包括你在内的一名已受伤的角色"。
+          // 在 1v1 中，任一方受伤即可出【桃】；若双方满血则无合法目标。
+          var taoSelfWounded = self.hp < self.maxHp;
+          var taoFoeWounded = game[opponent(actor)].hp < game[opponent(actor)].maxHp;
+          if (!taoSelfWounded && !taoFoeWounded) return fail('体力已满，不能使用【桃】。');
+        }
         if ((card.type === 'guohe' || card.type === 'shunshou') && !hasAnyTargetableCard(game[opponent(actor)])) {
           return fail('对方没有可操作的牌。');
         }
@@ -1996,9 +2002,25 @@
         }
 
         if (card.type === 'tao') {
+          // v7 PR-1: 目标"包括你在内的一名已受伤的角色"。options.taoTarget
+          // 可指定 'player' / 'enemy'；未指定时默认为发动者，若发动者满血而对手
+          // 受伤则回退到对手（保持 canPlayCard 已放行的合法性）。
+          var requestedTaoTarget = options.taoTarget;
+          var taoTargetActor;
+          if (requestedTaoTarget === 'player' || requestedTaoTarget === 'enemy') {
+            taoTargetActor = requestedTaoTarget;
+          } else if (self.hp < self.maxHp) {
+            taoTargetActor = actor;
+          } else {
+            taoTargetActor = opponent(actor);
+          }
+          var taoTargetState = game[taoTargetActor];
+          if (!taoTargetState || taoTargetState.hp >= taoTargetState.maxHp) {
+            return fail('目标体力已满，不能使用【桃】。');
+          }
           discardCard(game, card);
-          self.hp = Math.min(self.maxHp, self.hp + 1);
-          log(game, actorName(game, actor) + '使用【桃】，回复 1 点体力。');
+          taoTargetState.hp = Math.min(taoTargetState.maxHp, taoTargetState.hp + 1);
+          log(game, actorName(game, actor) + '使用【桃】' + (taoTargetActor === actor ? '' : '对' + actorName(game, taoTargetActor)) + '，回复 1 点体力。');
           return success('回复体力。');
         }
 

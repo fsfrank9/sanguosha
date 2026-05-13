@@ -101,13 +101,13 @@
           engineHooks: ['consumeResponse']
         },
         tao: {
-          summary: '出牌阶段对自己使用回复 1 体力；濒死阶段任意角色可对濒死者使用。',
+          summary: '出牌阶段对包括自己在内的一名已受伤的角色使用；濒死阶段对濒死者使用。',
           timing: 'playPhase+dying',
-          targets: 'self-or-dying',
-          effect: '回复 1 点体力，不能超过体力上限。',
+          targets: 'any-wounded-or-dying',
+          effect: '目标角色回复 1 点体力，不能超过体力上限；v7 PR-1: 支持通过 options.taoTarget 指定 player/enemy。',
           frequency: 'unlimited',
           responseWindow: [],
-          engineHooks: ['playTao']
+          engineHooks: ['playTao', 'options.taoTarget']
         },
         jiu: {
           summary: '出牌阶段使用，本回合下一张【杀】伤害 +1；濒死时回复 1 点体力。',
