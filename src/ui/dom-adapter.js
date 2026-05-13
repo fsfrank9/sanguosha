@@ -342,8 +342,13 @@
           if (kind === 'guicai-replace' && pending.actor === 'player') {
             els.guicaiPromptPanel.hidden = false;
             if (els.guicaiPromptHint) {
+              // v6.1: surface whose judgement is being replaced — when 司马懿
+              // replaces opponent's judgement, the holder ≠ judgement actor.
+              var whoseJudge = pending.judgementActor && pending.judgementActor !== pending.actor
+                ? '对方'
+                : '你';
               els.guicaiPromptHint.textContent =
-                '鬼才：判定牌【' + pending.judgementCard.name + '】' + suitLabel(pending.judgementCard.suit) +
+                '鬼才：' + whoseJudge + '的判定牌【' + pending.judgementCard.name + '】' + suitLabel(pending.judgementCard.suit) +
                 ' ' + (pending.judgementCard.rank || '') +
                 '（' + (pending.reason || '判定') + '）— 选择手牌替换或跳过';
             }

@@ -495,54 +495,78 @@
         return { claimedJudgementCard: true };
       }
 
-      // 鬼才 (Phase 6C): the cache says 司马懿 picks any one hand card as the
-      // replacement, optionally. For an AI-controlled 司马懿 we keep the
-      // hand[0] auto-pick (matches the v5 behavior and 1v1 strategy is fine).
-      // For a human 司马懿 we set game.pendingChoice and let the caller suspend
-      // the in-progress flow so the UI can prompt for the replacement card.
-      // skillPreferences.guicai overrides:
-      //   'auto'    — always pick hand[0] without prompting (legacy behavior)
-      //   'decline' — never fire 鬼才 this turn (skip the replacement)
-      //   undefined — 'ask' for player, 'auto' for AI
+      // 鬼才 — spec: "任意判定牌翻出后、判定结果生效前... 司马懿有可打出
+      // 的手牌". The skill fires whenever ANY judgement happens at the table
+      // and any actor with 鬼才 has hand cards — it is NOT restricted to
+      // 司马懿's own judgements. Priority order if multiple actors hold the
+      // skill: judgement actor first (so 司马懿's own judgement uses his own
+      // hand), then opponent (so 司马懿 can replace opponent judgements with
+      // his own hand cards).
+      //
+      // pausable: only processJudgeArea-driven judgements can suspend the
+      // engine for a player prompt (it has the pauseState snapshot path to
+      // resume). For non-pausable judgements (bagua armor, ganglie retal-
+      // iation judge, tieqi judge), the 'ask' preference cannot be honored
+      // mid-flow — those fall back to auto-fire (hand[0]).
+      //
+      // skillPreferences.guicai overrides per holder:
+      //   'auto'    — always pick hand[0] without prompting
+      //   'decline' — never fire 鬼才 this trigger
+      //   undefined — 'ask' for human player, 'auto' for AI
       function triggerGuicaiJudgementBeforeResolve(context) {
         var game = context.game;
-        var actor = context.actor;
-        var state = context.state || game[actor];
+        var judgementActor = context.actor;
         var originalCard = context.originalCard || context.card;
-        if (!game || !state || !originalCard || context.replaced) return null;
-        if (!hasSkill(state, 'guicai') || !state.hand || state.hand.length === 0) return null;
-        var pref = (state.skillPreferences && state.skillPreferences.guicai) || (actor === 'player' ? 'ask' : 'auto');
+        if (!game || !originalCard || context.replaced) return null;
+        // Find any actor at the table who can fire 鬼才.
+        var order = [judgementActor, opponent(judgementActor)];
+        var holder = null;
+        for (var i = 0; i < order.length; i += 1) {
+          var s = game[order[i]];
+          if (s && hasSkill(s, 'guicai') && s.hand && s.hand.length > 0) {
+            holder = order[i];
+            break;
+          }
+        }
+        if (!holder) return null;
+        var holderState = game[holder];
+        var pref = (holderState.skillPreferences && holderState.skillPreferences.guicai)
+          || (holder === 'player' ? 'ask' : 'auto');
         if (pref === 'decline') {
-          log(game, actorName(game, actor) + '选择不发动【鬼才】。');
+          log(game, actorName(game, holder) + '选择不发动【鬼才】。');
           return { declinedGuicai: true };
         }
-        if (pref === 'ask') {
-          // Set pendingChoice; processJudgeArea (or another caller) will
-          // detect this and suspend its loop, snapshotting resume state.
+        if (pref === 'ask' && context.pausable) {
+          // Set pendingChoice; processJudgeArea will detect this and snapshot
+          // its iteration state. resolveGuicaiReplaceChoice takes the
+          // replacement from holder.hand and resumes from the saved trick.
           game.pendingChoice = {
             kind: 'guicai-replace',
-            actor: actor,
+            actor: holder,
+            judgementActor: judgementActor,
             reason: context.reason || '',
             judgementCard: {
               id: originalCard.id, name: originalCard.name,
               type: originalCard.type, suit: originalCard.suit,
               rank: originalCard.rank
             },
-            candidates: state.hand.map(function (c) {
+            candidates: holderState.hand.map(function (c) {
               return { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank };
             })
           };
           return { suspendedForGuicai: true };
         }
-        // pref === 'auto' or any other value: keep legacy hand[0] auto-pick
-        var replacement = state.hand[0];
-        var paidCard = removeCardFromHand(state, replacement.id);
+        // Auto path (pref === 'auto', AI default, or non-pausable judgement):
+        // hand[0] from holder. Discard the original judgement card and swap
+        // in the replacement.
+        var replacement = holderState.hand[0];
+        var paidCard = removeCardFromHand(holderState, replacement.id);
         if (!paidCard) return null;
         discardCard(game, originalCard);
         context.card = replacement;
         context.replaced = true;
-        log(game, actorName(game, actor) + '发动【鬼才】，用【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）代替判定牌。');
-        return { replacedJudgementCard: true, originalCard: originalCard, replacementCard: replacement };
+        log(game, actorName(game, holder) + '发动【鬼才】，用【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）代替' + actorName(game, judgementActor) + '的判定牌。');
+        return { replacedJudgementCard: true, holder: holder, originalCard: originalCard, replacementCard: replacement };
       }
 
       function triggerLongdanCardAs(context) {
@@ -942,7 +966,7 @@
         return true;
       }
 
-      function judge(game, actor, reason) {
+      function judge(game, actor, reason, opts) {
         reshuffleIfNeeded(game);
         var card = game.deck.pop();
         if (!card) return null;
@@ -955,7 +979,14 @@
           reason: reason,
           card: card,
           originalCard: card,
-          replaced: false
+          replaced: false,
+          // v6.1: only processJudgeArea's caller can suspend a judgement
+          // mid-resolution (it has the pauseState snapshot to resume from).
+          // Other callers (bagua armor judge, ganglie judge, tieqi judge)
+          // run judge() inside their own multi-step logic with no resume
+          // point, so 鬼才 falls back to auto-fire there. processJudgeArea
+          // passes `{ pausable: true }`; others leave the default false.
+          pausable: !!(opts && opts.pausable)
         };
         SkillRuntime.runHook(skillRegistry, 'onJudgementBeforeResolve', judgementContext);
         return judgementContext.card;
@@ -1008,7 +1039,7 @@
         for (var i = startIdx; i < pending.length; i += 1) {
           var trick = pending[i];
           var reason = judgementReasonFor(trick);
-          var judgementCard = reason ? judge(game, actor, reason) : null;
+          var judgementCard = reason ? judge(game, actor, reason, { pausable: true }) : null;
           if (game.pendingChoice) {
             // judge() invoked a hook that asked for a choice. Snapshot the
             // iteration so resolvePendingChoice can pick up where we left off.
@@ -1134,38 +1165,45 @@
       }
 
       function resolveGuicaiReplaceChoice(game, pending, decision) {
-        var actor = pending.actor;
-        var state = game[actor];
-        if (!state) return fail('未知角色。');
+        // v6.1: pending.actor is the 鬼才 HOLDER (the actor whose hand is used
+        // to replace the judgement card). pending.judgementActor is whose
+        // judgement is being replaced — usually the same as holder when 司马懿
+        // is being judged on his own, but different when 鬼才 fires on the
+        // opponent's judgement.
+        var holder = pending.actor;
+        var judgementActor = pending.judgementActor || holder;
+        var holderState = game[holder];
+        var judgementActorState = game[judgementActor];
+        if (!holderState || !judgementActorState) return fail('未知角色。');
         var saved = game.pauseState && game.pauseState.judgeArea;
-        if (!saved || saved.actor !== actor) return fail('找不到挂起的判定。');
+        if (!saved || saved.actor !== judgementActor) return fail('找不到挂起的判定。');
         var originalCard = saved.currentJudgementCard;
         var resolvedCard = originalCard;
         var declined = !decision.cardId;
         if (!declined) {
-          var idx = state.hand.findIndex(function (c) { return c.id === decision.cardId; });
+          var idx = holderState.hand.findIndex(function (c) { return c.id === decision.cardId; });
           if (idx < 0) return fail('找不到这张牌。');
-          var replacement = state.hand.splice(idx, 1)[0];
+          var replacement = holderState.hand.splice(idx, 1)[0];
           if (originalCard) discardCard(game, originalCard);
           resolvedCard = replacement;
-          log(game, actorName(game, actor) + '发动【鬼才】，用【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）代替判定牌。');
+          log(game, actorName(game, holder) + '发动【鬼才】，用【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）代替' + actorName(game, judgementActor) + '的判定牌。');
         } else {
-          log(game, actorName(game, actor) + '选择不发动【鬼才】。');
+          log(game, actorName(game, holder) + '选择不发动【鬼才】。');
         }
-        applyJudgeAreaOutcome(game, actor, state, saved.currentTrick, saved.currentReason, resolvedCard);
+        applyJudgeAreaOutcome(game, judgementActor, judgementActorState, saved.currentTrick, saved.currentReason, resolvedCard);
         // Resume the iteration from the trick AFTER the one we just resolved.
         game.pauseState.judgeArea = {
-          actor: actor,
+          actor: judgementActor,
           pending: saved.pending,
           idx: saved.idx + 1
         };
-        var resumeResult = processJudgeArea(game, actor);
+        var resumeResult = processJudgeArea(game, judgementActor);
         if (resumeResult && resumeResult.suspended) {
           return success('继续等待玩家选择。');
         }
         if (game.phase === 'gameover') return success('游戏结束。');
         // Judge area fully resolved — continue the turn flow (draw + play).
-        return continueTurnAfterJudgeArea(game, actor);
+        return continueTurnAfterJudgeArea(game, judgementActor);
       }
 
       function newGame(options) {
