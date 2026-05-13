@@ -94,6 +94,7 @@ test('phase runtime resets actor turn state at the start of a turn', () => {
     rendeHealed: false,
     aiKurouUsed: false,
     luoyi: false,
+    jiuUsedThisTurn: false, // v7 PR-8
   });
 });
 

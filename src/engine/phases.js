@@ -37,6 +37,8 @@
     flags.rendeHealed = false;
     flags.aiKurouUsed = false;
     flags.luoyi = false;
+    // v7 PR-8: gltjk card__basic.md 酒 使用方法Ⅰ "出牌阶段。每回合限一次。"
+    flags.jiuUsedThisTurn = false;
   }
 
   function resetEndOfTurnState(state) {
@@ -53,6 +55,8 @@
     flags.aiKurouUsed = false;
     flags.biyueTriggered = false;
     flags.luoyi = false;
+    // v7 PR-8: 酒 使用次数也在回合结束时复位
+    flags.jiuUsedThisTurn = false;
   }
 
   export const PhaseRuntime = {
