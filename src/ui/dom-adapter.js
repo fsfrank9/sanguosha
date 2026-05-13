@@ -39,6 +39,7 @@
           'conversionHint', 'conversionNormalBtn', 'conversionShaBtn', 'conversionCancelBtn', 'guanxingModePanel',
           'guanxingHint', 'guanxingChoices', 'guanxingReverseBtn', 'guanxingConfirmBtn', 'guanxingCancelBtn', 'zhihengModePanel',
           'zhihengConfirmBtn', 'zhihengCancelBtn', 'zhihengHint', 'roleDraftPanel',
+          'guicaiPromptPanel', 'guicaiPromptHint', 'guicaiOriginalCard', 'guicaiCandidates', 'guicaiDeclineBtn',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -296,7 +297,42 @@
         renderStatus();
         renderPhaseTrack();
         renderZones();
+        renderPendingChoice();
         els.enemyHandBacks.innerHTML = miniBacks(game.enemy.hand.length);
+      }
+
+      function suitLabel(suit) {
+        return { spade: '♠', heart: '♥', club: '♣', diamond: '♦' }[suit] || suit || '';
+      }
+
+      function renderPendingChoice() {
+        var pending = game && Engine.getPendingChoice(game);
+        if (!els.guicaiPromptPanel) return;
+        if (!pending || pending.kind !== 'guicai-replace' || pending.actor !== 'player') {
+          els.guicaiPromptPanel.hidden = true;
+          return;
+        }
+        els.guicaiPromptPanel.hidden = false;
+        if (els.guicaiPromptHint) {
+          els.guicaiPromptHint.textContent =
+            '鬼才：判定牌【' + pending.judgementCard.name + '】' + suitLabel(pending.judgementCard.suit) +
+            ' ' + (pending.judgementCard.rank || '') +
+            '（' + (pending.reason || '判定') + '）— 选择手牌替换或跳过';
+        }
+        if (els.guicaiOriginalCard) {
+          els.guicaiOriginalCard.innerHTML =
+            '<span class="mini-card">原判定：【' + escapeHtml(pending.judgementCard.name) +
+            '】' + escapeHtml(suitLabel(pending.judgementCard.suit)) +
+            ' ' + escapeHtml(String(pending.judgementCard.rank || '')) + '</span>';
+        }
+        if (els.guicaiCandidates) {
+          els.guicaiCandidates.innerHTML = pending.candidates.map(function (card) {
+            return '<button class="mini-card guicai-candidate" data-guicai-card-id="' + escapeHtml(card.id) +
+              '" title="选这张作为新的判定牌">' +
+              escapeHtml('【' + card.name + '】' + suitLabel(card.suit) + ' ' + (card.rank || '')) +
+              '</button>';
+          }).join('') || '<span class="mini-card">手牌为空，必须跳过</span>';
+        }
       }
 
       function flashHero(actor, label) {
@@ -985,13 +1021,30 @@
         if (els.targetCancelBtn) els.targetCancelBtn.addEventListener('click', function () { hideTargetZonePanel(); render(); });
         if (els.zhihengConfirmBtn) els.zhihengConfirmBtn.addEventListener('click', confirmCardSkill);
         if (els.zhihengCancelBtn) els.zhihengCancelBtn.addEventListener('click', function () { exitSkillSelectMode(); render(); });
+        if (els.guicaiCandidates) els.guicaiCandidates.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-guicai-card-id]');
+          if (!btn) return;
+          var cardId = btn.getAttribute('data-guicai-card-id');
+          var result = Engine.resolvePendingChoice(game, { cardId: cardId });
+          if (!result.ok) {
+            renderLog();
+          }
+          render();
+        });
+        if (els.guicaiDeclineBtn) els.guicaiDeclineBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { cardId: null });
+          if (!result.ok) renderLog();
+          render();
+        });
         if (els.playerSkillBar) els.playerSkillBar.addEventListener('click', function (event) {
           var skill = event.target.closest('[data-skill-id]');
           if (!skill || skill.disabled) return;
           var toggle = skill.getAttribute('data-skill-toggle');
           if (toggle) {
-            var current = Engine.getSkillPreference(game, 'player', toggle) || 'auto';
-            Engine.setSkillPreference(game, 'player', toggle, current === 'decline' ? 'auto' : 'decline');
+            var current = Engine.getSkillPreference(game, 'player', toggle);
+            // Cycle null (default) ↔ 'decline'. Other preference values (e.g.
+            // 'auto' for guicai) are set explicitly through other UI controls.
+            Engine.setSkillPreference(game, 'player', toggle, current === 'decline' ? null : 'decline');
             render();
             return;
           }

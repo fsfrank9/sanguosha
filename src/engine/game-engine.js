@@ -226,18 +226,20 @@
         return drawCards(game, actor, drawContext.drawCount);
       }
 
-      // v6B: skill preference toggle. Lets the player opt out of a skill that
-      // is officially optional but currently auto-fires in the engine. Default
-      // is no preference set, which preserves current auto-fire behavior.
-      // Supported values per skill:
-      //   luoyi: 'auto' (default, auto-fire) | 'decline' (skip this turn's
-      //          draw-phase trade-off)
+      // Skill preference toggle. Lets the player explicitly choose how an
+      // optional/configurable skill fires. Passing null/undefined clears the
+      // preference (restores per-skill default behavior). Any string value
+      // (including 'auto') is stored verbatim so per-skill hooks can read it
+      // and react. Per-skill semantics:
+      //   luoyi  (default: auto-fire) — 'decline' skips reduceDraw + damage flag
+      //   guicai (default: 'ask' for player, 'auto' for AI) — 'auto' restores
+      //          the legacy hand[0] auto-pick; 'decline' skips the skill
       function setSkillPreference(game, actor, skillId, value) {
         if (!game || !actor || !skillId) return fail('参数缺失。');
         var state = game[actor];
         if (!state) return fail('未知角色。');
         state.skillPreferences = state.skillPreferences || {};
-        if (value === undefined || value === null || value === 'auto') {
+        if (value === undefined || value === null) {
           delete state.skillPreferences[skillId];
         } else {
           state.skillPreferences[skillId] = value;
@@ -465,17 +467,46 @@
         return { claimedJudgementCard: true };
       }
 
-      // 1v1 minimal implementation: the cache spec lets 司马懿 pick any hand
-      // card as the replacement; here we always take the first card. This is
-      // functionally equivalent for AI and acceptable for play-test smoke,
-      // but it strips human strategy. Phase 6C will add a pause-prompt path
-      // so a human 司马懿 can choose which card to play as the replacement.
+      // 鬼才 (Phase 6C): the cache says 司马懿 picks any one hand card as the
+      // replacement, optionally. For an AI-controlled 司马懿 we keep the
+      // hand[0] auto-pick (matches the v5 behavior and 1v1 strategy is fine).
+      // For a human 司马懿 we set game.pendingChoice and let the caller suspend
+      // the in-progress flow so the UI can prompt for the replacement card.
+      // skillPreferences.guicai overrides:
+      //   'auto'    — always pick hand[0] without prompting (legacy behavior)
+      //   'decline' — never fire 鬼才 this turn (skip the replacement)
+      //   undefined — 'ask' for player, 'auto' for AI
       function triggerGuicaiJudgementBeforeResolve(context) {
         var game = context.game;
         var actor = context.actor;
         var state = context.state || game[actor];
         var originalCard = context.originalCard || context.card;
-        if (!game || !state || !originalCard || context.replaced || !hasSkill(state, 'guicai') || !state.hand || state.hand.length === 0) return null;
+        if (!game || !state || !originalCard || context.replaced) return null;
+        if (!hasSkill(state, 'guicai') || !state.hand || state.hand.length === 0) return null;
+        var pref = (state.skillPreferences && state.skillPreferences.guicai) || (actor === 'player' ? 'ask' : 'auto');
+        if (pref === 'decline') {
+          log(game, actorName(game, actor) + '选择不发动【鬼才】。');
+          return { declinedGuicai: true };
+        }
+        if (pref === 'ask') {
+          // Set pendingChoice; processJudgeArea (or another caller) will
+          // detect this and suspend its loop, snapshotting resume state.
+          game.pendingChoice = {
+            kind: 'guicai-replace',
+            actor: actor,
+            reason: context.reason || '',
+            judgementCard: {
+              id: originalCard.id, name: originalCard.name,
+              type: originalCard.type, suit: originalCard.suit,
+              rank: originalCard.rank
+            },
+            candidates: state.hand.map(function (c) {
+              return { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank };
+            })
+          };
+          return { suspendedForGuicai: true };
+        }
+        // pref === 'auto' or any other value: keep legacy hand[0] auto-pick
         var replacement = state.hand[0];
         var paidCard = removeCardFromHand(state, replacement.id);
         if (!paidCard) return null;
@@ -878,35 +909,121 @@
         return null;
       }
 
+      // Re-entrant judge-area processor. State that needs to survive a pause
+      // (e.g. 鬼才 prompting) is held on game.pauseState.judgeArea so the
+      // same function can resume from the right trick index after the player
+      // resolves the prompt.
       function processJudgeArea(game, actor) {
         var state = game[actor];
         state.flags = state.flags || {};
-        state.flags.skipPlay = false;
-        state.flags.skipDraw = false;
-        if (!state.judgeArea) state.judgeArea = [];
-        var pending = state.judgeArea.splice(0);
-        pending.forEach(function (trick) {
+        if (!game.pauseState) game.pauseState = {};
+        var saved = game.pauseState.judgeArea;
+        var pending;
+        var startIdx;
+        if (saved && saved.actor === actor) {
+          pending = saved.pending;
+          startIdx = saved.idx;
+        } else {
+          state.flags.skipPlay = false;
+          state.flags.skipDraw = false;
+          if (!state.judgeArea) state.judgeArea = [];
+          pending = state.judgeArea.splice(0);
+          startIdx = 0;
+        }
+        for (var i = startIdx; i < pending.length; i += 1) {
+          var trick = pending[i];
           var reason = judgementReasonFor(trick);
           var judgementCard = reason ? judge(game, actor, reason) : null;
-          var outcome = evaluateDelayedTrick(trick, judgementCard);
+          if (game.pendingChoice) {
+            // judge() invoked a hook that asked for a choice. Snapshot the
+            // iteration so resolvePendingChoice can pick up where we left off.
+            game.pauseState.judgeArea = {
+              actor: actor,
+              pending: pending,
+              idx: i,
+              currentTrick: trick,
+              currentReason: reason,
+              currentJudgementCard: judgementCard
+            };
+            return { suspended: true };
+          }
+          applyJudgeAreaOutcome(game, actor, state, trick, reason, judgementCard);
+        }
+        // Clear the snapshot if we exited cleanly.
+        if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
+        return { ok: true };
+      }
 
-          if (outcome.skipPlay) {
-            state.flags.skipPlay = true;
-            log(game, actorName(game, actor) + '【乐不思蜀】判定失败，跳过出牌阶段。');
-          }
-          if (outcome.skipDraw) {
-            state.flags.skipDraw = true;
-            log(game, actorName(game, actor) + '【兵粮寸断】判定失败，跳过摸牌阶段。');
-          }
-          if (trick.type === 'shandian' && outcome.hit) {
-            damage(game, actor, outcome.damage, null, '【闪电】');
-          } else if (trick.type === 'shandian' && outcome.moveToNext) {
-            game[opponent(actor)].judgeArea.push(trick);
-            log(game, '【闪电】移至' + actorName(game, opponent(actor)) + '的判定区。');
-          }
-          resolveJudgementCard(game, actor, state, reason, judgementCard);
-          if (outcome.discardTrick) discardCard(game, trick);
-        });
+      function applyJudgeAreaOutcome(game, actor, state, trick, reason, judgementCard) {
+        var outcome = evaluateDelayedTrick(trick, judgementCard);
+        if (outcome.skipPlay) {
+          state.flags.skipPlay = true;
+          log(game, actorName(game, actor) + '【乐不思蜀】判定失败，跳过出牌阶段。');
+        }
+        if (outcome.skipDraw) {
+          state.flags.skipDraw = true;
+          log(game, actorName(game, actor) + '【兵粮寸断】判定失败，跳过摸牌阶段。');
+        }
+        if (trick.type === 'shandian' && outcome.hit) {
+          damage(game, actor, outcome.damage, null, '【闪电】');
+        } else if (trick.type === 'shandian' && outcome.moveToNext) {
+          game[opponent(actor)].judgeArea.push(trick);
+          log(game, '【闪电】移至' + actorName(game, opponent(actor)) + '的判定区。');
+        }
+        resolveJudgementCard(game, actor, state, reason, judgementCard);
+        if (outcome.discardTrick) discardCard(game, trick);
+      }
+
+      function getPendingChoice(game) {
+        return (game && game.pendingChoice) || null;
+      }
+
+      // Resolve a pending player prompt. Decision shape depends on kind:
+      //   guicai-replace: { cardId } — picks the hand card used as the new
+      //                   judgement card. cardId === null means decline.
+      function resolvePendingChoice(game, decision) {
+        var pending = game && game.pendingChoice;
+        if (!pending) return fail('没有待处理的选择。');
+        game.pendingChoice = null;
+        if (pending.kind === 'guicai-replace') {
+          return resolveGuicaiReplaceChoice(game, pending, decision || {});
+        }
+        return fail('未知的选择类型：' + pending.kind);
+      }
+
+      function resolveGuicaiReplaceChoice(game, pending, decision) {
+        var actor = pending.actor;
+        var state = game[actor];
+        if (!state) return fail('未知角色。');
+        var saved = game.pauseState && game.pauseState.judgeArea;
+        if (!saved || saved.actor !== actor) return fail('找不到挂起的判定。');
+        var originalCard = saved.currentJudgementCard;
+        var resolvedCard = originalCard;
+        var declined = !decision.cardId;
+        if (!declined) {
+          var idx = state.hand.findIndex(function (c) { return c.id === decision.cardId; });
+          if (idx < 0) return fail('找不到这张牌。');
+          var replacement = state.hand.splice(idx, 1)[0];
+          if (originalCard) discardCard(game, originalCard);
+          resolvedCard = replacement;
+          log(game, actorName(game, actor) + '发动【鬼才】，用【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）代替判定牌。');
+        } else {
+          log(game, actorName(game, actor) + '选择不发动【鬼才】。');
+        }
+        applyJudgeAreaOutcome(game, actor, state, saved.currentTrick, saved.currentReason, resolvedCard);
+        // Resume the iteration from the trick AFTER the one we just resolved.
+        game.pauseState.judgeArea = {
+          actor: actor,
+          pending: saved.pending,
+          idx: saved.idx + 1
+        };
+        var resumeResult = processJudgeArea(game, actor);
+        if (resumeResult && resumeResult.suspended) {
+          return success('继续等待玩家选择。');
+        }
+        if (game.phase === 'gameover') return success('游戏结束。');
+        // Judge area fully resolved — continue the turn flow (draw + play).
+        return continueTurnAfterJudgeArea(game, actor);
       }
 
       function newGame(options) {
@@ -928,6 +1045,8 @@
           discard: [],
           log: [],
           turnHistory: [],
+          pendingChoice: null,
+          pauseState: {},
           roles: roles,
           firstActor: firstActor,
           player: makePlayer(clone(HERO_CATALOG[options.playerHero] || HEROES.player)),
@@ -1368,9 +1487,17 @@
 
         setPhase(game, actor, 'judge');
         log(game, actorName(game, actor) + '的判定阶段。');
-        processJudgeArea(game, actor);
+        var judgeResult = processJudgeArea(game, actor);
+        if (judgeResult && judgeResult.suspended) {
+          return success('回合暂停，等待玩家选择。');
+        }
         if (game.phase === 'gameover') return success('游戏结束。');
 
+        return continueTurnAfterJudgeArea(game, actor);
+      }
+
+      function continueTurnAfterJudgeArea(game, actor) {
+        var state = game[actor];
         setPhase(game, actor, 'draw');
         log(game, actorName(game, actor) + '的摸牌阶段。');
         if (!state.flags.skipDraw) {
@@ -1378,7 +1505,6 @@
         } else {
           log(game, actorName(game, actor) + '跳过摸牌阶段。');
         }
-
         setPhase(game, actor, nextPlayablePhase(state));
         log(game, actorName(game, actor) + '进入' + (game.phase === 'play' ? '出牌' : '弃牌') + '阶段。');
         return success('回合开始。');
@@ -1800,6 +1926,8 @@
         endTurn: endTurn,
         setSkillPreference: setSkillPreference,
         getSkillPreference: getSkillPreference,
+        getPendingChoice: getPendingChoice,
+        resolvePendingChoice: resolvePendingChoice,
         drawCards: drawCards,
         aiChooseCard: aiChooseCard,
         aiChooseSkillAction: aiChooseSkillAction,

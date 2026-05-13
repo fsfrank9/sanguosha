@@ -157,38 +157,64 @@
 
 ---
 
-## Phase 6C — Pause-prompt infrastructure + 鬼才/遗计/铁骑
+## Phase 6C — Pause-prompt infrastructure + 鬼才 prompt
+
+**Status:** 进行中（鬼才 已完成，遗计/铁骑 推进到 6C-bis）。
+
+### 实际交付（与最初设计的差异）
+
+最初 6C 计划是「pause-prompt 基础设施 + 鬼才/遗计/铁骑 三处接入」。落地时把范围收窄为「基础设施 + 鬼才」，把遗计/铁骑的接入推迟到下一个 PR（6C-bis）。原因：
+
+- 鬼才的中断点 (`onJudgementBeforeResolve` inside `judge()` inside `processJudgeArea` inside `startTurn`) 已经迫使我们把 `processJudgeArea` 重构为可再入函数 + 把 `startTurn` 拆出 `continueTurnAfterJudgeArea` 续跑入口。仅此一处就是约 200 行引擎改动 + UI panel + 7 条行为测试。
+- 遗计/铁骑触发在 `damage()` / `playSha()` 调用链，复用同一套 `pendingChoice` API 但需要各自再加一组 resume + UI panel。把它们塞进同一个 PR 会让 diff 体量过大、回归面变宽。
+
+### 已落地
+
+- `game.pendingChoice = { kind, actor, ... }` 状态字段；`game.pauseState.judgeArea` 用于 judge-area 循环的可再入快照。
+- `Engine.getPendingChoice` / `Engine.resolvePendingChoice` 公开 API。`resolvePendingChoice` 按 `kind` 派发，目前实现 `guicai-replace`。
+- `processJudgeArea` 重构成 for-loop + 重入：可以从 `game.pauseState.judgeArea.idx` 处继续。
+- `startTurn` 现在在 `processJudgeArea` 报 `{ suspended: true }` 时直接返回，把"后半段"放在 `continueTurnAfterJudgeArea` 里。`resolveGuicaiReplaceChoice` 处理完玩家选择、消化剩下的延时锦囊后调用 `continueTurnAfterJudgeArea`，把摸牌阶段/出牌阶段补齐。
+- 鬼才 hook 行为：actor 为 player 时默认走 `'ask'` 路径设置 pendingChoice；actor 为 enemy（AI）时默认走 `'auto'` 路径，与 v5/v6B 一致。
+- `setSkillPreference` 语义化为 `null → 删除`、其它值 → 存储。原来「`'auto'` == 删除」的简化被丢弃，因为鬼才需要 'ask' 和 'auto' 两个不同的显式值。
+- UI 在 `index.html` 加 `#guicaiPromptPanel`，dom-adapter 渲染原判定牌 + 手牌候选；点击候选发 `resolvePendingChoice({ cardId })`，点 "不发动" 发 `{ cardId: null }`。
+- `tests/pending_choice.test.mjs` 7 条覆盖 AI auto / player suspend / player resolve / player decline / `'auto'` 偏好 / `'decline'` 偏好 / 无 pending 时调用 resolve 报错。
+
+### 验收
+
+- `npm test` 全绿（30 个测试文件，鬼才行为测试 7 条新增）。
+- 浏览器选司马懿，对方放乐不思蜀，回合开始时 #guicaiPromptPanel 弹出原判定牌与手牌候选；点候选 → 替换、继续摸牌；点"不发动" → 原判定 → 摸牌。
+
+---
+
+## Phase 6C-bis — 遗计 / 铁骑 接入既有 pause-prompt
 
 **Status:** 待启动。
 
 ### 设计要点
 
-- 6B 留下的两条 prompt 类 mismatch 都需要"引擎在自动流程中暂停 → UI 弹 prompt → 玩家选择 → 引擎继续"。当前引擎完全同步，没有这条 seam。
-- 设计 `game.pendingChoice = { kind, actor, payload } | null` + `Engine.resolvePendingChoice(game, decision)`。Hook 可以 SET pendingChoice 并 early-return；调用方检查并把 in-progress 状态保留到 payload。
-- 第一批接入：
-  - **【鬼才】**：判定生效前如果司马懿是 player 且 `skillPreferences.guicai !== 'decline'`，设置 `pendingChoice` 让玩家挑替换牌；AI 走 auto（继续 hand[0]）。
-  - **【遗计】**：受伤后摸牌完成时如果郭嘉是 player 且对方还有 HP，提供"全部留给自己 / 把这 N 张交给对方"的二选一；AI 默认全部留己。
-  - **【铁骑】**：根据 cache 与现行实现，新增 `skillPreferences.tieqi` 切换 auto-fire 与 ask-each-sha；默认 auto-fire（与现行实现一致）。
-- 同时把 6.0 audit harness 增强到能识别"⚠️ 部分对齐"项：6C 完成后所有 26 条全部 ✅。
+- 6C 已经把 pendingChoice + pauseState 基建做好。本阶段只是再写两个 hook 改造 + 两个 UI panel。
+- **【遗计】**：`triggerYijiDamageAfter` 改成"actor 为 player 且对手非满血时 → 摸完的 N 张牌先放到 pendingChoice.payload.drawnIds，玩家选 keep-self / split / give-all-opponent"。AI 维持 keep-self 默认。
+- **【铁骑】**：新增 `skillPreferences.tieqi` 切换 auto-fire（默认）与 ask-each-sha；ask 模式下 player 用【杀】时先 pendingChoice 弹"是否发动【铁骑】"。
+- pauseState 也许需要 `damageResume` / `playShaResume` 两条子状态。鬼才已经验证过 judgeArea 的可再入模式，复用其骨架。
 
 ### 任务
 
-- Task 1: 在 game-engine.js 新增 `setPendingChoice` / `getPendingChoice` / `resolvePendingChoice` 三件套；编写最小的"中断 + 续跑"的内部协议。
-- Task 2: 在 UI dom-adapter.js 新增 `pendingChoicePanel` 顶层渲染，根据 `kind` 路由到具体 prompt（鬼才选牌、遗计分配、铁骑是否发动）。
-- Task 3: 把 `triggerGuicaiJudgementBeforeResolve` / `triggerYijiDamageAfter` / `triggerTieqiNeedResponse` 改造成"AI / 不在意者 auto；player 且未设 decline → 走 prompt"。
-- Task 4: 新增 `tests/pending_choice.test.mjs`：鬼才选不同手牌结果不同、遗计交给对方对方手牌增加、铁骑选不发动则不判定不锁闪。
+- Task 1: 遗计 hook 改造 + `resolveYijiDistributeChoice` 派发；UI 加 `#yijiPromptPanel`。
+- Task 2: 铁骑 hook 改造 + `resolveTieqiFireChoice`；UI 加 `#tieqiPromptPanel`。
+- Task 3: 新增 `tests/pending_choice.test.mjs` 拓展 2-4 条断言覆盖遗计/铁骑。
+- Task 4: 更新 6.0 audit harness 让"⚠️ 部分对齐"可识别 + 收尾让 26 / 26 全 ✅。
 
 ### 验收标准
 
 - `npm test` 全绿。
-- 浏览器中玩家选司马懿/郭嘉/马超开局，相关 prompt 在正确时机弹出并能被解析继续。
+- 浏览器中玩家选郭嘉 / 马超开局，对应 prompt 在正确时机弹出并能解析继续。
 - 6.0 audit harness 全部 ✅。
 
 ---
 
 ## Phase 6C-old (合并到上方 6C) — Description / implementation mismatch fixes
 
-**Status:** 已并入新 6C。
+**Status:** 已并入新 6C / 6C-bis。
 
 ### 设计要点（保留参考）
 

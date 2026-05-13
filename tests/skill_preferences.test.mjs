@@ -23,8 +23,15 @@ test('setSkillPreference / getSkillPreference round-trip', () => {
   assert.equal(r1.ok, true);
   assert.equal(Engine.getSkillPreference(game, 'player', 'luoyi'), 'decline');
 
+  // 'auto' is now a stored value (distinct from null/default) so multi-state
+  // preferences like guicai can express "auto" vs "ask" explicitly.
   const r2 = Engine.setSkillPreference(game, 'player', 'luoyi', 'auto');
   assert.equal(r2.ok, true);
+  assert.equal(Engine.getSkillPreference(game, 'player', 'luoyi'), 'auto');
+
+  // Passing null/undefined clears the preference back to default.
+  const r3 = Engine.setSkillPreference(game, 'player', 'luoyi', null);
+  assert.equal(r3.ok, true);
   assert.equal(Engine.getSkillPreference(game, 'player', 'luoyi'), null);
 });
 
@@ -47,11 +54,11 @@ test('luoyi opt-out via skillPreferences: draws full 2 cards and no damage bonus
   assert.equal(game.player.flags.luoyiDeclined, true, 'flags.luoyiDeclined records the decision');
 });
 
-test('luoyi preference resets after re-setting to auto', () => {
+test('luoyi preference resets after clearing with null', () => {
   const game = newGameWithXuChu();
   Engine.setSkillPreference(game, 'player', 'luoyi', 'decline');
   assert.equal(Engine.getSkillPreference(game, 'player', 'luoyi'), 'decline');
-  Engine.setSkillPreference(game, 'player', 'luoyi', 'auto');
+  Engine.setSkillPreference(game, 'player', 'luoyi', null);
   assert.equal(Engine.getSkillPreference(game, 'player', 'luoyi'), null);
 });
 
