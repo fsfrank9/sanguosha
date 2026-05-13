@@ -1,4 +1,4 @@
-# v6.0 Game-Logic Correctness & Refactor Plan
+# v6.0 + v6.1 Game-Logic Correctness & Spec-Compliance Plan
 
 > **方向锚定:** v5 把架构搬到了原生 ES 模块 + GitHub Pages，但游戏内部规则层面仍然存在三类问题：（a）实现行为与技能描述文案不一致（如【裸衣】描述是可选但实现是强制）；（b）实现与官方规则有出入；（c）频率/可选/消耗这类元规则全部硬编码在引擎里，加新技能必须改 `resetActorTurnState()` 等共享状态。v6 不再动架构，专门把"规则正确性"和"数据驱动"两件事做好。
 

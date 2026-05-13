@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>三国杀 · 进阶单文件版</title>
+  <title>三国杀 · 1v1 模块化版</title>
   <link rel="stylesheet" href="./src/styles/main.css" />
 </head>
-<body data-version="3.0">
+<body data-version="6.1">
   <main class="app">
     <header>
       <section class="title-card">
-        <h1>三国杀 · 进阶单机版 <span class="version-pill">v3.0 正式流程扩展版</span></h1>
-        <div class="subtitle">纯 HTML/CSS/JavaScript，无需联网、无需服务器，直接打开 index.html 即可游玩。当前已支持面对面 1v1、标准+军争核心牌组、武将技能、阶段 AI 与弃牌交互。</div>
+        <h1>三国杀 · 1v1 模块化版 <span class="version-pill">v6.1 规则合规版</span></h1>
+        <div class="subtitle">纯 HTML/CSS/JavaScript 原生 ES 模块加载，GitHub Pages 静态发布。已支持面对面 1v1、标准+军争核心牌组、26 个已实现技能全部对照官方 spec、玩家可选技能的暂停-恢复 UI 选择流程。</div>
       </section>
       <nav class="top-actions">
         <button class="btn primary" id="newGameBtn">新开一局</button>
@@ -115,10 +115,11 @@
         <section class="rules">
           <strong>升级路线</strong>
           <ul>
-            <li>v2.1：面对面 UI + 牌组/武将 catalog 落盘。</li>
-            <li>v2.2：正式阶段、装备区、判定区。</li>
-            <li>v2.3：标准 + 军争核心牌组与装备结算。</li>
-            <li>v2.4：咆哮、武圣、龙胆、制衡、苦肉、奸雄等武将技能。</li>
+            <li>v3.0：标准 + 军争牌组 + 武将技能 + AI 阶段流程。</li>
+            <li>v4.0：源码拆模块（src/），构建脚本生成单文件 HTML。</li>
+            <li>v5.0：原生 ES 模块加载，GitHub Pages 静态发布。</li>
+            <li>v6.0：数据驱动技能 / 牌 / 装备规则；玩家选择暂停机制；AI 主动技能感知。</li>
+            <li>v6.1：26 个已实现技能逐字段对照官方 spec 全部修正。</li>
           </ul>
         </section>
       </section>
