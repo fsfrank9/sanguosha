@@ -139,13 +139,13 @@
           engineHooks: ['playJuedou', 'damage']
         },
         guohe: {
-          summary: '弃置距离 1 内一名其他角色的一张牌（手牌、装备区、判定区皆可）。',
+          summary: '1V1 变体：你选择一项 — 1) 弃置对手装备区一张牌；2) 观看对手手牌并弃置其中一张。',
           timing: 'playPhase',
-          targets: 'distance-1',
-          effect: '从目标选定区域中弃置 1 张牌；手牌随机或按 targetCardId 指定。',
+          targets: 'opponent-with-hand-or-equip',
+          effect: 'v7 PR-9: gltjk card__scroll.md 1V1 变体两选项。canPlayCard 要求对手手牌或装备区有牌（不再含判定区）。options.targetZone="equipment"|"hand" 直传可走旧 UI；未指定 → 按 skillPreferences.guohe (auto/ask/decline) 处理：auto 优先弃装备，ask 设 pendingChoice "guohe-1v1-pick" 暴露装备列表 + 手牌内容（spec: 选项 2 是观看手牌后弃）。',
           frequency: 'unlimited',
           responseWindow: ['wuxie'],
-          engineHooks: ['playGuohe', 'removeTargetZoneCard']
+          engineHooks: ['canPlayCard:guohe-1v1', 'resolveGuohe1v1', 'executeGuohe1v1Pick', 'resolveGuohe1v1PickChoice', 'pendingChoice:guohe-1v1-pick']
         },
         shunshou: {
           summary: '获得距离 1 内一名其他角色的一张牌（手牌、装备区、判定区皆可）。',
