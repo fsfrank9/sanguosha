@@ -396,18 +396,101 @@
         return { claimedSourceCard: true };
       }
 
+      // 反馈 — spec: "司马懿 受到伤害结算后" / "需要选择来源的一张可获得
+      // 牌" (手牌 / 装备 / 判定区). The v5/v6 engine called
+      // removeTargetZoneCard(game, sourceActor) with no zone/cardId, which
+      // defaults to a RANDOM hand card. Player 司马懿 got no choice over
+      // zone or specific card, violating the spec's "需要选择".
+      //
+      // v6.1 flow:
+      //   1. Catalogue source's gainable cards into zones:
+      //      - hand:      count only (opponent hand contents are private)
+      //      - equipment: per-slot entry with full card info (face-up)
+      //      - judge:     per-trick entry with full card info (face-up)
+      //   2. Player 司马懿 with default pref: pendingChoice 'fankui-pick'.
+      //      UI shows the catalog; player picks { zone, cardId? }.
+      //      For hand zone the cardId is ignored — random pick within hand
+      //      preserves the "you can't peek at opponent's hand contents"
+      //      semantic. For equipment/judge, cardId selects the specific
+      //      card.
+      //   3. AI / 'auto' / 'decline': behaves as v5/v6 (auto random hand or
+      //      first available; 'decline' skips entirely).
       function triggerFankuiDamageAfter(context) {
         var game = context.game;
         var targetActor = context.targetActor;
         var sourceActor = context.sourceActor;
         var target = game[targetActor];
         var source = game[sourceActor];
-        if (!target || !sourceActor || !source || sourceActor === targetActor || !hasSkill(target, 'fankui') || game.phase === 'gameover') return null;
+        if (!target || !sourceActor || !source || sourceActor === targetActor
+          || !hasSkill(target, 'fankui') || game.phase === 'gameover') return null;
+        var pref = (target.skillPreferences && target.skillPreferences.fankui)
+          || (targetActor === 'player' ? 'ask' : 'auto');
+        if (pref === 'decline') {
+          log(game, actorName(game, targetActor) + '选择不发动【反馈】。');
+          return { declinedFankui: true };
+        }
+        // Build a zone catalog of every gainable card.
+        var zones = [];
+        if (source.hand && source.hand.length > 0) {
+          zones.push({ zone: 'hand', count: source.hand.length });
+        }
+        ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
+          var card = source.equipment && source.equipment[slot];
+          if (card) zones.push({
+            zone: 'equipment', slot: slot, cardId: card.id,
+            name: card.name, suit: card.suit, rank: card.rank
+          });
+        });
+        if (source.judgeArea) {
+          source.judgeArea.forEach(function (card) {
+            zones.push({
+              zone: 'judge', cardId: card.id,
+              name: card.name, suit: card.suit, rank: card.rank
+            });
+          });
+        }
+        if (zones.length === 0) {
+          return null;  // nothing to gain
+        }
+        if (pref === 'ask') {
+          game.pendingChoice = {
+            kind: 'fankui-pick',
+            actor: targetActor,
+            sourceActor: sourceActor,
+            zones: zones
+          };
+          return { suspendedForFankui: true };
+        }
+        // Auto path: legacy default zone (hand if any → equipment → judge).
         var gained = removeTargetZoneCard(game, sourceActor);
         if (!gained || !gained.card) return null;
         target.hand.push(gained.card);
         log(game, actorName(game, targetActor) + '发动【反馈】，获得' + actorName(game, sourceActor) + '的一张' + gained.zone + '牌。');
         return { gainedSourceCard: true };
+      }
+
+      function resolveFankuiPickChoice(game, pending, decision) {
+        var holder = pending.actor;
+        var sourceActor = pending.sourceActor;
+        var holderState = game[holder];
+        if (!holderState) return fail('未知角色。');
+        var zone = decision && decision.zone;
+        if (['hand', 'equipment', 'judge'].indexOf(zone) < 0) {
+          game.pendingChoice = pending;
+          return fail('请选择有效的区域（hand / equipment / judge）。');
+        }
+        // For hand zone we deliberately ignore decision.cardId — engine
+        // picks a random hand card, preserving the "opponent's hand
+        // contents are hidden when 反馈 is choosing" semantic. equipment
+        // and judge zones use the specific cardId the player clicked.
+        var gained = removeTargetZoneCard(game, sourceActor, zone, zone === 'hand' ? null : decision.cardId);
+        if (!gained || !gained.card) {
+          game.pendingChoice = pending;
+          return fail('找不到目标牌，请重新选择。');
+        }
+        holderState.hand.push(gained.card);
+        log(game, actorName(game, holder) + '发动【反馈】，获得' + actorName(game, sourceActor) + '的一张' + gained.zone + '牌。');
+        return success('反馈完成。');
       }
 
       // 遗计 (Phase 6C-bis): the cache spec lets 郭嘉 distribute the drawn
@@ -1189,6 +1272,9 @@
         }
         if (pending.kind === 'fanjian-guess') {
           return resolveFanjianGuessChoice(game, pending, decision || {});
+        }
+        if (pending.kind === 'fankui-pick') {
+          return resolveFankuiPickChoice(game, pending, decision || {});
         }
         return fail('未知的选择类型：' + pending.kind);
       }

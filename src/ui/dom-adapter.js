@@ -51,6 +51,7 @@
           'yijiPromptPanel', 'yijiPromptHint', 'yijiCandidates', 'yijiKeepAllBtn', 'yijiConfirmBtn',
           'fanjianPromptPanel', 'fanjianPromptHint',
           'fanjianSpadeBtn', 'fanjianHeartBtn', 'fanjianClubBtn', 'fanjianDiamondBtn',
+          'fankuiPromptPanel', 'fankuiPromptHint', 'fankuiZones',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -422,6 +423,29 @@
             }
           } else {
             els.fanjianPromptPanel.hidden = true;
+          }
+        }
+        if (els.fankuiPromptPanel) {
+          if (kind === 'fankui-pick' && pending.actor === 'player') {
+            els.fankuiPromptPanel.hidden = false;
+            if (els.fankuiPromptHint) {
+              els.fankuiPromptHint.textContent =
+                '反馈：选择获得' + (pending.sourceActor === 'enemy' ? '对方' : '来源') +
+                '的一张牌（手牌随机；装备/判定区可指定）';
+            }
+            if (els.fankuiZones) {
+              els.fankuiZones.innerHTML = pending.zones.map(function (entry) {
+                if (entry.zone === 'hand') {
+                  return '<button class="mini-card fankui-zone-btn" data-fankui-zone="hand">手牌（随机 1 张，共 ' + entry.count + ' 张）</button>';
+                }
+                var label = (entry.zone === 'equipment' ? '装备区' : '判定区') +
+                  '【' + entry.name + '】' + suitLabel(entry.suit) + ' ' + (entry.rank || '');
+                return '<button class="mini-card fankui-zone-btn" data-fankui-zone="' + entry.zone +
+                  '" data-fankui-card-id="' + escapeHtml(entry.cardId) + '">' + escapeHtml(label) + '</button>';
+              }).join('') || '<span class="mini-card">对方没有可获得的牌</span>';
+            }
+          } else {
+            els.fankuiPromptPanel.hidden = true;
           }
         }
       }
@@ -1204,6 +1228,15 @@
             if (!result.ok) renderLog();
             render();
           });
+        });
+        if (els.fankuiZones) els.fankuiZones.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-fankui-zone]');
+          if (!btn) return;
+          var zone = btn.getAttribute('data-fankui-zone');
+          var cardId = btn.getAttribute('data-fankui-card-id') || null;
+          var result = Engine.resolvePendingChoice(game, { zone: zone, cardId: cardId });
+          if (!result.ok) renderLog();
+          render();
         });
         if (els.yijiCandidates) els.yijiCandidates.addEventListener('click', function (event) {
           var btn = event.target.closest('[data-yiji-card-id]');
