@@ -157,13 +157,13 @@
           engineHooks: ['playShunshou', 'removeTargetZoneCard']
         },
         jiedao: {
-          summary: '令一名装备武器的其他角色对其武器距离内的另一名角色使用【杀】；不出则发动者获得其武器。',
+          summary: '令一名装备武器且攻击范围内有合法【杀】目标的其他角色对该目标使用【杀】；不出则将其武器交给你。',
           timing: 'playPhase',
-          targets: 'one-other-with-weapon',
-          effect: '目标对第三方使用【杀】；目标不出【杀】则发动者获得目标的武器。',
+          targets: 'one-other-with-weapon-and-legal-sha-target',
+          effect: 'v7 PR-5: spec 要求两次合法性检测。canPlayCard 阶段检 An 武器范围覆盖 Bn (1v1: Bn=source) 且无 target-protection；resolve 阶段 opponent 决定 fire/decline，若 fire 则 playSha 入内再做第二次检测；任何环节失败 → 交武器。skillPreferences.jiedao = auto (AI) / ask (player) / decline 同义 comply.',
           frequency: 'unlimited',
           responseWindow: ['wuxie'],
-          engineHooks: ['playJiedao']
+          engineHooks: ['canPlayCard:jiedao', 'resolveJiedaoDecision', 'jiedaoFireOpponentSha', 'transferWeaponJiedao', 'resolveJiedaoDecisionChoice', 'pendingChoice:jiedao-decision']
         },
         taoyuan: {
           summary: '所有角色按发动者起逆时针顺序结算；已受伤的角色回复 1 点体力，未受伤的角色无效。',
