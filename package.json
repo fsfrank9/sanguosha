@@ -3,7 +3,7 @@
   "version": "6.1.0",
   "private": true,
   "type": "module",
-  "description": "三国杀 1v1 browser game served as native ES modules from a static GitHub Pages site, with data-driven skill / card / equipment metadata and pause-prompt player choice for optional skills.",
+  "description": "三国杀 1v1 browser game served as native ES modules from a static GitHub Pages site. v6.1: data-driven skill/card/equipment metadata, pause-prompt player choice for optional skills, all 26 implemented skills verified against official-pack specs through a 7-PR mismatch-fix chain.",
   "scripts": {
     "build": "node tools/build.mjs",
     "build:check": "node tools/build.mjs --check",

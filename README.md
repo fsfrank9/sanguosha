@@ -35,25 +35,49 @@ npm run build:check
 
 ## 当前版本
 
-`v6.0 数据驱动技能 / 牌 / 装备规则 + 玩家选择暂停机制`
+`v6.1 已实现技能 100% 对照官方 spec` （v6.0 数据驱动基础 + v6.1 mismatch 修复链）
 
-v6 保留 v5 的「原生 ES 模块 + GitHub Pages 托管」架构（详见 `docs/plans/2026-05-13-sanguosha-v5-architecture.md`），把工作重心从架构搬到规则层。主要新增：
+v6 保留 v5 的「原生 ES 模块 + GitHub Pages 托管」架构（详见 `docs/plans/2026-05-13-sanguosha-v5-architecture.md`），把工作重心从架构搬到规则层。
+
+### v6.0 基础（数据驱动 + 暂停/恢复机制）
 
 - **结构化技能元数据** (`src/data/heroes.js` 的 `SKILL_METADATA`)：26 个已实现技能各有 `{ trigger, frequency, optional, mandatory, cost, hooks }` 六字段，跨武将共享的同名技能（mashu / wusheng / longdan / biyue / paoxiao）自动保持一致。UI tooltip 从结构化字段派生分行提示。
 - **结构化牌规则** (`src/data/cards.js` 的 `CARD_RULES`)：35 张牌（基本 / 即时锦囊 / 延时锦囊 / 装备）各有 `{ summary, timing, targets, effect, frequency, responseWindow, engineHooks }`，自动 merge 到 `CARD_CATALOG[id].rule`。
 - **官方规格 cache + audit harness**：`official-skill-cache/sanguosha-standard/official_standard_skill_cache.json` 保存所有 26 个已实现技能的官方规格副本（带 sourceTextSha256）。`tests/v6_skill_audit.test.mjs` + `tests/skill_schema.test.mjs` + `tests/card_rules.test.mjs` 持续校验「cache ↔ specs fixture ↔ heroes.js ↔ cards.js」四方一致。
 - **装备被动效果注册表** (`src/engine/state.js` 的 `EQUIPMENT_EFFECTS`)：诸葛连弩 / 青釭剑 / 仁王盾 的布尔被动通过 `hasEquipmentEffect(state, name)` 查询，与 `SkillRuntime.hasPassiveEffect` 同形。
-- **玩家选择暂停 / 恢复**：引擎引入 `game.pendingChoice` + `game.pauseState`，让规则上属于”可选”的技能在玩家控制时真的可以选择：
-  - **【裸衣】**：默认 auto-fire；UI 技能栏 toggle 切换「自动发动 / 本回合跳过」。
-  - **【鬼才】**：玩家司马懿在判定生效前可挑任意手牌替换判定，或不发动；AI 走 hand[0] 自动路径。
-  - **【遗计】**：玩家郭嘉受伤后摸完牌可勾选哪些交给对手；默认全部留己。
-  - **【铁骑】**：玩家马超可在技能栏切「不发动」全局禁用本场铁骑判定。
-  - `Engine.setSkillPreference` / `Engine.getSkillPreference` / `Engine.getPendingChoice` / `Engine.resolvePendingChoice` 是公开 API。
+- **玩家选择暂停 / 恢复机制**：`game.pendingChoice` + `game.pauseState` + 公开 API `Engine.setSkillPreference` / `getSkillPreference` / `getPendingChoice` / `resolvePendingChoice`。
 - **AI 主动技能感知**：AI 从只识【苦肉】【制衡】扩到全部 5 个主动技（+ 仁德 / 反间 / 观星）+ 2 个出牌期转化（武圣 / 龙胆 把红牌或闪当杀），其余 19 个被动 / 触发 / 锁定技通过引擎 hooks 自动生效。
+
+### v6.1 mismatch 修复链（7 个 PR 把所有偏差修到与官方 spec 完全一致）
+
+v6.0 收尾后做了一次"逐字对照"per-skill spec audit，发现 12 处真实 mismatch（包括第一次 audit 漏掉的隐藏问题）。v6.1 用 7 个独立 PR 全部修完：
+
+- **【观星】#17**：预览张数 = min(存活角色数, 5, deck)；触发时机搬到准备阶段；新 API `{ topIds, bottomIds }` 支持任意排序 + 顶/底独立分配
+- **【鬼才】#18**：跨 actor 触发 —— 任何判定都能干预（不只是 司马懿 自己的）；非 pausable 判定（八卦/铁骑/刚烈 内部判定）回退 auto-fire
+- **【反间】#19**：目标方真·猜花色（不是出招方传 options）；player UI 弹 4 花色选择；AI 盲随机
+- **【反馈】#20**：玩家挑区域 + 具体牌（hand 随机不可窥探 / 装备 / 判定区按 cardId）
+- **【刚烈】#21**：4 子问题（夏侯惇 可选触发 / 来源选弃 2 vs 受 1 / 来源选哪两张 / 含装备可弃）
+- **【武圣】+【制衡】+【苦肉】#22**：装备区可作牌源（关羽 卸下红色武器当杀响应决斗）；制衡 可弃装备；苦肉 hp=1 允许
+- **【突袭】+【遗计】#23**：突袭 可决/不发动 toggle；遗计 "按伤害点数逐点处理"（闪电 3 点 → 3 个独立 prompt）
+
+v6.1 累计基础设施：
+- **7 个 pendingChoice kinds**: `guicai-replace` / `yiji-distribute` / `guanxing-reorder` / `fanjian-guess` / `fankui-pick` / `ganglie-fire` / `ganglie-source-choice`
+- **6 个 skillPreferences** toggles: `luoyi` / `tieqi` / `guicai` / `yiji` / `tuxi` / `ganglie`
+- **3 个"自己的牌 = hand + equipment" helpers**: `findOwnCardById` / `removeOwnCardFromAnyZone` / `firstMatchingOwnCard`
+- **判定 pausable flag**: `judge(game, actor, reason, { pausable })`
+- **多点伤害逐点处理**: `pauseState.yiji.{ remainingPoints, totalPoints }` + `fireNextYijiPoint`
+- **60 条新 behavior 测试** 覆盖每个修复点
+
+### 1v1 玩法
+
 - 1v1 选将、主公/反贼身份与主公先手流程，标准包/风林火山/SP 武将池 catalog，标准+军争核心牌组。
 - 阶段、装备区、判定区、延时锦囊、部分武将技能和 AI 行动。
 - 火攻、铁索连环、顺手牵羊、过河拆桥等交互选择流程。
-- 技能实现状态可见：已实现技能可用；仅展示/待实现技能会明确标记为”未实现”，避免看起来有技能但实际无法触发。
+- 技能实现状态可见：已实现技能可用；仅展示/待实现技能会明确标记为"未实现"，避免看起来有技能但实际无法触发。
+
+### 后续方向
+
+详见 plan 文档「下一步方向」节，主要候选：装备复杂副作用 handler 体系（八卦/藤甲/青龙等）、牌效果对照官方修复、新技能批量接入（17 个 cache-ready 技能）、AI 进阶、多人模式。
 
 ## 架构路线
 
@@ -103,7 +127,7 @@ docs/plans/2026-05-13-sanguosha-v5-architecture.md  [已完成]
 v6.0 游戏逻辑正确性与重构计划见：
 
 ```text
-docs/plans/2026-05-13-sanguosha-v6-logic-correctness.md  [已完成]
+docs/plans/2026-05-13-sanguosha-v6-logic-correctness.md  [v6.0 + v6.1 已完成]
 ```
 
 ## 武将技能实现状态
