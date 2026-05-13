@@ -274,11 +274,11 @@
           engineHooks: ['StateRuntime.hasEquipmentEffect:ignoreArmorOnSha', 'isArmorIgnoredBySha']
         },
         cixiong: {
-          summary: '对异性目标使用【杀】后，可令目标弃 1 张手牌；目标不弃则发动者摸 1 张。',
+          summary: '使用【杀】指定与你性别不同的目标后，你可以令其选择：1) 弃 1 张手牌，2) 令你摸 1 张牌。',
           timing: 'passive',
-          effect: '【杀】指定异性目标后触发；目标二选一：弃 1 手牌 或 让发动者摸 1 张。当前 1v1 引擎尚未实现性别属性区分。',
+          effect: 'v7 PR-4: 触发时机 = 指定目标后（响应窗口之前，gltjk flow__use.md step 5）。需要 source.gender !== target.gender。source 通过 skillPreferences.cixiong (auto/ask/decline) 决定是否发动；target 通过 skillPreferences.cixiongResponse (auto=弃手牌；ask=pendingChoice "cixiong-choose") 选择 discard/draw。任一暂停时 sha 状态保存在 pauseState.playSha 等候续算。',
           frequency: 'passive',
-          engineHooks: ['playSha:cixiongBranch']
+          engineHooks: ['playSha → applyCixiongOnDesignate', 'fireCixiongTargetChoice', 'resolveCixiongFireChoice', 'resolveCixiongChoose', 'continueShaAfterCixiong', 'pauseState.playSha']
         },
         qinglong: {
           summary: '【杀】被【闪】抵消后，可立即对同目标再次使用【杀】（不算次数）。',
