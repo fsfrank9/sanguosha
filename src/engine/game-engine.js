@@ -1247,12 +1247,80 @@
         return success('失去装备。');
       }
 
+      // v7 PR-3: 麒麟弓 — gltjk card__equipment.md：
+      //   "每当你使用【杀】对目标角色造成伤害时，你可以弃置其装备区里的
+      //    一张坐骑牌。"
+      // 关键：弃【一张】，而非两张；且 "你可以" → 可选。
+      //
+      // skillPreferences.qilin（写入发动者 state）：
+      //   'auto'    (AI/enemy 默认): 总是触发；目标有 2 匹马时默认弃 +1 马
+      //   'ask'     (player 默认):   2 匹马时 pendingChoice 让 source 选；
+      //                              1 匹马仍自动弃（没的选）
+      //   'decline':                 完全不触发
+      function applyQilinDiscard(game, sourceActor, targetActor) {
+        var target = game[targetActor];
+        if (!target || !target.equipment) return;
+        var slots = [];
+        if (target.equipment.horseMinus) slots.push('horseMinus');
+        if (target.equipment.horsePlus) slots.push('horsePlus');
+        if (slots.length === 0) return;
+        var source = game[sourceActor];
+        var pref = (source && source.skillPreferences && source.skillPreferences.qilin)
+          || (sourceActor === 'player' ? 'ask' : 'auto');
+        if (pref === 'decline') {
+          log(game, actorName(game, sourceActor) + '选择不发动【麒麟弓】。');
+          return;
+        }
+        if (slots.length === 1) {
+          loseEquipment(game, targetActor, slots[0]);
+          log(game, actorName(game, sourceActor) + '发动【麒麟弓】，弃置' + actorName(game, targetActor) + '的坐骑牌。');
+          return;
+        }
+        // slots.length === 2
+        if (pref === 'ask') {
+          game.pendingChoice = {
+            kind: 'qilin-pick',
+            actor: sourceActor,
+            target: targetActor,
+            horseSlots: slots.slice()
+          };
+          return;
+        }
+        // 'auto': default heuristic — kill +1 马 first（多数情况对目标更具威胁）。
+        loseEquipment(game, targetActor, 'horsePlus');
+        log(game, actorName(game, sourceActor) + '发动【麒麟弓】，弃置' + actorName(game, targetActor) + '的【+1 马】。');
+      }
+
+      function resolveQilinPickChoice(game, pending, decision) {
+        var sourceActor = pending.actor;
+        var targetActor = pending.target;
+        var sourceState = game[sourceActor];
+        var targetState = game[targetActor];
+        if (!sourceState || !targetState) return fail('未知角色。');
+        if (decision && decision.decline) {
+          log(game, actorName(game, sourceActor) + '选择不发动【麒麟弓】。');
+          return success('麒麟弓已取消。');
+        }
+        var slot = decision && decision.slot;
+        if (['horseMinus', 'horsePlus'].indexOf(slot) < 0) {
+          game.pendingChoice = pending;
+          return fail('请选择要弃置的坐骑（horseMinus / horsePlus）。');
+        }
+        if (pending.horseSlots.indexOf(slot) < 0
+          || !targetState.equipment || !targetState.equipment[slot]) {
+          game.pendingChoice = pending;
+          return fail('该坐骑已不在装备区。');
+        }
+        loseEquipment(game, targetActor, slot);
+        log(game, actorName(game, sourceActor) + '发动【麒麟弓】，弃置' + actorName(game, targetActor) + '的【' + (slot === 'horsePlus' ? '+1 马' : '-1 马') + '】。');
+        return success('麒麟弓结算完成。');
+      }
+
       function applyWeaponHitEffects(game, actor, targetActor) {
         var weapon = game[actor].equipment && game[actor].equipment.weapon;
         if (!weapon) return;
         if (weapon.type === 'qilin') {
-          if (game[targetActor].equipment.horsePlus) loseEquipment(game, targetActor, 'horsePlus');
-          if (game[targetActor].equipment.horseMinus) loseEquipment(game, targetActor, 'horseMinus');
+          applyQilinDiscard(game, actor, targetActor);
         } else if (weapon.type === 'cixiong') {
           if (game[targetActor].hand.length) {
             var dropped = game[targetActor].hand.splice(0, 1)[0];
@@ -1568,6 +1636,9 @@
         }
         if (pending.kind === 'ganglie-source-choice') {
           return resolveGanglieSourceChoice(game, pending, decision || {});
+        }
+        if (pending.kind === 'qilin-pick') {
+          return resolveQilinPickChoice(game, pending, decision || {});
         }
         return fail('未知的选择类型：' + pending.kind);
       }
