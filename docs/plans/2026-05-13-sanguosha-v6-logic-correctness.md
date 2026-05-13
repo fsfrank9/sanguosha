@@ -245,7 +245,31 @@
 
 ## Phase 6D — Equipment passive effects
 
-**Status:** 待启动。
+**Status:** ✅ 已完成（首批）。
+
+### 实际交付（与最初设计的差异）
+
+最初的计划是把所有装备硬编码（包括诸葛连弩、青龙偃月刀、藤甲、八卦阵、白银狮子、寒冰剑、青釭剑、贯石斧等）都搬到 StateRuntime 的注册表里。落地时分了两类：
+
+- **可声明式表达的（本 PR 交付）**：诸葛连弩（`unlimitedSha`）、青釭剑（`ignoreArmorOnSha`）、仁王盾（`blockBlackSha`）。这三个就是简单的布尔标志，引擎调用一次 `hasEquipmentEffect(state, name)` 就行，没有副作用。
+- **带副作用的（留给后续 phase）**：八卦阵自动判定生【闪】、青龙偃月刀 miss 后再【杀】、藤甲 ±1 伤害与抗南蛮万箭、白银狮子降伤+回血、贯石斧弃 2 强制命中、寒冰剑双弃。这些都需要"事件 handler"或多步骤副作用，硬塞进 `EQUIPMENT_EFFECTS` 表会让 schema 含义混乱。先把 boolean 注册表跑通做样板，下次 phase 用一个真正的 equipment-hook 体系（类似 SkillRuntime.registerSkill）把这些 side-effect 装备搬进来。
+
+### 落地范围
+
+- `src/engine/state.js`:
+    * 新增 `EQUIPMENT_EFFECTS` 表：`zhuge: { unlimitedSha: true }`、`qinggang: { ignoreArmorOnSha: true }`、`renwang: { blockBlackSha: true }`。
+    * 新增 `hasEquipmentEffect(state, effectName)` 与 `sumEquipmentEffect(state, effectName)` 两个查询（API 形状与 `SkillRuntime.hasPassiveEffect` / `sumPassiveEffect` 对齐，便于将来 helper 统一）。
+    * `canUseUnlimitedSha` 改成 `SkillRuntime.hasPassiveEffect(...) || hasEquipmentEffect(...)`，不再硬判 `weapon.type === 'zhuge'`。
+- `src/engine/game-engine.js`:
+    * `isArmorIgnoredBySha` 改成 `hasEquipmentEffect(source, 'ignoreArmorOnSha')`，不再硬判 `weapon.type === 'qinggang'`。
+    * `renwang` 黑【杀】拦截改成 `!ignoreArmor && card.color === 'black' && hasEquipmentEffect(target, 'blockBlackSha')`，不再硬判 `armor.type === 'renwang'`。
+- `tests/equipment_effects.test.mjs`（新增）：11 条覆盖 registry API + 三件装备的集成行为（含 qinggang 穿透 renwang 的优先级）。
+
+### 验收
+
+- `npm test` 全绿（32 个测试文件）。
+- `cards_equipment.test.mjs` 中现有装备行为测试 0 改动通过 → 重构保持行为。
+- 浏览器选周瑜/孙权对许褚等，装备诸葛/青釭/仁王后的实战行为与 6C-bis 之前一致。
 
 ### 设计要点
 

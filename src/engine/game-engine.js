@@ -28,6 +28,7 @@
       var firstActorFromRoles = StateRuntime.firstActorFromRoles;
       var handLimit = StateRuntime.handLimit;
       var getActorStatus = StateRuntime.getActorStatus;
+      var hasEquipmentEffect = StateRuntime.hasEquipmentEffect;
       var setPhase = PhaseRuntime.setPhase;
       var nextPlayablePhase = PhaseRuntime.nextPlayablePhase;
       var resetActorTurnState = PhaseRuntime.resetActorTurnState;
@@ -288,7 +289,7 @@
 
       function isArmorIgnoredBySha(game, sourceActor, card) {
         var source = game[sourceActor];
-        return !!(source && isShaCard(card) && source.equipment && source.equipment.weapon && source.equipment.weapon.type === 'qinggang');
+        return !!(source && isShaCard(card) && hasEquipmentEffect(source, 'ignoreArmorOnSha'));
       }
 
       function log(game, text) {
@@ -1265,7 +1266,7 @@
         var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
         log(game, actorName(game, actor) + '对' + actorName(game, targetActor) + '使用【' + card.name + '】。');
 
-        if (armor && !ignoreArmor && armor.type === 'renwang' && card.color === 'black') {
+        if (!ignoreArmor && card.color === 'black' && hasEquipmentEffect(target, 'blockBlackSha')) {
           log(game, actorName(game, targetActor) + '的【仁王盾】抵消了黑色【杀】。');
           discardCard(game, card);
           return success('仁王盾抵消。');
