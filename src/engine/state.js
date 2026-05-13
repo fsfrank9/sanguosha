@@ -1,5 +1,44 @@
   import { SkillRuntime } from './skill-runtime.js';
 
+  // v6D: declarative equipment-passive-effect registry, mirroring
+  // SkillRuntime's PASSIVE_EFFECTS. Each entry maps an equipment type to a
+  // bag of named effects that other engine helpers query via
+  // hasEquipmentEffect / sumEquipmentEffect. Only effects that fit a
+  // boolean-or-numeric flag form belong here; side-effecting equipment
+  // (bagua auto-judge, qinglong re-Sha, tengjia/baiyin damage maths) stays
+  // as bespoke handlers in game-engine.js for now.
+  var EQUIPMENT_EFFECTS = {
+    zhuge:   { unlimitedSha: true },
+    qinggang:{ ignoreArmorOnSha: true },
+    renwang: { blockBlackSha: true }
+  };
+
+  function equipmentSlots(state) {
+    if (!state || !state.equipment) return [];
+    return ['weapon', 'armor', 'horsePlus', 'horseMinus']
+      .map(function (slot) { return state.equipment[slot]; })
+      .filter(function (card) { return !!card; });
+  }
+
+  function equipmentEffectValue(equipmentType, effectName) {
+    var effects = EQUIPMENT_EFFECTS[equipmentType];
+    if (!effects) return undefined;
+    return effects[effectName];
+  }
+
+  function hasEquipmentEffect(state, effectName) {
+    return equipmentSlots(state).some(function (card) {
+      return !!equipmentEffectValue(card.type, effectName);
+    });
+  }
+
+  function sumEquipmentEffect(state, effectName) {
+    return equipmentSlots(state).reduce(function (total, card) {
+      var value = equipmentEffectValue(card.type, effectName);
+      return total + (typeof value === 'number' ? value : 0);
+    }, 0);
+  }
+
   function actorName(game, actor) {
     return game[actor].name;
   }
@@ -13,7 +52,7 @@
   }
 
   function canUseUnlimitedSha(state) {
-    return SkillRuntime.hasPassiveEffect(state, 'unlimitedSha') || (state.equipment && state.equipment.weapon && state.equipment.weapon.type === 'zhuge');
+    return SkillRuntime.hasPassiveEffect(state, 'unlimitedSha') || hasEquipmentEffect(state, 'unlimitedSha');
   }
 
   function weaponRange(state) {
@@ -57,6 +96,8 @@
     opponent: opponent,
     hasSkill: hasSkill,
     canUseUnlimitedSha: canUseUnlimitedSha,
+    hasEquipmentEffect: hasEquipmentEffect,
+    sumEquipmentEffect: sumEquipmentEffect,
     weaponRange: weaponRange,
     distanceBetween: distanceBetween,
     canReachWithSha: canReachWithSha,
