@@ -154,7 +154,9 @@
             if (skill.id === 'fanjian' && state.flags && state.flags.fanjianUsed) active = false;
             if (skill.id === 'guanxing' && state.flags && state.flags.guanxingUsed) active = false;
             if ((skill.id === 'rende' || skill.id === 'fanjian') && !state.hand.length) active = false;
-            if (skill.id === 'kurou' && state.hp <= 1) active = false;
+            // v6.1: spec allows 苦肉 at hp=1 (hp→0 ends the game in 1v1 but
+            // is a valid choice). Only block when truly dead.
+            if (skill.id === 'kurou' && state.hp <= 0) active = false;
             var statusClass = skill.status ? ' skill-status-' + skill.status : '';
             var statusText = skill.statusText || (skill.status === 'todo' ? '未实现' : '');
             var label = skill.name + (skill.status === 'todo' ? '·未实现' : '');
@@ -317,8 +319,28 @@
         return zoneCards(cards, '未装备');
       }
 
+      // v6.1: player-side equipment rendered as clickable buttons when in
+      // a skill select mode that accepts equipment cards (currently 制衡).
+      function playerEquipmentForZhiheng(equipment) {
+        var cards = [];
+        ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
+          if (equipment && equipment[slot]) cards.push(equipment[slot]);
+        });
+        if (!cards.length) return '<span class="mini-card">未装备</span>';
+        return cards.map(function (card) {
+          var selected = selectedSkillCardIds.indexOf(card.id) >= 0;
+          return '<button class="mini-card zhiheng-equip-pick' + (selected ? ' selected' : '') +
+            '" data-card-id="' + escapeHtml(card.id) + '" title="点击切换是否弃置（含装备）">' +
+            escapeHtml(card.name) + (selected ? ' ✓' : '') + '</button>';
+        }).join('');
+      }
+
       function renderZones() {
-        if (els.playerEquipmentArea) els.playerEquipmentArea.innerHTML = equipmentCards(game.player.equipment);
+        if (els.playerEquipmentArea) {
+          els.playerEquipmentArea.innerHTML = skillSelectMode === 'zhiheng'
+            ? playerEquipmentForZhiheng(game.player.equipment)
+            : equipmentCards(game.player.equipment);
+        }
         if (els.enemyEquipmentArea) els.enemyEquipmentArea.innerHTML = equipmentCards(game.enemy.equipment);
         if (els.playerJudgeArea) els.playerJudgeArea.innerHTML = zoneCards(game.player.judgeArea, '空');
         if (els.enemyJudgeArea) els.enemyJudgeArea.innerHTML = zoneCards(game.enemy.judgeArea, '空');
@@ -1205,6 +1227,15 @@
           var card = event.target.closest('[data-card-id]');
           if (!card) return;
           usePlayerCard(card.getAttribute('data-card-id'));
+        });
+        // v6.1: 制衡 may include equipment-area cards; clicking them in
+        // zhiheng select mode toggles selection just like a hand card.
+        if (els.playerEquipmentArea) els.playerEquipmentArea.addEventListener('click', function (event) {
+          if (skillSelectMode !== 'zhiheng') return;
+          var btn = event.target.closest('[data-card-id]');
+          if (!btn) return;
+          toggleSkillCard(btn.getAttribute('data-card-id'));
+          render();
         });
         if (els.confirmDiscardBtn) els.confirmDiscardBtn.addEventListener('click', confirmDiscardSelection);
         if (els.tiesuoRecastBtn) els.tiesuoRecastBtn.addEventListener('click', function () { resolveTiesuo({ mode: 'recast' }); });
