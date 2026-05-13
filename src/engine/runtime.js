@@ -17,6 +17,7 @@
       heroId: hero.id,
       name: hero.name,
       camp: hero.camp,
+      gender: hero.gender || 'male', // v7 PR-4: 雌雄双股剑 性别校验依据
       title: hero.title,
       quote: hero.quote,
       skills: clone(hero.skills || []),

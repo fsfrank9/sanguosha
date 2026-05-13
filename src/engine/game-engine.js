@@ -1321,16 +1321,129 @@
         if (!weapon) return;
         if (weapon.type === 'qilin') {
           applyQilinDiscard(game, actor, targetActor);
-        } else if (weapon.type === 'cixiong') {
-          if (game[targetActor].hand.length) {
-            var dropped = game[targetActor].hand.splice(0, 1)[0];
-            discardCard(game, dropped);
-            log(game, actorName(game, targetActor) + '因【雌雄双股剑】弃置一张牌。');
-          } else {
-            drawCards(game, actor, 1);
-            log(game, actorName(game, actor) + '因【雌雄双股剑】摸一张牌。');
-          }
         }
+        // v7 PR-4: 雌雄双股剑 已经迁移到 "指定目标后" 时机 (applyCixiongOnDesignate)，
+        // 不再于 applyWeaponHitEffects (post-damage) 触发——这样即便目标用闪
+        // 闪避，雌雄仍按 spec 触发。
+      }
+
+      // v7 PR-4: 雌雄双股剑 — gltjk card__equipment.md：
+      //   "每当你使用【杀】指定与你性别不同的一个目标后，
+      //    你可以令其选择一项：1.弃置一张手牌；2.令你摸一张牌。"
+      //
+      // 时机：use-event step 5 "指定目标后"（响应窗口之前）。
+      // 性别检查：source.gender !== target.gender 才触发。
+      // 两个决策：
+      //   1) source 可以选择是否发动（skillPreferences.cixiong）
+      //   2) target 选择一项（skillPreferences.cixiongResponse）
+      // 任一暂停 → pendingChoice + pauseState.playSha 保存 sha 上下文。
+      function applyCixiongOnDesignate(game, sourceActor, targetActor) {
+        var source = game[sourceActor];
+        var target = game[targetActor];
+        if (!source || !target) return null;
+        var weapon = source.equipment && source.equipment.weapon;
+        if (!weapon || weapon.type !== 'cixiong') return null;
+        var sourceGender = source.gender;
+        var targetGender = target.gender;
+        if (!sourceGender || !targetGender || sourceGender === targetGender) return null;
+        var sourcePref = (source.skillPreferences && source.skillPreferences.cixiong)
+          || (sourceActor === 'player' ? 'ask' : 'auto');
+        if (sourcePref === 'decline') {
+          log(game, actorName(game, sourceActor) + '选择不发动【雌雄双股剑】。');
+          return null;
+        }
+        if (sourcePref === 'ask') {
+          game.pendingChoice = {
+            kind: 'cixiong-fire',
+            actor: sourceActor,
+            target: targetActor
+          };
+          return { paused: true };
+        }
+        // 'auto' → fire immediately, proceed to target's choice.
+        return fireCixiongTargetChoice(game, sourceActor, targetActor);
+      }
+
+      function fireCixiongTargetChoice(game, sourceActor, targetActor) {
+        var source = game[sourceActor];
+        var target = game[targetActor];
+        log(game, actorName(game, sourceActor) + '发动【雌雄双股剑】，令' + actorName(game, targetActor) + '二选一。');
+        if (!target.hand || target.hand.length === 0) {
+          // No handcards → forced to option 2 (source draws 1).
+          drawCards(game, sourceActor, 1);
+          log(game, actorName(game, targetActor) + '没有手牌，' + actorName(game, sourceActor) + '摸一张牌。');
+          return null;
+        }
+        var targetPref = (target.skillPreferences && target.skillPreferences.cixiongResponse)
+          || (targetActor === 'player' ? 'ask' : 'auto');
+        if (targetPref === 'auto') {
+          // AI default heuristic: discard one hand card (don't help the
+          // attacker top up a hand). Picks hand[0] for determinism.
+          var dropped = target.hand.splice(0, 1)[0];
+          discardCard(game, dropped);
+          log(game, actorName(game, targetActor) + '因【雌雄双股剑】弃置【' + dropped.name + '】。');
+          return null;
+        }
+        // 'ask' → pendingChoice for target.
+        game.pendingChoice = {
+          kind: 'cixiong-choose',
+          actor: targetActor,
+          sourceActor: sourceActor,
+          handIds: target.hand.map(function (c) { return c.id; })
+        };
+        return { paused: true };
+      }
+
+      function resolveCixiongFireChoice(game, pending, decision) {
+        var sourceActor = pending.actor;
+        var targetActor = pending.target;
+        if (!game[sourceActor] || !game[targetActor]) return fail('未知角色。');
+        if (decision && (decision.decline || decision.fire === false)) {
+          log(game, actorName(game, sourceActor) + '选择不发动【雌雄双股剑】。');
+          return resumePlayShaAfterCixiong(game);
+        }
+        var targetResult = fireCixiongTargetChoice(game, sourceActor, targetActor);
+        if (targetResult && targetResult.paused) {
+          return success('等待目标选择…');
+        }
+        return resumePlayShaAfterCixiong(game);
+      }
+
+      function resolveCixiongChoose(game, pending, decision) {
+        var targetActor = pending.actor;
+        var sourceActor = pending.sourceActor;
+        var target = game[targetActor];
+        if (!target || !game[sourceActor]) return fail('未知角色。');
+        var option = decision && decision.option;
+        if (option === 'draw') {
+          drawCards(game, sourceActor, 1);
+          log(game, actorName(game, targetActor) + '选择让' + actorName(game, sourceActor) + '摸一张牌。');
+        } else if (option === 'discard') {
+          if (!target.hand.length) {
+            drawCards(game, sourceActor, 1);
+            log(game, actorName(game, targetActor) + '没有手牌，' + actorName(game, sourceActor) + '摸一张牌。');
+          } else {
+            var cardId = decision && decision.cardId;
+            var idx = cardId ? target.hand.findIndex(function (c) { return c.id === cardId; }) : 0;
+            if (idx < 0) idx = 0;
+            var dropped = target.hand.splice(idx, 1)[0];
+            discardCard(game, dropped);
+            log(game, actorName(game, targetActor) + '弃置【' + dropped.name + '】响应【雌雄双股剑】。');
+          }
+        } else {
+          game.pendingChoice = pending;
+          return fail('请选择 discard 或 draw。');
+        }
+        return resumePlayShaAfterCixiong(game);
+      }
+
+      function resumePlayShaAfterCixiong(game) {
+        if (game.pauseState && game.pauseState.playSha) {
+          var saved = game.pauseState.playSha;
+          game.pauseState.playSha = null;
+          return continueShaAfterCixiong(game, saved.actor, saved.card, saved.amount);
+        }
+        return success('雌雄双股剑结算完成。');
       }
 
       function randomHandIndex(game, state) {
@@ -1640,6 +1753,12 @@
         if (pending.kind === 'qilin-pick') {
           return resolveQilinPickChoice(game, pending, decision || {});
         }
+        if (pending.kind === 'cixiong-fire') {
+          return resolveCixiongFireChoice(game, pending, decision || {});
+        }
+        if (pending.kind === 'cixiong-choose') {
+          return resolveCixiongChoose(game, pending, decision || {});
+        }
         return fail('未知的选择类型：' + pending.kind);
       }
 
@@ -1917,10 +2036,28 @@
         self.usedOrRespondedSha = true;
         var amount = 1 + (self.shaBonus || 0);
         self.shaBonus = 0;
+        log(game, actorName(game, actor) + '对' + actorName(game, targetActor) + '使用【' + card.name + '】。');
+
+        // v7 PR-4: 雌雄双股剑 fires at "指定目标后" (gltjk flow__use.md step 5).
+        // 在响应窗口之前结算；若需要 source/target 的 pendingChoice，则把
+        // sha 的剩余状态保存到 pauseState.playSha，由 resolveCixiong* 完成
+        // 后调用 continueShaAfterCixiong 接着 渲染 仁王/闪/八卦/贯石/青龙/伤害.
+        var cixiongResult = applyCixiongOnDesignate(game, actor, targetActor);
+        if (cixiongResult && cixiongResult.paused) {
+          if (!game.pauseState) game.pauseState = {};
+          game.pauseState.playSha = { actor: actor, card: card, amount: amount };
+          return success('【雌雄双股剑】结算中…');
+        }
+        return continueShaAfterCixiong(game, actor, card, amount);
+      }
+
+      function continueShaAfterCixiong(game, actor, card, amount) {
+        var self = game[actor];
+        var targetActor = opponent(actor);
+        var target = game[targetActor];
         var weapon = self.equipment && self.equipment.weapon;
         var armor = target.equipment && target.equipment.armor;
         var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
-        log(game, actorName(game, actor) + '对' + actorName(game, targetActor) + '使用【' + card.name + '】。');
 
         if (!ignoreArmor && card.color === 'black' && hasEquipmentEffect(target, 'blockBlackSha')) {
           log(game, actorName(game, targetActor) + '的【仁王盾】抵消了黑色【杀】。');

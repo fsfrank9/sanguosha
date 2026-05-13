@@ -1,30 +1,32 @@
+      // v7 PR-4: 性别字段为 cixiong (雌雄双股剑) 等需要"性别不同"判定的
+      // 装备/技能服务。按 gltjk card__hero__shu/wei/wu/neutral 镜像所列。
       var HERO_CATALOG = {
-        liubei: { id: 'liubei', name: '刘备', camp: '蜀', title: '乱世的枭雄', maxHp: 4, quote: '惟贤惟德，能服于人。', pack: 'standard', skills: [
+        liubei: { id: 'liubei', name: '刘备', camp: '蜀', gender: 'male', title: '乱世的枭雄', maxHp: 4, quote: '惟贤惟德，能服于人。', pack: 'standard', skills: [
           { id: 'rende', name: '仁德', desc: '出牌阶段可交给对方任意张牌；累计给出两张后回复 1 点体力。' },
           { id: 'jijiang', name: '激将', desc: '主公技：可令蜀势力角色代出【杀】；1v1 中作为身份技展示。', lord: true }
         ] },
-        zhangfei: { id: 'zhangfei', name: '张飞', camp: '蜀', title: '万夫不当', maxHp: 4, quote: '燕人张飞在此！', pack: 'standard', skills: [{ id: 'paoxiao', name: '咆哮', desc: '锁定技：出牌阶段使用【杀】无次数限制。' }] },
-        guanyu: { id: 'guanyu', name: '关羽', camp: '蜀', title: '武圣', maxHp: 4, quote: '关某义字当先。', pack: 'standard', skills: [{ id: 'wusheng', name: '武圣', desc: '可将红色牌当【杀】使用或打出。' }] },
-        zhaoyun: { id: 'zhaoyun', name: '赵云', camp: '蜀', title: '虎威将军', maxHp: 4, quote: '进退自如，游刃有余。', pack: 'standard', skills: [{ id: 'longdan', name: '龙胆', desc: '可将【杀】当【闪】、【闪】当【杀】使用或打出。' }] },
-        sunquan: { id: 'sunquan', name: '孙权', camp: '吴', title: '年轻的贤君', maxHp: 4, quote: '容我三思。', pack: 'standard', skills: [
+        zhangfei: { id: 'zhangfei', name: '张飞', camp: '蜀', gender: 'male', title: '万夫不当', maxHp: 4, quote: '燕人张飞在此！', pack: 'standard', skills: [{ id: 'paoxiao', name: '咆哮', desc: '锁定技：出牌阶段使用【杀】无次数限制。' }] },
+        guanyu: { id: 'guanyu', name: '关羽', camp: '蜀', gender: 'male', title: '武圣', maxHp: 4, quote: '关某义字当先。', pack: 'standard', skills: [{ id: 'wusheng', name: '武圣', desc: '可将红色牌当【杀】使用或打出。' }] },
+        zhaoyun: { id: 'zhaoyun', name: '赵云', camp: '蜀', gender: 'male', title: '虎威将军', maxHp: 4, quote: '进退自如，游刃有余。', pack: 'standard', skills: [{ id: 'longdan', name: '龙胆', desc: '可将【杀】当【闪】、【闪】当【杀】使用或打出。' }] },
+        sunquan: { id: 'sunquan', name: '孙权', camp: '吴', gender: 'male', title: '年轻的贤君', maxHp: 4, quote: '容我三思。', pack: 'standard', skills: [
           { id: 'zhiheng', name: '制衡', desc: '出牌阶段限一次，弃任意牌摸等量牌。' },
           { id: 'jiuyuan', name: '救援', desc: '主公技：吴势力角色对濒死的你使用【桃】回复量 +1；1v1 中作为身份技展示。', lord: true }
         ] },
-        huanggai: { id: 'huanggai', name: '黄盖', camp: '吴', title: '轻身为国', maxHp: 4, quote: '请鞭挞我吧，公瑾！', pack: 'standard', skills: [{ id: 'kurou', name: '苦肉', desc: '出牌阶段可失去 1 点体力，摸两张牌。' }] },
-        caocao: { id: 'caocao', name: '曹操', camp: '魏', title: '魏武帝', maxHp: 4, quote: '宁教我负天下人，休教天下人负我。', pack: 'standard', skills: [
+        huanggai: { id: 'huanggai', name: '黄盖', camp: '吴', gender: 'male', title: '轻身为国', maxHp: 4, quote: '请鞭挞我吧，公瑾！', pack: 'standard', skills: [{ id: 'kurou', name: '苦肉', desc: '出牌阶段可失去 1 点体力，摸两张牌。' }] },
+        caocao: { id: 'caocao', name: '曹操', camp: '魏', gender: 'male', title: '魏武帝', maxHp: 4, quote: '宁教我负天下人，休教天下人负我。', pack: 'standard', skills: [
           { id: 'jianxiong', name: '奸雄', desc: '受到伤害后可获得造成伤害的牌。' },
           { id: 'hujia', name: '护驾', desc: '主公技：可令魏势力角色代出【闪】；1v1 中作为身份技展示。', lord: true }
         ] },
-        machao: { id: 'machao', name: '马超', camp: '群', title: '一骑当千', maxHp: 4, quote: '全军突击！', pack: 'standard', skills: [
+        machao: { id: 'machao', name: '马超', camp: '群', gender: 'male', title: '一骑当千', maxHp: 4, quote: '全军突击！', pack: 'standard', skills: [
           { id: 'mashu', name: '马术', desc: '锁定技：你计算与其他角色的距离 -1。' },
           { id: 'tieqi', name: '铁骑', desc: '杀指定目标后判定，红色则目标不能闪。' }
         ] },
-        zhangliao: { id: 'zhangliao', name: '张辽', camp: '魏', title: '前将军', maxHp: 4, quote: '没想到吧？', pack: 'standard', skills: [{ id: 'tuxi', name: '突袭', desc: '摸牌阶段可少摸并从对方获得手牌。' }] },
-        zhouyu: { id: 'zhouyu', name: '周瑜', camp: '吴', title: '大都督', maxHp: 3, quote: '哈哈哈哈！', pack: 'standard', skills: [
+        zhangliao: { id: 'zhangliao', name: '张辽', camp: '魏', gender: 'male', title: '前将军', maxHp: 4, quote: '没想到吧？', pack: 'standard', skills: [{ id: 'tuxi', name: '突袭', desc: '摸牌阶段可少摸并从对方获得手牌。' }] },
+        zhouyu: { id: 'zhouyu', name: '周瑜', camp: '吴', gender: 'male', title: '大都督', maxHp: 3, quote: '哈哈哈哈！', pack: 'standard', skills: [
           { id: 'yingzi', name: '英姿', desc: '摸牌阶段额外摸一张牌。' },
           { id: 'fanjian', name: '反间', desc: '出牌阶段限一次，交给对方一张牌并猜花色；猜错则其受到 1 点伤害。' }
         ] },
-        zhugeliang: { id: 'zhugeliang', name: '诸葛亮', camp: '蜀', title: '迟暮的丞相', maxHp: 3, quote: '观今夜天象，知天下大事。', pack: 'standard', skills: [
+        zhugeliang: { id: 'zhugeliang', name: '诸葛亮', camp: '蜀', gender: 'male', title: '迟暮的丞相', maxHp: 3, quote: '观今夜天象，知天下大事。', pack: 'standard', skills: [
           { id: 'guanxing', name: '观星', desc: '准备阶段可观看并调整牌堆顶牌。' },
           { id: 'kongcheng', name: '空城', desc: '锁定技：无手牌时不能成为【杀】或【决斗】目标。' }
         ] }
@@ -39,19 +41,19 @@
       }
 
       addHeroPack('standard', [
-        { id: 'xiahoudun', name: '夏侯惇', camp: '魏', title: '独眼的罗刹', maxHp: 4, quote: '刚烈之躯，岂惧刀兵。', skills: [{ id: 'ganglie', name: '刚烈', desc: '受到伤害后可判定反制来源。' }] },
-        { id: 'xuchu', name: '许褚', camp: '魏', title: '虎痴', maxHp: 4, quote: '谁来与我大战三百回合！', skills: [{ id: 'luoyi', name: '裸衣', desc: '摸牌阶段可少摸以提升杀/决斗伤害。' }] },
-        { id: 'simayi', name: '司马懿', camp: '魏', title: '狼顾之鬼', maxHp: 3, quote: '天命？哈哈哈哈！', skills: [{ id: 'fankui', name: '反馈', desc: '受到伤害后可获得来源一张牌。' }, { id: 'guicai', name: '鬼才', desc: '可打出牌修改判定。' }] },
-        { id: 'guojia', name: '郭嘉', camp: '魏', title: '早终的先知', maxHp: 3, quote: '就这样吧。', skills: [{ id: 'tiandu', name: '天妒', desc: '判定牌生效后可获得。' }, { id: 'yiji', name: '遗计', desc: '受到伤害后可摸牌并分配。' }] },
-        { id: 'zhenji', name: '甄姬', camp: '魏', title: '薄幸的美人', maxHp: 3, quote: '凌波微步，罗袜生尘。', skills: [{ id: 'luoshen', name: '洛神', desc: '准备阶段可连续判定获得黑色牌。' }, { id: 'qingguo', name: '倾国', desc: '可将黑色手牌当【闪】使用或打出。' }] },
-        { id: 'ganning', name: '甘宁', camp: '吴', title: '锦帆游侠', maxHp: 4, quote: '接招吧！', skills: [{ id: 'qixi', name: '奇袭', desc: '可将黑色牌当【过河拆桥】使用。' }] },
-        { id: 'lvmeng', name: '吕蒙', camp: '吴', title: '白衣渡江', maxHp: 4, quote: '克己复礼。', skills: [{ id: 'keji', name: '克己', desc: '若未使用/打出杀，可跳过弃牌阶段。' }] },
-        { id: 'luxun', name: '陆逊', camp: '吴', title: '儒生雄才', maxHp: 3, quote: '牌不是万能的，但是没牌是万万不能的。', skills: [{ id: 'qianxun', name: '谦逊', desc: '不能成为顺手牵羊和乐不思蜀目标。' }, { id: 'lianying', name: '连营', desc: '失去最后手牌后可摸一张。' }] },
-        { id: 'daqiao', name: '大乔', camp: '吴', title: '矜持之花', maxHp: 3, quote: '请休息吧。', skills: [{ id: 'guose', name: '国色', desc: '可将方片牌当【乐不思蜀】使用。' }, { id: 'liuli', name: '流离', desc: '被杀指定时可转移目标。' }] },
-        { id: 'huangyueying', name: '黄月英', camp: '蜀', title: '归隐的杰女', maxHp: 3, quote: '哼，谁说女子不如男？', skills: [{ id: 'jizhi', name: '集智', desc: '使用锦囊牌时可摸一张。' }, { id: 'qicai', name: '奇才', desc: '锦囊牌距离无限。' }] },
-        { id: 'huatuo', name: '华佗', camp: '群', title: '神医', maxHp: 3, quote: '早睡早起，方能养生。', skills: [{ id: 'jijiu', name: '急救', desc: '回合外可将红色牌当【桃】。' }, { id: 'qingnang', name: '青囊', desc: '出牌阶段可弃一牌令一名角色回复。' }] },
-        { id: 'lvbu', name: '吕布', camp: '群', title: '武的化身', maxHp: 4, quote: '谁能挡我！', skills: [{ id: 'wushuang', name: '无双', desc: '杀/决斗需要目标连续响应两张。' }] },
-        { id: 'diaochan', name: '貂蝉', camp: '群', title: '绝世的舞姬', maxHp: 3, quote: '失礼了。', skills: [{ id: 'lijian', name: '离间', desc: '出牌阶段可令两名男性角色决斗。' }, { id: 'biyue', name: '闭月', desc: '结束阶段摸一张牌。' }] }
+        { id: 'xiahoudun', name: '夏侯惇', camp: '魏', gender: 'male', title: '独眼的罗刹', maxHp: 4, quote: '刚烈之躯，岂惧刀兵。', skills: [{ id: 'ganglie', name: '刚烈', desc: '受到伤害后可判定反制来源。' }] },
+        { id: 'xuchu', name: '许褚', camp: '魏', gender: 'male', title: '虎痴', maxHp: 4, quote: '谁来与我大战三百回合！', skills: [{ id: 'luoyi', name: '裸衣', desc: '摸牌阶段可少摸以提升杀/决斗伤害。' }] },
+        { id: 'simayi', name: '司马懿', camp: '魏', gender: 'male', title: '狼顾之鬼', maxHp: 3, quote: '天命？哈哈哈哈！', skills: [{ id: 'fankui', name: '反馈', desc: '受到伤害后可获得来源一张牌。' }, { id: 'guicai', name: '鬼才', desc: '可打出牌修改判定。' }] },
+        { id: 'guojia', name: '郭嘉', camp: '魏', gender: 'male', title: '早终的先知', maxHp: 3, quote: '就这样吧。', skills: [{ id: 'tiandu', name: '天妒', desc: '判定牌生效后可获得。' }, { id: 'yiji', name: '遗计', desc: '受到伤害后可摸牌并分配。' }] },
+        { id: 'zhenji', name: '甄姬', camp: '魏', gender: 'female', title: '薄幸的美人', maxHp: 3, quote: '凌波微步，罗袜生尘。', skills: [{ id: 'luoshen', name: '洛神', desc: '准备阶段可连续判定获得黑色牌。' }, { id: 'qingguo', name: '倾国', desc: '可将黑色手牌当【闪】使用或打出。' }] },
+        { id: 'ganning', name: '甘宁', camp: '吴', gender: 'male', title: '锦帆游侠', maxHp: 4, quote: '接招吧！', skills: [{ id: 'qixi', name: '奇袭', desc: '可将黑色牌当【过河拆桥】使用。' }] },
+        { id: 'lvmeng', name: '吕蒙', camp: '吴', gender: 'male', title: '白衣渡江', maxHp: 4, quote: '克己复礼。', skills: [{ id: 'keji', name: '克己', desc: '若未使用/打出杀，可跳过弃牌阶段。' }] },
+        { id: 'luxun', name: '陆逊', camp: '吴', gender: 'male', title: '儒生雄才', maxHp: 3, quote: '牌不是万能的，但是没牌是万万不能的。', skills: [{ id: 'qianxun', name: '谦逊', desc: '不能成为顺手牵羊和乐不思蜀目标。' }, { id: 'lianying', name: '连营', desc: '失去最后手牌后可摸一张。' }] },
+        { id: 'daqiao', name: '大乔', camp: '吴', gender: 'female', title: '矜持之花', maxHp: 3, quote: '请休息吧。', skills: [{ id: 'guose', name: '国色', desc: '可将方片牌当【乐不思蜀】使用。' }, { id: 'liuli', name: '流离', desc: '被杀指定时可转移目标。' }] },
+        { id: 'huangyueying', name: '黄月英', camp: '蜀', gender: 'female', title: '归隐的杰女', maxHp: 3, quote: '哼，谁说女子不如男？', skills: [{ id: 'jizhi', name: '集智', desc: '使用锦囊牌时可摸一张。' }, { id: 'qicai', name: '奇才', desc: '锦囊牌距离无限。' }] },
+        { id: 'huatuo', name: '华佗', camp: '群', gender: 'male', title: '神医', maxHp: 3, quote: '早睡早起，方能养生。', skills: [{ id: 'jijiu', name: '急救', desc: '回合外可将红色牌当【桃】。' }, { id: 'qingnang', name: '青囊', desc: '出牌阶段可弃一牌令一名角色回复。' }] },
+        { id: 'lvbu', name: '吕布', camp: '群', gender: 'male', title: '武的化身', maxHp: 4, quote: '谁能挡我！', skills: [{ id: 'wushuang', name: '无双', desc: '杀/决斗需要目标连续响应两张。' }] },
+        { id: 'diaochan', name: '貂蝉', camp: '群', gender: 'female', title: '绝世的舞姬', maxHp: 3, quote: '失礼了。', skills: [{ id: 'lijian', name: '离间', desc: '出牌阶段可令两名男性角色决斗。' }, { id: 'biyue', name: '闭月', desc: '结束阶段摸一张牌。' }] }
       ]);
 
       addHeroPack('wind', [
