@@ -550,6 +550,65 @@ v5 的架构是 1v1 hardcoded（`game.player` / `game.enemy`）。如果要做 3
 
 ---
 
+## v7 — 牌效果与流程规则对照官方 spec-compliance Series
+
+### 缘起
+
+v6.1 完成后，用户指出"目前里面很多牌的用法都是不对，规则很多也是有问题的"，并提供 https://gltjk.com/sanguosha/rules/ 作为权威规则参考。完整 55 页规则镜像已通过 PR #26 合入 `official-skill-cache/gltjk-sanguosha-rules/` 作为本地资料源。
+
+逐条对照 gltjk 镜像（card__basic / card__scroll / card__equipment / flow__use / flow__damage / flow__judge / flow__neardeath / flow__condition / rule__principle），audit 发现 16 项 spec 偏差，按硬伤 / 行为偏差 / 基础流程缺失分 3 个 tier 修复。
+
+### 计划 PR 列表
+
+#### Tier 1：影响盘面的硬伤
+| PR | 修复对象 | spec 引用 | 状态 |
+|---|---|---|---|
+| PR-1 | 【桃】支持 target 选择（己方 / 受伤的对手） | `card__basic.md` "包括你在内的一名已受伤的角色" | 🟢 已合并 |
+| PR-2 | 【桃园结义】对未受伤角色无效（不触发回血事件） | `card__scroll.md` "对未受伤的角色无效" | ⏳ 待开 |
+| PR-3 | 【麒麟弓】只弃 1 匹马（含 pendingChoice 二选一） | `card__equipment.md` "弃置其装备区里的一张坐骑牌" | ⏳ 待开 |
+| PR-4 | 【雌雄双股剑】目标角色二选一（弃手牌 / 源摸 1） | `card__equipment.md` "令其选择一项" | ⏳ 待开 |
+| PR-5 | 【借刀杀人】双合法性检测（选 Bn 时 + An 用杀时） | `card__scroll.md` "须进行两次使用【杀】的合法性检测" | ⏳ 待开 |
+| PR-6 | 延时锦囊同名禁叠（判定区已有同名 → 不合法目标） | `flow__condition.md` "判定区里有延时类锦囊牌的角色不是使用同名..." | ⏳ 待开 |
+| PR-7 | 【五谷丰登】reveal-then-pick 结算流程 | `card__scroll.md` "亮出 X 张...获得这些牌中（剩余）的一张" | ⏳ 待开 |
+
+#### Tier 2：行为偏差
+| PR | 修复对象 | spec 引用 | 状态 |
+|---|---|---|---|
+| PR-8 | 【酒】每回合限一次 + shaBonus 绑回合 | `card__basic.md` "每回合限一次"；shaBonus 基于"声明【杀】的回合" | ⏳ 待开 |
+| PR-9 | 【过河拆桥】1V1 二选项（弃装备区 / 看手并弃） | `card__scroll.md` "1V1 变体" | ⏳ 待开 |
+| PR-10 | 【顺手牵羊】1V1 无距离限制（任意区域） | `card__scroll.md` "1V1 变体：有牌的对手" | ⏳ 待开 |
+| PR-11 | 【兵粮寸断】1V1 无距离限制 | `card__scroll.md` "1V1 变体" | ⏳ 待开 |
+| PR-12 | 【闪电】next-valid 链转 + 判定区冲突回退 | `card__scroll.md` "若其下家不是此【闪电】的合法目标..." | ⏳ 待开 |
+
+#### Tier 3：基础流程缺失
+| PR | 修复对象 | spec 引用 | 状态 |
+|---|---|---|---|
+| PR-13 | 濒死流程（hp≤0 → 进入处于濒死状态 → 双方按顺序提示 桃 / 酒） | `flow__neardeath.md` 完整结算流程 | ⏳ 待开 |
+| PR-14 | 【丈八蛇矛】2 手牌当虚拟【杀】使用 | `card__equipment.md` "你可以将两张手牌当【杀】使用或打出" | ⏳ 待开 |
+| PR-15 | 【方天画戟】最后一张手牌时 +2 额外目标标记 | `card__equipment.md` "若你使用的【杀】是最后的手牌..." | ⏳ 待开 |
+| PR-16 | 【无中生有】target 可选（含对手） | `card__scroll.md` "包括你在内的一名角色" | ⏳ 待开 |
+
+### PR-1 落地 — 桃 target 选择
+
+**问题**：`game-engine.js:1797` 已经禁止满血用桃（这条 audit 报告误报），但 `playTao` (`:1998-2003`) 硬编码 `self.heal(1)`，不支持把【桃】用在受伤的对手身上——而 gltjk 明文是"包括你在内的一名已受伤的角色"。
+
+**改动**：
+- `canPlayCard`：放宽为"任一方受伤即可"（双方满血才拒绝）。
+- `resolve tao`：接受 `options.taoTarget = 'player' | 'enemy'`；缺省回退顺序 = 自己受伤 → 自己；否则 → 对手。Target 满血即 reject。
+- `CARD_RULES.tao`：summary / targets / effect 三字段对齐 gltjk 文本。
+- 新增 `tests/tao_target_choice.test.mjs`（6 条断言）覆盖 canPlayCard / 自治 / 对治 / 双满血拒绝 / 单受伤回退。
+
+**回归**：`npm run verify` 全绿，包含原 `tests/game_engine.test.mjs` 的 "tao heals but never above max hp"——后者依赖默认 newGame 双方均为满血，所以二次出桃仍然被拒。
+
+### 测试增量
+
+| 文件 | 断言数 | PR |
+|---|---:|---|
+| `tests/tao_target_choice.test.mjs` | 6 | PR-1 |
+| _其余 PR 待开_ | — | — |
+
+---
+
 ## 风险与回滚
 
 - **风险 1: schema 扩展引发的级联改动。** 6A 给 26 个技能补 5 个新字段会触及 `heroes.js` 大量 entries。**应对：** 6.0 audit harness 在 6A 期间作为 RED 灯指引；schema 字段在 6B/6C 真正用到之前保持纯数据形态，不影响行为。
