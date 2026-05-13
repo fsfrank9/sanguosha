@@ -1,36 +1,13 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import vm from 'node:vm';
-import { fileURLToPath } from 'node:url';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-function read(relativePath) {
-  return fs.readFileSync(path.join(root, relativePath), 'utf8');
-}
+import { Engine, StateRuntime } from './helpers/load-engine.mjs';
 
 function test(name, fn) {
   fn();
   console.log(`✓ ${name}`);
 }
 
-function loadBuiltWindow() {
-  const html = read('dist/index.html');
-  const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
-  assert.ok(match, 'built root index.html should contain <script id="game-engine">');
-  const sandbox = { window: {}, console };
-  vm.createContext(sandbox);
-  vm.runInContext(match[1], sandbox, { filename: 'built-game-engine.js' });
-  return sandbox.window;
-}
-
 test('state runtime exposes pure actor/state helpers while preserving public engine APIs', () => {
-  const win = loadBuiltWindow();
-  const StateRuntime = win.SanguoshaEngineModules && win.SanguoshaEngineModules.StateRuntime;
-  const Engine = win.SanguoshaEngine;
-
-  assert.ok(StateRuntime, 'built artifact should expose StateRuntime');
+  assert.ok(StateRuntime, 'ES module should export StateRuntime');
   assert.equal(typeof StateRuntime.actorName, 'function');
   assert.equal(typeof StateRuntime.opponent, 'function');
   assert.equal(typeof StateRuntime.hasSkill, 'function');
@@ -45,9 +22,6 @@ test('state runtime exposes pure actor/state helpers while preserving public eng
 });
 
 test('state runtime preserves roles, skill lookup, distance, range, limits, and status behavior', () => {
-  const win = loadBuiltWindow();
-  const StateRuntime = win.SanguoshaEngineModules.StateRuntime;
-  const Engine = win.SanguoshaEngine;
   const game = Engine.newGame({ seed: 303, playerHero: 'machao', enemyHero: 'sunquan', playerRole: '反贼', enemyRole: '主公' });
 
   assert.equal(StateRuntime.opponent('player'), 'enemy');

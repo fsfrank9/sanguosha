@@ -57,7 +57,7 @@ test('v5 Phase 5A: root index.html is a hand-written module entry; dist/index.ht
   assert.doesNotMatch(rootHtml, /<script id="game-engine"/, 'root index.html should no longer inline the bundled engine');
   assert.doesNotMatch(rootHtml, /__SANGUOSHA_/, 'root index.html should not leak template placeholders');
 
-  assert.match(distHtml, /<script id="game-engine"[^>]*>/, 'legacy bundle keeps the engine marker used by vm-based tests');
+  assert.match(distHtml, /<script id="game-engine"[^>]*>/, 'legacy bundle keeps the engine marker for browser debug snapshots');
   assert.match(distHtml, /window\.SanguoshaEngine/, 'legacy bundle exposes SanguoshaEngine');
   assert.doesNotMatch(distHtml, /__SANGUOSHA_/, 'legacy bundle should not leak template placeholders');
   assert.doesNotMatch(distHtml, /^\s*import\s/m, 'legacy bundle should have module imports stripped');

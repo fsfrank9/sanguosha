@@ -1,19 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
+import { SkillRuntime } from './helpers/load-engine.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const htmlPath = path.join(root, 'dist/index.html');
-const html = fs.readFileSync(htmlPath, 'utf8');
-const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
-assert.ok(match, 'index.html should contain <script id="game-engine">');
-
-const sandbox = { window: {}, console };
-vm.createContext(sandbox);
-vm.runInContext(match[1], sandbox, { filename: 'game-engine.js' });
-const SkillRuntime = sandbox.window.SanguoshaEngineModules && sandbox.window.SanguoshaEngineModules.SkillRuntime;
-assert.ok(SkillRuntime, 'built artifact should expose SkillRuntime');
+assert.ok(SkillRuntime, 'ES module should export SkillRuntime');
 
 function test(name, fn) {
   try {

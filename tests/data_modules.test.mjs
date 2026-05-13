@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  Engine,
+  HERO_CATALOG,
+  CARD_CATALOG,
+  IMPLEMENTED_SKILL_IDS,
+  ACTIVE_SKILL_IDS,
+} from './helpers/load-engine.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -14,19 +20,6 @@ function read(relativePath) {
 function test(name, fn) {
   fn();
   console.log(`✓ ${name}`);
-}
-
-function loadBuiltEngine() {
-  const html = read('dist/index.html');
-  const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
-  assert.ok(match, 'built root index.html should contain <script id="game-engine">');
-
-  const sandbox = { window: {}, console };
-  vm.createContext(sandbox);
-  vm.runInContext(match[1], sandbox, { filename: 'built-game-engine.js' });
-  assert.ok(sandbox.window.SanguoshaData, 'built artifact should keep SanguoshaData available for debugging');
-  assert.ok(sandbox.window.SanguoshaEngine, 'built artifact should expose SanguoshaEngine');
-  return { Data: sandbox.window.SanguoshaData, Engine: sandbox.window.SanguoshaEngine };
 }
 
 test('v4 phase 2 keeps catalog and skill-status data in dedicated source modules', () => {
@@ -71,20 +64,19 @@ test('data module build preserves direct-open single-file engine exports', () =>
   const distHtml = read('dist/index.html');
   assert.doesNotMatch(distHtml, /^\s*(import|export)\s/m, 'legacy bundle should not contain unstripped ES module syntax');
 
-  const { Data, Engine } = loadBuiltEngine();
-  assert.ok(Data.HERO_CATALOG, 'built data bundle should expose HERO_CATALOG');
-  assert.ok(Data.CARD_CATALOG, 'built data bundle should expose CARD_CATALOG');
-  assert.ok(Data.IMPLEMENTED_SKILL_IDS, 'built data bundle should expose IMPLEMENTED_SKILL_IDS');
-  assert.ok(Data.ACTIVE_SKILL_IDS, 'built data bundle should expose ACTIVE_SKILL_IDS');
-  assert.equal(Data.HERO_CATALOG, Engine.HERO_CATALOG, 'engine should reuse the hero catalog object from SanguoshaData');
-  assert.equal(Data.CARD_CATALOG, Engine.CARD_CATALOG, 'engine should reuse the card catalog object from SanguoshaData');
-  assert.equal(Object.keys(Engine.HERO_CATALOG).length, 68, 'built engine should preserve all local heroes');
+  assert.ok(HERO_CATALOG, 'data module should export HERO_CATALOG');
+  assert.ok(CARD_CATALOG, 'data module should export CARD_CATALOG');
+  assert.ok(IMPLEMENTED_SKILL_IDS, 'data module should export IMPLEMENTED_SKILL_IDS');
+  assert.ok(ACTIVE_SKILL_IDS, 'data module should export ACTIVE_SKILL_IDS');
+  assert.equal(HERO_CATALOG, Engine.HERO_CATALOG, 'engine should reuse the hero catalog object');
+  assert.equal(CARD_CATALOG, Engine.CARD_CATALOG, 'engine should reuse the card catalog object');
+  assert.equal(Object.keys(Engine.HERO_CATALOG).length, 68, 'engine should preserve all local heroes');
   assert.ok(Engine.HERO_CATALOG.liubei.skills.some((skill) => skill.id === 'rende' && skill.status === 'implemented'));
   assert.equal(Engine.HERO_CATALOG.sunquan.skills.find((skill) => skill.id === 'jiuyuan').status, 'display');
-  assert.ok(Engine.CARD_CATALOG.sha, 'built engine should preserve basic card catalog');
-  assert.ok(Engine.CARD_CATALOG.huogong, 'built engine should preserve trick card catalog');
-  assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes('jizhi'), 'implemented skill status should survive build');
-  assert.ok(Engine.ACTIVE_SKILL_IDS.includes('guanxing'), 'active skill status should survive build');
+  assert.ok(Engine.CARD_CATALOG.sha, 'engine should preserve basic card catalog');
+  assert.ok(Engine.CARD_CATALOG.huogong, 'engine should preserve trick card catalog');
+  assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes('jizhi'), 'implemented skill status should survive ES module import');
+  assert.ok(Engine.ACTIVE_SKILL_IDS.includes('guanxing'), 'active skill status should survive ES module import');
 });
 
 console.log('\nData module architecture tests passed.');
