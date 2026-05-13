@@ -4,14 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HERO_CATALOG, IMPLEMENTED_SKILL_IDS } from './helpers/load-engine.mjs';
 
-// v6 skill-audit harness. Default-skip until Phase 6A/6B populate the new
-// schema fields and expand official spec coverage. Enable with SANGUOSHA_V6=1
-// to see the RED report listing exactly what is missing.
-
-if (process.env.SANGUOSHA_V6 !== '1') {
-  console.log('v6 skill audit skipped (set SANGUOSHA_V6=1 to enforce).');
-  process.exit(0);
-}
+// v6 skill-audit harness. Default-enforced as of Phase 6A. The harness prints
+// a markdown report of schema completeness vs official-spec coverage for every
+// implemented skill, then asserts both sides are complete.
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 

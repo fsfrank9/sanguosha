@@ -1,0 +1,157 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  HERO_CATALOG,
+  IMPLEMENTED_SKILL_IDS,
+  SKILL_METADATA,
+} from './helpers/load-engine.mjs';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function readJson(rel) {
+  return JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8'));
+}
+
+function test(name, fn) {
+  fn();
+  console.log(`✓ ${name}`);
+}
+
+const cache = readJson(
+  'official-skill-cache/sanguosha-standard/official_standard_skill_cache.json',
+);
+const specs = readJson('tests/fixtures/official_standard_skill_specs.json');
+
+function indexByLocalId(doc, specKey) {
+  const map = new Map();
+  for (const hero of doc.heroes || []) {
+    for (const skill of hero.skills || []) {
+      if (!skill.localSkillId) continue;
+      map.set(skill.localSkillId, {
+        heroLocalId: hero.localHeroId,
+        heroName: hero.name,
+        skillName: skill.name,
+        sourceTextRef: skill.sourceTextRef,
+        spec: skill[specKey],
+      });
+    }
+  }
+  return map;
+}
+
+const cacheById = indexByLocalId(cache, 'implementationSpec');
+const specsById = indexByLocalId(specs, 'spec');
+
+const VALID_TRIGGERS = new Set([
+  'playPhase',
+  'drawPhase',
+  'preparePhase',
+  'discardPhase',
+  'turnEnd',
+  'damageAfter',
+  'beforeJudgement',
+  'afterJudgement',
+  'cardUse',
+  'cardConvert',
+  'targetValidation',
+  'passive',
+]);
+const VALID_FREQUENCIES = new Set([
+  'oncePerTurn',
+  'unlimited',
+  'passiveAlways',
+]);
+const VALID_COST_TYPES = new Set([
+  'none',
+  'discardOwn',
+  'giveHand',
+  'playHand',
+  'loseHp',
+  'reduceDraw',
+  'judgement',
+]);
+
+test('every implemented skill has structured metadata with valid tag values', () => {
+  for (const skillId of IMPLEMENTED_SKILL_IDS) {
+    const meta = SKILL_METADATA[skillId];
+    assert.ok(meta, `${skillId}: SKILL_METADATA entry is missing`);
+    assert.ok(
+      VALID_TRIGGERS.has(meta.trigger),
+      `${skillId}: trigger ${meta.trigger} is not in the canonical set`,
+    );
+    assert.ok(
+      VALID_FREQUENCIES.has(meta.frequency),
+      `${skillId}: frequency ${meta.frequency} is not in the canonical set`,
+    );
+    assert.equal(typeof meta.optional, 'boolean', `${skillId}: optional must be boolean`);
+    assert.equal(typeof meta.mandatory, 'boolean', `${skillId}: mandatory must be boolean`);
+    assert.ok(meta.cost && typeof meta.cost === 'object', `${skillId}: cost must be an object`);
+    assert.ok(
+      VALID_COST_TYPES.has(meta.cost.type),
+      `${skillId}: cost.type ${meta.cost.type} is not in the canonical set`,
+    );
+    assert.ok(Array.isArray(meta.hooks) && meta.hooks.length > 0, `${skillId}: hooks must be a non-empty array`);
+  }
+});
+
+test('mandatory skills are not optional and vice versa for lock skills', () => {
+  for (const skillId of IMPLEMENTED_SKILL_IDS) {
+    const meta = SKILL_METADATA[skillId];
+    if (meta.mandatory) {
+      assert.equal(meta.optional, false, `${skillId}: lock skill cannot also be optional`);
+      assert.equal(meta.frequency, 'passiveAlways', `${skillId}: lock skill must have passiveAlways frequency`);
+    }
+  }
+});
+
+test('SKILL_METADATA is merged into every HERO_CATALOG entry that carries the skill', () => {
+  for (const heroId of Object.keys(HERO_CATALOG)) {
+    const skills = HERO_CATALOG[heroId].skills || [];
+    for (const skill of skills) {
+      const meta = SKILL_METADATA[skill.id];
+      if (!meta) continue;
+      for (const field of ['trigger', 'frequency', 'optional', 'mandatory', 'cost', 'hooks']) {
+        assert.deepEqual(
+          skill[field],
+          meta[field],
+          `${heroId}.${skill.id}: ${field} should equal SKILL_METADATA value`,
+        );
+      }
+    }
+  }
+});
+
+test('cache and specs fixtures cover every implemented skill', () => {
+  for (const skillId of IMPLEMENTED_SKILL_IDS) {
+    assert.ok(cacheById.has(skillId), `${skillId} missing from official_standard_skill_cache.json`);
+    assert.ok(specsById.has(skillId), `${skillId} missing from official_standard_skill_specs.json`);
+  }
+});
+
+test('cache and specs fixtures agree on every shared skill', () => {
+  for (const [skillId, cacheEntry] of cacheById) {
+    const specEntry = specsById.get(skillId);
+    if (!specEntry) continue;
+    assert.equal(
+      specEntry.sourceTextRef,
+      cacheEntry.sourceTextRef,
+      `${skillId}: sourceTextRef differs between cache and specs`,
+    );
+    for (const field of ['summary', 'timing', 'condition', 'cost', 'effect', 'frequency']) {
+      assert.equal(
+        specEntry.spec?.[field],
+        cacheEntry.spec?.[field],
+        `${skillId}: spec.${field} differs between cache and specs`,
+      );
+    }
+    assert.deepEqual(
+      specEntry.spec?.engineHooks,
+      cacheEntry.spec?.engineHooks,
+      `${skillId}: engineHooks array differs between cache and specs`,
+    );
+  }
+});
+
+console.log('\nSkill schema and fixture consistency tests passed.');
