@@ -299,7 +299,7 @@ test('郭嘉【遗计】 resolves once per damage point from boosted Sha damage'
   assert.equal(game.log.filter((entry) => /遗计/.test(entry)).length, 2, 'Yiji should log once per damage point');
 });
 
-test('夏侯惇【刚烈】 non-heart judgment makes the damage source discard two hand cards', () => {
+test('夏侯惇【刚烈】 non-heart judgment lets the player-source choose 2 hand cards to discard (v6.1)', () => {
   const game = skillGame('sunquan', 'xiahoudun');
   game.player.hand = [
     c('sha', { id: 'ganglie-discard-sha' }),
@@ -309,27 +309,41 @@ test('夏侯惇【刚烈】 non-heart judgment makes the damage source discard t
   game.deck = [c('sha', { id: 'ganglie-black-judge', suit: 'club', color: 'black' })];
 
   const result = Engine.playCard(game, 'player', 'ganglie-discard-sha');
-
   assert.equal(result.ok, true, result.message);
   assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'original Sha damage should still land on Xiahou Dun');
-  assert.equal(game.player.hp, game.player.maxHp, 'source should avoid Ganglie damage by discarding two hand cards');
-  assert.deepEqual(ids(game.player.hand), [], 'Ganglie should discard the source\'s remaining two hand cards');
+
+  // v6.1: source (player) is now prompted to choose between discard 2 or
+  // take 1 damage (spec: "伤害来源选择弃置两张牌或承受1点伤害").
+  const pending = Engine.getPendingChoice(game);
+  assert.ok(pending, 'expected ganglie-source-choice pendingChoice for player source');
+  assert.equal(pending.kind, 'ganglie-source-choice');
+  assert.equal(pending.actor, 'player');
+  Engine.resolvePendingChoice(game, {
+    mode: 'discard',
+    cardIds: ['ganglie-source-card-1', 'ganglie-source-card-2']
+  });
+  assert.equal(game.player.hp, game.player.maxHp, 'source avoided Ganglie damage by discarding 2 cards');
   assert.ok(ids(game.discard).includes('ganglie-black-judge'), 'Ganglie judgment card should be finalized to discard');
-  assert.ok(ids(game.discard).includes('ganglie-source-card-1'), 'first source hand card should be discarded for Ganglie');
-  assert.ok(ids(game.discard).includes('ganglie-source-card-2'), 'second source hand card should be discarded for Ganglie');
-  assert.ok(game.log.some((entry) => /刚烈/.test(entry) && /弃置两张手牌/.test(entry)), 'Ganglie discard choice should be logged');
+  assert.ok(ids(game.discard).includes('ganglie-source-card-1'), 'chosen card #1 should be discarded');
+  assert.ok(ids(game.discard).includes('ganglie-source-card-2'), 'chosen card #2 should be discarded');
+  assert.ok(game.log.some((entry) => /刚烈/.test(entry) && /弃置两张牌/.test(entry)), 'Ganglie discard choice should be logged');
 });
 
-test('夏侯惇【刚烈】 non-heart judgment damages the source when two hand cards are unavailable', () => {
+test('夏侯惇【刚烈】 non-heart judgment damages source when < 2 cards available — engine shortcuts the prompt (v6.1)', () => {
   const game = skillGame('sunquan', 'xiahoudun');
   game.player.hand = [c('sha', { id: 'ganglie-damage-sha' })];
   game.deck = [c('shan', { id: 'ganglie-spade-judge', suit: 'spade', color: 'black' })];
 
   const result = Engine.playCard(game, 'player', 'ganglie-damage-sha');
-
   assert.equal(result.ok, true, result.message);
   assert.equal(game.enemy.hp, game.enemy.maxHp - 1, 'original Sha damage should still land before Ganglie retaliation');
-  assert.equal(game.player.hp, game.player.maxHp - 1, 'source should lose 1 HP when unable to discard two hand cards');
+
+  // v6.1: source had 0 cards after playing the sha → the discard branch
+  // is unavailable, so the engine short-circuits to takeDamage without
+  // setting a pendingChoice. Spec's "选择" is preserved in spirit because
+  // the player would only have one option anyway.
+  assert.equal(Engine.getPendingChoice(game), null, 'no prompt when no real choice exists');
+  assert.equal(game.player.hp, game.player.maxHp - 1, 'source took 1 Ganglie damage');
   assert.ok(ids(game.discard).includes('ganglie-spade-judge'), 'Ganglie judgment card should be discarded after the result is used');
   assert.ok(game.log.some((entry) => /刚烈/.test(entry) && /受到 1 点伤害/.test(entry)), 'Ganglie damage choice should be logged');
 });

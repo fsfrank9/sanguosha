@@ -16,6 +16,8 @@
       var guanxingTopIds = [];
       var guanxingBottomIds = [];
       var guanxingSelected = null;
+      // v6.1 ganglie source-choice picker: 2-card multi-select.
+      var ganglieSelectedIds = [];
       var skillSelectMode = null;
       var selectedSkillCardIds = [];
       var enemyActionDelay = 650;
@@ -52,6 +54,8 @@
           'fanjianPromptPanel', 'fanjianPromptHint',
           'fanjianSpadeBtn', 'fanjianHeartBtn', 'fanjianClubBtn', 'fanjianDiamondBtn',
           'fankuiPromptPanel', 'fankuiPromptHint', 'fankuiZones',
+          'gangliePromptPanel', 'gangliePromptHint', 'ganglieFireBtn', 'ganglieDeclineBtn',
+          'ganglieSourcePanel', 'ganglieSourceHint', 'ganglieSourceCandidates', 'ganglieSourceConfirmBtn', 'ganglieSourceTakeDamageBtn',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -446,6 +450,48 @@
             }
           } else {
             els.fankuiPromptPanel.hidden = true;
+          }
+        }
+        // v6.1 ganglie: two distinct prompts.
+        if (els.gangliePromptPanel) {
+          if (kind === 'ganglie-fire' && pending.actor === 'player') {
+            els.gangliePromptPanel.hidden = false;
+            if (els.gangliePromptHint) {
+              els.gangliePromptHint.textContent =
+                '刚烈：' + pending.sourceName + ' 对你造成了伤害，是否发动判定反制？';
+            }
+          } else {
+            els.gangliePromptPanel.hidden = true;
+          }
+        }
+        if (els.ganglieSourcePanel) {
+          if (kind === 'ganglie-source-choice' && pending.actor === 'player') {
+            els.ganglieSourcePanel.hidden = false;
+            // Reset selection if the candidate set changed (new prompt).
+            var validIds = pending.candidates.map(function (e) { return e.id; });
+            ganglieSelectedIds = ganglieSelectedIds.filter(function (id) { return validIds.indexOf(id) >= 0; });
+            if (els.ganglieSourceHint) {
+              els.ganglieSourceHint.textContent =
+                '刚烈：选择 2 张牌弃置（手牌+装备区可选；已选 ' + ganglieSelectedIds.length + '/2），或选择直接受 1 点伤害。';
+            }
+            if (els.ganglieSourceCandidates) {
+              els.ganglieSourceCandidates.innerHTML = pending.candidates.map(function (entry) {
+                var selected = ganglieSelectedIds.indexOf(entry.id) >= 0;
+                var zoneLabel = entry.zone === 'hand' ? '手牌' : '装备区';
+                return '<button class="mini-card ganglie-candidate' + (selected ? ' selected' : '') +
+                  '" data-ganglie-card-id="' + escapeHtml(entry.id) +
+                  '" title="切换是否弃置">[' + zoneLabel + ']【' + escapeHtml(entry.name) +
+                  '】' + escapeHtml(suitLabel(entry.suit)) + ' ' + escapeHtml(String(entry.rank || '')) +
+                  (selected ? ' ✓' : '') +
+                  '</button>';
+              }).join('') || '<span class="mini-card">没有可弃置的牌</span>';
+            }
+            if (els.ganglieSourceConfirmBtn) {
+              els.ganglieSourceConfirmBtn.disabled = ganglieSelectedIds.length !== 2;
+            }
+          } else {
+            els.ganglieSourcePanel.hidden = true;
+            ganglieSelectedIds = [];
           }
         }
       }
@@ -1235,6 +1281,43 @@
           var zone = btn.getAttribute('data-fankui-zone');
           var cardId = btn.getAttribute('data-fankui-card-id') || null;
           var result = Engine.resolvePendingChoice(game, { zone: zone, cardId: cardId });
+          if (!result.ok) renderLog();
+          render();
+        });
+        // 刚烈 (v6.1): two prompts. ganglie-fire = yes/no for 夏侯惇 to
+        // trigger judgement. ganglie-source-choice = source picks 2 cards
+        // or takes 1 damage.
+        if (els.ganglieFireBtn) els.ganglieFireBtn.addEventListener('click', function () {
+          Engine.resolvePendingChoice(game, { fire: true });
+          render();
+        });
+        if (els.ganglieDeclineBtn) els.ganglieDeclineBtn.addEventListener('click', function () {
+          Engine.resolvePendingChoice(game, { fire: false });
+          render();
+        });
+        if (els.ganglieSourceCandidates) els.ganglieSourceCandidates.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-ganglie-card-id]');
+          if (!btn) return;
+          var id = btn.getAttribute('data-ganglie-card-id');
+          var idx = ganglieSelectedIds.indexOf(id);
+          if (idx >= 0) {
+            ganglieSelectedIds.splice(idx, 1);
+          } else if (ganglieSelectedIds.length < 2) {
+            ganglieSelectedIds.push(id);
+          }
+          render();
+        });
+        if (els.ganglieSourceConfirmBtn) els.ganglieSourceConfirmBtn.addEventListener('click', function () {
+          if (ganglieSelectedIds.length !== 2) return;
+          var ids = ganglieSelectedIds.slice();
+          ganglieSelectedIds = [];
+          var result = Engine.resolvePendingChoice(game, { mode: 'discard', cardIds: ids });
+          if (!result.ok) renderLog();
+          render();
+        });
+        if (els.ganglieSourceTakeDamageBtn) els.ganglieSourceTakeDamageBtn.addEventListener('click', function () {
+          ganglieSelectedIds = [];
+          var result = Engine.resolvePendingChoice(game, { mode: 'takeDamage' });
           if (!result.ok) renderLog();
           render();
         });

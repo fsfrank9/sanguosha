@@ -537,6 +537,32 @@
         return { triggeredYiji: true, drawPairs: context.amount };
       }
 
+      // 刚烈 — spec has two distinct player-choice points the v5/v6 engine
+      // collapsed:
+      //   (a) 夏侯惇's choice to TRIGGER the judgement at all (spec:
+      //       "夏侯惇 选择 触发反制判定"). v5/v6 auto-fired.
+      //   (b) Source's choice between 弃 2 张牌 OR 受 1 点伤害 (spec:
+      //       "伤害来源 选择 弃置两张牌或承受1点伤害"). v5/v6 forced
+      //       discard if source had ≥ 2 hand cards, otherwise forced
+      //       damage; source never got to pick.
+      //   Plus: spec says "弃置两张 牌" (any cards: hand OR equipment) and
+      //   source picks WHICH 2 — v5/v6 took source.hand.shift()×2 (oldest
+      //   two hand cards) with no choice and no equipment included.
+      //
+      // v6.1 flow:
+      //   1. Determine 夏侯惇's preference; if 'decline', skip. If 'ask'
+      //      (player default), set pendingChoice 'ganglie-fire' for a
+      //      yes/no prompt. AI 'auto' goes straight to step 2.
+      //   2. resolveGanglieFireChoice with decision.fire === true (or
+      //      auto-fire) runs the judgement.
+      //   3. Heart judgement → no retaliation, return.
+      //   4. Non-heart judgement → check source's preference:
+      //      - 'ask' (player default): pendingChoice 'ganglie-source-choice'
+      //        with the candidate list (hand + equipment) plus a take-1
+      //        button. Source picks { mode, cardIds? }.
+      //      - 'auto' (AI default): runGanglieSourceAutoChoice — discard
+      //        the 2 lowest-value gainable cards if source has ≥ 2 cards,
+      //        else take 1 damage.
       function triggerGanglieDamageAfter(context) {
         var game = context.game;
         var targetActor = context.targetActor;
@@ -544,6 +570,28 @@
         var target = game[targetActor];
         var source = game[sourceActor];
         if (!target || !sourceActor || !source || !hasSkill(target, 'ganglie') || game.phase === 'gameover') return null;
+        var pref = (target.skillPreferences && target.skillPreferences.ganglie)
+          || (targetActor === 'player' ? 'ask' : 'auto');
+        if (pref === 'decline') {
+          log(game, actorName(game, targetActor) + '选择不发动【刚烈】。');
+          return { declinedGanglie: true };
+        }
+        if (pref === 'ask') {
+          game.pendingChoice = {
+            kind: 'ganglie-fire',
+            actor: targetActor,
+            sourceActor: sourceActor,
+            sourceName: actorName(game, sourceActor)
+          };
+          return { suspendedForGanglieFire: true };
+        }
+        return runGanglieJudgement(game, targetActor, sourceActor);
+      }
+
+      function runGanglieJudgement(game, targetActor, sourceActor) {
+        var target = game[targetActor];
+        var source = game[sourceActor];
+        if (!source) return null;
         var ganglieJudge = judge(game, targetActor, '【刚烈】');
         var retaliates = !!(ganglieJudge && ganglieJudge.suit !== 'heart');
         resolveJudgementCard(game, targetActor, target, '【刚烈】', ganglieJudge);
@@ -555,15 +603,150 @@
           log(game, actorName(game, targetActor) + '发动【刚烈】，判定为红桃，未触发反制。');
           return { triggeredGanglie: true, retaliated: false };
         }
-        if (source.hand && source.hand.length >= 2) {
-          discardCard(game, source.hand.shift());
-          discardCard(game, source.hand.shift());
-          log(game, actorName(game, sourceActor) + '因【刚烈】弃置两张手牌。');
-          return { triggeredGanglie: true, retaliated: true, discardedCards: true };
+        // Spec gives source two options (discard 2 or take 1 damage). If
+        // source has < 2 discardable cards, the discard branch is
+        // unavailable — short-circuit to take-damage with no prompt.
+        var candidates = collectGanglieDiscardCandidates(source);
+        if (candidates.length < 2) {
+          log(game, actorName(game, sourceActor) + '无法弃置两张牌，因【刚烈】受到 1 点伤害。');
+          damage(game, sourceActor, 1, targetActor, '【刚烈】', null, 'normal');
+          return { triggeredGanglie: true, retaliated: true, dealtDamage: true };
         }
-        log(game, actorName(game, sourceActor) + '无法因【刚烈】弃置两张手牌，受到 1 点伤害。');
+        var sourcePref = (source.skillPreferences && source.skillPreferences.ganglieSource)
+          || (sourceActor === 'player' ? 'ask' : 'auto');
+        if (sourcePref === 'ask') {
+          game.pendingChoice = {
+            kind: 'ganglie-source-choice',
+            actor: sourceActor,
+            targetActor: targetActor,
+            candidates: candidates
+          };
+          return { suspendedForGanglieSource: true };
+        }
+        return runGanglieSourceAutoChoice(game, targetActor, sourceActor);
+      }
+
+      function collectGanglieDiscardCandidates(source) {
+        var list = [];
+        if (source.hand) {
+          source.hand.forEach(function (c) {
+            list.push({ zone: 'hand', id: c.id, name: c.name, suit: c.suit, rank: c.rank });
+          });
+        }
+        ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
+          var card = source.equipment && source.equipment[slot];
+          if (card) list.push({ zone: 'equipment', slot: slot, id: card.id, name: card.name, suit: card.suit, rank: card.rank });
+        });
+        return list;
+      }
+
+      function applyGanglieDiscardCards(game, sourceActor, cardIds) {
+        var source = game[sourceActor];
+        var discarded = [];
+        for (var i = 0; i < cardIds.length; i += 1) {
+          var id = cardIds[i];
+          // Hand?
+          var handIdx = source.hand.findIndex(function (c) { return c.id === id; });
+          if (handIdx >= 0) {
+            var hcard = source.hand.splice(handIdx, 1)[0];
+            discardCard(game, hcard);
+            discarded.push(hcard);
+            continue;
+          }
+          // Equipment slot?
+          var slotKey = ['weapon', 'armor', 'horseMinus', 'horsePlus'].find(function (s) {
+            return source.equipment && source.equipment[s] && source.equipment[s].id === id;
+          });
+          if (slotKey) {
+            var ecard = source.equipment[slotKey];
+            source.equipment[slotKey] = null;
+            discardCard(game, ecard);
+            discarded.push(ecard);
+          }
+        }
+        return discarded;
+      }
+
+      function runGanglieSourceAutoChoice(game, targetActor, sourceActor) {
+        var source = game[sourceActor];
+        var candidates = collectGanglieDiscardCandidates(source);
+        if (candidates.length >= 2) {
+          // AI heuristic: discard the 2 lowest-scoring hand cards (prefer
+          // not to discard equipment); fall through to take-damage if
+          // somehow not enough hand cards either.
+          var scored = candidates
+            .filter(function (e) { return e.zone === 'hand'; })
+            .map(function (e) {
+              var card = source.hand.find(function (c) { return c.id === e.id; });
+              return { entry: e, score: card ? scoreCardForAI(game, sourceActor, card) : 0 };
+            })
+            .sort(function (a, b) { return a.score - b.score; });
+          if (scored.length >= 2) {
+            var ids = [scored[0].entry.id, scored[1].entry.id];
+            var disc = applyGanglieDiscardCards(game, sourceActor, ids);
+            log(game, actorName(game, sourceActor) + '因【刚烈】弃置两张牌：' + disc.map(function (c) { return '【' + c.name + '】'; }).join('、') + '。');
+            return { triggeredGanglie: true, retaliated: true, discardedCards: true };
+          }
+        }
+        log(game, actorName(game, sourceActor) + '无法弃置两张牌，因【刚烈】受到 1 点伤害。');
         damage(game, sourceActor, 1, targetActor, '【刚烈】', null, 'normal');
         return { triggeredGanglie: true, retaliated: true, dealtDamage: true };
+      }
+
+      function resolveGanglieFireChoice(game, pending, decision) {
+        var holder = pending.actor;
+        var sourceActor = pending.sourceActor;
+        if (!decision.fire) {
+          log(game, actorName(game, holder) + '选择不发动【刚烈】。');
+          return success('刚烈：未发动。');
+        }
+        var result = runGanglieJudgement(game, holder, sourceActor);
+        if (result && result.suspendedForGanglieSource) {
+          return success('刚烈：等待来源选择。');
+        }
+        return success('刚烈完成。');
+      }
+
+      function resolveGanglieSourceChoice(game, pending, decision) {
+        var sourceActor = pending.actor;
+        var targetActor = pending.targetActor;
+        var source = game[sourceActor];
+        if (!source) return fail('未知角色。');
+        if (decision.mode === 'takeDamage') {
+          log(game, actorName(game, sourceActor) + '选择因【刚烈】受到 1 点伤害。');
+          damage(game, sourceActor, 1, targetActor, '【刚烈】', null, 'normal');
+          return success('刚烈完成（受 1 伤）。');
+        }
+        if (decision.mode === 'discard') {
+          var cardIds = Array.isArray(decision.cardIds) ? decision.cardIds : [];
+          if (cardIds.length !== 2) {
+            game.pendingChoice = pending;
+            return fail('请选择两张牌弃置（或选择受 1 点伤害）。');
+          }
+          // Validate each id is in pending.candidates (i.e. source's
+          // hand-or-equipment at the moment the prompt fired).
+          var validIds = pending.candidates.map(function (e) { return e.id; });
+          for (var i = 0; i < cardIds.length; i += 1) {
+            if (validIds.indexOf(cardIds[i]) < 0) {
+              game.pendingChoice = pending;
+              return fail('选择的牌不在可弃置列表中。');
+            }
+          }
+          if (cardIds[0] === cardIds[1]) {
+            game.pendingChoice = pending;
+            return fail('需要两张不同的牌。');
+          }
+          var disc = applyGanglieDiscardCards(game, sourceActor, cardIds);
+          if (disc.length !== 2) {
+            // Shouldn't happen because we validated, but guard anyway.
+            game.pendingChoice = pending;
+            return fail('弃置失败，请重新选择。');
+          }
+          log(game, actorName(game, sourceActor) + '因【刚烈】弃置两张牌：' + disc.map(function (c) { return '【' + c.name + '】'; }).join('、') + '。');
+          return success('刚烈完成（弃 2 牌）。');
+        }
+        game.pendingChoice = pending;
+        return fail('请选择：弃两张牌 或 受 1 点伤害。');
       }
 
       function triggerTianduJudgementAfterResolve(context) {
@@ -1275,6 +1458,12 @@
         }
         if (pending.kind === 'fankui-pick') {
           return resolveFankuiPickChoice(game, pending, decision || {});
+        }
+        if (pending.kind === 'ganglie-fire') {
+          return resolveGanglieFireChoice(game, pending, decision || {});
+        }
+        if (pending.kind === 'ganglie-source-choice') {
+          return resolveGanglieSourceChoice(game, pending, decision || {});
         }
         return fail('未知的选择类型：' + pending.kind);
       }
