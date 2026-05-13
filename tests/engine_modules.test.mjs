@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {
+  Engine,
+  Runtime,
+  SkillRuntime,
+  CardRuntime,
+  StateRuntime,
+  PhaseRuntime,
+  JudgementRuntime,
+} from './helpers/load-engine.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -18,16 +26,6 @@ function exists(relativePath) {
 function test(name, fn) {
   fn();
   console.log(`✓ ${name}`);
-}
-
-function loadBuiltEngineScript() {
-  const html = read('index.html');
-  const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
-  assert.ok(match, 'built root index.html should contain <script id="game-engine">');
-  const sandbox = { window: {}, console };
-  vm.createContext(sandbox);
-  vm.runInContext(match[1], sandbox, { filename: 'built-game-engine.js' });
-  return sandbox.window;
 }
 
 test('v4 phase 3 introduces engine runtime modules before the game engine', () => {
@@ -79,8 +77,8 @@ test('v4 phase 3 introduces engine runtime modules before the game engine', () =
   assert.match(judgementSource, /isShandianHit/, 'judgement runtime should own lightning-hit rules');
 
   const engineSource = read('src/engine/game-engine.js');
-  assert.match(engineSource, /SanguoshaEngineModules/, 'game engine should consume runtime modules');
-  assert.match(engineSource, /JudgementRuntime/, 'game engine should consume JudgementRuntime for delayed-trick rules');
+  assert.match(engineSource, /import\s*\{\s*Runtime\s*\}\s*from\s*['"]\.\/runtime\.js['"]/, 'game engine should import Runtime module');
+  assert.match(engineSource, /import\s*\{\s*JudgementRuntime\s*\}\s*from\s*['"]\.\/judgement\.js['"]/, 'game engine should import JudgementRuntime module');
   assert.doesNotMatch(engineSource, /function\s+annotateSkillStatus\s*\(/, 'skill status annotation should live outside the monolithic engine');
   assert.doesNotMatch(engineSource, /function\s+clone\s*\(/, 'generic clone helper should live in runtime module');
   assert.doesNotMatch(engineSource, /function\s+makeRng\s*\(/, 'generic RNG helper should live in runtime module');
@@ -108,39 +106,34 @@ test('engine runtime modules are bundled into the direct-open artifact', () => {
     `node tools/build.mjs --check should pass\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
   );
 
-  const rootHtml = read('index.html');
   const distHtml = read('dist/index.html');
-  assert.equal(distHtml, rootHtml, 'dist/index.html should stay byte-identical to root index.html');
-  assert.doesNotMatch(rootHtml, /<script\s+type="module"|import\s+\{/, 'direct-open artifact should not depend on runtime ES modules');
+  assert.doesNotMatch(distHtml, /^\s*(import|export)\s/m, 'legacy bundle should not contain unstripped ES module syntax');
 
-  const win = loadBuiltEngineScript();
-  assert.ok(win.SanguoshaData, 'data bundle should still be available');
-  assert.ok(win.SanguoshaEngineModules, 'built artifact should expose engine runtime modules for debugging');
-  assert.ok(win.SanguoshaEngineModules.Runtime, 'built artifact should expose Runtime module');
-  assert.ok(win.SanguoshaEngineModules.SkillRuntime, 'built artifact should expose SkillRuntime module');
-  assert.ok(win.SanguoshaEngineModules.CardRuntime, 'built artifact should expose CardRuntime module');
-  assert.ok(win.SanguoshaEngineModules.StateRuntime, 'built artifact should expose StateRuntime module');
-  assert.ok(win.SanguoshaEngineModules.PhaseRuntime, 'built artifact should expose PhaseRuntime module');
-  assert.ok(win.SanguoshaEngineModules.JudgementRuntime, 'built artifact should expose JudgementRuntime module');
-  assert.equal(typeof win.SanguoshaEngineModules.Runtime.requireData, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.SkillRuntime.annotateSkillStatus, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.SkillRuntime.createRegistry, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.SkillRuntime.registerSkill, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.SkillRuntime.runHook, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.CardRuntime.makeTestCard, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.CardRuntime.isShaCard, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.StateRuntime.distanceBetween, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.StateRuntime.hasSkill, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.PhaseRuntime.recordPhase, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.PhaseRuntime.resetActorTurnState, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.PhaseRuntime.resetEndOfTurnState, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.PhaseRuntime.setPhase, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.PhaseRuntime.nextPlayablePhase, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.JudgementRuntime.evaluateDelayedTrick, 'function');
-  assert.equal(typeof win.SanguoshaEngineModules.JudgementRuntime.isShandianHit, 'function');
-  assert.ok(win.SanguoshaEngine, 'built artifact should still expose SanguoshaEngine');
-  assert.equal(Object.keys(win.SanguoshaEngine.HERO_CATALOG).length, 68, 'engine should preserve all local heroes');
-  assert.ok(win.SanguoshaEngine.IMPLEMENTED_SKILL_IDS.includes('jizhi'), 'skill implementation status should survive runtime extraction');
+  assert.ok(Runtime, 'Runtime should be importable as an ES module');
+  assert.ok(SkillRuntime, 'SkillRuntime should be importable as an ES module');
+  assert.ok(CardRuntime, 'CardRuntime should be importable as an ES module');
+  assert.ok(StateRuntime, 'StateRuntime should be importable as an ES module');
+  assert.ok(PhaseRuntime, 'PhaseRuntime should be importable as an ES module');
+  assert.ok(JudgementRuntime, 'JudgementRuntime should be importable as an ES module');
+  assert.equal(typeof Runtime.requireData, 'function');
+  assert.equal(typeof SkillRuntime.annotateSkillStatus, 'function');
+  assert.equal(typeof SkillRuntime.createRegistry, 'function');
+  assert.equal(typeof SkillRuntime.registerSkill, 'function');
+  assert.equal(typeof SkillRuntime.runHook, 'function');
+  assert.equal(typeof CardRuntime.makeTestCard, 'function');
+  assert.equal(typeof CardRuntime.isShaCard, 'function');
+  assert.equal(typeof StateRuntime.distanceBetween, 'function');
+  assert.equal(typeof StateRuntime.hasSkill, 'function');
+  assert.equal(typeof PhaseRuntime.recordPhase, 'function');
+  assert.equal(typeof PhaseRuntime.resetActorTurnState, 'function');
+  assert.equal(typeof PhaseRuntime.resetEndOfTurnState, 'function');
+  assert.equal(typeof PhaseRuntime.setPhase, 'function');
+  assert.equal(typeof PhaseRuntime.nextPlayablePhase, 'function');
+  assert.equal(typeof JudgementRuntime.evaluateDelayedTrick, 'function');
+  assert.equal(typeof JudgementRuntime.isShandianHit, 'function');
+  assert.ok(Engine, 'SanguoshaEngine should be importable as an ES module');
+  assert.equal(Object.keys(Engine.HERO_CATALOG).length, 68, 'engine should preserve all local heroes');
+  assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes('jizhi'), 'skill implementation status should survive ES module import');
 });
 
 console.log('\nEngine module architecture tests passed.');

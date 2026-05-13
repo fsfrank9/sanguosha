@@ -1,8 +1,3 @@
-(function () {
-  'use strict';
-
-  var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-
   function baseOutcome(type) {
     return {
       type: type,
@@ -60,10 +55,14 @@
     return outcome;
   }
 
-  modules.JudgementRuntime = {
+  export const JudgementRuntime = {
     isLeBusishuSuccess: isLeBusishuSuccess,
     isBingliangSuccess: isBingliangSuccess,
     isShandianHit: isShandianHit,
     evaluateDelayedTrick: evaluateDelayedTrick
   };
-}());
+
+  if (typeof window !== 'undefined') {
+    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
+    modules.JudgementRuntime = JudgementRuntime;
+  }

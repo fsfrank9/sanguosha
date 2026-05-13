@@ -1,8 +1,3 @@
-(function () {
-  'use strict';
-
-  var data = window.SanguoshaData || (window.SanguoshaData = {});
-
       var CARD_CATALOG = {
         sha: { name: '杀', family: 'basic', group: 'attack', label: '基本', symbol: '杀', desc: '出牌阶段使用。若目标没有【闪】，造成 1 点伤害。每回合限一次。' },
         fire_sha: { name: '火杀', family: 'basic', group: 'attack', label: '基本', symbol: '火', desc: '火属性【杀】，造成火焰伤害。' },
@@ -47,7 +42,11 @@
       var CARD_INFO = CARD_CATALOG;
       var PHASES = ['prepare', 'judge', 'draw', 'play', 'discard', 'finish'];
 
-      data.CARD_CATALOG = CARD_CATALOG;
-      data.CARD_INFO = CARD_INFO;
-      data.PHASES = PHASES;
-}());
+      export { CARD_CATALOG, CARD_INFO, PHASES };
+
+      if (typeof window !== 'undefined') {
+        var data = window.SanguoshaData || (window.SanguoshaData = {});
+        data.CARD_CATALOG = CARD_CATALOG;
+        data.CARD_INFO = CARD_INFO;
+        data.PHASES = PHASES;
+      }

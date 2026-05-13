@@ -1,24 +1,16 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import vm from 'node:vm';
+import { Engine } from './helpers/load-engine.mjs';
+
+assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const fixturePath = path.join(repoRoot, 'tests/fixtures/official_standard_skills.json');
 const specFixturePath = path.join(repoRoot, 'tests/fixtures/official_standard_skill_specs.json');
 const gitignorePath = path.join(repoRoot, '.gitignore');
-const htmlPath = path.join(repoRoot, 'index.html');
 
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
-const html = fs.readFileSync(htmlPath, 'utf8');
-const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
-assert.ok(match, 'index.html should contain <script id="game-engine">');
-
-const sandbox = { window: {}, console };
-vm.createContext(sandbox);
-vm.runInContext(match[1], sandbox, { filename: 'game-engine.js' });
-const Engine = sandbox.window.SanguoshaEngine;
-assert.ok(Engine, 'engine should expose window.SanguoshaEngine');
 
 function test(name, fn) {
   try {

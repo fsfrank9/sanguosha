@@ -1,8 +1,4 @@
-(function () {
-  'use strict';
-
-  var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
-  var SkillRuntime = modules.SkillRuntime;
+  import { SkillRuntime } from './skill-runtime.js';
 
   function actorName(game, actor) {
     return game[actor].name;
@@ -56,7 +52,7 @@
     return state.chained ? '铁索横置' : '未横置';
   }
 
-  modules.StateRuntime = {
+  export const StateRuntime = {
     actorName: actorName,
     opponent: opponent,
     hasSkill: hasSkill,
@@ -68,4 +64,8 @@
     handLimit: handLimit,
     getActorStatus: getActorStatus
   };
-}());
+
+  if (typeof window !== 'undefined') {
+    var modules = window.SanguoshaEngineModules || (window.SanguoshaEngineModules = {});
+    modules.StateRuntime = StateRuntime;
+  }

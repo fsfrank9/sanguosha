@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const htmlPath = path.resolve(import.meta.dirname, '../index.html');
+const htmlPath = path.resolve(import.meta.dirname, '../dist/index.html');
 const html = fs.readFileSync(htmlPath, 'utf8');
 
 function test(name, fn) {

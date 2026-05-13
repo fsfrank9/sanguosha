@@ -1,36 +1,13 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import vm from 'node:vm';
-import { fileURLToPath } from 'node:url';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-function read(relativePath) {
-  return fs.readFileSync(path.join(root, relativePath), 'utf8');
-}
+import { Engine, CardRuntime } from './helpers/load-engine.mjs';
 
 function test(name, fn) {
   fn();
   console.log(`✓ ${name}`);
 }
 
-function loadBuiltWindow() {
-  const html = read('index.html');
-  const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
-  assert.ok(match, 'built root index.html should contain <script id="game-engine">');
-  const sandbox = { window: {}, console };
-  vm.createContext(sandbox);
-  vm.runInContext(match[1], sandbox, { filename: 'built-game-engine.js' });
-  return sandbox.window;
-}
-
 test('card runtime exposes pure card helpers while preserving public engine APIs', () => {
-  const win = loadBuiltWindow();
-  const CardRuntime = win.SanguoshaEngineModules && win.SanguoshaEngineModules.CardRuntime;
-  const Engine = win.SanguoshaEngine;
-
-  assert.ok(CardRuntime, 'built artifact should expose CardRuntime');
+  assert.ok(CardRuntime, 'ES module should export CardRuntime');
   assert.equal(typeof CardRuntime.makeTestCard, 'function');
   assert.equal(typeof CardRuntime.isShaCard, 'function');
   assert.equal(typeof CardRuntime.isNormalTrickCard, 'function');
@@ -40,9 +17,6 @@ test('card runtime exposes pure card helpers while preserving public engine APIs
 });
 
 test('card runtime preserves card metadata, classification, and physical-card resolution', () => {
-  const win = loadBuiltWindow();
-  const CardRuntime = win.SanguoshaEngineModules.CardRuntime;
-
   const fireSha = CardRuntime.makeTestCard('fire_sha', { id: 'fire-1', suit: 'heart', rank: 'Q' });
   assert.equal(fireSha.type, 'fire_sha');
   assert.equal(fireSha.name, '火杀');

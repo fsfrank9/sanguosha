@@ -1,14 +1,5 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import vm from 'node:vm';
-import { fileURLToPath } from 'node:url';
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-function read(relativePath) {
-  return fs.readFileSync(path.join(root, relativePath), 'utf8');
-}
+import { Engine, PhaseRuntime } from './helpers/load-engine.mjs';
 
 function test(name, fn) {
   fn();
@@ -19,22 +10,8 @@ function normalize(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function loadBuiltWindow() {
-  const html = read('index.html');
-  const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
-  assert.ok(match, 'built root index.html should contain <script id="game-engine">');
-  const sandbox = { window: {}, console };
-  vm.createContext(sandbox);
-  vm.runInContext(match[1], sandbox, { filename: 'built-game-engine.js' });
-  return sandbox.window;
-}
-
 test('phase runtime exposes phase helpers without removing public engine phase APIs', () => {
-  const win = loadBuiltWindow();
-  const PhaseRuntime = win.SanguoshaEngineModules && win.SanguoshaEngineModules.PhaseRuntime;
-  const Engine = win.SanguoshaEngine;
-
-  assert.ok(PhaseRuntime, 'built artifact should expose PhaseRuntime');
+  assert.ok(PhaseRuntime, 'ES module should export PhaseRuntime');
   assert.equal(typeof PhaseRuntime.recordPhase, 'function');
   assert.equal(typeof PhaseRuntime.setPhase, 'function');
   assert.equal(typeof PhaseRuntime.nextPlayablePhase, 'function');
@@ -47,8 +24,6 @@ test('phase runtime exposes phase helpers without removing public engine phase A
 });
 
 test('phase runtime records phase history and sets the current phase', () => {
-  const win = loadBuiltWindow();
-  const PhaseRuntime = win.SanguoshaEngineModules.PhaseRuntime;
   const game = {};
 
   PhaseRuntime.recordPhase(game, 'player', 'prepare');
@@ -63,8 +38,6 @@ test('phase runtime records phase history and sets the current phase', () => {
 });
 
 test('phase runtime chooses play or discard after draw based on skipPlay', () => {
-  const win = loadBuiltWindow();
-  const PhaseRuntime = win.SanguoshaEngineModules.PhaseRuntime;
 
   assert.equal(PhaseRuntime.nextPlayablePhase({ flags: { skipPlay: true } }), 'discard');
   assert.equal(PhaseRuntime.nextPlayablePhase({ flags: { skipPlay: false } }), 'play');
@@ -73,8 +46,6 @@ test('phase runtime chooses play or discard after draw based on skipPlay', () =>
 });
 
 test('phase runtime resets actor turn state at the start of a turn', () => {
-  const win = loadBuiltWindow();
-  const PhaseRuntime = win.SanguoshaEngineModules.PhaseRuntime;
   const state = {
     usedSha: true,
     usedOrRespondedSha: true,
@@ -127,8 +98,6 @@ test('phase runtime resets actor turn state at the start of a turn', () => {
 });
 
 test('phase runtime resets end-of-turn state without clearing skip phase flags', () => {
-  const win = loadBuiltWindow();
-  const PhaseRuntime = win.SanguoshaEngineModules.PhaseRuntime;
   const state = {
     usedSha: true,
     usedOrRespondedSha: true,

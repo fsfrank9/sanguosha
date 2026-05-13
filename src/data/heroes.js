@@ -1,8 +1,3 @@
-(function () {
-  'use strict';
-
-  var data = window.SanguoshaData || (window.SanguoshaData = {});
-
       var HERO_CATALOG = {
         liubei: { id: 'liubei', name: '刘备', camp: '蜀', title: '乱世的枭雄', maxHp: 4, quote: '惟贤惟德，能服于人。', pack: 'standard', skills: [
           { id: 'rende', name: '仁德', desc: '出牌阶段可交给对方任意张牌；累计给出两张后回复 1 点体力。' },
@@ -123,6 +118,10 @@
         enemy: HERO_CATALOG.caocao
       };
 
-      data.HERO_CATALOG = HERO_CATALOG;
-      data.HEROES = HEROES;
-}());
+      export { HERO_CATALOG, HEROES };
+
+      if (typeof window !== 'undefined') {
+        var data = window.SanguoshaData || (window.SanguoshaData = {});
+        data.HERO_CATALOG = HERO_CATALOG;
+        data.HEROES = HEROES;
+      }

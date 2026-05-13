@@ -1,17 +1,7 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import vm from 'node:vm';
-import path from 'node:path';
+import { Engine } from './helpers/load-engine.mjs';
 
-const htmlPath = path.resolve(import.meta.dirname, '../index.html');
-const html = fs.readFileSync(htmlPath, 'utf8');
-const match = html.match(/<script id="game-engine"[^>]*>([\s\S]*?)<\/script>/);
-assert.ok(match, 'index.html should contain <script id="game-engine">');
-
-const sandbox = { window: {}, console };
-vm.createContext(sandbox);
-vm.runInContext(match[1], sandbox, { filename: 'game-engine.js' });
-const Engine = sandbox.window.SanguoshaEngine;
+assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
 
 function test(name, fn) {
   try {
