@@ -35,30 +35,22 @@ npm run build:check
 
 ## 当前版本
 
-`v5.0 原生 ES 模块 + GitHub Pages 托管`
+`v6.0 数据驱动技能 / 牌 / 装备规则 + 玩家选择暂停机制`
 
-主要特性：
+v6 保留 v5 的「原生 ES 模块 + GitHub Pages 托管」架构（详见 `docs/plans/2026-05-13-sanguosha-v5-architecture.md`），把工作重心从架构搬到规则层。主要新增：
 
-- `src/` 是浏览器直接加载的 ES 模块源码，无打包步骤：
-  - `src/main.js`：浏览器 ES 模块入口，按依赖顺序装配各子模块。
-  - `src/styles/main.css`：样式源码。
-  - `src/data/heroes.js`：武将 catalog 与技能元数据。
-  - `src/data/cards.js`：卡牌 catalog、牌类信息与阶段常量。
-  - `src/data/skill-status.js`：已实现技能与主动技能入口清单。
-  - `src/engine/runtime.js`：引擎通用 runtime/helper 模块，负责数据校验、克隆、随机数、玩家工厂等基础能力。
-  - `src/engine/skill-runtime.js`：技能 runtime 模块，承接技能状态标注、被动效果查询 seam，以及最小 SkillRegistry 与 hook 分发 API（`createRegistry` / `registerSkill` / `runHook`）。
-  - `src/engine/card-runtime.js`：卡牌 runtime 模块，负责测试卡生成、牌堆生成、【杀】/普通锦囊分类与虚拟牌实体牌解析。
-  - `src/engine/state.js`：状态/角色 runtime 模块，负责角色名、对手、技能查询、距离/攻击范围、先手、手牌上限与状态文案等纯查询。
-  - `src/engine/phases.js`：阶段 runtime 模块，负责阶段历史记录、回合状态重置、阶段切换 helper 与摸牌后进入出牌/弃牌的判断。
-  - `src/engine/judgement.js`：判定 runtime 模块，负责【乐不思蜀】、【兵粮寸断】、【闪电】等延时锦囊判定规则。
-  - `src/engine/game-engine.js`：纯游戏引擎，通过 `import` 聚合所有 runtime 模块，`export const SanguoshaEngine`。
-  - `src/ui/dom-adapter.js`：DOM/UI 适配层，`import { SanguoshaEngine }` 后绑定事件与渲染。
-- `index.html` 是手写的 ES 模块入口（`<script type=”module” src=”./src/main.js”>`），不由构建脚本生成。
-- `tools/build.mjs --check` 只做结构校验：必需源文件存在、入口 HTML 用模块标签、不再有 `dist/` 残留。
-- `.github/workflows/pages.yml` 在每次推送 `main` 后自动验证并发布到 GitHub Pages。
-- 1v1 选将、主公/反贼身份与主公先手流程。
-- 标准包、风林火山、SP 武将池 catalog。
-- 标准 + 军争核心牌组。
+- **结构化技能元数据** (`src/data/heroes.js` 的 `SKILL_METADATA`)：26 个已实现技能各有 `{ trigger, frequency, optional, mandatory, cost, hooks }` 六字段，跨武将共享的同名技能（mashu / wusheng / longdan / biyue / paoxiao）自动保持一致。UI tooltip 从结构化字段派生分行提示。
+- **结构化牌规则** (`src/data/cards.js` 的 `CARD_RULES`)：35 张牌（基本 / 即时锦囊 / 延时锦囊 / 装备）各有 `{ summary, timing, targets, effect, frequency, responseWindow, engineHooks }`，自动 merge 到 `CARD_CATALOG[id].rule`。
+- **官方规格 cache + audit harness**：`official-skill-cache/sanguosha-standard/official_standard_skill_cache.json` 保存所有 26 个已实现技能的官方规格副本（带 sourceTextSha256）。`tests/v6_skill_audit.test.mjs` + `tests/skill_schema.test.mjs` + `tests/card_rules.test.mjs` 持续校验「cache ↔ specs fixture ↔ heroes.js ↔ cards.js」四方一致。
+- **装备被动效果注册表** (`src/engine/state.js` 的 `EQUIPMENT_EFFECTS`)：诸葛连弩 / 青釭剑 / 仁王盾 的布尔被动通过 `hasEquipmentEffect(state, name)` 查询，与 `SkillRuntime.hasPassiveEffect` 同形。
+- **玩家选择暂停 / 恢复**：引擎引入 `game.pendingChoice` + `game.pauseState`，让规则上属于”可选”的技能在玩家控制时真的可以选择：
+  - **【裸衣】**：默认 auto-fire；UI 技能栏 toggle 切换「自动发动 / 本回合跳过」。
+  - **【鬼才】**：玩家司马懿在判定生效前可挑任意手牌替换判定，或不发动；AI 走 hand[0] 自动路径。
+  - **【遗计】**：玩家郭嘉受伤后摸完牌可勾选哪些交给对手；默认全部留己。
+  - **【铁骑】**：玩家马超可在技能栏切「不发动」全局禁用本场铁骑判定。
+  - `Engine.setSkillPreference` / `Engine.getSkillPreference` / `Engine.getPendingChoice` / `Engine.resolvePendingChoice` 是公开 API。
+- **AI 主动技能感知**：AI 从只识【苦肉】【制衡】扩到全部 5 个主动技（+ 仁德 / 反间 / 观星）+ 2 个出牌期转化（武圣 / 龙胆 把红牌或闪当杀），其余 19 个被动 / 触发 / 锁定技通过引擎 hooks 自动生效。
+- 1v1 选将、主公/反贼身份与主公先手流程，标准包/风林火山/SP 武将池 catalog，标准+军争核心牌组。
 - 阶段、装备区、判定区、延时锦囊、部分武将技能和 AI 行动。
 - 火攻、铁索连环、顺手牵羊、过河拆桥等交互选择流程。
 - 技能实现状态可见：已实现技能可用；仅展示/待实现技能会明确标记为”未实现”，避免看起来有技能但实际无法触发。
@@ -111,7 +103,7 @@ docs/plans/2026-05-13-sanguosha-v5-architecture.md  [已完成]
 v6.0 游戏逻辑正确性与重构计划见：
 
 ```text
-docs/plans/2026-05-13-sanguosha-v6-logic-correctness.md  [进行中]
+docs/plans/2026-05-13-sanguosha-v6-logic-correctness.md  [已完成]
 ```
 
 ## 武将技能实现状态

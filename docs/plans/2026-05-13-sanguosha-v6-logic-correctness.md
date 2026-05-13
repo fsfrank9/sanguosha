@@ -52,7 +52,7 @@
 
 ## Phase 6.0 — Plan + RED audit harness（本次提交）
 
-**Status:** 进行中。
+**Status:** ✅ 已完成（PR #6 合并）。
 
 ### Task 1: 计划文档
 
@@ -406,20 +406,36 @@
 
 ## Phase 6G — 收尾
 
-**Status:** 待启动。
+**Status:** ✅ 已完成。
 
-### 任务
+### 落地
 
-- v6 计划文档把 6.0 → 6G 全部标 `✅ 已完成`。
-- README「当前版本」从 v5.0 节升级到 v6.0 节，提"规则正确性 + 数据驱动元规则"。
-- README「武将技能实现状态」节按 6A 后的 schema 重新生成。
-- `docs/plans/2026-05-13-sanguosha-v5-architecture.md` 保持冻结状态不变。
-- `package.json` version 升到 6.0.0。
+- `package.json` version 升到 `6.0.0`，描述串补上「data-driven skill / card / equipment metadata and pause-prompt player choice for optional skills」。
+- README「当前版本」整段重写为 v6.0 描述：列出 SKILL_METADATA / CARD_RULES / EQUIPMENT_EFFECTS 三个数据源，pendingChoice 暂停/恢复机制，AI 主动技扩展。
+- README 顶部的 v6 plan 引用从 `[进行中]` 改为 `[已完成]`。
+- 本计划文档：6.0 → 6G 全部标 `✅ 已完成`。
+- `docs/plans/2026-05-13-sanguosha-v5-architecture.md` 保持冻结不变。
+- 「武将技能实现状态」节保持原样：v5 列的状态本来就准确（26 个已实现技能），v6 没有新增技能，只是把 AI 决策面补齐 + 玩家可选化。
 
-### 验收标准
+### 验收
 
-- 全量 `npm run verify`（构建 check + 全部测试）通过。
-- 浏览器线上访问 `https://fsfrank9.github.io/sanguosha/` 完整对战 OK。
+- 全量 `npm run verify`（结构 check + 35 个测试文件）全部通过。
+- 浏览器线上 `https://fsfrank9.github.io/sanguosha/` 可整局对战；AI 行动呈现：观星预览、仁德/反间机会触发、武圣/龙胆 主动转化为杀。
+
+### v6 完整时间线
+
+| Phase | 交付 | PR |
+|---|---|---|
+| 6.0 | 计划文档 + RED audit harness | #6 |
+| 6A | SKILL_METADATA schema + 官方 spec 100% 覆盖 + UI tooltip 结构化 | #8 |
+| 6B | 【裸衣】可选化 + skillPreferences 容器 | #9 |
+| 6C | pause-prompt 基建 + 【鬼才】 | #10 |
+| 6C-bis | 【遗计】分配 + 【铁骑】 toggle | #11 |
+| 6D | EQUIPMENT_EFFECTS 注册表（zhuge/qinggang/renwang） | #12 |
+| 6E | CARD_RULES 元数据 + audit harness | #13 |
+| 6F | AI 主动技扩展（仁德 / 反间 / 观星） | #14 |
+| 6F-bis | AI card-as conversions（武圣 / 龙胆） | #15 |
+| 6G | 收尾 + v6.0 cut | （本 PR） |
 
 ---
 
