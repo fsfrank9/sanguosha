@@ -226,13 +226,45 @@
         return drawCards(game, actor, drawContext.drawCount);
       }
 
+      // v6B: skill preference toggle. Lets the player opt out of a skill that
+      // is officially optional but currently auto-fires in the engine. Default
+      // is no preference set, which preserves current auto-fire behavior.
+      // Supported values per skill:
+      //   luoyi: 'auto' (default, auto-fire) | 'decline' (skip this turn's
+      //          draw-phase trade-off)
+      function setSkillPreference(game, actor, skillId, value) {
+        if (!game || !actor || !skillId) return fail('参数缺失。');
+        var state = game[actor];
+        if (!state) return fail('未知角色。');
+        state.skillPreferences = state.skillPreferences || {};
+        if (value === undefined || value === null || value === 'auto') {
+          delete state.skillPreferences[skillId];
+        } else {
+          state.skillPreferences[skillId] = value;
+        }
+        return success('偏好已更新。');
+      }
+
+      function getSkillPreference(game, actor, skillId) {
+        if (!game || !actor || !skillId) return null;
+        var state = game[actor];
+        if (!state || !state.skillPreferences) return null;
+        return state.skillPreferences[skillId] || null;
+      }
+
       function triggerLuoyiDrawPhase(context) {
         var game = context.game;
         var state = game[context.actor];
         if (!state || !hasSkill(state, 'luoyi') || context.drawCount <= 0) return null;
         state.flags = state.flags || {};
+        state.skillPreferences = state.skillPreferences || {};
         var flags = state.flags;
         if (flags.luoyi) return null;
+        if (state.skillPreferences.luoyi === 'decline') {
+          flags.luoyiDeclined = true;
+          log(game, actorName(game, context.actor) + '选择本回合不发动【裸衣】。');
+          return { declinedLuoyi: true };
+        }
         context.drawCount = Math.max(0, context.drawCount - 1);
         flags.luoyi = true;
         log(game, actorName(game, context.actor) + '发动【裸衣】，摸牌阶段少摸一张牌，本回合【杀】或【决斗】伤害 +1。');
@@ -375,6 +407,11 @@
         return { gainedSourceCard: true };
       }
 
+      // 1v1 minimal implementation: the cache spec lets 郭嘉 distribute the
+      // drawn cards to any actor, but the only other actor in a 1v1 match is
+      // the opponent, and giving cards to the opponent is dominated. Keep all
+      // cards on 郭嘉. Phase 6C may add a pause-prompt path so a human player
+      // can explicitly hand cards to the opponent for edge-case strategies.
       function triggerYijiDamageAfter(context) {
         var game = context.game;
         var targetActor = context.targetActor;
@@ -428,6 +465,11 @@
         return { claimedJudgementCard: true };
       }
 
+      // 1v1 minimal implementation: the cache spec lets 司马懿 pick any hand
+      // card as the replacement; here we always take the first card. This is
+      // functionally equivalent for AI and acceptable for play-test smoke,
+      // but it strips human strategy. Phase 6C will add a pause-prompt path
+      // so a human 司马懿 can choose which card to play as the replacement.
       function triggerGuicaiJudgementBeforeResolve(context) {
         var game = context.game;
         var actor = context.actor;
@@ -1756,6 +1798,8 @@
         handLimit: handLimit,
         getActorStatus: getActorStatus,
         endTurn: endTurn,
+        setSkillPreference: setSkillPreference,
+        getSkillPreference: getSkillPreference,
         drawCards: drawCards,
         aiChooseCard: aiChooseCard,
         aiChooseSkillAction: aiChooseSkillAction,
