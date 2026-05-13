@@ -1,9 +1,9 @@
 {
   "name": "sanguosha-html",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "private": true,
   "type": "module",
-  "description": "三国杀 1v1 browser game served as native ES modules from a static GitHub Pages site.",
+  "description": "三国杀 1v1 browser game served as native ES modules from a static GitHub Pages site, with data-driven skill / card / equipment metadata and pause-prompt player choice for optional skills.",
   "scripts": {
     "build": "node tools/build.mjs",
     "build:check": "node tools/build.mjs --check",
