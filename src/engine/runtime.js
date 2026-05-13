@@ -26,6 +26,7 @@
       equipment: { weapon: null, armor: null, horseMinus: null, horsePlus: null },
       judgeArea: [],
       flags: {},
+      skillPreferences: {},
       usedSha: false,
       usedOrRespondedSha: false,
       shaBonus: 0

@@ -142,7 +142,21 @@
             var statusText = skill.statusText || (skill.status === 'todo' ? '未实现' : '');
             var label = skill.name + (skill.status === 'todo' ? '·未实现' : '');
             var title = formatSkillTooltip(skill, statusText);
-            return '<button class="mini-card skill-button' + statusClass + '" data-skill-id="' + escapeHtml(skill.id) + '" ' + (active ? '' : 'disabled') + ' title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
+            var dataAttrs = '';
+            // v6B: luoyi is officially optional. Render its button as a
+            // toggle (auto-fire ↔ decline) that the player can flip any time
+            // before their draw phase resolves. Click handler is special-
+            // cased downstream so the button can be enabled outside of play.
+            if (skill.id === 'luoyi' && skill.status === 'implemented') {
+              var pref = (state.skillPreferences && state.skillPreferences.luoyi) || 'auto';
+              var luoyiDeclined = pref === 'decline';
+              active = !enemyThinking && !game.winner && game.turn === 'player';
+              label = skill.name + '·' + (luoyiDeclined ? '本回合跳过' : '自动发动');
+              title = formatSkillTooltip(skill, statusText) + '｜点击切换本回合是否发动';
+              dataAttrs = ' data-skill-toggle="luoyi"';
+              if (luoyiDeclined) statusClass += ' skill-toggle-off';
+            }
+            return '<button class="mini-card skill-button' + statusClass + '" data-skill-id="' + escapeHtml(skill.id) + '"' + dataAttrs + ' ' + (active ? '' : 'disabled') + ' title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
           }).join('') || '<span class="mini-card">无技能</span>';
         }
       }
@@ -974,6 +988,13 @@
         if (els.playerSkillBar) els.playerSkillBar.addEventListener('click', function (event) {
           var skill = event.target.closest('[data-skill-id]');
           if (!skill || skill.disabled) return;
+          var toggle = skill.getAttribute('data-skill-toggle');
+          if (toggle) {
+            var current = Engine.getSkillPreference(game, 'player', toggle) || 'auto';
+            Engine.setSkillPreference(game, 'player', toggle, current === 'decline' ? 'auto' : 'decline');
+            render();
+            return;
+          }
           usePlayerSkill(skill.getAttribute('data-skill-id'));
         });
       }

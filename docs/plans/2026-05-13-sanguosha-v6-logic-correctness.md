@@ -126,41 +126,71 @@
 
 ---
 
-## Phase 6B — Parametric frequency / optional / cost
+## Phase 6B — Headline mismatch fixes (audit-driven)
 
-**Status:** 待启动。
+**Status:** 进行中。
 
-### 设计要点
+### 修订说明（与原 6B 的差异）
 
-- 当前 ad-hoc per-skill flag：`zhihengUsed`、`rendeGiven`、`fanjianUsed`、`luoyi`、`tieqiLocked`、`usedOrRespondedSha`、`kurouTurn` 等。
-- v6B 把这些迁到 `SkillRuntime.frequencyRegistry`：
-  ```js
-  SkillRuntime.frequencyRegistry.markUsed(actor, skillId);
-  SkillRuntime.frequencyRegistry.canUse(actor, skillId);
-  ```
-  Registry 内部按 metadata `frequency` 字段决定是 turn-scoped、game-scoped、还是 unlimited。
-- `resetActorTurnState()` 不再写死字段名，而是遍历 `IMPLEMENTED_SKILL_IDS` 重置 `oncePerTurn` 范围的标记。
-- 【裸衣】改回可选：在摸牌阶段触发"是否使用裸衣？"主动 prompt，AI 默认 yes（由 6F 调整），人类玩家显式选择。
+原 6B 设计的是「先把所有 per-skill flag 搬进 frequency registry，再修 mismatch」。Phase 6A 后端到端 audit 的实际产出（见 Phase 6.0 audit harness + 一次性 implementation-vs-cache 比对）说明实际 mismatch 只有 1 处真硬错误 + 2 处架构性 prompt 缺失：
+
+- ❌ **【裸衣】 强制 → 可选**（headline）— 引擎硬编码 `drawCount-1`，玩家无选择；cache 明确"许褚...选择发动"
+- ⚠️ **【鬼才】 总是取 hand[0] → 玩家选**（架构性，需 pause-prompt）
+- ⚠️ **【遗计】 分配机制缺失**（1v1 trivial — 唯一"其他角色"是对手，给对手是劣势策略）
+- ⚠️ **【铁骑】 cache 文案模糊** — 实际引擎按 lock skill 行为，与 cache 的"选择触发"措辞不一致
+
+考虑到 pause-prompt 是一个跨技能的基础设施（鬼才/遗计/未来 6E 牌效果都需要），不应该塞进 6B 一个 PR。所以 6B 实际范围收窄为：**修可以独立修的 mismatch（裸衣），其余加 1v1 minimal 标注 + 推到 Phase 6C 与 pause-prompt 基建一起做**。
 
 ### 任务
 
-- Task 1: 新增 `src/engine/frequency-registry.js`，作为 `SkillRuntime` 子模块。
-- Task 2: 把当前所有 per-skill flag 迁到 registry，旧字段保留一个版本作 fallback（标记 `// @deprecated v6C 删除`）。
-- Task 3: 【裸衣】改成可选 prompt + AI 默认 yes。
-- Task 4: 行为测试覆盖：制衡每回合只能用一次、仁德每回合限一次、裸衣可拒绝、克己仍按 `usedOrRespondedSha` 判定但走 registry。
+- Task 1: 新增 `state.skillPreferences` 容器与 `Engine.setSkillPreference` / `Engine.getSkillPreference` 公开 API；`Runtime.makePlayer` 默认初始化为空对象。
+- Task 2: 【裸衣】hook 读 `skillPreferences.luoyi`：`'decline'` 时跳过减摸与伤害 flag，并记 `flags.luoyiDeclined` 供日志/AI 决策参考；默认行为不变。
+- Task 3: UI 在玩家技能栏把【裸衣】渲染成 toggle（`data-skill-toggle="luoyi"`），点击切换 auto / decline，标签随状态更新；不影响其它技能的渲染与点击。
+- Task 4: 新增 `tests/skill_preferences.test.mjs`：5 条覆盖 round-trip、默认自动发动、声明 decline 后摸满 2 张并未置 flag、auto 重置、未知 actor 拒绝。
+- Task 5: 在 `triggerGuicaiJudgementBeforeResolve` / `triggerYijiDamageAfter` 加 1v1-minimal 注释，明确 Phase 6C 会接入 pause-prompt 走玩家选择路径。
 
 ### 验收标准
 
-- `npm test` 全绿，且包含至少 3 条参数化频率测试。
-- 浏览器中摸到周瑜对面是【裸衣】许褚时，AI 仍按既有强度行动；人类玩家自己玩许褚时摸牌阶段会出现【裸衣】prompt。
+- `npm test` 全绿；`tests/skill_preferences.test.mjs` 5 条全部通过。
+- 浏览器中玩家选许褚开局，技能栏出现【裸衣·自动发动】toggle；点击切到【裸衣·本回合跳过】后下个回合摸牌阶段摸满 2 张，伤害不再 +1。
+- AI 玩许褚时行为与之前一致（不写偏好 → 走默认 auto-fire 路径）。
 
 ---
 
-## Phase 6C — Description / implementation mismatch fixes
+## Phase 6C — Pause-prompt infrastructure + 鬼才/遗计/铁骑
 
 **Status:** 待启动。
 
 ### 设计要点
+
+- 6B 留下的两条 prompt 类 mismatch 都需要"引擎在自动流程中暂停 → UI 弹 prompt → 玩家选择 → 引擎继续"。当前引擎完全同步，没有这条 seam。
+- 设计 `game.pendingChoice = { kind, actor, payload } | null` + `Engine.resolvePendingChoice(game, decision)`。Hook 可以 SET pendingChoice 并 early-return；调用方检查并把 in-progress 状态保留到 payload。
+- 第一批接入：
+  - **【鬼才】**：判定生效前如果司马懿是 player 且 `skillPreferences.guicai !== 'decline'`，设置 `pendingChoice` 让玩家挑替换牌；AI 走 auto（继续 hand[0]）。
+  - **【遗计】**：受伤后摸牌完成时如果郭嘉是 player 且对方还有 HP，提供"全部留给自己 / 把这 N 张交给对方"的二选一；AI 默认全部留己。
+  - **【铁骑】**：根据 cache 与现行实现，新增 `skillPreferences.tieqi` 切换 auto-fire 与 ask-each-sha；默认 auto-fire（与现行实现一致）。
+- 同时把 6.0 audit harness 增强到能识别"⚠️ 部分对齐"项：6C 完成后所有 26 条全部 ✅。
+
+### 任务
+
+- Task 1: 在 game-engine.js 新增 `setPendingChoice` / `getPendingChoice` / `resolvePendingChoice` 三件套；编写最小的"中断 + 续跑"的内部协议。
+- Task 2: 在 UI dom-adapter.js 新增 `pendingChoicePanel` 顶层渲染，根据 `kind` 路由到具体 prompt（鬼才选牌、遗计分配、铁骑是否发动）。
+- Task 3: 把 `triggerGuicaiJudgementBeforeResolve` / `triggerYijiDamageAfter` / `triggerTieqiNeedResponse` 改造成"AI / 不在意者 auto；player 且未设 decline → 走 prompt"。
+- Task 4: 新增 `tests/pending_choice.test.mjs`：鬼才选不同手牌结果不同、遗计交给对方对方手牌增加、铁骑选不发动则不判定不锁闪。
+
+### 验收标准
+
+- `npm test` 全绿。
+- 浏览器中玩家选司马懿/郭嘉/马超开局，相关 prompt 在正确时机弹出并能被解析继续。
+- 6.0 audit harness 全部 ✅。
+
+---
+
+## Phase 6C-old (合并到上方 6C) — Description / implementation mismatch fixes
+
+**Status:** 已并入新 6C。
+
+### 设计要点（保留参考）
 
 - 由 6.0 audit harness 在 6A/6B 完成后给出的"mismatch 待办清单"驱动。
 - 每个 mismatch 一个子 PR（commit on PR branch），commit 标题格式：`fix(skill): align <skillId> with official spec — <one-liner>`。
