@@ -2079,6 +2079,19 @@
         if ((card.type === 'guohe' || card.type === 'shunshou') && !hasAnyTargetableCard(game[opponent(actor)])) {
           return fail('对方没有可操作的牌。');
         }
+        // v7 PR-6: gltjk flow__condition.md 共同合法性: "判定区里有延时类锦囊
+        // 牌的角色不是使用同名延时类锦囊牌的合法目标"。乐 / 兵 → opponent；
+        // 闪电 → self。
+        if (card.family === 'delayed') {
+          var delayedTargetActor = card.type === 'shandian' ? actor : opponent(actor);
+          var delayedTargetState = game[delayedTargetActor];
+          var alreadyHas = (delayedTargetState.judgeArea || []).some(function (judge) {
+            return judge && judge.type === card.type;
+          });
+          if (alreadyHas) {
+            return fail(actorName(game, delayedTargetActor) + '的判定区已有【' + card.name + '】，不能再放置同名延时锦囊。');
+          }
+        }
         if (card.type === 'jiedao') {
           // v7 PR-5: gltjk card__scroll.md 注 — 借刀杀人 两次合法性检测，
           // 第一次在 "选择 An 为目标的同时选择 Bn"。1v1 中 An = opponent，
