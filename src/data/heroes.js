@@ -118,4 +118,61 @@
         enemy: HERO_CATALOG.caocao
       };
 
-      export { HERO_CATALOG, HEROES };
+      // v6A: structured skill metadata, single source of truth keyed by skill id.
+      // Merged into every HERO_CATALOG.skills entry below so that the same skill
+      // appearing on multiple heroes (e.g. mashu on machao / pangde / sp_pangde,
+      // wusheng on guanyu / sp_guanyu, longdan on zhaoyun / sp_zhaoyun, biyue on
+      // diaochan / sp_diaochan) stays rule-consistent. Derived from the official
+      // standard-pack spec cache (official-skill-cache/sanguosha-standard/).
+      //
+      // Field taxonomy:
+      //   trigger   — timing tag: playPhase / drawPhase / preparePhase /
+      //               discardPhase / turnEnd / damageAfter / beforeJudgement /
+      //               afterJudgement / cardUse / cardConvert / targetValidation /
+      //               passive
+      //   frequency — oncePerTurn / unlimited / passiveAlways
+      //   optional  — actor can decline to trigger
+      //   mandatory — 锁定技 (fires automatically when conditions hold)
+      //   cost      — { type, count? } where type ∈ { none, discardOwn,
+      //               giveHand, playHand, loseHp, reduceDraw, judgement }
+      //   hooks     — engine hook names this skill is wired into
+      var SKILL_METADATA = {
+        zhiheng:   { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 'any' }, hooks: ['onActiveSkill'] },
+        kurou:     { trigger: 'playPhase',         frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'loseHp',     count: 1 },     hooks: ['onActiveSkill'] },
+        rende:     { trigger: 'playPhase',         frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'giveHand',   count: 'any' }, hooks: ['onActiveSkill'] },
+        fanjian:   { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'giveHand',   count: 1 },     hooks: ['onActiveSkill'] },
+        guanxing:  { trigger: 'preparePhase',      frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onActiveSkill', 'onSkillPreview'] },
+        paoxiao:   { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['hasPassiveEffect'] },
+        wusheng:   { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs'] },
+        longdan:   { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs'] },
+        qingguo:   { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs'] },
+        jianxiong: { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
+        ganglie:   { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['onDamageAfter', 'onJudgementAfterResolve'] },
+        fankui:    { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
+        guicai:    { trigger: 'beforeJudgement',   frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onJudgementBeforeResolve'] },
+        mashu:     { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['sumPassiveEffect'] },
+        qicai:     { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['hasPassiveEffect'] },
+        qianxun:   { trigger: 'targetValidation',  frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onCardTarget'] },
+        tiandu:    { trigger: 'afterJudgement',    frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onJudgementAfterResolve'] },
+        yiji:      { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
+        luoyi:     { trigger: 'drawPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'reduceDraw', count: 1 },     hooks: ['onDrawPhase', 'onDamageModify'] },
+        tieqi:     { trigger: 'cardUse',           frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['onNeedResponse'] },
+        tuxi:      { trigger: 'drawPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'reduceDraw', count: 'any' }, hooks: ['onDrawPhase'] },
+        yingzi:    { trigger: 'drawPhase',         frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDrawPhase'] },
+        kongcheng: { trigger: 'targetValidation',  frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onCardTarget'] },
+        biyue:     { trigger: 'turnEnd',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onTurnEnd'] },
+        keji:      { trigger: 'discardPhase',      frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onBeforeDiscardPhase'] },
+        jizhi:     { trigger: 'cardUse',           frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onCardUse'] }
+      };
+
+      for (var _heroId in HERO_CATALOG) {
+        if (Object.prototype.hasOwnProperty.call(HERO_CATALOG, _heroId)) {
+          var _skills = HERO_CATALOG[_heroId].skills || [];
+          for (var _i = 0; _i < _skills.length; _i++) {
+            var _meta = SKILL_METADATA[_skills[_i].id];
+            if (_meta) Object.assign(_skills[_i], _meta);
+          }
+        }
+      }
+
+      export { HERO_CATALOG, HEROES, SKILL_METADATA };
