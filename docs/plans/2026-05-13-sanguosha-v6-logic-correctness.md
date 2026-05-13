@@ -435,7 +435,118 @@
 | 6E | CARD_RULES 元数据 + audit harness | #13 |
 | 6F | AI 主动技扩展（仁德 / 反间 / 观星） | #14 |
 | 6F-bis | AI card-as conversions（武圣 / 龙胆） | #15 |
-| 6G | 收尾 + v6.0 cut | （本 PR） |
+| 6G | 收尾 + v6.0 cut | #16 |
+
+---
+
+## v6.1 — Mismatch fix series (spec-compliance re-audit)
+
+**Status:** ✅ 已完成。
+
+### 缘起
+
+v6.0 收尾后做了一轮"逐字对照"per-skill spec audit（subagent 跑），结果声称全部 ✅。但用户随后**单点抽查【观星】**就发现 3 个真问题（预览张数硬编码 5、触发时机错位到出牌阶段、不支持顶/底独立排序）。这暴露 v6.0 audit 太表面，看到 hook 注册了就标 ✅，没真正逐字段解析。
+
+随后做了一次手工**逐字段重审**（25 个技能 × 5 spec 字段：timing / condition / cost / effect / frequency），又找到 9 处真实 mismatch。v6.1 用 7 个独立 PR 把这 12 处全部修到与 spec 完全一致。**硬性要求**：修好的标准是引擎实际行为与官方技能描述里所说的效果一字不差。
+
+### 完整 PR 时间线
+
+| PR | 修了什么 | 关键基础设施 |
+|---|---|---|
+| #17 | 【观星】预览张数 = min(存活, 5, deck)；触发时机搬到准备阶段（pendingChoice）；新 API `{ topIds, bottomIds }` 支持任意排序+顶/底分配 | `aliveActorCount`、`processPreparePhase`、`continueTurnAfterPreparePhase`、pendingChoice kind `guanxing-reorder` |
+| #18 | 【鬼才】跨 actor 触发 — 任何判定都能干预，不只是自己的；非 pausable 判定回退 auto-fire | `judge(game, actor, reason, { pausable })`；handler 扫全场找 holder |
+| #19 | 【反间】目标方真·猜花色（不是出招方传 `options.guessedSuit`）；player UI 弹 4 花色选择；AI 盲随机；保留 legacy override 不破 v30 test | pendingChoice kind `fanjian-guess`；`applyFanjianGuess` helper |
+| #20 | 【反馈】玩家挑区域 + 具体牌（hand 随机不可窥探/装备/判定区按 cardId）| pendingChoice kind `fankui-pick`；zone catalog 构造 |
+| #21 | 【刚烈】4 子问题全修：（a）夏侯惇 可选触发 yes/no；（b）来源可选 弃 2 vs 受 1；（c）来源可选哪两张；（d）含装备区可弃 | pendingChoice kinds `ganglie-fire` + `ganglie-source-choice`；shortcut 当 source 可弃 < 2 时跳 prompt 直接 takeDamage |
+| #22 | 【武圣】扫红色含装备牌（关羽 卸下红色武器当杀）；【制衡】可弃装备区牌；【苦肉】hp=1 允许（spec "存活"，1v1 立即 gameover）| `findOwnCardById` / `removeOwnCardFromAnyZone` / `firstMatchingOwnCard` 三个"自己的牌 = hand + equipment"helpers；`canPlayCardAs` / `playCardAs` / `findResponseCard` 都过此 helper |
+| #23 | 【突袭】skillPreferences.tuxi=decline 让 张辽 可弃用；【遗计】"按伤害点数逐点处理"——多点伤害（闪电 3 点）逐点弹 prompt 而不再批处理 | `pauseState.yiji` 跟踪 remainingPoints；`fireNextYijiPoint` 续跑；pendingChoice 加 `currentPoint` / `totalPoints` 元数据 |
+
+### v6.1 累计基础设施
+
+| 类别 | 内容 |
+|---|---|
+| **pendingChoice kinds** (7) | `guicai-replace` (6C) · `yiji-distribute` (6C-bis) · `guanxing-reorder` (6.1 #17) · `fanjian-guess` (#19) · `fankui-pick` (#20) · `ganglie-fire` (#21) · `ganglie-source-choice` (#21) |
+| **skillPreferences** (6) | `luoyi`、`tieqi`、`guicai`、`yiji`、`tuxi`、`ganglie`（外加 `ganglieSource`）|
+| **own-card helpers** | `findOwnCardById` / `removeOwnCardFromAnyZone` / `firstMatchingOwnCard` 跨 hand + equipment |
+| **判定相关** | `judge(opts.pausable)` flag；processJudgeArea 可中断/恢复 |
+| **多点处理** | `pauseState.yiji.{ remainingPoints, totalPoints }`；`fireNextYijiPoint` 续跑机制 |
+
+### 测试增量
+
+| 文件 | 断言数 | PR |
+|---|---:|---|
+| `tests/guanxing.test.mjs` | 14 | #17 |
+| `tests/guicai_cross_actor.test.mjs` | 6 | #18 |
+| `tests/fanjian_target_guess.test.mjs` | 7 | #19 |
+| `tests/fankui_pick.test.mjs` | 8 | #20 |
+| `tests/ganglie_choices.test.mjs` | 9 | #21 |
+| `tests/wusheng_zhiheng_kurou_edge.test.mjs` | 9 | #22 |
+| `tests/tuxi_yiji_perpoint.test.mjs` | 7 | #23 |
+| 合计 | **60** 条 spec-compliance behavior 测试 | |
+
+加上更新的 `tests/skills.test.mjs`（刚烈 3 条改写）和 `tests/pending_choice.test.mjs`（遗计 amount=1 不变），现有测试全部仍然 green。
+
+### 验收（v6.1 全量）
+
+- `npm run verify` —— 41 个测试文件全绿；6.0 audit harness 仍 26/26 ✅。
+- 浏览器线上 `https://fsfrank9.github.io/sanguosha/` 完整对战流程，每个修复的技能都按官方规则交互。
+
+---
+
+## 下一步方向（v7 候选）
+
+v6.1 把"现有 26 个已实现技能与 spec 完全对齐"做完了。还没碰、可作为后续主题的事：
+
+### 1. 未实现的标准包技能 (17 个)
+官方 cache 已经覆盖但引擎没接入：激将、酒援、奇袭、国色、流离、连营、护驾、洛神、急救、青囊、巨象、烈刃、好施、缔盟、英魂、化身、新生…… 每个都有完整 implementationSpec 可直接照抄。
+
+### 2. 装备的"复杂副作用" handler 体系
+6D 只把 **3 件 boolean 装备**（诸葛连弩 / 青釭剑 / 仁王盾）搬到 `EQUIPMENT_EFFECTS` 注册表。带副作用的装备仍硬编码在 `damage()` / `playSha()` 里：
+- **八卦阵** 自动判定生闪
+- **藤甲** -1 普通 +1 火 + 抗南蛮/万箭
+- **白银狮子** 单次伤害降到 1 + 离场回血
+- **青龙偃月刀** miss 后再杀
+- **贯石斧** 弃 2 强制命中
+- **寒冰剑** 双弃
+- **雌雄双股剑** 性别效果（需先加性别属性）
+- **方天画戟** +1 目标（需先支持多目标杀）
+
+这些可以模仿 SkillRuntime hook 模型搞一套 `EquipmentRuntime.registerHook`，让装备的副作用也走 declarative 注册而不是硬编码。
+
+### 3. 牌效果对照官方规则
+6E 把 35 张牌的 spec 写到 `CARD_RULES` 里了，但没真正对照每张牌的实际引擎行为。已识别（但未修）的 5 个候选：
+- 火攻属性是否通过铁索连环正确传导
+- 借刀杀人 第三方距离校验是否到位
+- 桃园结义 / 五谷丰登 在 1v1 的结算顺序
+- 万箭齐发 在带【藤甲】时的伤害链
+- 铁索连环 横置 + 火/雷链式触发的完整路径
+
+每个可以走"先 audit 后修"的小 PR 流程，类似 v6.1 的节奏。
+
+### 4. AI 进阶
+- 把 6F 加的 5 个主动技 AI 决策从规则启发式升级到 expectimax 1-2 ply（特别是 仁德/反间 的目标价值评估）
+- 加入 card-as 响应路径的 AI（当 AI 是 杀 目标时优先用 龙胆 转 闪、用 倾国 转 闪）
+- 难度调节（保守/标准/激进）
+
+### 5. 多人模式（3+ players）
+v5 的架构是 1v1 hardcoded（`game.player` / `game.enemy`）。如果要做 3 人以上：
+- 重构成 `game.actors = ['p1', 'p2', 'p3']` 列表
+- `opponent()` helper 改成"下家"/"上家"/"所有其他"语义
+- 修改身份系统（主公/忠臣/反贼/内奸）
+- 距离计算从"恒为 1"改为座次
+- 触发顺序（多人 同时触发 onDamageAfter 等）
+- 这是一次性大重构，可能需要单独的 v7 major version
+
+### 6. 牌组扩展
+风林火山、SP 包目前只有 catalog 没有完整实现。可以按"技能就绪后再 enable 该武将"的顺序推进。
+
+### 推荐优先级
+
+如果让我建议：**(2) → (3) → (1) → (4) → (6) → (5)**。
+- (2) 装备体系是当前最大的硬编码债务，影响其他技能交互（藤甲挡杀、青釭穿透、白银防止）
+- (3) 牌规则是用户最先能感知到的"为什么这张牌不按官方走"问题
+- (1) 新技能给玩家更多可选武将
+- (5) 多人是最大改造，最后再做
 
 ---
 
