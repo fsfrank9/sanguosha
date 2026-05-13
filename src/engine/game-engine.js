@@ -1437,6 +1437,88 @@
         return resumePlayShaAfterCixiong(game);
       }
 
+      // v7 PR-5: 借刀杀人 — 两次合法性检测中的第二次（An 决定是否用杀时）。
+      // 在 1v1 中 An = opponent，Bn = source。 流程:
+      //   1) 若 opponent 手牌没 杀 → 强制交武器 (transferWeaponToSource);
+      //   2) 若 opponent 有 杀 但当下 source 已经不是合法目标（spec 第二次检测
+      //      —— 比如 借刀 期间双方距离改变 / 装备改变） → 交武器;
+      //   3) opponent 决定 use / decline；'auto'(AI 默认) = 直接 use；
+      //      'ask' (player 默认) = pendingChoice 'jiedao-decision'.
+      function resolveJiedaoDecision(game, sourceActor, opponentActor, jiedaoCard, options) {
+        var opponentState = game[opponentActor];
+        if (!opponentState || !opponentState.equipment.weapon) {
+          return success('【借刀杀人】无效果（目标无武器）。');
+        }
+        var hasSha = opponentState.hand.some(function (c) {
+          return c && (c.type === 'sha' || c.type === 'fire_sha' || c.type === 'thunder_sha');
+        });
+        var canHit = canReachWithSha(game, opponentActor, sourceActor)
+          && !cardTargetProtection(game, opponentActor, sourceActor, { type: 'sha', color: 'black', name: '杀' }, '杀');
+        if (!hasSha || !canHit) {
+          if (!hasSha) {
+            log(game, actorName(game, opponentActor) + '没有【杀】可用，交出武器。');
+          } else {
+            log(game, actorName(game, opponentActor) + '无法对' + actorName(game, sourceActor) + '使用【杀】，交出武器。');
+          }
+          return transferWeaponJiedao(game, sourceActor, opponentActor);
+        }
+        var pref = (opponentState.skillPreferences && opponentState.skillPreferences.jiedao)
+          || (opponentActor === 'player' ? 'ask' : 'auto');
+        if (pref === 'comply') pref = 'auto'; // synonym
+        if (pref === 'ask') {
+          game.pendingChoice = {
+            kind: 'jiedao-decision',
+            actor: opponentActor,
+            sourceActor: sourceActor
+          };
+          return success('【借刀杀人】等待目标决定…');
+        }
+        // 'auto' → fire sha.
+        return jiedaoFireOpponentSha(game, sourceActor, opponentActor);
+      }
+
+      function jiedaoFireOpponentSha(game, sourceActor, opponentActor) {
+        var opponentState = game[opponentActor];
+        var borrowedSha = removeFirstCardOfType(opponentState, 'sha')
+          || removeFirstCardOfType(opponentState, 'fire_sha')
+          || removeFirstCardOfType(opponentState, 'thunder_sha');
+        if (!borrowedSha) {
+          return transferWeaponJiedao(game, sourceActor, opponentActor);
+        }
+        log(game, actorName(game, opponentActor) + '被【借刀杀人】驱使使用【' + borrowedSha.name + '】。');
+        var shaResult = playSha(game, opponentActor, borrowedSha);
+        if (!shaResult || !shaResult.ok) {
+          // Second legality check failed at playSha entry (target protection / distance
+          // changed since canPlayCard). Return sha to opponent's hand and transfer weapon.
+          opponentState.hand.push(borrowedSha);
+          log(game, '【杀】不再合法（second legality check）；交出武器。');
+          return transferWeaponJiedao(game, sourceActor, opponentActor);
+        }
+        return shaResult;
+      }
+
+      function transferWeaponJiedao(game, sourceActor, opponentActor) {
+        var opponentState = game[opponentActor];
+        var sourceState = game[sourceActor];
+        var weapon = opponentState.equipment && opponentState.equipment.weapon;
+        if (!weapon) return success('【借刀杀人】无效果（目标无武器）。');
+        opponentState.equipment.weapon = null;
+        sourceState.hand.push(weapon);
+        log(game, actorName(game, sourceActor) + '因【借刀杀人】获得【' + weapon.name + '】，置入手牌。');
+        return success('借刀杀人获得武器。');
+      }
+
+      function resolveJiedaoDecisionChoice(game, pending, decision) {
+        var sourceActor = pending.sourceActor;
+        var opponentActor = pending.actor;
+        if (!game[sourceActor] || !game[opponentActor]) return fail('未知角色。');
+        if (decision && (decision.decline || decision.fire === false)) {
+          log(game, actorName(game, opponentActor) + '选择不出【杀】，交出武器。');
+          return transferWeaponJiedao(game, sourceActor, opponentActor);
+        }
+        return jiedaoFireOpponentSha(game, sourceActor, opponentActor);
+      }
+
       function resumePlayShaAfterCixiong(game) {
         if (game.pauseState && game.pauseState.playSha) {
           var saved = game.pauseState.playSha;
@@ -1759,6 +1841,9 @@
         if (pending.kind === 'cixiong-choose') {
           return resolveCixiongChoose(game, pending, decision || {});
         }
+        if (pending.kind === 'jiedao-decision') {
+          return resolveJiedaoDecisionChoice(game, pending, decision || {});
+        }
         return fail('未知的选择类型：' + pending.kind);
       }
 
@@ -1993,6 +2078,28 @@
         }
         if ((card.type === 'guohe' || card.type === 'shunshou') && !hasAnyTargetableCard(game[opponent(actor)])) {
           return fail('对方没有可操作的牌。');
+        }
+        if (card.type === 'jiedao') {
+          // v7 PR-5: gltjk card__scroll.md 注 — 借刀杀人 两次合法性检测，
+          // 第一次在 "选择 An 为目标的同时选择 Bn"。1v1 中 An = opponent，
+          // Bn = source 本人。
+          // canPlayCard 阶段（第一次合法性检测）做以下保守检查：
+          //   1) An 装备区有武器；
+          //   2) An 的武器范围覆盖 Bn (canReachWithSha)；
+          //   3) Bn 不被 onCardTarget 钩子拒绝（如【谦逊】等"不能成为目标"
+          //      的技能）。
+          // 装备效果（仁王盾屏蔽黑杀 / 藤甲屏蔽普通杀）等属于"对该牌无效"
+          // 而非"非合法目标"，且不知道 An 的具体 杀 颜色 / 属性，因此放
+          // 到 resolveJiedaoDecision 的第二次合法性检测中按实际 杀 牌再判。
+          var jiedaoOpp = game[opponent(actor)];
+          if (!jiedaoOpp.equipment.weapon) return fail('目标没有武器，无法发动【借刀杀人】。');
+          if (!canReachWithSha(game, opponent(actor), actor)) {
+            return fail('目标武器范围内没有合法的【杀】目标，无法发动【借刀杀人】。');
+          }
+          var jiedaoProtection = cardTargetProtection(game, opponent(actor), actor, { type: 'sha', name: '杀' }, '杀');
+          if (jiedaoProtection) {
+            return fail('目标无法对你使用【杀】，无法发动【借刀杀人】。');
+          }
         }
         return success('可以使用。');
       }
@@ -2354,20 +2461,17 @@
         }
 
         if (card.type === 'jiedao') {
+          // v7 PR-5: gltjk card__scroll.md 注 — 须做两次合法性检测。
+          // 第一次已在 canPlayCard 检过；这里做第二次（An 选择是否用杀时）。
           var weaponOwner = game[opponent(actor)];
           discardCard(game, card);
-          if (consumeWuxie(game, opponent(actor), '【借刀杀人】')) return finishTrickUse(game, actor, card, success('借刀杀人被无懈可击。'), options);
-          if (!weaponOwner.equipment.weapon) return finishTrickUse(game, actor, card, success('目标没有武器，借刀杀人无效果。'), options);
-          var borrowedSha = removeFirstCardOfType(weaponOwner, 'sha');
-          if (borrowedSha) {
-            log(game, actorName(game, opponent(actor)) + '被【借刀杀人】驱使使用【杀】。');
-            return finishTrickUse(game, actor, card, playSha(game, opponent(actor), borrowedSha), options);
+          if (consumeWuxie(game, opponent(actor), '【借刀杀人】')) {
+            return finishTrickUse(game, actor, card, success('借刀杀人被无懈可击。'), options);
           }
-          var borrowedWeapon = weaponOwner.equipment.weapon;
-          weaponOwner.equipment.weapon = null;
-          self.hand.push(borrowedWeapon);
-          log(game, actorName(game, actor) + '因【借刀杀人】获得【' + borrowedWeapon.name + '】，置入手牌。');
-          return finishTrickUse(game, actor, card, success('借刀杀人获得武器。'), options);
+          if (!weaponOwner.equipment.weapon) {
+            return finishTrickUse(game, actor, card, success('目标没有武器，借刀杀人无效果。'), options);
+          }
+          return finishTrickUse(game, actor, card, resolveJiedaoDecision(game, actor, opponent(actor), card, options), options);
         }
 
         discardCard(game, card);
