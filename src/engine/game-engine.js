@@ -1437,6 +1437,88 @@
         return resumePlayShaAfterCixiong(game);
       }
 
+      // v7 PR-9: 过河拆桥 1V1 — gltjk card__scroll.md：
+      //   "你选择一项：1.弃置目标角色的装备区里的一张牌；2.观看目标角色的手牌
+      //    并弃置其中一张牌。"
+      // 调用方可通过 options.targetZone ('equipment' | 'hand') 直接指定（向后
+      // 兼容老 UI）；'judge' 在 1V1 不合法。无显式选择时按 skillPreferences.guohe
+      // (auto / ask / decline) 决定 — auto = 装备优先 → 手牌；ask = pendingChoice
+      // 'guohe-1v1-pick' 暴露对手装备列表 + 手牌内容（spec: 选项 2 是 "观看
+      // 目标角色的手牌并弃置其中一张"）。
+      function resolveGuohe1v1(game, sourceActor, targetActor, options) {
+        var target = game[targetActor];
+        if (!target) return fail('未知角色。');
+        var requestedZone = options && options.targetZone;
+        if (requestedZone === 'judge') {
+          return fail('1V1【过河拆桥】不能弃置判定区。');
+        }
+        if (requestedZone === 'equipment' || requestedZone === 'hand') {
+          return executeGuohe1v1Pick(game, sourceActor, targetActor, requestedZone, options && options.targetCardId);
+        }
+        var sourceState = game[sourceActor];
+        var pref = (sourceState && sourceState.skillPreferences && sourceState.skillPreferences.guohe)
+          || (sourceActor === 'player' ? 'ask' : 'auto');
+        if (pref === 'decline') {
+          // spec 没说可放弃，但保留这个 toggle 以便测试 / future 扩展
+          log(game, actorName(game, sourceActor) + '放弃【过河拆桥】结算。');
+          return success('过河拆桥已取消。');
+        }
+        if (pref === 'ask') {
+          game.pendingChoice = {
+            kind: 'guohe-1v1-pick',
+            actor: sourceActor,
+            target: targetActor,
+            equipment: equipmentList(target).map(function (e) {
+              return { slot: e.slot, cardId: e.card.id, name: e.card.name, suit: e.card.suit, rank: e.card.rank };
+            }),
+            hand: target.hand.map(function (c) {
+              return { cardId: c.id, name: c.name, suit: c.suit, color: c.color, rank: c.rank };
+            })
+          };
+          return success('【过河拆桥】等待发动者选择…');
+        }
+        // 'auto' → 装备优先，否则手牌
+        var equips = equipmentList(target);
+        if (equips.length) {
+          return executeGuohe1v1Pick(game, sourceActor, targetActor, 'equipment', equips[0].card.id);
+        }
+        if (target.hand.length) {
+          return executeGuohe1v1Pick(game, sourceActor, targetActor, 'hand', target.hand[0].id);
+        }
+        return success('过河拆桥无效果（对方两区均空）。');
+      }
+
+      function executeGuohe1v1Pick(game, sourceActor, targetActor, zone, cardId) {
+        var info = removeTargetZoneCard(game, targetActor, zone, cardId);
+        if (!info || !info.card) {
+          return fail('指定牌不存在或已被移除。');
+        }
+        discardCard(game, info.card);
+        log(game, actorName(game, sourceActor) + '使用【过河拆桥】，弃置了' + actorName(game, targetActor) + (zone === 'equipment' ? '装备区' : '手牌') + '的【' + info.card.name + '】。');
+        return success('弃置对方一张牌。');
+      }
+
+      function resolveGuohe1v1PickChoice(game, pending, decision) {
+        var sourceActor = pending.actor;
+        var targetActor = pending.target;
+        var zone = decision && decision.zone;
+        var cardId = decision && decision.cardId;
+        if (zone !== 'equipment' && zone !== 'hand') {
+          game.pendingChoice = pending;
+          return fail('请选择 equipment 或 hand。');
+        }
+        if (!cardId) {
+          game.pendingChoice = pending;
+          return fail('请通过 cardId 指定具体牌。');
+        }
+        var result = executeGuohe1v1Pick(game, sourceActor, targetActor, zone, cardId);
+        if (!result.ok) {
+          game.pendingChoice = pending;
+          return result;
+        }
+        return result;
+      }
+
       // v7 PR-7: 五谷丰登 — 顺序选牌循环。每个 picker：pool 仅余 1 张时强制
       // 取走（无可选项）；多张时按 skillPreferences.wugu 决定 auto/ask。
       // 暂停时 pauseState.wugu 保存 sourceActor / wuguCard / pool / order /
@@ -1931,6 +2013,9 @@
         if (pending.kind === 'wugu-pick') {
           return resolveWuguPickChoice(game, pending, decision || {});
         }
+        if (pending.kind === 'guohe-1v1-pick') {
+          return resolveGuohe1v1PickChoice(game, pending, decision || {});
+        }
         return fail('未知的选择类型：' + pending.kind);
       }
 
@@ -2174,6 +2259,17 @@
         }
         if ((card.type === 'guohe' || card.type === 'shunshou') && !hasAnyTargetableCard(game[opponent(actor)])) {
           return fail('对方没有可操作的牌。');
+        }
+        // v7 PR-9: gltjk card__scroll.md 过河拆桥 (1V1) — "你选择一项：
+        // 1.弃置目标角色的装备区里的一张牌；2.观看目标角色的手牌并弃置其中一张牌。"
+        // 1V1 变体不允许选判定区；若对手只有判定区有牌而无手牌/装备 → 无合法行动，拒绝。
+        if (card.type === 'guohe') {
+          var guoheFoe = game[opponent(actor)];
+          var guoheHasHand = (guoheFoe.hand || []).length > 0;
+          var guoheHasEquip = equipmentList(guoheFoe).length > 0;
+          if (!guoheHasHand && !guoheHasEquip) {
+            return fail('1V1【过河拆桥】只能弃对手装备区或手牌；对方两者皆空。');
+          }
         }
         // v7 PR-6: gltjk flow__condition.md 共同合法性: "判定区里有延时类锦囊
         // 牌的角色不是使用同名延时类锦囊牌的合法目标"。乐 / 兵 → opponent；
@@ -2477,15 +2573,12 @@
         if (card.type === 'wanjian') return finishTrickUse(game, actor, card, playAOE(game, actor, card, 'shan', '万箭齐发'), options);
 
         if (card.type === 'guohe') {
-          var target = game[opponent(actor)];
+          // v7 PR-9: 1V1 变体两选项 — 装备区一张 / 看手并弃一张。
           discardCard(game, card);
-          if (consumeWuxie(game, opponent(actor), '【过河拆桥】')) return finishTrickUse(game, actor, card, success('过河拆桥被无懈可击。'), options);
-          var droppedInfo = removeTargetZoneCard(game, opponent(actor), options.targetZone, options.targetCardId);
-          if (droppedInfo && droppedInfo.card) {
-            discardCard(game, droppedInfo.card);
-            log(game, actorName(game, actor) + '使用【过河拆桥】，弃置了' + actorName(game, opponent(actor)) + droppedInfo.zone + '的【' + droppedInfo.card.name + '】。');
+          if (consumeWuxie(game, opponent(actor), '【过河拆桥】')) {
+            return finishTrickUse(game, actor, card, success('过河拆桥被无懈可击。'), options);
           }
-          return finishTrickUse(game, actor, card, success('弃置对方一张牌。'), options);
+          return finishTrickUse(game, actor, card, resolveGuohe1v1(game, actor, opponent(actor), options), options);
         }
 
         if (card.type === 'shunshou') {
