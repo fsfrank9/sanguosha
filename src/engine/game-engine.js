@@ -409,19 +409,46 @@
         return { gainedSourceCard: true };
       }
 
-      // 1v1 minimal implementation: the cache spec lets 郭嘉 distribute the
-      // drawn cards to any actor, but the only other actor in a 1v1 match is
-      // the opponent, and giving cards to the opponent is dominated. Keep all
-      // cards on 郭嘉. Phase 6C may add a pause-prompt path so a human player
-      // can explicitly hand cards to the opponent for edge-case strategies.
+      // 遗计 (Phase 6C-bis): the cache spec lets 郭嘉 distribute the drawn
+      // cards to any actor. In 1v1 the only "other" is the opponent, which
+      // is dominated for most cards but legitimate strategy for low-value
+      // hands (e.g. discarding 杀 to a 桃-rich opponent does nothing for
+      // them, and frees deck space). We surface the choice when the
+      // skillPreferences.yiji preference is explicitly 'ask'; default is
+      // 'auto' (keep all to self), matching v5/v6B behavior. AI never opts
+      // into 'ask'.
       function triggerYijiDamageAfter(context) {
         var game = context.game;
         var targetActor = context.targetActor;
         var target = game[targetActor];
         if (!target || !hasSkill(target, 'yiji') || game.phase === 'gameover' || context.amount <= 0) return null;
+        var pref = (target.skillPreferences && target.skillPreferences.yiji) || 'auto';
+        if (pref === 'decline') {
+          log(game, actorName(game, targetActor) + '选择不发动【遗计】。');
+          return { declinedYiji: true };
+        }
+        var drawnIds = [];
         for (var i = 0; i < context.amount; i += 1) {
-          drawCards(game, targetActor, 2);
+          var batch = drawCards(game, targetActor, 2);
+          for (var j = 0; j < batch.length; j += 1) drawnIds.push(batch[j].id);
           log(game, actorName(game, targetActor) + '发动【遗计】，摸两张牌。');
+        }
+        if (pref === 'ask' && drawnIds.length > 0) {
+          // Snapshot the drawn cards (their current shape — they live in
+          // target.hand right now) so the UI can render them and the
+          // resolver can move chosen IDs to the opponent.
+          var cards = [];
+          for (var k = 0; k < drawnIds.length; k += 1) {
+            var found = target.hand.find(function (c) { return c.id === drawnIds[k]; });
+            if (found) cards.push({ id: found.id, name: found.name, type: found.type, suit: found.suit, rank: found.rank });
+          }
+          game.pendingChoice = {
+            kind: 'yiji-distribute',
+            actor: targetActor,
+            drawnIds: drawnIds,
+            cards: cards
+          };
+          return { suspendedForYiji: true };
         }
         return { triggeredYiji: true, drawPairs: context.amount };
       }
@@ -979,8 +1006,16 @@
       }
 
       // Resolve a pending player prompt. Decision shape depends on kind:
-      //   guicai-replace: { cardId } — picks the hand card used as the new
-      //                   judgement card. cardId === null means decline.
+      //   guicai-replace:  { cardId }              — picks the hand card used
+      //                                              as the new judgement
+      //                                              card. cardId === null
+      //                                              means decline.
+      //   yiji-distribute: { giveIds: [<cardId>] } — drawn cards in giveIds
+      //                                              are transferred to the
+      //                                              opponent. Cards not in
+      //                                              giveIds stay in hand.
+      //                                              giveIds === undefined or
+      //                                              empty means keep all.
       function resolvePendingChoice(game, decision) {
         var pending = game && game.pendingChoice;
         if (!pending) return fail('没有待处理的选择。');
@@ -988,7 +1023,36 @@
         if (pending.kind === 'guicai-replace') {
           return resolveGuicaiReplaceChoice(game, pending, decision || {});
         }
+        if (pending.kind === 'yiji-distribute') {
+          return resolveYijiDistributeChoice(game, pending, decision || {});
+        }
         return fail('未知的选择类型：' + pending.kind);
+      }
+
+      function resolveYijiDistributeChoice(game, pending, decision) {
+        var actor = pending.actor;
+        var state = game[actor];
+        if (!state) return fail('未知角色。');
+        var giveIds = Array.isArray(decision.giveIds) ? decision.giveIds : [];
+        var validIds = giveIds.filter(function (id) { return pending.drawnIds.indexOf(id) >= 0; });
+        if (validIds.length === 0) {
+          log(game, actorName(game, actor) + '将【遗计】所摸的牌全部留给自己。');
+          return success('遗计：全部留己。');
+        }
+        var opp = opponent(actor);
+        var oppState = game[opp];
+        var moved = [];
+        for (var i = 0; i < validIds.length; i += 1) {
+          var idx = state.hand.findIndex(function (c) { return c.id === validIds[i]; });
+          if (idx < 0) continue;
+          var card = state.hand.splice(idx, 1)[0];
+          oppState.hand.push(card);
+          moved.push(card.name);
+        }
+        if (moved.length > 0) {
+          log(game, actorName(game, actor) + '将【遗计】所摸的 ' + moved.length + ' 张牌交给' + actorName(game, opp) + '：' + moved.join('、') + '。');
+        }
+        return success('遗计：分配完成。');
       }
 
       function resolveGuicaiReplaceChoice(game, pending, decision) {
@@ -1157,9 +1221,23 @@
         return success('可以使用。');
       }
 
+      // 铁骑 (Phase 6C-bis): the cache wording ("发动者选择触发判定" /
+      // "可结算") frames the skill as optional, although the v5/v6 engine
+      // auto-fires. Rather than refactor playSha to pause mid-flow for a
+      // per-杀 prompt (which would require pauseState.playSha and a
+      // continuePlaySha continuation), we expose a persistent skill
+      // preference that the player can flip on the skill bar:
+      //   'auto' / undefined — fire on every Sha (legacy behavior, AI uses)
+      //   'decline'          — skip 铁骑 entirely (no judgement, target may
+      //                        still 闪 normally)
       function triggerTieqiNeedResponse(game, actor, targetActor, responseType, triggeringCard) {
         var source = game[actor];
         if (!source || responseType !== 'shan' || !isShaCard(triggeringCard) || !hasSkill(source, 'tieqi')) return null;
+        var pref = source.skillPreferences && source.skillPreferences.tieqi;
+        if (pref === 'decline') {
+          log(game, actorName(game, actor) + '选择不发动【铁骑】。');
+          return null;
+        }
         var tieqiJudge = judge(game, actor, '【铁骑】');
         if (tieqiJudge && tieqiJudge.color === 'red') {
           log(game, actorName(game, actor) + '发动【铁骑】，红色判定令' + actorName(game, targetActor) + '不能打出【闪】。');

@@ -40,6 +40,7 @@
           'guanxingHint', 'guanxingChoices', 'guanxingReverseBtn', 'guanxingConfirmBtn', 'guanxingCancelBtn', 'zhihengModePanel',
           'zhihengConfirmBtn', 'zhihengCancelBtn', 'zhihengHint', 'roleDraftPanel',
           'guicaiPromptPanel', 'guicaiPromptHint', 'guicaiOriginalCard', 'guicaiCandidates', 'guicaiDeclineBtn',
+          'yijiPromptPanel', 'yijiPromptHint', 'yijiCandidates', 'yijiKeepAllBtn', 'yijiConfirmBtn',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -144,18 +145,37 @@
             var label = skill.name + (skill.status === 'todo' ? '·未实现' : '');
             var title = formatSkillTooltip(skill, statusText);
             var dataAttrs = '';
-            // v6B: luoyi is officially optional. Render its button as a
-            // toggle (auto-fire ↔ decline) that the player can flip any time
-            // before their draw phase resolves. Click handler is special-
-            // cased downstream so the button can be enabled outside of play.
+            // v6B/6C-bis: officially-optional or auto-firing skills get a
+            // toggle on the skill bar so the player can flip auto-fire vs
+            // opt-out / opt-in. Click handler is special-cased downstream
+            // so the button can be enabled outside of play.
+            //   luoyi (default auto) ↔ 'decline'  — opt out of the trade
+            //   tieqi (default auto) ↔ 'decline'  — opt out of the judge
+            //   yiji  (default auto) ↔ 'ask'      — opt in to distribute
             if (skill.id === 'luoyi' && skill.status === 'implemented') {
-              var pref = (state.skillPreferences && state.skillPreferences.luoyi) || 'auto';
-              var luoyiDeclined = pref === 'decline';
+              var luoyiPref = state.skillPreferences && state.skillPreferences.luoyi;
+              var luoyiDeclined = luoyiPref === 'decline';
               active = !enemyThinking && !game.winner && game.turn === 'player';
               label = skill.name + '·' + (luoyiDeclined ? '本回合跳过' : '自动发动');
               title = formatSkillTooltip(skill, statusText) + '｜点击切换本回合是否发动';
               dataAttrs = ' data-skill-toggle="luoyi"';
               if (luoyiDeclined) statusClass += ' skill-toggle-off';
+            } else if (skill.id === 'tieqi' && skill.status === 'implemented') {
+              var tieqiPref = state.skillPreferences && state.skillPreferences.tieqi;
+              var tieqiDeclined = tieqiPref === 'decline';
+              active = !enemyThinking && !game.winner && game.turn === 'player';
+              label = skill.name + '·' + (tieqiDeclined ? '不发动' : '自动发动');
+              title = formatSkillTooltip(skill, statusText) + '｜点击切换本【杀】是否触发铁骑判定';
+              dataAttrs = ' data-skill-toggle="tieqi"';
+              if (tieqiDeclined) statusClass += ' skill-toggle-off';
+            } else if (skill.id === 'yiji' && skill.status === 'implemented') {
+              var yijiPref = state.skillPreferences && state.skillPreferences.yiji;
+              var yijiAsk = yijiPref === 'ask';
+              active = !enemyThinking && !game.winner && game.turn === 'player';
+              label = skill.name + '·' + (yijiAsk ? '手动分配' : '全部留己');
+              title = formatSkillTooltip(skill, statusText) + '｜点击切换：摸完后是否弹出分配面板';
+              dataAttrs = ' data-skill-toggle="yiji"';
+              if (yijiAsk) statusClass += ' skill-toggle-on';
             }
             return '<button class="mini-card skill-button' + statusClass + '" data-skill-id="' + escapeHtml(skill.id) + '"' + dataAttrs + ' ' + (active ? '' : 'disabled') + ' title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
           }).join('') || '<span class="mini-card">无技能</span>';
@@ -305,33 +325,64 @@
         return { spade: '♠', heart: '♥', club: '♣', diamond: '♦' }[suit] || suit || '';
       }
 
+      var yijiGiveSelection = [];
+
       function renderPendingChoice() {
         var pending = game && Engine.getPendingChoice(game);
-        if (!els.guicaiPromptPanel) return;
-        if (!pending || pending.kind !== 'guicai-replace' || pending.actor !== 'player') {
-          els.guicaiPromptPanel.hidden = true;
-          return;
+        var kind = pending && pending.kind;
+        if (els.guicaiPromptPanel) {
+          if (kind === 'guicai-replace' && pending.actor === 'player') {
+            els.guicaiPromptPanel.hidden = false;
+            if (els.guicaiPromptHint) {
+              els.guicaiPromptHint.textContent =
+                '鬼才：判定牌【' + pending.judgementCard.name + '】' + suitLabel(pending.judgementCard.suit) +
+                ' ' + (pending.judgementCard.rank || '') +
+                '（' + (pending.reason || '判定') + '）— 选择手牌替换或跳过';
+            }
+            if (els.guicaiOriginalCard) {
+              els.guicaiOriginalCard.innerHTML =
+                '<span class="mini-card">原判定：【' + escapeHtml(pending.judgementCard.name) +
+                '】' + escapeHtml(suitLabel(pending.judgementCard.suit)) +
+                ' ' + escapeHtml(String(pending.judgementCard.rank || '')) + '</span>';
+            }
+            if (els.guicaiCandidates) {
+              els.guicaiCandidates.innerHTML = pending.candidates.map(function (card) {
+                return '<button class="mini-card guicai-candidate" data-guicai-card-id="' + escapeHtml(card.id) +
+                  '" title="选这张作为新的判定牌">' +
+                  escapeHtml('【' + card.name + '】' + suitLabel(card.suit) + ' ' + (card.rank || '')) +
+                  '</button>';
+              }).join('') || '<span class="mini-card">手牌为空，必须跳过</span>';
+            }
+          } else {
+            els.guicaiPromptPanel.hidden = true;
+          }
         }
-        els.guicaiPromptPanel.hidden = false;
-        if (els.guicaiPromptHint) {
-          els.guicaiPromptHint.textContent =
-            '鬼才：判定牌【' + pending.judgementCard.name + '】' + suitLabel(pending.judgementCard.suit) +
-            ' ' + (pending.judgementCard.rank || '') +
-            '（' + (pending.reason || '判定') + '）— 选择手牌替换或跳过';
-        }
-        if (els.guicaiOriginalCard) {
-          els.guicaiOriginalCard.innerHTML =
-            '<span class="mini-card">原判定：【' + escapeHtml(pending.judgementCard.name) +
-            '】' + escapeHtml(suitLabel(pending.judgementCard.suit)) +
-            ' ' + escapeHtml(String(pending.judgementCard.rank || '')) + '</span>';
-        }
-        if (els.guicaiCandidates) {
-          els.guicaiCandidates.innerHTML = pending.candidates.map(function (card) {
-            return '<button class="mini-card guicai-candidate" data-guicai-card-id="' + escapeHtml(card.id) +
-              '" title="选这张作为新的判定牌">' +
-              escapeHtml('【' + card.name + '】' + suitLabel(card.suit) + ' ' + (card.rank || '')) +
-              '</button>';
-          }).join('') || '<span class="mini-card">手牌为空，必须跳过</span>';
+        if (els.yijiPromptPanel) {
+          if (kind === 'yiji-distribute' && pending.actor === 'player') {
+            els.yijiPromptPanel.hidden = false;
+            // Drop selections that no longer match this prompt's drawn IDs.
+            yijiGiveSelection = yijiGiveSelection.filter(function (id) {
+              return pending.drawnIds.indexOf(id) >= 0;
+            });
+            if (els.yijiPromptHint) {
+              els.yijiPromptHint.textContent =
+                '遗计：勾选要交给对方的牌（' + pending.cards.length + ' 张可分配，未勾选的留己）';
+            }
+            if (els.yijiCandidates) {
+              els.yijiCandidates.innerHTML = pending.cards.map(function (card) {
+                var selected = yijiGiveSelection.indexOf(card.id) >= 0;
+                return '<button class="mini-card yiji-candidate' + (selected ? ' selected' : '') +
+                  '" data-yiji-card-id="' + escapeHtml(card.id) +
+                  '" title="切换：交给对方 / 留给自己">' +
+                  escapeHtml('【' + card.name + '】' + suitLabel(card.suit) + ' ' + (card.rank || '')) +
+                  (selected ? ' · 交给对方' : ' · 留己') +
+                  '</button>';
+              }).join('') || '<span class="mini-card">未摸到任何牌</span>';
+            }
+          } else {
+            els.yijiPromptPanel.hidden = true;
+            yijiGiveSelection = [];
+          }
         }
       }
 
@@ -1036,15 +1087,35 @@
           if (!result.ok) renderLog();
           render();
         });
+        if (els.yijiCandidates) els.yijiCandidates.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-yiji-card-id]');
+          if (!btn) return;
+          var id = btn.getAttribute('data-yiji-card-id');
+          var idx = yijiGiveSelection.indexOf(id);
+          if (idx >= 0) yijiGiveSelection.splice(idx, 1);
+          else yijiGiveSelection.push(id);
+          render();
+        });
+        if (els.yijiConfirmBtn) els.yijiConfirmBtn.addEventListener('click', function () {
+          Engine.resolvePendingChoice(game, { giveIds: yijiGiveSelection.slice() });
+          yijiGiveSelection = [];
+          render();
+        });
+        if (els.yijiKeepAllBtn) els.yijiKeepAllBtn.addEventListener('click', function () {
+          Engine.resolvePendingChoice(game, { giveIds: [] });
+          yijiGiveSelection = [];
+          render();
+        });
         if (els.playerSkillBar) els.playerSkillBar.addEventListener('click', function (event) {
           var skill = event.target.closest('[data-skill-id]');
           if (!skill || skill.disabled) return;
           var toggle = skill.getAttribute('data-skill-toggle');
           if (toggle) {
             var current = Engine.getSkillPreference(game, 'player', toggle);
-            // Cycle null (default) ↔ 'decline'. Other preference values (e.g.
-            // 'auto' for guicai) are set explicitly through other UI controls.
-            Engine.setSkillPreference(game, 'player', toggle, current === 'decline' ? null : 'decline');
+            // Each skill has its own opt-in/opt-out value vs the default.
+            // null = default; flipping cycles to the skill-specific value.
+            var flipValue = toggle === 'yiji' ? 'ask' : 'decline';
+            Engine.setSkillPreference(game, 'player', toggle, current === flipValue ? null : flipValue);
             render();
             return;
           }

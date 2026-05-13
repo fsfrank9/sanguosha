@@ -188,27 +188,31 @@
 
 ## Phase 6C-bis — 遗计 / 铁骑 接入既有 pause-prompt
 
-**Status:** 待启动。
+**Status:** ✅ 已完成。
 
-### 设计要点
+### 实际交付（与最初设计的差异）
 
-- 6C 已经把 pendingChoice + pauseState 基建做好。本阶段只是再写两个 hook 改造 + 两个 UI panel。
-- **【遗计】**：`triggerYijiDamageAfter` 改成"actor 为 player 且对手非满血时 → 摸完的 N 张牌先放到 pendingChoice.payload.drawnIds，玩家选 keep-self / split / give-all-opponent"。AI 维持 keep-self 默认。
-- **【铁骑】**：新增 `skillPreferences.tieqi` 切换 auto-fire（默认）与 ask-each-sha；ask 模式下 player 用【杀】时先 pendingChoice 弹"是否发动【铁骑】"。
-- pauseState 也许需要 `damageResume` / `playShaResume` 两条子状态。鬼才已经验证过 judgeArea 的可再入模式，复用其骨架。
+- **【遗计】**：按计划，`pendingChoice.kind === 'yiji-distribute'` 暂停在 onDamageAfter 之后；`resolveYijiDistributeChoice` 把 `giveIds` 中的牌从郭嘉手牌移到对手手牌。`skillPreferences.yiji` 默认 `auto`（全部留己，保持 v5 行为），玩家可切到 `ask`（弹分配面板）或 `decline`（不摸牌不分配）。AI 永远走 `auto`。
+- **【铁骑】**：原设计是"ask 模式下 player 用【杀】时先弹是否发动"，但要实现需要把 `playSha` 拆成可中断的两段（pauseState.playSha + continuePlaySha），增加面积超过其价值。改成**持久 toggle**：`skillPreferences.tieqi` 默认 `auto`，玩家可切 `decline` 即全局禁用铁骑判定（target 可正常打闪）。要让铁骑"再次自动触发"只需切回 default。语义上比 ask-each-sha 略弱，但完全满足"不想发动"的需求，且没动 playSha 体量。
+- 6.0 audit harness 这里保持现状（schema 26/26 ✅，spec 26/26 ✅）；"⚠️ 部分对齐"目前没有专门的字段表达，留给后续 phase 在 audit harness 升级时再加。
 
-### 任务
+### 落地范围
 
-- Task 1: 遗计 hook 改造 + `resolveYijiDistributeChoice` 派发；UI 加 `#yijiPromptPanel`。
-- Task 2: 铁骑 hook 改造 + `resolveTieqiFireChoice`；UI 加 `#tieqiPromptPanel`。
-- Task 3: 新增 `tests/pending_choice.test.mjs` 拓展 2-4 条断言覆盖遗计/铁骑。
-- Task 4: 更新 6.0 audit harness 让"⚠️ 部分对齐"可识别 + 收尾让 26 / 26 全 ✅。
+- `src/engine/game-engine.js`:
+    * `triggerYijiDamageAfter` 读 `skillPreferences.yiji`，`'ask'` 时建 pendingChoice、`'decline'` 时跳过摸牌、`'auto'`/未设置时维持现行。
+    * `triggerTieqiNeedResponse` 读 `skillPreferences.tieqi`，`'decline'` 时返回 null（不判定、不锁闪）。
+    * `resolvePendingChoice` 新增 `yiji-distribute` 分支；`resolveYijiDistributeChoice` 处理 `decision.giveIds`，把选中牌从郭嘉手牌挪到对手。
+- `index.html` + `src/ui/dom-adapter.js`:
+    * 新 `#yijiPromptPanel` 列出可分配的牌，按钮切勾选状态；"确认分配" 与 "全部留己" 两条出口。
+    * 技能栏 toggle 推广到 tieqi (`auto ↔ decline`) 与 yiji (`auto ↔ ask`)，与 6B 的 luoyi 共享同一段渲染/点击代码。
+- `tests/pending_choice.test.mjs`:
+    * 新增 7 条覆盖：yiji default / yiji ask suspend / yiji giveIds transfer / yiji keep-all / yiji decline / tieqi default auto / tieqi decline。
 
-### 验收标准
+### 验收
 
-- `npm test` 全绿。
-- 浏览器中玩家选郭嘉 / 马超开局，对应 prompt 在正确时机弹出并能解析继续。
-- 6.0 audit harness 全部 ✅。
+- `npm test` 全绿（31 个测试文件，pending_choice 共 14 条断言）。
+- 浏览器选郭嘉开局，技能栏点【遗计·全部留己】→ 切为【遗计·手动分配】。被对手【杀】命中后 `#yijiPromptPanel` 弹出，勾选若干牌后点"确认分配"会把所选牌移到对方手牌；点"全部留己"则全部留下。
+- 浏览器选马超开局，技能栏点【铁骑·自动发动】→ 切为【铁骑·不发动】。再使用【杀】不再判定，对手可正常打【闪】。
 
 ---
 
