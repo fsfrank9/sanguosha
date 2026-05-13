@@ -1866,6 +1866,28 @@
         var self = game[actor];
         if (!self) return null;
         self.flags = self.flags || {};
+        var target = game[opponent(actor)];
+
+        // 观星: free information; fire once per turn whenever deck has cards.
+        if (hasSkill(self, 'guanxing') && !self.flags.guanxingUsed && game.deck.length > 0) {
+          return { skillId: 'guanxing', cardIds: [], options: {} };
+        }
+
+        // 仁德: heal-trigger only. Giving cards to the opponent in 1v1 is a
+        // real cost, so only fire when (a) the heal can fire this turn
+        // (rendeGiven >= 1 means one more triggers heal), or (b) we are at
+        // 1 HP and need 2 cards to start the heal chain. Always pick the
+        // lowest-value card to give.
+        if (hasSkill(self, 'rende') && self.hp < self.maxHp && !self.flags.rendeHealed && self.hand.length > 0) {
+          var rendeGiven = self.flags.rendeGiven || 0;
+          var emergency = self.hp <= 1 && self.hand.length >= 2;
+          if (rendeGiven >= 1 || emergency) {
+            var rendeCandidates = self.hand
+              .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
+              .sort(function (a, b) { return a.score - b.score; });
+            return { skillId: 'rende', cardIds: [rendeCandidates[0].card.id] };
+          }
+        }
 
         if (hasSkill(self, 'kurou') && !self.flags.aiKurouUsed && self.hp > 1) {
           var hasPlayable = !!aiChooseCard(game, actor);
@@ -1884,6 +1906,27 @@
           if (candidates.length) return { skillId: 'zhiheng', cardIds: [candidates[0].card.id] };
         }
 
+        // 反间: opportunistic chip damage. The opponent guesses a suit
+        // (default 'spade' if no UI prompt); giving a non-spade card biases
+        // toward triggering damage. Only fire when we can afford the card
+        // loss — either we are over hand limit (the card would be discarded
+        // anyway) or the opponent is at low HP and the chip helps close out.
+        if (hasSkill(self, 'fanjian') && !self.flags.fanjianUsed && self.hand.length > 0 && target) {
+          var overLimit = self.hand.length > handLimit(game, actor);
+          var oppLowHp = target.hp <= 2;
+          if (overLimit || oppLowHp) {
+            var fanjianCandidates = self.hand
+              .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
+              .sort(function (a, b) { return a.score - b.score; });
+            // Prefer giving a non-spade card so the default 'spade' guess
+            // tends to miss, biasing toward damage. Fall back to the lowest-
+            // score card if every hand card is a spade.
+            var nonSpade = fanjianCandidates.find(function (item) { return item.card.suit !== 'spade'; });
+            var picked = nonSpade || fanjianCandidates[0];
+            return { skillId: 'fanjian', cardIds: [picked.card.id] };
+          }
+        }
+
         return null;
       }
 
@@ -1896,7 +1939,7 @@
 
         var skillAction = aiChooseSkillAction(game, actor);
         if (skillAction) {
-          var skillResult = useSkill(game, actor, skillAction.skillId, skillAction.cardIds);
+          var skillResult = useSkill(game, actor, skillAction.skillId, skillAction.cardIds, skillAction.options);
           if (skillResult.ok && skillAction.skillId === 'kurou') game[actor].flags.aiKurouUsed = true;
           skillResult.action = skillAction.skillId;
           return skillResult;
