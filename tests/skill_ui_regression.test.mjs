@@ -124,7 +124,7 @@ test('converted Wusheng damage keeps the original physical card for Jianxiong/di
   assert.equal(gained.name, '桃');
 });
 
-test('Guanxing shows top cards in the UI and supports reordering before the skill is consumed', () => {
+test('Guanxing previews min(aliveActorCount, 5, deckSize) cards and reorders via topIds/bottomIds (v6.1)', () => {
   assert.equal(typeof Engine.getGuanxingPreview, 'function', 'engine should expose a non-consuming Guanxing preview');
   const game = Engine.newGame({ seed: 7104, playerHero: 'zhugeliang', enemyHero: 'caocao' });
   game.turn = 'player';
@@ -139,14 +139,19 @@ test('Guanxing shows top cards in the UI and supports reordering before the skil
   ];
   const preview = Engine.getGuanxingPreview(game, 'player');
   assert.equal(preview.ok, true, preview.message);
-  assert.deepEqual(Array.from(preview.cards).map((card) => card.id), ['top-5', 'top-4', 'top-3', 'top-2', 'top-1']);
+  // 1v1 ⇒ aliveActorCount = 2 ⇒ preview is the top 2 cards only.
+  assert.deepEqual(Array.from(preview.cards).map((card) => card.id), ['top-2', 'top-1']);
   assert.equal(game.player.flags.guanxingUsed, undefined, 'preview must not consume Guanxing');
-  assert.equal(Engine.useSkill(game, 'player', 'guanxing', [], { orderIds: ['top-1', 'top-2', 'top-3', 'top-4', 'top-5'] }).ok, true);
-  assert.deepEqual(game.deck.slice(-5).map((card) => card.id), ['top-1', 'top-2', 'top-3', 'top-4', 'top-5'], 'orderIds should reorder the deck top');
+
+  // New API: topIds[0] is drawn first. With topIds=['top-1','top-2'], deck
+  // top after reorder should be top-1 (drawn next), then top-2.
+  assert.equal(Engine.useSkill(game, 'player', 'guanxing', [], { topIds: ['top-1', 'top-2'], bottomIds: [] }).ok, true);
+  assert.deepEqual(game.deck.slice(-2).map((card) => card.id), ['top-2', 'top-1'], 'topIds[0] should end up at deck top (pop() first)');
 
   assert.match(html, /id="guanxingModePanel"/, 'UI should expose a Guanxing panel');
-  assert.match(html, /function showGuanxingPanel\(\)/, 'UI should preview Guanxing cards before confirming');
-  assert.match(html, /id="guanxingReverseBtn"/, 'UI should offer at least one reorder action');
+  assert.match(html, /function showGuanxingPanelFromPending\(\)/, 'UI should preview Guanxing cards from pendingChoice');
+  assert.match(html, /id="guanxingTopBtn"/, 'UI should offer a "place on top" action (v6.1)');
+  assert.match(html, /id="guanxingBottomBtn"/, 'UI should offer a "place on bottom" action (v6.1)');
   assert.match(html, /function confirmGuanxing\(\)/, 'UI should confirm Guanxing after preview/reorder');
 });
 

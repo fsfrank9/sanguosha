@@ -196,12 +196,26 @@
           <button class="btn small" id="conversionCancelBtn">取消</button>
         </div>
         <div class="guanxing-mode-panel" id="guanxingModePanel" hidden>
-          <span class="badge" id="guanxingHint">观星：预览牌堆顶牌</span>
-          <button class="btn small" id="guanxingReverseBtn">逆序调整</button>
-          <button class="btn small" id="guanxingConfirmBtn">确认观星</button>
-          <button class="btn small" id="guanxingCancelBtn">取消</button>
-          <div class="guanxing-card-choices" id="guanxingChoices" aria-live="polite">
-            <span class="mini-card">发动观星后显示牌堆顶牌</span>
+          <span class="badge" id="guanxingHint">观星：准备阶段开始时分配预览牌</span>
+          <div class="guanxing-zone" id="guanxingUnassigned" aria-live="polite">
+            <span class="mini-card">待分配的牌（点选）</span>
+          </div>
+          <div class="guanxing-zone-row">
+            <button class="btn small" id="guanxingTopBtn">↑ 放牌堆顶</button>
+            <button class="btn small" id="guanxingBottomBtn">↓ 放牌堆底</button>
+            <button class="btn small" id="guanxingReturnBtn">↩ 取回未分配</button>
+          </div>
+          <div class="guanxing-zone-label">牌堆顶（左→右 = 先抽→后抽）</div>
+          <div class="guanxing-zone" id="guanxingTopZone" aria-live="polite">
+            <span class="mini-card">尚无</span>
+          </div>
+          <div class="guanxing-zone-label">牌堆底（左→右 = 先抽→后抽，最右最底）</div>
+          <div class="guanxing-zone" id="guanxingBottomZone" aria-live="polite">
+            <span class="mini-card">尚无</span>
+          </div>
+          <div class="guanxing-zone-row">
+            <button class="btn small" id="guanxingConfirmBtn">确认观星</button>
+            <button class="btn small" id="guanxingDeclineBtn">不发动</button>
           </div>
         </div>
         <div class="zhiheng-mode-panel" id="zhihengModePanel" hidden>

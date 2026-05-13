@@ -91,6 +91,17 @@
     return state.chained ? '铁索横置' : '未横置';
   }
 
+  function aliveActorCount(game) {
+    if (!game) return 0;
+    var actors = ['player', 'enemy'];
+    var count = 0;
+    for (var i = 0; i < actors.length; i += 1) {
+      var s = game[actors[i]];
+      if (s && typeof s.hp === 'number' && s.hp > 0) count += 1;
+    }
+    return count;
+  }
+
   export const StateRuntime = {
     actorName: actorName,
     opponent: opponent,
@@ -103,5 +114,6 @@
     canReachWithSha: canReachWithSha,
     firstActorFromRoles: firstActorFromRoles,
     handLimit: handLimit,
-    getActorStatus: getActorStatus
+    getActorStatus: getActorStatus,
+    aliveActorCount: aliveActorCount
   };
