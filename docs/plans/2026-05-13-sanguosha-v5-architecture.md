@@ -49,7 +49,7 @@
 
 ## Phase 5.0 — Plan + RED architecture scaffold (本次提交)
 
-**Status:** 进行中。
+**Status:** ✅ 已完成。
 
 ### Task 1: 计划文档
 
@@ -77,7 +77,7 @@
 
 ## Phase 5A — Source modules → ES exports + multi-script HTML entry
 
-**Status:** 待启动。
+**Status:** ✅ 已完成。
 
 ### 设计要点
 
@@ -145,7 +145,7 @@
 
 ## Phase 5B — Tests switch from `vm.runInContext` to `import`
 
-**Status:** 待启动。
+**Status:** ✅ 已完成。
 
 ### 设计要点
 
@@ -182,7 +182,7 @@
 
 ## Phase 5C — Drop legacy: single-file artifact, build concat, window shims
 
-**Status:** 待启动。
+**Status:** ✅ 已完成。
 
 ### 任务
 
@@ -204,7 +204,7 @@
 
 ## Phase 5D — GitHub Pages publish
 
-**Status:** 待启动。
+**Status:** ✅ 已完成。
 
 ### 任务
 
@@ -221,7 +221,7 @@
 
 ## Phase 5E — 收尾
 
-**Status:** 待启动。
+**Status:** ✅ 已完成。
 
 ### 任务
 

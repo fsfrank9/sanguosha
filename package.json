@@ -1,9 +1,9 @@
 {
   "name": "sanguosha-html",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "private": true,
   "type": "module",
-  "description": "Offline 三国杀 browser game with modular source and single-file build artifact.",
+  "description": "三国杀 1v1 browser game served as native ES modules from a static GitHub Pages site.",
   "scripts": {
     "build": "node tools/build.mjs",
     "build:check": "node tools/build.mjs --check",
