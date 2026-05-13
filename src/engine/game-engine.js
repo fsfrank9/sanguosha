@@ -2073,10 +2073,21 @@
 
         if (card.type === 'taoyuan') {
           discardCard(game, card);
-          ['player', 'enemy'].forEach(function (side) {
-            game[side].hp = Math.min(game[side].maxHp, game[side].hp + 1);
+          // v7 PR-2: gltjk card__scroll.md 注："对未受伤的角色无效"。
+          // 多角色结算顺序：从当前回合角色开始按逆时针方向（rule__principle.md
+          // 多角色结算顺序原则 a.），即发动者先结算、对手后结算。
+          log(game, actorName(game, actor) + '使用【桃园结义】。');
+          var taoyuanOrder = [actor, opponent(actor)];
+          taoyuanOrder.forEach(function (side) {
+            var taoyuanState = game[side];
+            if (!taoyuanState) return;
+            if (taoyuanState.hp >= taoyuanState.maxHp) {
+              log(game, '【桃园结义】对' + actorName(game, side) + '无效（未受伤）。');
+              return;
+            }
+            taoyuanState.hp = Math.min(taoyuanState.maxHp, taoyuanState.hp + 1);
+            log(game, actorName(game, side) + '因【桃园结义】回复 1 点体力。');
           });
-          log(game, actorName(game, actor) + '使用【桃园结义】，所有角色回复 1 点体力。');
           return finishTrickUse(game, actor, card, success('桃园结义结算完成。'), options);
         }
 

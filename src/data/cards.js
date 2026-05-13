@@ -166,10 +166,10 @@
           engineHooks: ['playJiedao']
         },
         taoyuan: {
-          summary: '所有存活角色依次回复 1 点体力。',
+          summary: '所有角色按发动者起逆时针顺序结算；已受伤的角色回复 1 点体力，未受伤的角色无效。',
           timing: 'playPhase',
           targets: 'all-living',
-          effect: '按座次依次结算，每名存活角色回复 1 体力（不超上限）。',
+          effect: 'v7 PR-2: 从发动者开始按逆时针依次处理；hp == maxHp 的目标无效（spec："对未受伤的角色无效"）。',
           frequency: 'unlimited',
           responseWindow: ['wuxie'],
           engineHooks: ['playTaoyuan']
