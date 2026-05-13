@@ -347,28 +347,52 @@
 
 ---
 
-## Phase 6F — AI skill awareness
+## Phase 6F — AI skill awareness (active skills)
 
-**Status:** 待启动。
+**Status:** ✅ 已完成（active skills 子批次）。
 
-### 设计要点
+### 修订说明（与最初设计的差异）
 
-- 当前 `aiTakeAction` 只识别【苦肉】【制衡】两个主动技；扩展到 26 个：
-  - 主动技（仁德、反间、观星、苦肉、制衡）：进入 AI 主动调度循环。
-  - 转化/响应技（武圣、龙胆、倾国、铁骑、英姿、突袭、奇才）：扩 `findResponseCard` / `canPlayCardAs` 时 AI 也走转化路径。
-  - 被动/伤后技（奸雄、反馈、刚烈、鬼才、天妒、遗计、闭月、克己、集智、空城、谦逊、咆哮、马术、裸衣）：原本就在 hook 里跑，AI 只需在评分时把"我有这些技能"作为正向权重。
-- 引入 `aiSkillStrategy` 表，每个技能一个"该不该用 / 用了之后期望收益"配置；评分函数读这个表。
+最初的设计是「26 个技能全 AI 化 + 抽 ai-strategy.js 模块」。落地时把范围聚焦到**真正需要 AI 决策**的部分：
 
-### 任务
+- **主动技（active skills, 5 个: 苦肉/制衡/仁德/反间/观星）**：AI 必须显式选用。原来已有 2 个（苦肉/制衡），本 phase 补齐另外 3 个。
+- **被动/伤后/锁定技（约 15 个: 奸雄/反馈/刚烈/鬼才/天妒/遗计/闭月/克己/集智/空城/谦逊/咆哮/马术/奇才/英姿等）**：由引擎 SkillRuntime hooks 自动触发，**无论 player 还是 AI 都同样工作**。不需要 AI 额外决策代码，无需 6F 介入。
+- **转化技（武圣/龙胆/倾国 = 3 个）**：当 AI 手里没有【杀】但有红色 / 黑色牌时，AI 应该考虑用 `playCardAs('sha')` / `playCardAs('shan')`。当前 `aiChooseCard` 只看 hand 原始牌型，没有走 `canPlayCardAs` 路径，确实是个 gap。**留到 Phase 6F-bis**。
+- **响应锁定技（铁骑）**：6C-bis 已经做好默认 auto-fire + 玩家可 decline；AI 默认 auto。无 6F 决策代码。
+- **裸衣**：6B 默认 auto-fire；AI 默认 auto，自动获得伤害加成。无 6F 决策代码。
 
-- Task 1: 新增 `src/engine/ai-strategy.js`（与现有 game-engine.js AI 段独立，便于以后扩展）。
-- Task 2: 把当前内嵌评分逻辑（杀=45–78、桃=100、酒=82 等）迁过去并扩展。
-- Task 3: 新增 `tests/ai_skills.test.mjs`：26 条对照测试，每条断言"在 X 条件下，AI 应该用 / 不应该用 Y 技能"。
+抽 `ai-strategy.js` 单独模块的工作量与收益不成比例（当前 AI 逻辑 ~90 行，单独模块化为时尚早），留到决策面真的变大再考虑。
 
-### 验收标准
+### 落地范围
 
-- `npm test` 全绿。
-- 浏览器 smoke：AI 控制黄盖时会主动使用【苦肉】（已有），AI 控制黄月英、孙权、刘备、周瑜、诸葛亮时都能看到技能被合理使用。
+- `src/engine/game-engine.js`:
+    * `aiChooseSkillAction` 新增三段决策分支：
+      - **观星**：deck 非空且本回合未用过 → 立即发动（不指定 orderIds，等同于纯预览）。
+      - **仁德**：HP 不满且未触发 heal 时；条件 (a) `rendeGiven >= 1`（再给一张就触发回血）或 (b) HP <= 1 且手牌 >= 2（紧急启动 heal 链）。挑得分最低的一张牌给对方。
+      - **反间**：本回合未用且 (a) 手牌超过 hand limit 或 (b) 对方 HP <= 2 才发动。挑非黑桃手牌（让默认黑桃 guess 大概率猜错触发 1 点伤害）。
+    * 优先级顺序: 观星 → 仁德 → 苦肉 → 制衡 → 反间。先用免费/治疗，再用循环，最后才是赌博性伤害。
+    * `aiTakeAction` 把 `skillAction.options` 串进 `useSkill(..., options)`，让 AI 可以传递 skill-specific 参数（目前主要给观星，将来 6F-bis 也会用到）。
+- `tests/ai_skill_awareness.test.mjs`（新增）：11 条断言覆盖
+    - 观星：available 时立即发动；同回合不重复触发。
+    - 仁德：满血时不发动；rendeGiven=1 时发动；HP=1 时紧急发动；调用后 player 手牌+1 且 rendeHealed 置位。
+    - 反间：健康对手不发动；低 HP 对手发动；优先选非黑桃手牌。
+    - 优先级：观星先于仁德。
+    - 司马懿（无 active skill）：不发动任何主动技。
+
+### 验收
+
+- `npm test` 全绿（34 个测试文件）。
+- `node tests/ai_skill_awareness.test.mjs` 11/11 ✅。
+- 浏览器选 AI = 诸葛亮/刘备/周瑜，AI 回合开始时会按上述条件分别使用观星/仁德/反间。
+
+### 后续 — Phase 6F-bis (待启动)
+
+转化技 AI：当 AI 控制关羽/赵云/甄姬等且手里没有 sha/shan 而有红色/黑色牌时，扩展 `aiChooseCard` 与 `findResponseCard`，让 AI 通过 `playCardAs` / `canRespondAs` 走转化路径。具体改动:
+
+- `aiChooseCard`：除了原 hand 牌型，再扫一遍 hand 看哪些可通过 `canPlayCardAs(game, actor, card, 'sha')` 转化成杀；按转化后的价值评分。
+- `findResponseCard` (或等效): AI 应该自动用倾国把黑色手牌当闪。
+
+预计代码量 ~50 行 + 5-8 条新测试。
 
 ---
 
