@@ -68,6 +68,8 @@
           // v9 PR-E1: 装饰外框角落 widgets — 菜单 / 分享. placeholder 行为, 等
           // PR-E5 接入侧抽屉.
           'frameMenuBtn', 'frameShareBtn',
+          // v9 PR-E2: 中央日志 overlay + 暂停 brush 横幅 + 底部状态条
+          'logOverlay', 'pauseBanner', 'statusBar', 'statusBarVersion', 'statusBarScore', 'statusBarTime',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -284,6 +286,46 @@
           return '<div class="log-entry">' + escapeHtml(entry) + '</div>';
         }).join('');
         scrollLogToBottom();
+        renderLogOverlay();
+      }
+
+      // v9 PR-E2: 中央日志 overlay — 渲染最近 6 条到大字 overlay.
+      // 包含"阶段"或"回合"关键词的条目用 phase 高亮色 (浅金).
+      function renderLogOverlay() {
+        if (!els.logOverlay || !game) return;
+        var recent = game.log.slice(-6);
+        els.logOverlay.innerHTML = recent.map(function (entry) {
+          var isPhase = /阶段|回合开始|回合结束/.test(entry);
+          var cls = 'log-overlay__entry' + (isPhase ? ' log-overlay__entry--phase' : '');
+          return '<div class="' + cls + '">' + escapeHtml(entry) + '</div>';
+        }).join('');
+      }
+
+      // v9 PR-E2: 暂停 brush 横幅 — 等待玩家选择 (pendingChoice 存在)
+      // 或 enemyThinking 中时显示。游戏结束时也复用作 game-over 提示。
+      function renderPauseBanner() {
+        if (!els.pauseBanner) return;
+        var pending = game && Engine.getPendingChoice(game);
+        var showPause = !!(game && (pending || enemyThinking) && game.phase !== 'gameover');
+        els.pauseBanner.hidden = !showPause;
+      }
+
+      // v9 PR-E2: 底部状态条 — 版本 (硬编码 v9) / 分数占位 (用牌堆张数作
+      // 视觉占位, 无经济系统) / 实时时钟. 时钟在 bindEvents 里通过
+      // setInterval 每秒刷新, 此 fn 只渲染版本+score 部分。
+      function renderStatusBar() {
+        if (!els.statusBarScore || !game) return;
+        // 分数占位: 显示牌堆 + 弃牌 总数 (visual filler, 无实际意义)
+        var total = (game.deck ? game.deck.length : 0) + (game.discard ? game.discard.length : 0);
+        els.statusBarScore.textContent = String(total);
+      }
+
+      function tickStatusBarTime() {
+        if (!els.statusBarTime) return;
+        var now = new Date();
+        var hh = String(now.getHours()).padStart(2, '0');
+        var mm = String(now.getMinutes()).padStart(2, '0');
+        els.statusBarTime.textContent = hh + ':' + mm;
       }
 
       function stateStatusMarkup(actor, base) {
@@ -386,6 +428,9 @@
         renderPhaseTrack();
         renderZones();
         renderPendingChoice();
+        // v9 PR-E2: 暂停横幅 + 状态条
+        renderPauseBanner();
+        renderStatusBar();
         els.enemyHandBacks.innerHTML = miniBacks(game.enemy.hand.length);
       }
 
@@ -1509,6 +1554,11 @@
       }
 
       function bindEvents() {
+        // v9 PR-E2: 实时时钟 — 启动 + 每分钟刷新一次 (秒级精度对玩家无意义).
+        if (els.statusBarTime) {
+          tickStatusBarTime();
+          window.setInterval(tickStatusBarTime, 60 * 1000);
+        }
         els.newGameBtn.addEventListener('click', showSetup);
         if (els.startGameBtn) els.startGameBtn.addEventListener('click', newGame);
         if (els.randomPlayerHeroBtn) els.randomPlayerHeroBtn.addEventListener('click', function () { randomizeHero('player'); });

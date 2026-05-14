@@ -59,6 +59,20 @@
     </section>
 
     <section class="duel-table" id="duelTable" hidden>
+      <!-- v9 PR-E2: 中央日志 overlay + 暂停 brush 横幅 + 底部状态条.
+           overlay 显示最近 4-6 条 game.log; pause-banner 在等待玩家选择
+           (pendingChoice 或 enemyThinking) 时显示; status-bar 显示版本 /
+           占位分数 / 实时时钟. 都绝对定位在 .duel-table 上. -->
+      <div class="log-overlay" id="logOverlay" aria-live="polite"></div>
+      <div class="pause-banner" id="pauseBanner" hidden>
+        <span class="pause-banner__brush">游戏暂停中......</span>
+      </div>
+      <div class="status-bar" id="statusBar" aria-hidden="true">
+        <span class="status-bar__version" id="statusBarVersion">v9.0.0</span>
+        <span class="status-bar__score" id="statusBarScore">0</span>
+        <span class="status-bar__time" id="statusBarTime">--:--</span>
+      </div>
+
       <section class="opponent-zone" id="enemyBoard">
         <div class="zone-panel">
           <div class="zone-title">敌方判定区 <span class="badge">延时锦囊</span></div>

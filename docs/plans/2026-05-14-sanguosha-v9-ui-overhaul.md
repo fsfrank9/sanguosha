@@ -28,8 +28,8 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 |---|---|---|
 | PLAN | 本文档 — v9 方向 D 完整计划 | 🟢 PR #67 已合并 |
 | PR-E0 | CSS 拆分基础 (`main.css` 953 行 → 8 个职责文件 + 1 entry) | 🟢 PR #68 已合并 |
-| PR-E1 | 整体布局重构 + 装饰外框 (橙红 striped border + 角落 widgets) | 🟡 PR 待合并 |
-| PR-E2 | 中央日志 overlay + 状态条 + 暂停 brush 横幅 | ⏸ 待开 |
+| PR-E1 | 整体布局重构 + 装饰外框 (橙红 striped border + 角落 widgets) | 🟢 PR #69 已合并 |
+| PR-E2 | 中央日志 overlay + 状态条 + 暂停 brush 横幅 | 🟡 PR 待合并 |
 | PR-E3 | 卡牌外观重设计 (corner 花色+点数 + 卡身色块 + 底部 label) | ⏸ 待开 |
 | PR-E4 | 武将 portrait + HP 红方块 + 装备/判定区 + 技能 framed tag | ⏸ 待开 |
 | PR-E5 | 左上"菜单"按钮 + 侧抽屉 + 退出确认 modal (卷轴风) | ⏸ 待开 |
@@ -58,6 +58,37 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E2 落地 — 中央日志 + 暂停横幅 + 底部状态条 ✅
+
+**实际改动**:
+
+HTML (`index.html`) 在 `.duel-table` 顶部加 3 个 overlay 元素:
+- `<div class="log-overlay" id="logOverlay" aria-live="polite">` — 中央日志容器
+- `<div class="pause-banner" id="pauseBanner" hidden>` — 暂停 brush 横幅 (内含 `.pause-banner__brush` 文本)
+- `<div class="status-bar" id="statusBar">` — 底部状态条 (`statusBarVersion` / `statusBarScore` / `statusBarTime`)
+
+CSS:
+- `layout.css`: `.duel-table` 加 `position: relative` (overlay 锚); `.pause-banner` + `.pause-banner__brush` (多 `box-shadow` 偏移模拟笔触不规则边缘); `.status-bar` + 3 子样式
+- `zones.css`: `.log-overlay` 绝对定位 (`top: 24%`), `.log-overlay__entry` 大字白色 (clamp 15-21px) + 多层 text-shadow, `.log-overlay__entry--phase` 阶段名浅金高亮, `@keyframes log-overlay-in` 进入动画 (.25s fade-up)
+
+dom-adapter:
+- els 缓存追加 6 个新 ids
+- 新增 `renderLogOverlay()` — 取 `game.log.slice(-6)`, 用正则 `/阶段|回合开始|回合结束/` 给阶段名加 `--phase` 类
+- 新增 `renderPauseBanner()` — `pendingChoice || enemyThinking` 时显示 (gameover 排除)
+- 新增 `renderStatusBar()` — 把 `deck.length + discard.length` 作为占位分数
+- 新增 `tickStatusBarTime()` — 用 `Date()` 渲染 HH:MM
+- `renderLog()` 末尾调 `renderLogOverlay()`
+- `render()` 末尾调 `renderPauseBanner()` + `renderStatusBar()`
+- `bindEvents()` 启动 `setInterval(tickStatusBarTime, 60_000)`
+
+**新增** `tests/v9_pr_e2_center_log.test.mjs` (13 条守护):
+- HTML: 3 个 overlay 在 `.duel-table` 内 / pauseBanner 默认 hidden + brush 文本 / statusBar 3 子元素
+- CSS: `.duel-table` position relative / log-overlay 绝对定位 + pointer-events:none + 进入动画 / pause-banner brush 多 box-shadow / status-bar 3 子样式
+- dom-adapter: 6 ids 缓存 / 4 个新 fn / render 调用 / setInterval 接入
+- 回归: loadAllStyles 含新规则
+
+**Test status**: 546 → 559 ✓ (+13 新守护); 现有 546 条无 regression。
 
 ### PR-E1 落地 — 装饰外框 + 角落 widgets ✅
 

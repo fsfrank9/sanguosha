@@ -177,12 +177,72 @@
 
     /* v2.1 face-to-face duel table hooks */
     .duel-table {
+      position: relative;        /* v9 PR-E2: 中央 overlay 锚 */
       display: grid;
       grid-template-rows: minmax(110px, .9fr) minmax(150px, 1.05fr) minmax(110px, .9fr) minmax(128px, .9fr);
       gap: 8px;
       height: calc(100vh - 92px);
       min-height: 0;
       overflow: hidden;
+    }
+
+    /* v9 PR-E2: 暂停 brush 横幅. 在 .duel-table 上居中, 等待 pendingChoice
+       或 enemyThinking 时显示. brush 效果用 box-shadow 多偏移模拟不规则
+       笔触边缘 (无图片). */
+    .pause-banner {
+      position: absolute;
+      left: 50%;
+      bottom: 28%;
+      transform: translateX(-50%);
+      z-index: 7;
+      pointer-events: none;
+    }
+
+    .pause-banner__brush {
+      display: inline-block;
+      padding: 6px 28px;
+      color: #ffcb46;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      background: rgba(0, 0, 0, 0.78);
+      border-radius: 2px 14px 4px 10px;
+      box-shadow:
+        5px 0 0 -2px rgba(0, 0, 0, 0.72),
+        -4px 1px 0 -3px rgba(0, 0, 0, 0.78),
+        3px -2px 0 -1px rgba(0, 0, 0, 0.65);
+      text-shadow: 0 1px 0 rgba(0, 0, 0, .9);
+    }
+
+    /* v9 PR-E2: 底部状态条 — 版本 / 占位分数 / 实时时钟. 半透明小字. */
+    .status-bar {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 2px;
+      z-index: 6;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      color: rgba(255, 244, 220, 0.55);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .status-bar__version,
+    .status-bar__score,
+    .status-bar__time {
+      text-shadow: 0 1px 4px rgba(0, 0, 0, .7);
+    }
+
+    .status-bar__score {
+      flex: 1 0 auto;
+      text-align: center;
+      color: rgba(255, 213, 138, 0.8);
     }
 
     .opponent-zone,
