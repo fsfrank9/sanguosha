@@ -2515,6 +2515,9 @@
         if (pending.kind === 'dying-rescue') {
           return resolveDyingRescueChoice(game, pending, decision || {});
         }
+        if (pending.kind === 'luoshen-continue') {
+          return resolveLuoshenContinueChoice(game, pending, decision || {});
+        }
         return fail('未知的选择类型：' + pending.kind);
       }
 
@@ -3294,7 +3297,72 @@
           // AI: auto-fire with default ordering (no reorder).
           useSkill(game, actor, 'guanxing', [], {});
         }
+        // v8 PR-C5: 洛神 (甄姬) — 准备阶段开始时可连续黑色判定获得。
+        if (hasSkill(state, 'luoshen')) {
+          var luoshenResult = triggerLuoshenPrepare(game, actor);
+          if (luoshenResult && luoshenResult.suspended) return luoshenResult;
+        }
         return null;
+      }
+
+      // v8 PR-C5: 洛神 (甄姬) — gltjk card__hero__wei.md：
+      //   "准备阶段开始时，你可以判定，若结果为黑色，你可以重复此流程。
+      //    最后你获得所有的黑色判定牌。"
+      // 实现：每次判定→黑色入手 + 询问是否继续；红色直接结束并入弃牌堆。
+      // pref:
+      //   'decline' → 不发动（一次都不判）
+      //   'auto'    → 持续判定到红色（自动每次继续）
+      //   'ask'     → 玩家每次决定是否继续（首次也询问）
+      function triggerLuoshenPrepare(game, actor) {
+        var state = game[actor];
+        if (!state || !hasSkill(state, 'luoshen')) return null;
+        var pref = (state.skillPreferences && state.skillPreferences.luoshen)
+          || (actor === 'player' ? 'ask' : 'auto');
+        if (pref === 'decline') {
+          log(game, actorName(game, actor) + '选择不发动【洛神】。');
+          return null;
+        }
+        return startLuoshenStep(game, actor, pref);
+      }
+
+      function startLuoshenStep(game, actor, pref) {
+        if (pref === 'ask' && actor === 'player') {
+          if (!game.pauseState) game.pauseState = {};
+          game.pauseState.luoshen = { actor: actor };
+          game.pendingChoice = { kind: 'luoshen-continue', actor: actor };
+          return { suspended: true };
+        }
+        return runLuoshenJudge(game, actor, pref);
+      }
+
+      function runLuoshenJudge(game, actor, pref) {
+        var state = game[actor];
+        var card = judge(game, actor, '【洛神】');
+        if (!card) return null;
+        if (card.color === 'black') {
+          state.hand.push(card);
+          log(game, actorName(game, actor) + '获得【洛神】判定牌【' + card.name + '】。');
+          return startLuoshenStep(game, actor, pref);
+        }
+        log(game, '【洛神】判定为红色，结束。');
+        discardCard(game, card);
+        if (game.pauseState) game.pauseState.luoshen = null;
+        return null;
+      }
+
+      function resolveLuoshenContinueChoice(game, pending, decision) {
+        var actor = pending.actor;
+        var state = game[actor];
+        if (!state) return fail('未知角色。');
+        if (game.pauseState) game.pauseState.luoshen = null;
+        if (decision.decline || decision.stop) {
+          log(game, actorName(game, actor) + '选择停止【洛神】。');
+          return continueTurnAfterPreparePhase(game, actor);
+        }
+        var pref = (state.skillPreferences && state.skillPreferences.luoshen) || 'ask';
+        runLuoshenJudge(game, actor, pref);
+        if (game.pendingChoice) return success('洛神：等待玩家选择。');
+        return continueTurnAfterPreparePhase(game, actor);
       }
 
       function continueTurnAfterPreparePhase(game, actor) {
