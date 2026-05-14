@@ -125,8 +125,60 @@ UI 接完后再选：
 | PR-A1 | 通用 pendingChoice 面板框架 (方向 1 基础) | 🟢 PR #46 已合并 |
 | PR-A2 | qilin-pick + dying-rescue 面板 | 🟢 PR #47 已合并 |
 | PR-A3 | cixiong-fire + cixiong-choose 面板（双层） | 🟢 PR #48 已合并 |
-| PR-A4 | jiedao-decision + guohe-1v1-pick 面板 | 🟡 PR 待合并 |
-| _其余_ | _v8 PR-A5 + 方向 2/3/4_ | _按顺序推进_ |
+| PR-A4 | jiedao-decision + guohe-1v1-pick 面板 | 🟢 PR #49 已合并 |
+| PR-A5 | wugu-pick 面板（方向 1 收尾） | 🟡 PR 待合并 |
+| _其余_ | _v8 方向 2/3/4_ | _按顺序推进_ |
+
+### PR-A5 落地 — wugu-pick 面板（方向 1 收尾）
+
+**pending = `{kind, actor:picker, sourceActor, cards:[{id,name,suit,color,rank},...]}`**
+
+- 触发：五谷丰登发动后，按 [actor, opponent] 顺序选 pool 中剩余的 1 张；多张时 `skillPreferences.wugu === 'ask'`（player 默认）会暂停
+- 文案区分自己用五谷（`你亮出 X 张牌...`）vs 对手用五谷（`<对方名>亮出 X 张牌...`）
+- choices：pool 中每张牌一个 `promptCardChoice`，`dataAttrs wuguCardId` → `resolvePendingChoice({cardId})`
+- **无 decline 按钮** — spec 规定必须挑一张（选完所有 picker 后剩余的 pool 入弃牌堆）
+
+**改动**：
+- `index.html`：新增 `#wuguPickPanel`（hint + choices）
+- `dom-adapter.js`：`els` 新增 3 个 id；`renderPendingChoice` 增 wugu-pick 分支；事件绑定 1 个 delegated click handler
+
+**新增** `tests/pending_prompt_panels_a5.test.mjs`（8 条断言）：HTML 容器 / 框架类 / els 缓存 / render 分支 / 自/敌方 source 文案差异 / dataAttrs / click → `{cardId}` / 无 decline 按钮。
+
+---
+
+## 方向 1 完整收尾汇总（v8 PR-A1..A5）
+
+v8 方向 1 完成。v7 引擎里的 7 个新 pendingChoice 全部接入浏览器 UI：
+
+| pendingChoice | UI 面板 | PR |
+|---|---|---|
+| `qilin-pick` | `#qilinPickPanel` (选弃哪匹马) | PR-A2 |
+| `dying-rescue` | `#dyingRescuePanel` (选桃/酒救援) | PR-A2 |
+| `cixiong-fire` | `#cixiongFirePanel` (是否发动) | PR-A3 |
+| `cixiong-choose` | `#cixiongChoosePanel` (弃手牌/源摸 1) | PR-A3 |
+| `jiedao-decision` | `#jiedaoDecisionPanel` (出杀/交武器) | PR-A4 |
+| `guohe-1v1-pick` | `#guohePickPanel` (装备区 + 手牌内容) | PR-A4 |
+| `wugu-pick` | `#wuguPickPanel` (reveal pool) | PR-A5 |
+
+**累计基础设施**：
+- 通用 CSS 框架（PR-A1）：`.pending-prompt-panel` / `__hint` / `__choices` / `__actions` + `.prompt-card-choice` 含 hover/selected/:disabled
+- 通用 helper `promptCardChoice(card, opts)` — 统一牌按钮生成（PR-A1）
+- 7 个新 panel 元素 + 22 个新 els cache id + 11 个新 click handler
+- 旧 6 个 v6.1 面板（guicai/yiji/fanjian/fankui/ganglie-fire/ganglie-source）追加新框架类
+- helper `actorDisplayName(actor)` 用于面板文案（直接显示英雄名，区别于战报的"我方/对方"措辞）
+
+**测试增量（方向 1）**：
+
+| 文件 | 断言数 | PR |
+|---|---:|---|
+| `tests/pending_prompt_framework.test.mjs` | 9 | A1 |
+| `tests/pending_prompt_panels_a2.test.mjs` | 14 | A2 |
+| `tests/pending_prompt_panels_a3.test.mjs` | 13 | A3 |
+| `tests/pending_prompt_panels_a4.test.mjs` | 13 | A4 |
+| `tests/pending_prompt_panels_a5.test.mjs` | 8 | A5 |
+| 方向 1 小计 | **57 条** | |
+
+**下一步**：方向 2（装备扩展：寒冰剑 / 古锭刀 / 朱雀羽扇 / 银月枪）或方向 3（标准包技能：国色 / 流离 / 急救 / 青囊 / 洛神）。
 
 ### PR-A4 落地 — jiedao-decision + guohe-1v1-pick 面板
 
@@ -214,4 +266,6 @@ UI 接完后再选：
 | `tests/pending_prompt_panels_a2.test.mjs` | 14 | PR-A2 |
 | `tests/pending_prompt_panels_a3.test.mjs` | 13 | PR-A3 |
 | `tests/pending_prompt_panels_a4.test.mjs` | 13 | PR-A4 |
+| `tests/pending_prompt_panels_a5.test.mjs` | 8 | PR-A5 |
+| _方向 1 小计_ | **57** | A1..A5 |
 | _其余 PR 待开_ | — | — |

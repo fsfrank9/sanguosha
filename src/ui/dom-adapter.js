@@ -62,6 +62,7 @@
           'cixiongChoosePanel', 'cixiongChooseHint', 'cixiongChooseChoices', 'cixiongChooseDrawBtn',
           'jiedaoDecisionPanel', 'jiedaoDecisionHint', 'jiedaoDecisionFireBtn', 'jiedaoDecisionDeclineBtn',
           'guohePickPanel', 'guohePickHint', 'guohePickEquipment', 'guohePickHand',
+          'wuguPickPanel', 'wuguPickHint', 'wuguPickChoices',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -719,6 +720,31 @@
             }
           } else {
             els.guohePickPanel.hidden = true;
+          }
+        }
+        // v8 PR-A5: 五谷丰登 reveal-then-pick — picker 从 pool 中选 1 张
+        if (els.wuguPickPanel) {
+          if (kind === 'wugu-pick' && pending.actor === 'player') {
+            els.wuguPickPanel.hidden = false;
+            if (els.wuguPickHint) {
+              var wuguTotal = (pending.cards || []).length;
+              var wuguSourceName = pending.sourceActor === pending.actor
+                ? '你'
+                : actorDisplayName(pending.sourceActor);
+              els.wuguPickHint.textContent =
+                '五谷丰登：' + wuguSourceName + '亮出 ' + wuguTotal + ' 张牌，请挑 1 张获得（spec: 剩余的入弃牌堆）。';
+            }
+            if (els.wuguPickChoices) {
+              els.wuguPickChoices.innerHTML = (pending.cards || []).map(function (card) {
+                return promptCardChoice(card, {
+                  dataAttrs: { wuguCardId: card.id },
+                  title: '获得这张牌',
+                  extraClass: 'wugu-pick-choice'
+                });
+              }).join('') || '<span class="mini-card">池中没有可选牌</span>';
+            }
+          } else {
+            els.wuguPickPanel.hidden = true;
           }
         }
         // v8 PR-A2: 濒死救援 — responder 用 桃/酒 救援（酒仅自救）
@@ -1658,6 +1684,15 @@
         }
         if (els.guohePickEquipment) els.guohePickEquipment.addEventListener('click', handleGuohePickClick);
         if (els.guohePickHand) els.guohePickHand.addEventListener('click', handleGuohePickClick);
+        // v8 PR-A5: 五谷丰登挑牌面板
+        if (els.wuguPickChoices) els.wuguPickChoices.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-wugu-card-id]');
+          if (!btn) return;
+          var cardId = btn.getAttribute('data-wugu-card-id');
+          var result = Engine.resolvePendingChoice(game, { cardId: cardId });
+          if (!result.ok) renderLog();
+          render();
+        });
         // v8 PR-A2: 濒死救援面板
         if (els.dyingRescueChoices) els.dyingRescueChoices.addEventListener('click', function (event) {
           var btn = event.target.closest('[data-dying-rescue-card-id]');
