@@ -16,6 +16,17 @@
       --text: #fff5df;
       --muted: #d3b98a;
       --shadow: rgba(0, 0, 0, 0.35);
+
+      /* v9 PR-E1: 装饰外框配色 — 橙红条纹 + 金黄间隔 (参考截图风格)。
+         frame-warm 是主红橙, frame-bright 是亮黄, 用 45deg 重复线性渐变
+         画 striped border。frame-corner-wood / -gold 用于左上 菜单 / 右上
+         分享 角落按钮的木质 + 金边视觉。 */
+      --frame-stripe-warm: #d44a18;
+      --frame-stripe-bright: #f6c43c;
+      --frame-stripe-width: 14px;
+      --frame-inner-radius: 14px;
+      --frame-corner-wood: linear-gradient(180deg, #c9772e, #7a3b15);
+      --frame-corner-gold: linear-gradient(180deg, #f0a33a, #b27424);
     }
 
     * { box-sizing: border-box; }

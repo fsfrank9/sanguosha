@@ -27,8 +27,8 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR | 范围 | 状态 |
 |---|---|---|
 | PLAN | 本文档 — v9 方向 D 完整计划 | 🟢 PR #67 已合并 |
-| PR-E0 | CSS 拆分基础 (`main.css` 953 行 → 8 个职责文件 + 1 entry) | 🟡 PR 待合并 |
-| PR-E1 | 整体布局重构 + 装饰外框 (橙红 striped border + 角落 widgets) | ⏸ 待开 |
+| PR-E0 | CSS 拆分基础 (`main.css` 953 行 → 8 个职责文件 + 1 entry) | 🟢 PR #68 已合并 |
+| PR-E1 | 整体布局重构 + 装饰外框 (橙红 striped border + 角落 widgets) | 🟡 PR 待合并 |
 | PR-E2 | 中央日志 overlay + 状态条 + 暂停 brush 横幅 | ⏸ 待开 |
 | PR-E3 | 卡牌外观重设计 (corner 花色+点数 + 卡身色块 + 底部 label) | ⏸ 待开 |
 | PR-E4 | 武将 portrait + HP 红方块 + 装备/判定区 + 技能 framed tag | ⏸ 待开 |
@@ -58,6 +58,49 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E1 落地 — 装饰外框 + 角落 widgets ✅
+
+**实际改动**:
+
+设计 tokens (`tokens.css`):
+- `--frame-stripe-warm: #d44a18` (主红橙)
+- `--frame-stripe-bright: #f6c43c` (亮金黄)
+- `--frame-stripe-width: 14px` (边框厚度)
+- `--frame-inner-radius: 14px`
+- `--frame-corner-wood` (左上 菜单 木质 gradient)
+- `--frame-corner-gold` (右上 分享 金边 gradient)
+
+布局 (`layout.css`):
+- `.app` 改 `position: relative` (角落 widgets 绝对定位锚)
+- 新增 `.game-frame` — 用 background-clip 双层技巧 (padding-box 显示内层深色,
+  border-box 显示外层 `repeating-linear-gradient` 45° 红橙金黄条纹) 画装饰
+  边框。`flex: 1 1 auto`, `min-height: 0`, 包裹 header / setup-screen / duel-table。
+- 新增 `.frame-corner-btn` 基类 + `--menu` / `--share` 变体, 绝对定位
+  `top: 4px; left: 22px` / `right: 22px`。点击有 `:hover` brightness + transform 反馈。
+
+HTML (`index.html`):
+- `<main class="app">` 下: 先放 `frameMenuBtn` + `frameShareBtn` 两个按钮
+  (绝对定位浮在边框上), 然后 `<div class="game-frame">` 包裹原 `<header>` /
+  `<section.setup-screen>` / `<section.duel-table>`, 闭合于 `</main>` 前。
+
+dom-adapter (`src/ui/dom-adapter.js`):
+- els 缓存追加 `frameMenuBtn` / `frameShareBtn`
+- bindEvents 加 2 个 placeholder click handler (console.info trace, 等
+  PR-E5 接入侧抽屉)
+
+**新增** `tests/v9_pr_e1_layout_frame.test.mjs` (10 条):
+- tokens 含 5 个 frame design vars
+- layout.css `.game-frame` 用 repeating-linear-gradient + padding-box + border-box
+- `.frame-corner-btn` + `--menu`/`--share` 变体 + hover / focus 状态
+- `.app` 改 position: relative
+- HTML 含 frameMenuBtn / frameShareBtn
+- HTML 用 `.game-frame` 包裹 header → duel-table
+- 角落按钮在 `.game-frame` 之外 (作为 .app 直接子元素, 浮在 border 上)
+- dom-adapter 缓存 + click handler 绑定
+- `loadAllStyles()` 拼接结果含新 frame 规则 (回归)
+
+**Test status**: 536 → 546 ✓ (+10 新守护); 现有 536 条无 regression。
 
 ### PR-E0 落地 — CSS 拆分基础 ✅
 
