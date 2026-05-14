@@ -761,16 +761,22 @@
               var responderState = game[pending.actor];
               var taoIds = pending.taoIds || [];
               var jiuIds = pending.jiuIds || [];
-              var allIds = taoIds.concat(jiuIds);
+              var jijiuIds = pending.jijiuIds || [];
+              var allIds = taoIds.concat(jiuIds).concat(jijiuIds);
               els.dyingRescueChoices.innerHTML = allIds.map(function (cardId) {
                 var card = responderState && (responderState.hand || []).find(function (c) { return c.id === cardId; });
                 if (!card) return '';
                 var isJiu = jiuIds.indexOf(cardId) >= 0;
+                var isJijiu = jijiuIds.indexOf(cardId) >= 0;
+                var title, suffix;
+                if (isJiu) { title = '使用此酒（方法Ⅱ）自救'; suffix = ' · 酒Ⅱ'; }
+                else if (isJijiu) { title = '发动急救：将此红牌当桃救援'; suffix = ' · 急救'; }
+                else { title = '使用此桃救援'; suffix = ' · 桃'; }
                 return promptCardChoice(card, {
                   dataAttrs: { dyingRescueCardId: cardId },
-                  title: isJiu ? '使用此酒（方法Ⅱ）自救' : '使用此桃救援',
+                  title: title,
                   extraClass: 'dying-rescue-choice',
-                  suffix: isJiu ? ' · 酒Ⅱ' : ' · 桃'
+                  suffix: suffix
                 });
               }).join('') || '<span class="mini-card">手牌中没有可救援的牌</span>';
             }
