@@ -141,8 +141,94 @@ UI 接完后再选：
 | PR-D1 | AI scoreCard 精细化 + estimateShaCount/estimateShanCount 辅助（武圣/龙胆/倾国/丈八 转化路径全部计入，桃 score 按 hp 缺口梯度，决斗/锦囊 按双方资源差给分） | 🟢 PR #62 已合并 |
 | PR-D2 | pendingChoice auto 决策优化（cixiong-choose target / wugu-pick picker / guohe-1v1-pick source / guicai-replace holder 都改用 scoreCard 排序，替代原 deterministic hand[0] / pool[0] / equips[0]） | 🟢 PR #63 已合并 |
 | PR-D3 | 1-ply lookahead 框架：cloneGame + evaluateState + simulateCardPlay + scoreCardWithLookahead；aiChooseCard 改用启发 + 模拟 delta 综合分；致命牌优先级自动跃升 | 🟢 PR #64 已合并 |
-| PR-D4 | Threat-aware evaluation：aiEvaluateStateWithThreat 在 baseline 上扣减"对方下回合预期入帐 dmg × 25"。lookahead 改用 threat-aware 版, AI 会主动拆敌方武器 / 顺手对方 sha 削减威胁 | 🟡 PR 待合并 |
-| _其余_ | _v8 方向 4 D5 (深度搜索 / expectimax) 可选, 或者收官 v8 进入 v9_ | _按顺序推进_ |
+| PR-D4 | Threat-aware evaluation：aiEvaluateStateWithThreat 在 baseline 上扣减"对方下回合预期入帐 dmg × 25"。lookahead 改用 threat-aware 版, AI 会主动拆敌方武器 / 顺手对方 sha 削减威胁 | 🟢 PR #65 已合并 |
+| WRAP-UP | v8 收官 — 标 PR-D4 已合并 + 收官汇总段 + v9 候选方向 | 🟡 PR 待合并 |
+| _v8 主体完工_ | _共 21 个 PR (#44 + #46–#65), 529 ✓ 测试守护; v9 起点见下一节_ | — |
+
+---
+
+## v8 收官汇总
+
+v8 立项目标是把 v7 已经写好的 spec-compliant 引擎逻辑翻译为可用产品 + 持续扩展 1v1 体验。21 个 PR 后, 五个方向都做出了独立可见的进展:
+
+### 方向 0 — 牌面 suit + rank 可视化 ✅
+- **PR #44**: 所有手牌 / 装备 / 判定区 / pendingChoice 面板都显示 ♠ ♥ ♣ ♦ + 点数
+
+### 方向 1 — UI 接 v7 pendingChoice 面板 (5 个 PR) ✅
+- **PR-A1 #46**: 通用 `.pending-prompt-panel` 四件套 CSS 框架 + `promptCardChoice` helper
+- **PR-A2 #47**: 麒麟弓 picker + 濒死救援 (桃 / 酒 / 急救)
+- **PR-A3 #48**: 雌雄 source-fire + target-choose (双层)
+- **PR-A4 #49**: 借刀决定 + 过河 1v1 picker
+- **PR-A5 #50**: 五谷挑牌 (方向 1 收尾)
+
+### 方向 2 — 装备扩展 (4 个 PR) ✅
+- **PR-B1 #51**: 寒冰剑 — 防止伤害 + 双弃牌
+- **PR-B2 #52**: 古锭刀 — 锁定技, 无手牌伤害 +1
+- **PR-B3 #53**: 朱雀羽扇 — 普杀 → 火杀转化
+- **PR-B4 #54**: 银月枪 — 回合外黑色手牌触发额外伤害 (方向 2 收尾)
+
+### 方向 3 — 标准包技能扩充 (5 个 PR) ✅
+- **PR-C1 #55**: 国色 (大乔) — 方片当乐不思蜀
+- **PR-C2 #56**: 流离 (大乔) — 杀转移 (spec 忠实, 1v1 候选恒空)
+- **PR-C3 #57**: 急救 (华佗) — 回合外红色当桃 (接濒死流程)
+- **PR-C4 #58**: 青囊 (华佗) — 出牌阶段弃 1 手牌令受伤角色回 1 hp
+- **PR-C5 #59**: 洛神 (甄姬) — 准备阶段连续黑色判定获得 (方向 3 收尾)
+
+### 方向 4 — AI 进阶 (4 个 PR) ✅
+- **PR-D1 #62**: scoreCard 精细化 + `aiEstimateShaCount` / `aiEstimateShanCount` (武圣 / 龙胆 / 倾国 / 丈八 转化路径全部计入)
+- **PR-D2 #63**: pendingChoice auto 决策优化 (cixiong-choose / wugu-pick / guohe-pick / guicai-replace)
+- **PR-D3 #64**: 1-ply lookahead 框架 (`aiCloneGame` + `aiEvaluateState` + `aiSimulateCardPlay`); 致命牌优先级自动跃升 (gameover ±100000)
+- **PR-D4 #65**: threat-aware evaluation (考虑对方下回合预期 dmg, AI 会主动拆武器 / 顺手对方 sha)
+
+### Hotfix 链 (2 个 PR)
+- **HOTFIX #60**: `.pending-prompt-panel[hidden]` CSS 覆盖修复 (PR-A1 引入的 regression: `display:flex` 覆盖了 `hidden` 属性 → 13 个面板永远可见盖住手牌区)
+- **HOTFIX-2 #61**: v8 PR-C1..C5 5 个新技能注册到 `IMPLEMENTED_SKILL_IDS` (UI 一直显示"未实现") + 青囊 cardSkillConfig + 洛神 prompt panel UI
+
+### 测试覆盖
+- v8 共新增 **209 条测试** (含 hotfix), 累计 529 条 ✓ 全套通过
+- 方向 1 (PR-A1..A5): 64 条
+- 方向 2 (PR-B1..B4): 30 条
+- 方向 3 (PR-C1..C5): 46 条
+- 方向 4 (PR-D1..D4): 48 条
+- Hotfix + 方向 0: 21 条 (含 PR-0 卡面 + hotfix 守护)
+
+### 用户反馈循环
+- 用户在用浏览器实操后报告了两个 hidden bug, 都立即定位 + 出补丁 PR:
+  - 手牌区被 pendingChoice 面板覆盖 → CSS `[hidden]` override 缺失
+  - 洛神显示"未实现" → `IMPLEMENTED_SKILL_IDS` 漏注册 + UI panel 缺失
+- 一次部署延迟误判, 用户主动澄清后定位为 GitHub Pages 缓存
+
+---
+
+## v9 候选方向
+
+v8 完成了 1v1 体验的横向广度. v9 可向以下方向深化:
+
+### 选项 A: AI 深度搜索 (continuation of 方向 4)
+- **PR-D5**: negamax / α-β 多 ply 深度搜索 (深度 ≥ 2, 模拟对手最优反击)
+- expectimax: 把 deck draw 作为随机变量 (rollout 或概率分布) 评估
+- 性能 budget: ~100ms/回合可接受, 启发 + 剪枝
+
+### 选项 B: 多人模式 / 网络对战 (v6+ 时埋的远期方向)
+- 引擎重构: 把 1v1 的 `[player, enemy]` 抽象成 N 个 actor + 座位顺序
+- 1v1 的特例 (无 distance, jiedao 在 1v1 中 source=target 等) 通用化
+- 网络层: WebSocket / WebRTC 同步 game state
+- 房间系统 / 角色选择 / 主公 反贼 内奸 忠臣 4 身份
+
+### 选项 C: 更多扩展包技能
+- 风火林山 / SP 武将的技能 (目前 catalog 列了但 status='todo' 的 70+ 项)
+- 优先 1v1 体验相关的: 反馈 / 反间 已实现, 接下来可以挑 邓艾的屯田 / 卞夫人的颂威 等
+
+### 选项 D: UI / 美术升级
+- 卡面真实图案 (目前 emoji + 文字)
+- 动画 (出牌 / 受伤 / 判定 翻牌)
+- 音效
+
+### 选项 E: 对局回放 / 训练模式
+- log + state 序列化 → 重放
+- "残局训练": 给玩家一个固定 state, 让 AI 不同难度 vs
+
+---
 
 ### PR-D4 落地 — Threat-aware evaluation
 
