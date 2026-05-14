@@ -65,9 +65,10 @@ test('v9 PR-E0: loadAllStyles() 返回拼接结果 + 含原始内容片段', () 
   // tokens 内容
   assert.match(all, /:root\s*\{/);
   assert.match(all, /--gold:/);
-  // layout 内容
-  assert.match(all, /\.layout\s*\{/);
+  // layout 内容 (PR-E10 删除了 .layout / .battlefield / .side 死代码;
+  // 验证仍有的 .duel-table / .game-frame 即可)
   assert.match(all, /\.duel-table\s*\{/);
+  assert.match(all, /\.game-frame\s*\{/);
   // hero 内容
   assert.match(all, /\.hp-row\s*\{/);
   // cards 内容

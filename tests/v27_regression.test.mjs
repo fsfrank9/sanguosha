@@ -89,12 +89,15 @@ test('一级选将界面与二级游戏界面分离，并提供随机按钮', ()
 });
 
 test('双方英雄池一致且 UI 有去重逻辑，禁止同英雄对战', () => {
-  const playerSelect = html.match(/<select id="playerHeroSelect"[\s\S]*?<\/select>/)?.[0] || '';
-  const enemySelect = html.match(/<select id="enemyHeroSelect"[\s\S]*?<\/select>/)?.[0] || '';
-  const playerOptions = Array.from(playerSelect.matchAll(/value="([^"]+)"/g)).map((m) => m[1]).sort();
-  const enemyOptions = Array.from(enemySelect.matchAll(/value="([^"]+)"/g)).map((m) => m[1]).sort();
-  assert.deepEqual(playerOptions, enemyOptions, 'player and enemy hero pools should be identical');
-  assert.ok(playerOptions.length >= 10, 'both sides should have the full classic hero pool');
+  // v9 PR-E10: <select> 不再硬编码 11 个 stale options, 改由 JS
+  // populateHeroSelects() 从 Engine.HERO_CATALOG 动态填充 (含 31 个武将).
+  // 池一致性通过 "都从同一 HERO_CATALOG 取" 保证, 而非比对静态 HTML.
+  assert.match(html, /<select id="playerHeroSelect">/);
+  assert.match(html, /<select id="enemyHeroSelect">/);
+  assert.match(html, /function populateHeroSelects/, 'JS 应有 populateHeroSelects 从同一来源填充两侧');
+  // 池来源就是 Engine.HERO_CATALOG (函数内对两 select 走相同 fill 路径)
+  assert.match(html, /fill\(els\.playerHeroSelect[\s\S]{0,200}fill\(els\.enemyHeroSelect/, '同一 fill 函数应用到两 select');
+  // 去重逻辑仍在
   assert.match(html, /function ensureDistinctHeroes/, 'UI should enforce different heroes');
   assert.match(html, /option\.disabled = option\.value === otherValue/, 'same hero option should be disabled on the opposite side');
 });

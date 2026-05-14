@@ -1621,6 +1621,7 @@
         if (els.lobbyScreen) els.lobbyScreen.hidden = true;
         if (els.setupScreen) els.setupScreen.hidden = false;
         if (els.duelTable) els.duelTable.hidden = true;
+        _toggleHeader(true);  // v9 PR-E10: setup 显示 header (含新开一局)
         if (els.endTurnBtn) els.endTurnBtn.disabled = true;
         if (els.newGameBtn) els.newGameBtn.textContent = '重新选将';
         populateHeroSelects();
@@ -1629,17 +1630,26 @@
       }
 
       // v9 PR-E8: 入口屏切换 — splash → lobby → setup → game.
+      // v9 PR-E10: 同时切换 <header> 显隐 — splash/lobby 不显示 dev header,
+      // setup/game 显示 (含 "新开一局" / "结束回合" 按钮). 用 querySelector
+      // 取 header 避免增加 els id.
+      function _toggleHeader(show) {
+        var header = document.querySelector('.game-frame > header');
+        if (header) header.hidden = !show;
+      }
       function showSplash() {
         if (els.splashScreen) els.splashScreen.hidden = false;
         if (els.lobbyScreen) els.lobbyScreen.hidden = true;
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = true;
+        _toggleHeader(false);
       }
       function showLobby() {
         if (els.splashScreen) els.splashScreen.hidden = true;
         if (els.lobbyScreen) els.lobbyScreen.hidden = false;
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = true;
+        _toggleHeader(false);
       }
 
       function newGame() {
@@ -1658,6 +1668,7 @@
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = false;
         if (els.newGameBtn) els.newGameBtn.textContent = '重新选将';
+        _toggleHeader(true);  // v9 PR-E10: 游戏中也显示 header
         render();
         maybeStartEnemyTurn();
       }
