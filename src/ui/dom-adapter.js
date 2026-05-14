@@ -56,6 +56,8 @@
           'fankuiPromptPanel', 'fankuiPromptHint', 'fankuiZones',
           'gangliePromptPanel', 'gangliePromptHint', 'ganglieFireBtn', 'ganglieDeclineBtn',
           'ganglieSourcePanel', 'ganglieSourceHint', 'ganglieSourceCandidates', 'ganglieSourceConfirmBtn', 'ganglieSourceTakeDamageBtn',
+          'qilinPickPanel', 'qilinPickHint', 'qilinPickChoices', 'qilinDeclineBtn',
+          'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -599,6 +601,70 @@
             ganglieSelectedIds = [];
           }
         }
+        // v8 PR-A2: 麒麟弓 — source 在 2 马时挑一匹弃 (单匹自动走, 不会 pause)
+        if (els.qilinPickPanel) {
+          if (kind === 'qilin-pick' && pending.actor === 'player') {
+            els.qilinPickPanel.hidden = false;
+            if (els.qilinPickHint) {
+              els.qilinPickHint.textContent =
+                '麒麟弓：' + actorDisplayName(pending.target) + ' 装备区有 2 匹坐骑，选一匹弃置（spec：一张），或不发动。';
+            }
+            if (els.qilinPickChoices) {
+              var qilinTargetState = game[pending.target];
+              els.qilinPickChoices.innerHTML = (pending.horseSlots || []).map(function (slot) {
+                var card = qilinTargetState && qilinTargetState.equipment && qilinTargetState.equipment[slot];
+                if (!card) return '';
+                return promptCardChoice(card, {
+                  dataAttrs: { qilinSlot: slot },
+                  title: '弃置这一匹坐骑',
+                  extraClass: 'qilin-pick-choice',
+                  prefix: slot === 'horsePlus' ? '+1 马 ' : '-1 马 '
+                });
+              }).join('') || '<span class="mini-card">没有可弃置的坐骑</span>';
+            }
+          } else {
+            els.qilinPickPanel.hidden = true;
+          }
+        }
+        // v8 PR-A2: 濒死救援 — responder 用 桃/酒 救援（酒仅自救）
+        if (els.dyingRescuePanel) {
+          if (kind === 'dying-rescue' && pending.actor === 'player') {
+            els.dyingRescuePanel.hidden = false;
+            var selfRescue = pending.actor === pending.dyingActor;
+            if (els.dyingRescueHint) {
+              els.dyingRescueHint.textContent = selfRescue
+                ? '濒死救援：你已濒死，可用【桃】或【酒（方法Ⅱ）】自救，或放弃。'
+                : '濒死救援：' + actorDisplayName(pending.dyingActor) + '濒死，你可用【桃】救援（仅自救可用【酒】），或不救。';
+            }
+            if (els.dyingRescueChoices) {
+              var responderState = game[pending.actor];
+              var taoIds = pending.taoIds || [];
+              var jiuIds = pending.jiuIds || [];
+              var allIds = taoIds.concat(jiuIds);
+              els.dyingRescueChoices.innerHTML = allIds.map(function (cardId) {
+                var card = responderState && (responderState.hand || []).find(function (c) { return c.id === cardId; });
+                if (!card) return '';
+                var isJiu = jiuIds.indexOf(cardId) >= 0;
+                return promptCardChoice(card, {
+                  dataAttrs: { dyingRescueCardId: cardId },
+                  title: isJiu ? '使用此酒（方法Ⅱ）自救' : '使用此桃救援',
+                  extraClass: 'dying-rescue-choice',
+                  suffix: isJiu ? ' · 酒Ⅱ' : ' · 桃'
+                });
+              }).join('') || '<span class="mini-card">手牌中没有可救援的牌</span>';
+            }
+          } else {
+            els.dyingRescuePanel.hidden = true;
+          }
+        }
+      }
+
+      // v8 PR-A2: actorDisplayName — 与 actorName 类似，但只用 hero name
+      // 而非战报里的"我方/对方"。如果 actor === 'player'/'enemy' fall back
+      // to game[actor].name 保证有可读字符串。
+      function actorDisplayName(actor) {
+        if (!game || !game[actor]) return actor;
+        return game[actor].name || actor;
       }
 
       function flashHero(actor, label) {
@@ -1432,6 +1498,34 @@
         if (els.ganglieSourceTakeDamageBtn) els.ganglieSourceTakeDamageBtn.addEventListener('click', function () {
           ganglieSelectedIds = [];
           var result = Engine.resolvePendingChoice(game, { mode: 'takeDamage' });
+          if (!result.ok) renderLog();
+          render();
+        });
+        // v8 PR-A2: 麒麟弓 pick 面板
+        if (els.qilinPickChoices) els.qilinPickChoices.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-qilin-slot]');
+          if (!btn) return;
+          var slot = btn.getAttribute('data-qilin-slot');
+          var result = Engine.resolvePendingChoice(game, { slot: slot });
+          if (!result.ok) renderLog();
+          render();
+        });
+        if (els.qilinDeclineBtn) els.qilinDeclineBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { decline: true });
+          if (!result.ok) renderLog();
+          render();
+        });
+        // v8 PR-A2: 濒死救援面板
+        if (els.dyingRescueChoices) els.dyingRescueChoices.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-dying-rescue-card-id]');
+          if (!btn) return;
+          var cardId = btn.getAttribute('data-dying-rescue-card-id');
+          var result = Engine.resolvePendingChoice(game, { cardId: cardId });
+          if (!result.ok) renderLog();
+          render();
+        });
+        if (els.dyingRescueDeclineBtn) els.dyingRescueDeclineBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { decline: true });
           if (!result.ok) renderLog();
           render();
         });
