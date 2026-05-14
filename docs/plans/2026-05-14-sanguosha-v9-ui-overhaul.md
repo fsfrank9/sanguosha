@@ -29,8 +29,8 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PLAN | 本文档 — v9 方向 D 完整计划 | 🟢 PR #67 已合并 |
 | PR-E0 | CSS 拆分基础 (`main.css` 953 行 → 8 个职责文件 + 1 entry) | 🟢 PR #68 已合并 |
 | PR-E1 | 整体布局重构 + 装饰外框 (橙红 striped border + 角落 widgets) | 🟢 PR #69 已合并 |
-| PR-E2 | 中央日志 overlay + 状态条 + 暂停 brush 横幅 | 🟡 PR 待合并 |
-| PR-E3 | 卡牌外观重设计 (corner 花色+点数 + 卡身色块 + 底部 label) | ⏸ 待开 |
+| PR-E2 | 中央日志 overlay + 状态条 + 暂停 brush 横幅 | 🟢 PR #70 已合并 |
+| PR-E3 | 卡牌外观重设计 (corner 花色+点数 + 卡身色块 + 底部 label) | 🟡 PR 待合并 |
 | PR-E4 | 武将 portrait + HP 红方块 + 装备/判定区 + 技能 framed tag | ⏸ 待开 |
 | PR-E5 | 左上"菜单"按钮 + 侧抽屉 + 退出确认 modal (卷轴风) | ⏸ 待开 |
 | PR-E6 | pendingChoice modals 统一卷轴风 (13 个面板) | ⏸ 待开 |
@@ -58,6 +58,45 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E3 落地 — 卡牌外观重设计 ✅
+
+**实际改动**:
+
+CSS (`src/styles/cards.css`) 全量重写 .card 视觉:
+- 卡身: cream/yellow 渐变 (`#fff5d4 → #f9e4a8 → #e3c577`) 替代旧 dark gradient
+- 棕色装饰边框: `border: 2px solid #5b2f15` + 双层 `inset box-shadow` (内白边 + 中棕环) 模拟装饰边
+- 5 个 group (attack/defense/heal/trick/buff) 用集合选择器统一覆写为 cream bg (旧 group 颜色已不适合)
+- `.card::before { content: none }` — 关闭旧黄色圆形装饰
+- 中央 `.card-name`: 绝对定位 `top:50% left:50% translate(-50%,-50%)`, 16px 大字深色 `#2a160a` + 浅金 text-shadow
+- 底部右下 `.card-type`: `position: absolute; bottom: 4px; right: 6px`, 11px 小 badge, 5 group 颜色:
+  - attack `#c84527` (红) / defense `#2a648c` (蓝) / heal `#2d8c4c` (绿) / trick `#7d3b8c` (紫) / buff `#a06520` (棕黄)
+- 描述行 `.card-desc`: 底部小灰字, 2 行截断
+- 背景水印 `.card-symbol`: 右中半透明大字
+- 左上 corner: `.card-corner` 从原 right 改 left, `flex-direction: column` 排
+- 新增子类 `.card-corner__rank` (17px) + `.card-corner__suit` (14px)
+- `.card .suit-red` 覆写为 `#c4172a` (深红, cream bg 用); `.card .suit-black` 为 `#1a1a1a` (近黑)
+- 根 `.suit-red` 保持 `#ff7878` (亮红, mini-card-suit 在 dark bg 用 — 守 v8 PR-0 规则)
+- `.card.discard-selected`: 红 outline + 浮起 + 红光 shadow
+
+dom-adapter (`src/ui/dom-adapter.js`):
+- `suitRankBadge()` 输出嵌套 span: `<span class="card-corner suit-red"><span class="card-corner__rank">5</span><span class="card-corner__suit">♥</span></span>`
+- 仍保留顶层 `.card-corner` + `suit-red/black` class (向后兼容)
+
+**新增** `tests/v9_pr_e3_card_redesign.test.mjs` (14 条守护):
+- .card cream bg / 棕 border + 双 inset shadow
+- 5 group 共享 cream bg / `.card::before content:none`
+- .card-corner 左上 + column 排
+- `.card-corner__rank` + `__suit` 子样式
+- `.card .suit-red` 深红 / `.card .suit-black` 近黑
+- 根 `.suit-red` 仍亮红 (守 v8 PR-0)
+- .card-name 居中定位
+- .card-type 底部右下 + 5 group 颜色变体
+- suitRankBadge 输出嵌套 span + 仍保 .card-corner 顶层 class
+- .card.discard-selected outline + transform + shadow
+- 回归 loadAllStyles
+
+**Test status**: 559 → 573 ✓ (+14 新守护); 现有 559 条无 regression。
 
 ### PR-E2 落地 — 中央日志 + 暂停横幅 + 底部状态条 ✅
 
