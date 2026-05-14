@@ -82,4 +82,16 @@ test('v8 PR-A1: 既有 choices 容器追加 pending-prompt-panel__choices', () =
   });
 });
 
+// v8 hotfix: PR-A1 introduced `.pending-prompt-panel { display: flex; }`
+// which overrides the `hidden` HTML attribute. Without an explicit
+// `[hidden] { display: none !important; }` override, ALL pending-choice
+// panels (guicai / yiji / fankui / qilin / cixiong-* / jiedao /
+// wugu / guohe-1v1 / dying-rescue) are visible at once and cover the
+// hand area. Regression guard.
+test('v8 hotfix: .pending-prompt-panel[hidden] 必须有 display:none !important override', () => {
+  // 必须在 hidden-override block 中包含 .pending-prompt-panel[hidden]
+  // 否则所有 pendingChoice 面板会永远可见 (盖住手牌区)
+  assert.match(cssSource, /\.pending-prompt-panel\[hidden\][\s\S]{0,200}display:\s*none\s*!important/);
+});
+
 console.log('\nPending prompt framework (v8 PR-A1) tests passed.');
