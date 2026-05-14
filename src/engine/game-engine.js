@@ -3836,6 +3836,96 @@
       // same scoring pool so e.g. AI 关羽 with [red 桃, no 杀] at full HP
       // picks the 桃→杀 conversion (positive score) over the 桃 (negative
       // when full HP).
+      // v8 PR-D3: 1-ply lookahead 框架 — clone game, simulate playCard,
+      // evaluate resulting state. AI 用 simulation delta 修正 scoreCard
+      // 启发式. 当 simulation 暂停 (pendingChoice) 或异常时回退到纯启发.
+
+      // 深克隆 game state. log/turnHistory 用空数组 (simulation 不需要),
+      // random 用独立确定 seed (避免污染原 game.random 状态).
+      function aiCloneGame(g) {
+        var savedLog = g.log;
+        var savedHist = g.turnHistory;
+        var savedRandom = g.random;
+        g.log = [];
+        g.turnHistory = [];
+        g.random = undefined;
+        var copy;
+        try {
+          copy = JSON.parse(JSON.stringify(g));
+        } finally {
+          g.log = savedLog;
+          g.turnHistory = savedHist;
+          g.random = savedRandom;
+        }
+        copy.log = [];
+        copy.turnHistory = [];
+        // 模拟用确定 seed; 不复用原 random closure 避免双向污染
+        copy.random = makeRng(1);
+        copy.aiSimulating = true;
+        return copy;
+      }
+
+      // 状态评估: 自身 hp 与对方差为主, 加上 hand / equipment / judge 区差
+      // game over 时给极大的 +/- bonus.
+      function aiEvaluateState(g, actor) {
+        var self = g[actor];
+        var oppActor = opponent(actor);
+        var opp = g[oppActor];
+        if (!self || !opp) return 0;
+        if (g.phase === 'gameover') {
+          if (g.winner === actor) return 100000;
+          if (g.winner === oppActor) return -100000;
+        }
+        // hp 差权重最高
+        var hpScore = (self.hp - opp.hp) * 30;
+        if (self.hp <= 0) hpScore -= 1000;
+        else if (self.hp === 1) hpScore -= 50;
+        else if (self.hp === 2) hpScore -= 10;
+        // 手牌差
+        var handScore = ((self.hand || []).length - (opp.hand || []).length) * 5;
+        // 装备件数差
+        var slots = ['weapon', 'armor', 'horsePlus', 'horseMinus'];
+        var selfEq = slots.filter(function (s) { return self.equipment && self.equipment[s]; }).length;
+        var oppEq = slots.filter(function (s) { return opp.equipment && opp.equipment[s]; }).length;
+        var equipScore = (selfEq - oppEq) * 8;
+        // 判定区: 自己有延时锦囊待结算 = 坏; 对方有 = 好
+        var selfJudge = ((self.judgeArea || []).length) * -5;
+        var oppJudge = ((opp.judgeArea || []).length) * 5;
+        return hpScore + handScore + equipScore + selfJudge + oppJudge;
+      }
+
+      // 模拟 playCard / playCardAs, 返回 simulated game (post-state) 或 null.
+      // null 表示模拟失败 (suspended pendingChoice / 抛异常 / 不合法).
+      function aiSimulateCardPlay(g, actor, card, mode, options) {
+        var clone = aiCloneGame(g);
+        try {
+          var result;
+          if (mode === 'asSha') {
+            result = playCardAs(clone, actor, card.id, 'sha');
+          } else {
+            result = playCard(clone, actor, card.id, options || null);
+          }
+          if (!result || !result.ok) return null;
+          if (clone.pendingChoice) return null;
+          return clone;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      // 综合分: 启发 + lookahead delta. sim 失败时回退仅启发.
+      function aiScoreCardWithLookahead(g, actor, card, mode) {
+        var heuristic = (mode === 'asSha')
+          ? scoreCardForAI(g, actor, { type: 'sha', family: 'basic', color: card.color })
+          : scoreCardForAI(g, actor, card);
+        var preEval = aiEvaluateState(g, actor);
+        var sim = aiSimulateCardPlay(g, actor, card, mode);
+        if (!sim) return heuristic;
+        var postEval = aiEvaluateState(sim, actor);
+        var delta = postEval - preEval;
+        return heuristic + delta;
+      }
+
       function aiChooseCard(game, actor) {
         if (game.turn !== actor || game.phase === 'gameover') return null;
         var self = game[actor];
@@ -3843,17 +3933,15 @@
         self.hand.forEach(function (card) {
           // Original-card use.
           if (canPlayCard(game, actor, card).ok) {
-            var normalScore = scoreCardForAI(game, actor, card);
+            // v8 PR-D3: 用 lookahead 综合分; sim 失败回退到 scoreCardForAI
+            var normalScore = aiScoreCardWithLookahead(game, actor, card, 'normal');
             if (normalScore > 0) candidates.push({ card: card, mode: 'normal', score: normalScore });
           }
           // As-Sha conversion (武圣 / 龙胆). Skip cards that are already
           // 杀 — no conversion needed.
           if (!isShaType(card.type)) {
             if (canPlayCardAs(game, actor, card, 'sha').ok) {
-              // Score it as if it were a (virtual) sha so the comparison
-              // against normal plays is on the same scale.
-              var virtual = { type: 'sha', family: 'basic', color: card.color };
-              var asScore = scoreCardForAI(game, actor, virtual);
+              var asScore = aiScoreCardWithLookahead(game, actor, card, 'asSha');
               if (asScore > 0) candidates.push({ card: card, mode: 'asSha', score: asScore });
             }
           }
@@ -4077,6 +4165,11 @@
         aiScoreCard: scoreCardForAI,
         aiEstimateShaCount: aiEstimateShaCount,
         aiEstimateShanCount: aiEstimateShanCount,
+        // v8 PR-D3: 1-ply lookahead helpers
+        aiCloneGame: aiCloneGame,
+        aiEvaluateState: aiEvaluateState,
+        aiSimulateCardPlay: aiSimulateCardPlay,
+        aiScoreCardWithLookahead: aiScoreCardWithLookahead,
         runAITurn: runAITurn,
         opponent: opponent
       };
