@@ -127,13 +127,19 @@
       text-shadow: 0 1px 0 rgba(0, 0, 0, .9);
     }
 
+    /* v9 PR-E11: 顺序选将 — 当前 side tab 全宽; 另一 side tab hidden 隐藏.
+       改 grid → flex 自适应单/双 tab 显示. */
     .hero-pick__tabs {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
       gap: 10px;
     }
 
+    .hero-pick-tab[hidden] {
+      display: none !important;
+    }
+
     .hero-pick-tab {
+      flex: 1 1 auto;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -208,6 +214,13 @@
       transform: translateY(-2px);
     }
 
+    /* v9 PR-E11: 已被对方选走 → 锁定不可点 (顺序选将状态) */
+    .hero-pick-card:disabled,
+    .hero-pick-card.is-locked {
+      cursor: not-allowed;
+      filter: grayscale(.6) brightness(.7);
+    }
+
     .hero-pick-card__camp {
       position: absolute;
       top: 3px;
@@ -253,4 +266,9 @@
       display: flex;
       gap: 10px;
       justify-content: center;
+    }
+
+    /* v9 PR-E11: hidden 按钮强制 display:none (顺序选将只显当前 side btn) */
+    .hero-pick__random-row .btn.small[hidden] {
+      display: none !important;
     }
