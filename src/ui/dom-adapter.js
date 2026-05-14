@@ -58,6 +58,8 @@
           'ganglieSourcePanel', 'ganglieSourceHint', 'ganglieSourceCandidates', 'ganglieSourceConfirmBtn', 'ganglieSourceTakeDamageBtn',
           'qilinPickPanel', 'qilinPickHint', 'qilinPickChoices', 'qilinDeclineBtn',
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
+          'cixiongFirePanel', 'cixiongFireHint', 'cixiongFireBtn', 'cixiongFireDeclineBtn',
+          'cixiongChoosePanel', 'cixiongChooseHint', 'cixiongChooseChoices', 'cixiongChooseDrawBtn',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -624,6 +626,44 @@
             }
           } else {
             els.qilinPickPanel.hidden = true;
+          }
+        }
+        // v8 PR-A3: 雌雄双股剑 fire — source 决定是否对异性发动
+        if (els.cixiongFirePanel) {
+          if (kind === 'cixiong-fire' && pending.actor === 'player') {
+            els.cixiongFirePanel.hidden = false;
+            if (els.cixiongFireHint) {
+              els.cixiongFireHint.textContent =
+                '雌雄双股剑：对' + actorDisplayName(pending.target) + '（异性）发动效果？目标二选一：弃 1 手牌 / 令你摸 1 张。';
+            }
+          } else {
+            els.cixiongFirePanel.hidden = true;
+          }
+        }
+        // v8 PR-A3: 雌雄双股剑 choose — target 选 弃手 或 让 source 摸 1
+        if (els.cixiongChoosePanel) {
+          if (kind === 'cixiong-choose' && pending.actor === 'player') {
+            els.cixiongChoosePanel.hidden = false;
+            if (els.cixiongChooseHint) {
+              els.cixiongChooseHint.textContent =
+                '雌雄双股剑：' + actorDisplayName(pending.sourceActor) +
+                '发动，弃 1 张手牌或令其摸 1 张。';
+            }
+            if (els.cixiongChooseChoices) {
+              var cxResponder = game[pending.actor];
+              var cxHandIds = pending.handIds || [];
+              els.cixiongChooseChoices.innerHTML = cxHandIds.map(function (cardId) {
+                var card = cxResponder && (cxResponder.hand || []).find(function (c) { return c.id === cardId; });
+                if (!card) return '';
+                return promptCardChoice(card, {
+                  dataAttrs: { cixiongDiscardCardId: cardId },
+                  title: '弃这张手牌响应雌雄',
+                  extraClass: 'cixiong-choose-card'
+                });
+              }).join('') || '<span class="mini-card">没有手牌可弃 → 必须让对方摸 1 张</span>';
+            }
+          } else {
+            els.cixiongChoosePanel.hidden = true;
           }
         }
         // v8 PR-A2: 濒死救援 — responder 用 桃/酒 救援（酒仅自救）
@@ -1512,6 +1552,31 @@
         });
         if (els.qilinDeclineBtn) els.qilinDeclineBtn.addEventListener('click', function () {
           var result = Engine.resolvePendingChoice(game, { decline: true });
+          if (!result.ok) renderLog();
+          render();
+        });
+        // v8 PR-A3: 雌雄 fire 面板
+        if (els.cixiongFireBtn) els.cixiongFireBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { fire: true });
+          if (!result.ok) renderLog();
+          render();
+        });
+        if (els.cixiongFireDeclineBtn) els.cixiongFireDeclineBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { decline: true });
+          if (!result.ok) renderLog();
+          render();
+        });
+        // v8 PR-A3: 雌雄 choose 面板 — 弃手牌 / 让对方摸 1
+        if (els.cixiongChooseChoices) els.cixiongChooseChoices.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-cixiong-discard-card-id]');
+          if (!btn) return;
+          var cardId = btn.getAttribute('data-cixiong-discard-card-id');
+          var result = Engine.resolvePendingChoice(game, { option: 'discard', cardId: cardId });
+          if (!result.ok) renderLog();
+          render();
+        });
+        if (els.cixiongChooseDrawBtn) els.cixiongChooseDrawBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { option: 'draw' });
           if (!result.ok) renderLog();
           render();
         });
