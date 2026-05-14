@@ -21,15 +21,23 @@
       font-size: 14px;
     }
 
+    /* v9 PR-E12: 旧版 .side-log-panel (右侧滚动日志) 与 PR-E2 中央
+       overlay 重复显示最近条目. 隐藏以避免双显. 历史日志仍在 game.log
+       数据里, 后续可改成 hover 展开 / 单独 modal. */
+    .side-log-panel {
+      display: none !important;
+    }
+
     /* v9 PR-E2: 中央日志 overlay — 显示最近 4-6 条 game.log 大字白色,
-       覆盖在 .duel-table 上, 不影响点击. side-log-panel 仍保留作历史
-       完整滚动视图. */
+       覆盖在 .duel-table 上, 不影响点击. */
     .log-overlay {
       position: absolute;
-      left: 12%;
-      right: 24%;
-      top: 24%;
-      max-height: 36%;
+      /* v9 PR-E12: 现 side-log 已隐藏, overlay 居中 + 收窄 max-height
+         避免覆盖 opponent/player zone-panel. */
+      left: 22%;
+      right: 22%;
+      top: 32%;
+      max-height: 28%;
       z-index: 3;
       display: flex;
       flex-direction: column;
