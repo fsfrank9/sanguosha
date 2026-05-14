@@ -5,58 +5,133 @@
    .huogong-reveal/-cost-choices/-cost-choice + .unusable,
    the [hidden] override block (v8 hotfix #60). */
 
-    /* v8 PR-A1: 通用 pendingChoice 面板框架。所有需要玩家做选择的面板
-       (guicai / yiji / fankui / qilin-pick / cixiong-* / jiedao / wugu /
-       guohe-1v1 / dying-rescue 等) 走这套样式; 旧 per-kind 类保留作向后
-       兼容 hook. */
+    /* v8 PR-A1 → v9 PR-E6: 通用 pendingChoice 面板框架升级为卷轴风
+       center fixed modal — cream paper bg + 棕红 border + dim backdrop
+       via ::before. 所有 13 个 pendingChoice 面板 (guicai / yiji /
+       fanjian / fankui / ganglie-* / qilin / dying-rescue / cixiong-* /
+       jiedao / guohe / wugu / luoshen) 共享该样式. */
     .pending-prompt-panel {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 40;
+      margin: 0;
+      width: min(520px, 84vw);
+      max-height: 76vh;
+      overflow-y: auto;
+      padding: 24px 44px 20px;
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      padding: 10px;
-      border: 1px solid rgba(255, 214, 138, 0.35);
-      border-radius: 10px;
-      background: rgba(20, 14, 6, 0.55);
+      gap: 10px;
       align-items: center;
-      margin-top: 6px;
+      justify-content: center;
+      border: 1px solid #b27632;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #fef0c8 0%, #f5dca0 100%);
+      box-shadow:
+        0 14px 36px rgba(0, 0, 0, .55),
+        inset 0 0 0 1px rgba(255, 255, 255, .35);
+      color: #3a2010;
     }
+
+    /* v9 PR-E6: ::before 充当全屏暗背景 (modal backdrop). */
+    .pending-prompt-panel::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .45);
+      backdrop-filter: blur(2px);
+      z-index: -1;
+      pointer-events: auto;
+    }
+
     .pending-prompt-panel__hint {
       flex-basis: 100%;
-      font-size: 13px;
-      color: #f2dba7;
-      font-weight: 600;
+      font-size: 15px;
+      font-weight: 800;
+      color: #7a3a14;
+      text-align: center;
+      letter-spacing: .08em;
+      padding-bottom: 8px;
+      margin-bottom: 4px;
+      border-bottom: 1px dashed rgba(178, 118, 50, .4);
     }
     .pending-prompt-panel__choices {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
-      flex: 1 1 auto;
+      gap: 8px;
+      flex: 1 1 100%;
+      justify-content: center;
     }
     .pending-prompt-panel__actions {
       display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
+      gap: 14px;
+      flex: 1 1 100%;
+      justify-content: center;
+      margin-top: 4px;
     }
+    /* v9 PR-E6: prompt-card-choice 改 cream-on-cream 风 (用户挑牌时高亮金) */
     .prompt-card-choice {
-      border: 1px solid rgba(255, 214, 138, 0.4);
-      background: rgba(0, 0, 0, 0.3);
-      color: #f2dba7;
-      padding: 5px 9px;
-      border-radius: 9px;
-      font-size: 12px;
+      border: 1px solid #8e5824;
+      background: linear-gradient(180deg, #fff5d4, #f0c878);
+      color: #3a2010;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
       cursor: pointer;
-      transition: background 0.15s, transform 0.05s;
+      transition: background 0.15s, transform 0.05s, border-color 0.15s;
     }
     .prompt-card-choice:hover:not(:disabled) {
-      background: rgba(255, 214, 138, 0.18);
+      background: linear-gradient(180deg, #fff5d4, #ffb96e);
+      border-color: #5b2f15;
+      transform: translateY(-1px);
     }
     .prompt-card-choice.selected {
-      background: rgba(255, 214, 138, 0.32);
-      border-color: rgba(255, 214, 138, 0.7);
+      background: linear-gradient(180deg, #ffd68a, #d88427);
+      color: #fff4d0;
+      border-color: #5b2f15;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, .3);
     }
     .prompt-card-choice:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    /* v9 PR-E6: pending panel 内的 .btn.small 升级为小 .btn-frame.
+       特异性: .pending-prompt-panel .btn.small > .btn.small > .btn (后面
+       两条来自 controls.css). 通过 CSS @import 顺序 + 嵌套选择器赢. */
+    .pending-prompt-panel .btn.small {
+      padding: 7px 16px;
+      border: 2px solid #5b2f15;
+      border-radius: 4px;
+      background: linear-gradient(180deg, #f0a33a, #c25a1a 60%, #8b3c10);
+      color: #fff4d0;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: .14em;
+      box-shadow:
+        inset 0 1px rgba(255, 230, 180, .42),
+        0 3px 8px rgba(0, 0, 0, .42);
+    }
+    .pending-prompt-panel .btn.small:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    /* v9 PR-E6: badge 在 cream bg 上, 改深色 — 仅 pending panel 范围. */
+    .pending-prompt-panel .badge {
+      color: #5b2f15;
+      border-color: rgba(178, 118, 50, .55);
+      background: rgba(255, 240, 200, .55);
+    }
+
+    /* v9 PR-E6: mini-card 也覆写为 cream bg 风 (供 guicai-original 等用) */
+    .pending-prompt-panel .mini-card {
+      border: 1px solid #b27632;
+      background: linear-gradient(180deg, #fff5d4, #f0c878);
+      color: #3a2010;
     }
 
     /* [hidden] override for both legacy mode-panels and the pending-prompt
