@@ -65,6 +65,9 @@
           'wuguPickPanel', 'wuguPickHint', 'wuguPickChoices',
           // v8 hotfix-2: 洛神 (luoshen-continue) 面板 — 准备阶段连续判定决定
           'luoshenPromptPanel', 'luoshenPromptHint', 'luoshenContinueBtn', 'luoshenStopBtn',
+          // v9 PR-E1: 装饰外框角落 widgets — 菜单 / 分享. placeholder 行为, 等
+          // PR-E5 接入侧抽屉.
+          'frameMenuBtn', 'frameShareBtn',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -1743,6 +1746,18 @@
           var result = Engine.resolvePendingChoice(game, { decline: true });
           if (!result.ok) renderLog();
           render();
+        });
+        // v9 PR-E1: 角落 widgets click placeholder. 不绑定真行为, 仅在 console
+        // 留 trace, PR-E5 接入侧抽屉时替换。
+        if (els.frameMenuBtn) els.frameMenuBtn.addEventListener('click', function () {
+          if (window.console && window.console.info) {
+            window.console.info('[v9 PR-E1] 菜单 click — 侧抽屉将在 PR-E5 接入');
+          }
+        });
+        if (els.frameShareBtn) els.frameShareBtn.addEventListener('click', function () {
+          if (window.console && window.console.info) {
+            window.console.info('[v9 PR-E1] 分享 click — placeholder');
+          }
         });
         // v8 PR-A2: 濒死救援面板
         if (els.dyingRescueChoices) els.dyingRescueChoices.addEventListener('click', function (event) {

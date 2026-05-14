@@ -8,6 +8,17 @@
 </head>
 <body data-version="6.1">
   <main class="app">
+    <!-- v9 PR-E1: 角落 widget — 左上 菜单 / 右上 分享. placeholder click,
+         PR-E5 接入侧抽屉. 浮在 .game-frame 条纹边框上方. -->
+    <button type="button" class="frame-corner-btn frame-corner-btn--menu" id="frameMenuBtn" aria-label="菜单（待 PR-E5 接入侧抽屉）">
+      <span class="frame-corner-btn__icon" aria-hidden="true">📒</span>
+      <span class="frame-corner-btn__label">菜单</span>
+    </button>
+    <button type="button" class="frame-corner-btn frame-corner-btn--share" id="frameShareBtn" aria-label="分享（占位）">
+      <span class="frame-corner-btn__icon" aria-hidden="true">🪶</span>
+      <span class="frame-corner-btn__label">分享</span>
+    </button>
+    <div class="game-frame">
     <header>
       <section class="title-card">
         <h1>三国杀 · 1v1 模块化版 <span class="version-pill">v6.1 规则合规版</span></h1>
@@ -304,6 +315,7 @@
         <div class="hand" id="playerHand"></div>
       </section>
     </section>
+    </div><!-- /.game-frame -->
   </main>
   <script type="module" src="./src/main.js"></script>
 </body>
