@@ -3913,15 +3913,37 @@
         }
       }
 
+      // v8 PR-D4: threat-aware evaluation — baseline + 对手潜在伤害威胁.
+      // 用 estimateShaCount(opp) vs estimateShanCount(self) 估算下回合可能
+      // 接到的伤害, 给 actor 视角下负分. AI 因此会优先 disrupt 对手的杀
+      // (过河武器 / 顺手) 或缓解自身防御.
+      function aiEvaluateStateWithThreat(g, actor) {
+        var base = aiEvaluateState(g, actor);
+        if (g.phase === 'gameover') return base;
+        var self = g[actor];
+        var oppActor = opponent(actor);
+        var opp = g[oppActor];
+        if (!self || !opp) return base;
+        // 对方下回合能用几张杀 (estimateShaCount 含 武圣 红色 / 龙胆 闪 等)
+        var oppSha = aiEstimateShaCount(opp);
+        // 我方能用几张闪 (estimateShanCount 含 龙胆 杀 / 倾国 黑 等)
+        var selfShan = aiEstimateShanCount(self);
+        // 预期入帐伤害 = max(0, 对方杀数 - 我方闪数). 简化 (忽略 paoxiao
+        // 多杀重叠 / 距离等). 每点 dmg 减 25 (低于 hp 差权重 30 但显著).
+        var incoming = Math.max(0, oppSha - selfShan);
+        return base - incoming * 25;
+      }
+
       // 综合分: 启发 + lookahead delta. sim 失败时回退仅启发.
+      // v8 PR-D4: 评估改用 threat-aware 版本, 让 AI 考虑下回合对手反击潜力.
       function aiScoreCardWithLookahead(g, actor, card, mode) {
         var heuristic = (mode === 'asSha')
           ? scoreCardForAI(g, actor, { type: 'sha', family: 'basic', color: card.color })
           : scoreCardForAI(g, actor, card);
-        var preEval = aiEvaluateState(g, actor);
+        var preEval = aiEvaluateStateWithThreat(g, actor);
         var sim = aiSimulateCardPlay(g, actor, card, mode);
         if (!sim) return heuristic;
-        var postEval = aiEvaluateState(sim, actor);
+        var postEval = aiEvaluateStateWithThreat(sim, actor);
         var delta = postEval - preEval;
         return heuristic + delta;
       }
@@ -4170,6 +4192,8 @@
         aiEvaluateState: aiEvaluateState,
         aiSimulateCardPlay: aiSimulateCardPlay,
         aiScoreCardWithLookahead: aiScoreCardWithLookahead,
+        // v8 PR-D4: threat-aware eval (考虑对方下回合威胁)
+        aiEvaluateStateWithThreat: aiEvaluateStateWithThreat,
         runAITurn: runAITurn,
         opponent: opponent
       };
