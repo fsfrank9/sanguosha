@@ -38,6 +38,7 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E8 | **二级 splash + 一级 lobby** (3 模式卡, 仅 1V1 启用) | 🟢 PR #76 已合并 |
 | PR-E9 | **选将界面重设计** (4×3 网格 + 势力 tag + 随机/点将 切换) | 🟢 PR #77 已合并 |
 | PR-E10 | UI 审计 + 清理 (header 入口屏隐藏, 死代码 .layout/.side/.battlefield, 空 `<select>` options) + 20 条集成守护测试 | 🟡 PR 待合并 |
+| PR-E11 | 选将流程 bug 修复 (用户反馈: 选完不自动进游戏 + 应顺序选将主公先选不可返回) | 🟡 PR 待合并 |
 
 总预估: **~2700-3200 LOC 变更**, 跨 10 个 review cycle。
 
@@ -59,6 +60,62 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E11 落地 — 选将流程 bug 修复 ✅
+
+**用户反馈截图** (PR-E9/E10 合并后浏览器实测):
+> 这个界面直接卡住了，选完了不会自动进入游戏，还有逻辑应该是首先系统随机身份，分配到主公的先选，选完之后跳到反贼的选择，这个时候不可返回，而且每个身份选将的时候都不应该出现别的身份的吧
+
+**找到的问题**:
+
+1. **选完不自动进游戏** — PR-E9 设计成等用户点 `startGameBtn`, 但 iPad 视图下按钮滚出视窗用户看不到 → 卡死
+2. **双 tab 自由切换** — 用户能在我方/敌方间任意来回切, 与"主公先选, 反贼后选, 不可返回"的规则不符
+3. **每个 side 选将时不该看到另一 side 的 tab/按钮**
+4. **入 setup 不自动随机身份** — 默认 playerRole='主公', 用户期望"首先系统随机身份"
+
+**改动**:
+
+`src/ui/dom-adapter.js`:
+- 新增 state: `pickStep` (0 / 1 / 2) + `pickOrder` (按 主公→反贼 顺序排列的 `['player'|'enemy', ...]`)
+- 新增 `resetPickSequence()` — 清空 selects + 重置 pickStep + 按 `playerRole` 设 pickOrder + 设 `currentPickSide = pickOrder[0]`
+- `assignRandomRoles()` 末尾调 `resetPickSequence + renderHeroPickGrid` (重抽身份 = 重置选将)
+- `showSetup()` 末尾改调 `assignRandomRoles()` (入 setup 自动随机身份)
+- `handleHeroPickCardClick(heroId)`:
+  - 阻止选对方已锁 hero (`otherSelect.value === heroId` 早 return)
+  - 推进 `pickStep += 1`
+  - `pickStep >= pickOrder.length` (2): 渲染 + `setTimeout(newGame, 120)` 自动进游戏
+  - 未完成: `currentPickSide = pickOrder[pickStep]` 切到下一 side
+- `handleHeroPickTabClick(side)`: 顺序选将下锁定 tab 切换 (`side !== currentPickSide` 早 return)
+- `randomizeHero(side)`: 只允许 `currentPickSide`, 改走 `handleHeroPickCardClick` 统一流程
+- `renderHeroPickGrid()`:
+  - 用 `[hidden]` 切换非当前 side 的 tab + random btn (而非仅 `.is-active` class)
+  - 给被对方选走的 hero card 加 `disabled` 属性 + `.is-locked` class (灰化锁定)
+
+`src/styles/setup.css`:
+- `.hero-pick__tabs` 改 `display: flex` (替代 grid 2 列), 让单 tab 占满
+- `.hero-pick-tab[hidden]` `display: none !important`
+- `.hero-pick-card:disabled` + `.hero-pick-card.is-locked`: `cursor: not-allowed` + `filter: grayscale(.6) brightness(.7)`
+- `.hero-pick__random-row .btn.small[hidden]` `display: none !important`
+
+`index.html`:
+- `<button id="startGameBtn" hidden>` — auto-flow 后此按钮不再需要 (fallback)
+- `<button id="confirmHeroPickBtn" hidden>` — 同上
+
+**新增** `tests/v9_pr_e11_pick_sequence.test.mjs` (18 条守护):
+- pickStep + pickOrder 状态变量
+- resetPickSequence fn (清空 + 重置 + 按 role 排序)
+- assignRandomRoles 调 resetPickSequence + render
+- showSetup 调 assignRandomRoles
+- handleHeroPickCardClick 推进 + auto newGame + 阻止对方锁定 hero
+- randomizeHero 限 currentPickSide + 走统一流程
+- renderHeroPickGrid 用 [hidden] 切 tab/btn + 锁定 card disabled+.is-locked
+- handleHeroPickTabClick 锁定 tab 切换
+- CSS: flex tabs / [hidden] display:none / :disabled+.is-locked 灰化
+- HTML: startGameBtn / confirmHeroPickBtn hidden
+
+更新 `tests/v9_pr_e9_hero_grid.test.mjs` + `tests/v9_pr_e10_audit.test.mjs`: handleHeroPickCardClick / randomizeHero 测试改为新流程断言.
+
+**Test status**: 695 → 713 ✓ (+18 新守护; 现有 695 条无 regression — v9 PR-E9/E10 相关测试已同步更新).
 
 ### PR-E10 落地 — UI 审计 + 清理 + 集成守护 ✅
 
