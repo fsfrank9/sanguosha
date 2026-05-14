@@ -140,7 +140,8 @@
           <span class="badge" id="enemyRoleBadge">敌方：待定</span>
           <span class="badge" id="firstPickBadge">主公先选</span>
           <button class="btn small" id="randomRolesBtn">随机主公/反贼</button>
-          <button class="btn small" id="confirmHeroPickBtn">确认当前选择</button>
+          <!-- v9 PR-E11: 顺序选将自动确认, "确认当前选择" 不再需要 (hidden) -->
+          <button class="btn small" id="confirmHeroPickBtn" hidden>确认当前选择</button>
         </div>
         <!-- v9 PR-E9: 选将网格 — 替代旧 <select> 下拉. 顶部 tabs 切换
              我方/敌方, 中部 4 列武将网格 (含势力 tag), 右下角 preview.
@@ -171,7 +172,9 @@
           <label class="setup-side">我方武将 <select id="playerHeroSelect"></select></label>
           <label class="setup-side">敌方武将 <select id="enemyHeroSelect"></select></label>
         </div>
-        <button class="btn primary" id="startGameBtn">进入二级游戏界面</button>
+        <!-- v9 PR-E11: 顺序选将完成后自动进入游戏 (handleHeroPickCardClick
+             pickStep>=2 → newGame). 此 fallback 按钮 hidden, 仅留绑定. -->
+        <button class="btn primary" id="startGameBtn" hidden>进入二级游戏界面</button>
       </section>
     </section>
 

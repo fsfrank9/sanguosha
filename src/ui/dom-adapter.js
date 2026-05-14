@@ -1497,10 +1497,23 @@
         renderHeroPickGrid();
       }
 
-      // v9 PR-E9: 选将网格 state + render. 跟踪当前在为哪一方选将,
-      // 点 hero card → 更新对应 <select>.value (旧 state holder) + 重渲染
-      // 高亮. 切 tab 切换 currentPickSide. random 按钮仍走旧 randomizeHero.
+      // v9 PR-E11: 顺序选将 — 主公 先选, 反贼 后选, 不可返回. 状态:
+      //   pickStep: 0 = 第一位 picking, 1 = 第二位 picking, 2 = done (触发
+      //     auto-start)
+      //   pickOrder: ['player'|'enemy', ...] 按 主公→反贼 顺序排
+      //   currentPickSide: 当前 pick 的那一边 (= pickOrder[pickStep])
+      // assignRandomRoles / showSetup 入口都会重置此状态.
       var currentPickSide = 'player';
+      var pickStep = 0;
+      var pickOrder = ['player', 'enemy'];
+
+      function resetPickSequence() {
+        pickStep = 0;
+        pickOrder = playerRole === '主公' ? ['player', 'enemy'] : ['enemy', 'player'];
+        currentPickSide = pickOrder[0];
+        if (els.playerHeroSelect) els.playerHeroSelect.value = '';
+        if (els.enemyHeroSelect) els.enemyHeroSelect.value = '';
+      }
 
       function renderHeroPickGrid() {
         if (!els.heroPickGrid) return;
@@ -1510,28 +1523,46 @@
         var enemyVal = els.enemyHeroSelect ? els.enemyHeroSelect.value : '';
         els.heroPickGrid.innerHTML = heroes.map(function (hero) {
           var classes = ['hero-pick-card', 'hero-pick-card--camp-' + (hero.camp || '?')];
-          if (hero.id === playerVal) classes.push('is-player-selected');
-          if (hero.id === enemyVal) classes.push('is-enemy-selected');
-          return '<button type="button" class="' + classes.join(' ') + '" data-hero-id="' + escapeHtml(hero.id) + '">'
+          var isPlayerPicked = hero.id === playerVal && playerVal !== '';
+          var isEnemyPicked = hero.id === enemyVal && enemyVal !== '';
+          if (isPlayerPicked) classes.push('is-player-selected');
+          if (isEnemyPicked) classes.push('is-enemy-selected');
+          // v9 PR-E11: 当前 side 不能选已被对方选走的 hero, 锁定 + disable.
+          var locked = (currentPickSide === 'player' && isEnemyPicked)
+                    || (currentPickSide === 'enemy' && isPlayerPicked);
+          if (locked) classes.push('is-locked');
+          return '<button type="button" class="' + classes.join(' ') + '" data-hero-id="' + escapeHtml(hero.id) + '"' + (locked ? ' disabled' : '') + '>'
             + '<span class="hero-pick-card__camp">' + escapeHtml(hero.camp || '?') + '</span>'
             + '<span class="hero-pick-card__name">' + escapeHtml(hero.name) + '</span>'
             + '</button>';
         }).join('');
-        // tab values + prompt
+        // tab values + 可见性 (顺序选将只显示当前 side 的 tab)
         if (els.heroPickPlayerValue) {
-          var pH = Engine.HERO_CATALOG[playerVal];
+          var pH = playerVal ? Engine.HERO_CATALOG[playerVal] : null;
           els.heroPickPlayerValue.textContent = pH ? pH.name : '未选';
         }
         if (els.heroPickEnemyValue) {
-          var eH = Engine.HERO_CATALOG[enemyVal];
+          var eH = enemyVal ? Engine.HERO_CATALOG[enemyVal] : null;
           els.heroPickEnemyValue.textContent = eH ? eH.name : '未选';
         }
-        if (els.heroPickPlayerTab) els.heroPickPlayerTab.classList.toggle('is-active', currentPickSide === 'player');
-        if (els.heroPickEnemyTab) els.heroPickEnemyTab.classList.toggle('is-active', currentPickSide === 'enemy');
+        if (els.heroPickPlayerTab) {
+          els.heroPickPlayerTab.hidden = (currentPickSide !== 'player');
+          els.heroPickPlayerTab.classList.toggle('is-active', currentPickSide === 'player');
+        }
+        if (els.heroPickEnemyTab) {
+          els.heroPickEnemyTab.hidden = (currentPickSide !== 'enemy');
+          els.heroPickEnemyTab.classList.toggle('is-active', currentPickSide === 'enemy');
+        }
+        // 随机按钮也只显示当前 side 的
+        if (els.randomPlayerHeroBtn) els.randomPlayerHeroBtn.hidden = (currentPickSide !== 'player');
+        if (els.randomEnemyHeroBtn) els.randomEnemyHeroBtn.hidden = (currentPickSide !== 'enemy');
         if (els.heroPickPrompt) {
-          els.heroPickPrompt.textContent = currentPickSide === 'player'
-            ? (playerRole === '主公' ? '您是主公，请选将' : '您是反贼，请选将')
-            : '请选择您的对手!';
+          var sideRole = currentPickSide === 'player' ? playerRole : enemyRole;
+          if (currentPickSide === 'player') {
+            els.heroPickPrompt.textContent = sideRole === '主公' ? '您是主公，请选将' : '您是反贼，请选将';
+          } else {
+            els.heroPickPrompt.textContent = sideRole === '主公' ? '请为对手 (主公) 选将' : '请为对手 (反贼) 选将';
+          }
         }
       }
 
@@ -1539,19 +1570,26 @@
         if (!heroId) return;
         var targetSelect = currentPickSide === 'player' ? els.playerHeroSelect : els.enemyHeroSelect;
         if (!targetSelect) return;
+        // v9 PR-E11: 不能选对方已锁定的 hero
+        var otherSelect = currentPickSide === 'player' ? els.enemyHeroSelect : els.playerHeroSelect;
+        if (otherSelect && otherSelect.value === heroId) return;
         targetSelect.value = heroId;
         ensureDistinctHeroes(currentPickSide);
-        // 第一次选完我方自动切到敌方; 否则停在当前
-        if (currentPickSide === 'player' && !els.enemyHeroSelect.value) {
-          currentPickSide = 'enemy';
+        pickStep += 1;
+        if (pickStep >= pickOrder.length) {
+          // 双方都选完 → 自动进入游戏 (用 setTimeout 让 UI 先 paint 高亮态再切屏)
+          renderHeroPickGrid();
+          window.setTimeout(function () { newGame(); }, 120);
+          return;
         }
+        currentPickSide = pickOrder[pickStep];
         renderHeroPickGrid();
       }
 
       function handleHeroPickTabClick(side) {
-        if (side !== 'player' && side !== 'enemy') return;
-        currentPickSide = side;
-        renderHeroPickGrid();
+        // v9 PR-E11: 顺序选将锁定 tab 切换 — 点击非当前 side 的 tab 无操作.
+        // (其实非当前 tab 已 hidden, 通常无法点; 这里是 defensive.)
+        if (side !== currentPickSide) return;
       }
 
       function optionValues(select) {
@@ -1580,12 +1618,16 @@
       }
 
       function randomizeHero(side) {
+        // v9 PR-E11: 顺序选将 — 只允许随机当前 side, 走 handleHeroPickCardClick
+        // 统一流程 (含 pickStep 推进 + 完成 auto-start).
+        if (side !== currentPickSide) return;
         var select = side === 'player' ? els.playerHeroSelect : els.enemyHeroSelect;
-        var other = side === 'player' ? els.enemyHeroSelect.value : els.playerHeroSelect.value;
-        var pool = optionValues(select).filter(function (value) { return value !== other; });
-        select.value = pool[Math.floor(Math.random() * pool.length)];
-        ensureDistinctHeroes(side);
-        renderHeroPickGrid();  // v9 PR-E9: 同步 grid 高亮
+        var otherSelect = side === 'player' ? els.enemyHeroSelect : els.playerHeroSelect;
+        var other = otherSelect ? otherSelect.value : '';
+        var pool = optionValues(select).filter(function (value) { return value && value !== other; });
+        if (!pool.length) return;
+        var picked = pool[Math.floor(Math.random() * pool.length)];
+        handleHeroPickCardClick(picked);
       }
 
       function updateDraftUI() {
@@ -1600,9 +1642,14 @@
         enemyRole = playerIsLord ? '反贼' : '主公';
         draftPicker = playerIsLord ? 'player' : 'enemy';
         updateDraftUI();
+        // v9 PR-E11: 重抽身份 → 重置选将状态 (pickStep + selects 清空)
+        resetPickSequence();
+        renderHeroPickGrid();
       }
 
       function confirmHeroPick() {
+        // v9 PR-E11: 旧 "确认当前选择" 按钮已 hidden (顺序选将自动确认).
+        // 保留 fn 以兼容旧绑定; 仅推进 draftPicker 标签.
         if (draftPicker === 'player') draftPicker = 'enemy';
         else if (draftPicker === 'enemy') draftPicker = 'done';
         updateDraftUI();
@@ -1625,8 +1672,9 @@
         if (els.endTurnBtn) els.endTurnBtn.disabled = true;
         if (els.newGameBtn) els.newGameBtn.textContent = '重新选将';
         populateHeroSelects();
-        ensureDistinctHeroes('player');
-        updateDraftUI();
+        // v9 PR-E11: 入 setup 自动随机身份 (assignRandomRoles 内部已重置
+        // 选将状态 + renderHeroPickGrid). 用户可点 "随机主公/反贼" 重抽.
+        assignRandomRoles();
       }
 
       // v9 PR-E8: 入口屏切换 — splash → lobby → setup → game.

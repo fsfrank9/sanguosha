@@ -137,11 +137,14 @@ test('v9 PR-E10: handleHeroPickCardClick 末尾调 renderHeroPickGrid (高亮同
   assert.match(fn[0], /renderHeroPickGrid\(\)/);
 });
 
-test('v9 PR-E10: handleHeroPickCardClick 首次选我方后自动切到敌方 tab', () => {
+test('v9 PR-E10/E11: handleHeroPickCardClick 推进 pickStep + 切换 currentPickSide', () => {
   const fn = adapter.match(/function handleHeroPickCardClick\([\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
-  // 检查 auto-switch 逻辑
-  assert.match(fn[0], /currentPickSide\s*=\s*['"]enemy['"]/);
+  // PR-E11 顺序选将逻辑
+  assert.match(fn[0], /pickStep\s*\+=\s*1/);
+  assert.match(fn[0], /currentPickSide\s*=\s*pickOrder\[pickStep\]/);
+  // 完成后调用 newGame (auto-start)
+  assert.match(fn[0], /newGame\(\)/);
 });
 
 // ───── 整合: 全屏 hidden 状态守护 ────────────────────────────────────
