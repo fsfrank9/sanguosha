@@ -87,9 +87,8 @@ test('v9 PR-E13: layout.css 新增 .phase-prompt + .phase-prompt__brush 黑底�
 });
 
 test('v9 PR-E13: layout.css .status-bar__version display:none (避免 v9.0.0 与手牌重影)', () => {
-  const block = layoutCss.match(/\.status-bar__version\s*\{[\s\S]*?\n\s{4}\}/);
-  assert.ok(block);
-  assert.match(block[0], /display:\s*none/);
+  // PR-E15 后, version/score/time 三选择器共享 display:none 规则.
+  assert.match(layoutCss, /\.status-bar__version[,\s]*[\s\S]{0,80}display:\s*none/);
 });
 
 test('v9 PR-E13: zones.css .log-overlay display:none (整个隐藏, 数据仍在 game.log)', () => {

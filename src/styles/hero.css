@@ -192,12 +192,11 @@
       100% { opacity: 0; transform: translate(-50%, -110%) scale(.98); }
     }
 
+    /* v9 PR-E15: 用户反馈 "双方角色卡里的手牌和状态是用来干什么的, 文字只显示
+       了半截". 信息冗余 (手牌数已在敌方手牌区显示, 状态文字已被 turn-badge /
+       phase-prompt 替代), 整个 .stat-grid 隐藏. */
     .stat-grid {
-      position: relative;
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-      margin-top: 12px;
+      display: none;
     }
 
     .stat {

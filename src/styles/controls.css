@@ -4,15 +4,16 @@
    .skill-button (+ :disabled), .skill-status-todo/-display/-implemented,
    .discard-controls, .shake + @keyframes shake. */
 
-    /* v9 PR-E14: 之前在 <header> 内 flow 布局, header 在 game 模式 .title-card
-       hidden 后仍占顶部 ~50px 空白. 现 absolute 浮到 .game-frame 右上角
-       (避开 right:16 的 frame-share-btn), 一致用于 setup + game. header 仅
-       撑 .title-card 高度 (game 模式 hidden 后 collapsed). */
+    /* v9 PR-E14: 移出 header, absolute 锚到 .game-frame.
+       v9 PR-E15: 位置从右上 (top:18 right:86) 改到 "我的角色卡上面一点"
+       (用户反馈). hand-dock 高度 ~180 + player-zone ~110 + gap 24, 取
+       bottom 约 320, 让按钮浮在 player-zone 顶上方右侧. */
     .top-actions {
       position: absolute;
       z-index: 7;
-      top: 18px;
-      right: 86px;
+      top: auto;
+      right: 28px;
+      bottom: 320px;
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
