@@ -4,7 +4,15 @@
    .skill-button (+ :disabled), .skill-status-todo/-display/-implemented,
    .discard-controls, .shake + @keyframes shake. */
 
+    /* v9 PR-E14: 之前在 <header> 内 flow 布局, header 在 game 模式 .title-card
+       hidden 后仍占顶部 ~50px 空白. 现 absolute 浮到 .game-frame 右上角
+       (避开 right:16 的 frame-share-btn), 一致用于 setup + game. header 仅
+       撑 .title-card 高度 (game 模式 hidden 后 collapsed). */
     .top-actions {
+      position: absolute;
+      z-index: 7;
+      top: 18px;
+      right: 86px;
       display: flex;
       flex-wrap: wrap;
       gap: 10px;

@@ -48,6 +48,9 @@
       gap: 8px;
       align-items: flex-start;
       margin-bottom: 10px;
+      /* v9 PR-E14: 给左上 lord/rebel-badge (top:6/left:6, w:26) 留位置, 否则
+         hero-name 首字会被徽章压上. 始终保留 32px 左 padding. */
+      padding-left: 32px;
     }
 
     .hero-name {
@@ -125,22 +128,25 @@
       background: linear-gradient(180deg, #5a5a5a 0%, #2a2a2a 100%);
     }
 
-    /* v9 PR-E4: 主公徽章 — 红圆底 + 白边 + "主" 字, 绝对定位到 hero 卡右上.
-       由 renderHero 根据 game.roles[actor] === '主公' 切换 hidden 属性. */
-    .lord-badge {
+    /* v9 PR-E4: 主公徽章 — 红圆底 + 白边 + "主" 字, 绝对定位到 hero 卡角.
+       由 renderHero 根据 game.roles[actor] === '主公' 切换 hidden 属性.
+       v9 PR-E14: 位置从 top:8/right:8 → top:6/left:6 (避免与 hero-head 右侧
+       turn-badge "当前回合" 文字重叠), 尺寸 30 → 26. 加 .rebel-badge 同源
+       (绿圆 "反"), lord/rebel 互斥显示. */
+    .lord-badge,
+    .rebel-badge {
       position: absolute;
       z-index: 3;
-      top: 8px;
-      right: 8px;
-      width: 30px;
-      height: 30px;
+      top: 6px;
+      left: 6px;
+      width: 26px;
+      height: 26px;
       display: inline-grid;
       place-items: center;
       border-radius: 50%;
-      background: radial-gradient(circle at 35% 25%, #ff8a3a, #c12018 72%);
       border: 2px solid #fff4d0;
       color: #fff;
-      font-size: 15px;
+      font-size: 13px;
       font-weight: 900;
       line-height: 1;
       text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
@@ -149,7 +155,17 @@
       user-select: none;
     }
 
-    .lord-badge[hidden] {
+    .lord-badge {
+      background: radial-gradient(circle at 35% 25%, #ff8a3a, #c12018 72%);
+    }
+
+    /* v9 PR-E14: 反贼徽章 — 同尺寸位置, 绿圆底 + 白边 + "反" 字. */
+    .rebel-badge {
+      background: radial-gradient(circle at 35% 25%, #5fc77e, #1f7a3a 72%);
+    }
+
+    .lord-badge[hidden],
+    .rebel-badge[hidden] {
       display: none !important;
     }
 

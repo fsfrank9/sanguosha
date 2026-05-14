@@ -52,10 +52,12 @@ test('v9 PR-E12: setup.css 隐藏 .title-card::after (旧版 "魏 蜀 吴 群" �
 
 // ───── zones.css: side-log + log-overlay 调整 ─────────────────────────
 
-test('v9 PR-E12: zones.css 隐藏 .side-log-panel (与 PR-E2 中央 overlay 双显)', () => {
+test('v9 PR-E12: zones.css 含 .side-log-panel 规则块 (PR-E14 已恢复 display:flex)', () => {
+  // PR-E12 原意: hide .side-log-panel 避免与中央 overlay 双显.
+  // PR-E14 反转: 用户希望日志保留, 改 display:flex !important.
+  // 这里仅守护 .side-log-panel 规则块存在 (不再要求 display:none).
   const block = zonesCss.match(/\.side-log-panel\s*\{[\s\S]*?\n\s{4}\}/);
   assert.ok(block, 'zones.css 应含 .side-log-panel 规则块');
-  assert.match(block[0], /display:\s*none\s*!important/);
 });
 
 test('v9 PR-E12: .log-overlay 居中收窄 (left/right 22% + top 32% + max-height 28%)', () => {
@@ -69,8 +71,7 @@ test('v9 PR-E12: .log-overlay 居中收窄 (left/right 22% + top 32% + max-heigh
 
 // ───── 拼装回归: 全套 CSS 仍包含必要规则 ──────────────────────────────
 
-test('v9 PR-E12: loadAllStyles() 拼接含 .side-log-panel + .camp-ribbon + .quote 隐藏 (回归)', () => {
-  assert.match(css, /\.side-log-panel\s*\{[\s\S]*?display:\s*none\s*!important/);
+test('v9 PR-E12: loadAllStyles() 拼接含 .camp-ribbon + .quote 隐藏 (回归; .side-log-panel 由 PR-E14 恢复)', () => {
   assert.match(css, /\.camp-ribbon\s*\{[\s\S]*?display:\s*none/);
   assert.match(css, /\.quote\s*\{[\s\S]*?display:\s*none/);
 });
