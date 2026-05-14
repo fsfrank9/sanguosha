@@ -34,8 +34,8 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E4 | 武将 portrait + HP 红方块 + 装备/判定区 + 技能 framed tag | 🟢 PR #72 已合并 |
 | PR-E5 | 左上"菜单"按钮 + 侧抽屉 + 退出确认 modal (卷轴风) | 🟢 PR #73 已合并 |
 | PR-E6 | pendingChoice modals 统一卷轴风 (13 个面板) | 🟢 PR #74 已合并 |
-| PR-E7 | action button 统一橙金装饰风 + 收尾细节 | 🟡 PR 待合并 |
-| PR-E8 | **二级 splash + 一级 lobby** (3 模式卡, 仅 1V1 启用) | ⏸ 待开 |
+| PR-E7 | action button 统一橙金装饰风 + 收尾细节 | 🟢 PR #75 已合并 |
+| PR-E8 | **二级 splash + 一级 lobby** (3 模式卡, 仅 1V1 启用) | 🟡 PR 待合并 |
 | PR-E9 | **选将界面重设计** (4×3 网格 + 势力 tag + 随机/点将 切换) | ⏸ 待开 |
 
 总预估: **~2700-3200 LOC 变更**, 跨 10 个 review cycle。
@@ -58,6 +58,61 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E8 落地 — 二级 splash + 一级 lobby ✅
+
+**实际改动**:
+
+新流程: **app 启动 → splash 屏 → lobby 屏 → setup 屏 → 游戏**. 旧流程是 启动 → setup 屏 → 游戏, PR-E8 在前面插入了 2 个新屏。
+
+HTML (`index.html`):
+- 新增 `<section class="splash-screen" id="splashScreen">` (默认显示, 无 hidden) 含:
+  - `.splash-screen__bg` 山景背景容器 (CSS-only polygon clip)
+  - `.splash-screen__messages` 中央促销/介绍多行文字
+  - `.splash-screen__enter` 底部黑色 brush 横幅按钮 (与 PR-E2 暂停横幅同源风格)
+- 新增 `<section class="lobby-screen" id="lobbyScreen" hidden>` 含:
+  - `.lobby-screen__topbar` (avatar 圆头像 + name + VIP + 货币占位)
+  - `.lobby-screen__modes` 3 列 grid:
+    - `lobbyKofBtn` (KOF 模式) — `.lobby-mode-card--placeholder` + `disabled`
+    - `lobby1v1Btn` (1V1 对战) — `.lobby-mode-card--active`
+    - `lobbyHellBtn` (炼狱 KOF) — `--placeholder` + `disabled`
+  - `.lobby-screen__nav` 5 项 (排行榜/设置/武将/素材/福利) 均 disabled
+- `<section class="setup-screen">` 加 `hidden` (改默认隐藏, 由 lobby 1V1 click 唤起)
+
+CSS (新增 `src/styles/entry.css`, ~220 行):
+- `.splash-screen`: flex 居中, 山景 gradient bg
+- `.splash-screen__bg::before/::after` 用 `clip-path: polygon` 画山脉剪影
+- `.splash-screen__enter` 黑底黄字 brush 横幅 (与 `.pause-banner__brush` 同源 box-shadow 偏移)
+- `.lobby-screen` flex column, 顶部 topbar + 中部 grid 3 模式 + 底部 5 nav
+- `.lobby-mode-card` 金色 cream gradient + 3px 棕金 border + 大字 title + 双层 box-shadow
+- `--active` 更亮金, `--placeholder` grayscale + brightness .78
+- `.lobby-screen__currency` / `.lobby-screen__avatar` 配色与 frame 一致
+
+主 `main.css` `@import` 加 `entry.css` (最后, 适合 specific page override).
+
+dom-adapter (`src/ui/dom-adapter.js`):
+- els 缓存追加 6 个新 ids
+- 新增 `showSplash()` / `showLobby()` 工具 fn
+- `showSetup()` 扩展: 显示 setup 同时隐藏 splash + lobby
+- **入口初始化** 改为 `showSplash()` (替代旧 `showSetup()`)
+- `bindEvents()` 接入:
+  - `splashEnterBtn` click / `splashScreen` 整屏 click → `showLobby()`
+  - `lobby1v1Btn` click → `showSetup()`
+  - `lobbyKofBtn` / `lobbyHellBtn` click → alert "待开发 v10+"
+
+测试调整 `tests/css_split.test.mjs`:
+- 文件数 8 → 9 (含 entry.css)
+- `@import` 最后一个从 setup.css → entry.css
+- 文件存在检查覆盖 entry.css
+
+**新增** `tests/v9_pr_e8_splash_lobby.test.mjs` (22 条守护):
+- HTML 结构: splash 默认显示 / lobby hidden / setup 改 hidden / splash 三块 / lobby 5 部分 / 3 模式卡变体
+- CSS: entry.css 全套 selectors + polygon clip + brush button + lobby grid 3列 + 2 mode 变体 + [hidden] !important
+- main.css 含 entry.css @import
+- dom-adapter: 6 ids 缓存 + showSplash/Lobby fn / showSetup 扩展隐藏 splash+lobby / init 改 showSplash / 4 click handlers
+- loadAllStyles 回归
+
+**Test status**: 633 → 655 ✓ (+22 新守护); 现有 633 条无 regression (含 PR-E0 守护已同步更新到 9 文件).
 
 ### PR-E7 落地 — action button 统一橙金装饰风 + utility 收尾 ✅
 

@@ -12,3 +12,4 @@
 @import './modals.css';
 @import './controls.css';
 @import './setup.css';
+@import './entry.css';  /* v9 PR-E8: splash + lobby */

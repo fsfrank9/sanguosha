@@ -76,6 +76,9 @@
           // v9 PR-E5: 侧抽屉菜单 + 退出确认 modal
           'sideDrawer', 'drawerExitBtn', 'drawerRestartBtn', 'drawerHelpBtn', 'drawerCloseBtn',
           'exitConfirmModal', 'exitConfirmBackdrop', 'exitConfirmYesBtn', 'exitConfirmNoBtn',
+          // v9 PR-E8: 二级 splash + 一级 lobby
+          'splashScreen', 'splashEnterBtn',
+          'lobbyScreen', 'lobbyKofBtn', 'lobby1v1Btn', 'lobbyHellBtn',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -1551,6 +1554,9 @@
         hideConversionPanel();
         hideGuanxingPanel();
         exitSkillSelectMode();
+        // v9 PR-E8: 切到 setup 时, 隐藏 splash / lobby
+        if (els.splashScreen) els.splashScreen.hidden = true;
+        if (els.lobbyScreen) els.lobbyScreen.hidden = true;
         if (els.setupScreen) els.setupScreen.hidden = false;
         if (els.duelTable) els.duelTable.hidden = true;
         if (els.endTurnBtn) els.endTurnBtn.disabled = true;
@@ -1558,6 +1564,20 @@
         populateHeroSelects();
         ensureDistinctHeroes('player');
         updateDraftUI();
+      }
+
+      // v9 PR-E8: 入口屏切换 — splash → lobby → setup → game.
+      function showSplash() {
+        if (els.splashScreen) els.splashScreen.hidden = false;
+        if (els.lobbyScreen) els.lobbyScreen.hidden = true;
+        if (els.setupScreen) els.setupScreen.hidden = true;
+        if (els.duelTable) els.duelTable.hidden = true;
+      }
+      function showLobby() {
+        if (els.splashScreen) els.splashScreen.hidden = true;
+        if (els.lobbyScreen) els.lobbyScreen.hidden = false;
+        if (els.setupScreen) els.setupScreen.hidden = true;
+        if (els.duelTable) els.duelTable.hidden = true;
       }
 
       function newGame() {
@@ -1824,6 +1844,19 @@
           if (!result.ok) renderLog();
           render();
         });
+        // v9 PR-E8: splash click → lobby; lobby 1V1 → setup; KOF/炼狱 placeholder.
+        if (els.splashEnterBtn) els.splashEnterBtn.addEventListener('click', showLobby);
+        if (els.splashScreen) els.splashScreen.addEventListener('click', function (e) {
+          if (e.target === els.splashEnterBtn) return;
+          showLobby();
+        });
+        if (els.lobby1v1Btn) els.lobby1v1Btn.addEventListener('click', showSetup);
+        if (els.lobbyKofBtn) els.lobbyKofBtn.addEventListener('click', function () {
+          if (window.alert) window.alert('KOF 模式 — 待开发 (v10+ 计划)');
+        });
+        if (els.lobbyHellBtn) els.lobbyHellBtn.addEventListener('click', function () {
+          if (window.alert) window.alert('炼狱 KOF — 待开发 (v10+ 计划)');
+        });
         // v9 PR-E5: 角落"菜单"按钮 — 切换侧抽屉显隐。"分享"仍是 placeholder.
         if (els.frameMenuBtn) els.frameMenuBtn.addEventListener('click', toggleSideDrawer);
         if (els.frameShareBtn) els.frameShareBtn.addEventListener('click', function () {
@@ -1916,4 +1949,5 @@
       initElements();
       populateHeroSelects();
       bindEvents();
-      showSetup();
+      // v9 PR-E8: 启动从 splash 屏开始, 点击进 lobby, 选 1V1 进 setup
+      showSplash();
