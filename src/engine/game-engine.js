@@ -2238,10 +2238,8 @@
         if (targetProtection) return fail(targetProtection.message);
         // v7 PR-10/11: 1V1 顺手牵羊 / 兵粮寸断 都已取消距离限制
         //   顺手 (1V1): 目标 "有牌的对手"，无距离限制 — PR-10 已生效
-        //   兵粮 (1V1): 目标 "对手"，无距离限制 — PR-11 待办
-        if (card.type === 'bingliang' && !SkillRuntime.hasPassiveEffect(self, 'ignoreTrickDistance') && distanceBetween(game, actor, opponent(actor)) > 1) {
-          return fail('距离不足，当前距离无法使用【' + card.name + '】。');
-        }
+        //   兵粮 (1V1): 目标 "对手"，无距离限制 — PR-11 已生效
+        // 至此 1V1 标准包内已无距离限制的锦囊牌。
         if (isShaCard(card) && !canReachWithSha(game, actor, opponent(actor))) return fail('距离不足，当前武器范围无法使用【杀】。');
         if (isShaCard(card) && self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
         if (card.type === 'tao') {

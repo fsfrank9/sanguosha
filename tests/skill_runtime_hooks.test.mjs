@@ -151,16 +151,19 @@ test('state runtime resolves Paoxiao and Mashu through SkillRuntime passive effe
   assert.doesNotMatch(stateSource, /hasSkill\([^)]*['"]mashu['"]/, 'StateRuntime should not directly hard-code Mashu detection');
 });
 
-test('game engine resolves Qicai trick-distance checks through SkillRuntime passive effect seam', () => {
+test('game engine resolves trick distance checks through 1V1-spec-compliant path (v7 PR-10/11)', () => {
+  // v7 PR-10/11: 1V1 spec 把 顺手牵羊 / 兵粮寸断 的距离限制都去掉了，
+  // 1V1 标准包内已无 distance-limited 锦囊牌。canPlayCard 仍然必须：
+  //   - 不硬编码 hasSkill('qicai') 检测（保留 seam 给未来恢复时用）
+  //   - 保留 1V1 spec 注释说明
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const canPlayStart = source.indexOf('function canPlayCard(game, actor, card)');
   const canPlayEnd = source.indexOf('function triggerTieqiNeedResponse', canPlayStart);
   assert.ok(canPlayStart >= 0 && canPlayEnd > canPlayStart, 'canPlayCard source should be extractable');
   const canPlaySource = source.slice(canPlayStart, canPlayEnd);
 
-  assert.match(canPlaySource, /SkillRuntime\.hasPassiveEffect\(\s*self\s*,\s*['"]ignoreTrickDistance['"]/, 'canPlayCard should query Qicai through SkillRuntime passive effects');
-  assert.match(canPlaySource, /distanceBetween\(\s*game\s*,\s*actor\s*,\s*opponent\(actor\)\s*\)/, 'distance-limited trick validation should use the shared distance helper');
   assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"]qicai['"]/, 'canPlayCard should not directly hard-code Qicai detection');
+  assert.match(canPlaySource, /1V1/, 'canPlayCard 应当带 1V1 spec 注释说明无距离限制锦囊的现状');
 });
 
 test('game engine dispatches Kongcheng through onCardTarget hook seam', () => {
