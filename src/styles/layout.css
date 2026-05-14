@@ -209,16 +209,12 @@
       min-height: 0;
     }
 
+    /* v9 PR-E13: 旧版本 .status-banner (大棕色 "你的回合" + 长解释文字)
+       占地大 + 与新 .phase-prompt 横幅信息重复. 整个块隐藏, deckInfo
+       数据仍在 #deckInfo 内 (脚本仍写, 仅视觉隐藏 — score 已由
+       .status-bar__score 在底部显示, 等价信息). */
     .status-banner {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      padding: 16px;
-      border-radius: 20px;
-      border: 1px solid var(--line);
-      background: linear-gradient(90deg, rgba(133, 54, 35, .72), rgba(42, 22, 16, .82));
-      box-shadow: 0 18px 46px rgba(0,0,0,.24);
+      display: none;
     }
 
     .status-title {
@@ -284,6 +280,35 @@
       text-shadow: 0 1px 0 rgba(0, 0, 0, .9);
     }
 
+    /* v9 PR-E13: 中下 phase 横幅 — 黄字黑笔触, 复用 .pause-banner 风格.
+       常驻显示当前 phase 提示 (e.g. "你的回合"). 位置 bottom 22% — 比
+       .pause-banner 28% 低一些, 错开 (pendingChoice 时此横幅 hidden,
+       由 .pause-banner 接管). */
+    .phase-prompt {
+      position: absolute;
+      left: 50%;
+      bottom: 22%;
+      transform: translateX(-50%);
+      z-index: 6;
+      pointer-events: none;
+    }
+
+    .phase-prompt__brush {
+      display: inline-block;
+      padding: 5px 22px;
+      color: #ffd900;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      background: rgba(0, 0, 0, 0.78);
+      border-radius: 2px 14px 4px 10px;
+      box-shadow:
+        5px 0 0 -2px rgba(0, 0, 0, 0.72),
+        -4px 1px 0 -3px rgba(0, 0, 0, 0.78),
+        3px -2px 0 -1px rgba(0, 0, 0, 0.65);
+      text-shadow: 0 1px 0 rgba(0, 0, 0, .9);
+    }
+
     /* v9 PR-E2: 底部状态条 — 版本 / 占位分数 / 实时时钟. 半透明小字. */
     .status-bar {
       position: absolute;
@@ -307,6 +332,13 @@
     .status-bar__score,
     .status-bar__time {
       text-shadow: 0 1px 4px rgba(0, 0, 0, .7);
+    }
+
+    /* v9 PR-E13: 旧 v9.0.0 版本号 absolute bottom: 2px 在 .duel-table 上,
+       与 .hand-dock 卡牌底部重叠成水印重影. 版本号在底部状态条上意义不大,
+       隐藏只留 score (牌堆/弃牌数) + time. */
+    .status-bar__version {
+      display: none;
     }
 
     .status-bar__score {

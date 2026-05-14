@@ -82,7 +82,9 @@
           // v9 PR-E9: 选将网格 — 替代旧 <select> 下拉
           'heroPick', 'heroPickPrompt', 'heroPickPlayerTab', 'heroPickEnemyTab',
           'heroPickPlayerValue', 'heroPickEnemyValue', 'heroPickGrid',
-          'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
+          'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn',
+          // v9 PR-E13: 进入游戏后 UI 清理 v2 — 标题卡 hidden 控制 + 新中下 phase 横幅
+          'titleCard', 'phasePrompt', 'phasePromptBrush'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
       }
@@ -396,6 +398,15 @@
         els.enemyState.innerHTML = stateStatusMarkup('enemy', isGameOver ? (game.winner === 'enemy' ? '胜利' : '败北') : (!isPlayerTurn ? '行动' : '等待'));
         els.playerTurnBadge.textContent = isPlayerTurn ? '当前回合' : '玩家';
         els.enemyTurnBadge.textContent = !isPlayerTurn && !isGameOver ? '当前回合' : '电脑';
+        // v9 PR-E13: 中下 phase 横幅 (复用 .pause-banner brush 风格).
+        // 内容: title (e.g. "你的回合" / "弃牌阶段"). 仅在非 pause 时显示 —
+        // pendingChoice / enemyThinking 由 .pause-banner 接管, 避免双显.
+        if (els.phasePrompt && els.phasePromptBrush) {
+          var pending = Engine.getPendingChoice(game);
+          var hidePromptForPause = !!(pending || enemyThinking);
+          els.phasePromptBrush.textContent = title;
+          els.phasePrompt.hidden = hidePromptForPause || !title;
+        }
       }
 
       function zoneCards(cards, emptyText) {
@@ -1668,7 +1679,7 @@
         if (els.lobbyScreen) els.lobbyScreen.hidden = true;
         if (els.setupScreen) els.setupScreen.hidden = false;
         if (els.duelTable) els.duelTable.hidden = true;
-        _toggleHeader(true);  // v9 PR-E10: setup 显示 header (含新开一局)
+        _toggleHeader(true, 'setup');  // v9 PR-E10: setup 显示 header (含新开一局)
         if (els.endTurnBtn) els.endTurnBtn.disabled = true;
         if (els.newGameBtn) els.newGameBtn.textContent = '重新选将';
         populateHeroSelects();
@@ -1681,9 +1692,12 @@
       // v9 PR-E10: 同时切换 <header> 显隐 — splash/lobby 不显示 dev header,
       // setup/game 显示 (含 "新开一局" / "结束回合" 按钮). 用 querySelector
       // 取 header 避免增加 els id.
-      function _toggleHeader(show) {
+      // v9 PR-E13: 加 mode 参数 — 游戏中 (mode='game') 隐藏 .title-card
+      // (h1 + .subtitle 占顶部 ~12%, 信息冗余), 只保留 .top-actions 角落按钮.
+      function _toggleHeader(show, mode) {
         var header = document.querySelector('.game-frame > header');
         if (header) header.hidden = !show;
+        if (els.titleCard) els.titleCard.hidden = !show || mode === 'game';
       }
       function showSplash() {
         if (els.splashScreen) els.splashScreen.hidden = false;
@@ -1716,7 +1730,7 @@
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = false;
         if (els.newGameBtn) els.newGameBtn.textContent = '重新选将';
-        _toggleHeader(true);  // v9 PR-E10: 游戏中也显示 header
+        _toggleHeader(true, 'game');  // v9 PR-E10: 游戏中也显示 header; v9 PR-E13: 但隐藏 .title-card 大标题描述
         render();
         maybeStartEnemyTurn();
       }

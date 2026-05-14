@@ -28,18 +28,18 @@
       display: none !important;
     }
 
-    /* v9 PR-E2: 中央日志 overlay — 显示最近 4-6 条 game.log 大字白色,
-       覆盖在 .duel-table 上, 不影响点击. */
+    /* v9 PR-E2: 中央日志 overlay — 显示最近 4-6 条 game.log 大字白色.
+       v9 PR-E13: 与左侧 zone-panel + 中间 skill-bar widgets 仍重叠, 且
+       同样信息在新 .phase-prompt 横幅显示 (当前 phase) + log 数据在
+       game.log 内 (后续 hover modal 展开). 整个 overlay 隐藏. */
     .log-overlay {
+      display: none;
       position: absolute;
-      /* v9 PR-E12: 现 side-log 已隐藏, overlay 居中 + 收窄 max-height
-         避免覆盖 opponent/player zone-panel. */
       left: 22%;
       right: 22%;
       top: 32%;
       max-height: 28%;
       z-index: 3;
-      display: flex;
       flex-direction: column;
       justify-content: flex-end;
       gap: 6px;
@@ -68,11 +68,13 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* v9 PR-E13: zone-panel 背景从 .78/.82 不透明 → .32/.42 半透明,
+       让 .duel-table 的暗背景透出, 整体层次扁平化 (用户反馈深棕块压视觉). */
     .zone-panel {
       border: 1px solid var(--line);
       border-radius: 18px;
       padding: 8px;
-      background: linear-gradient(180deg, rgba(33, 20, 15, .78), rgba(14, 10, 8, .82));
+      background: linear-gradient(180deg, rgba(33, 20, 15, .32), rgba(14, 10, 8, .42));
       box-shadow: inset 0 1px rgba(255,255,255,.06), 0 14px 34px rgba(0,0,0,.2);
       min-height: 0;
       overflow: hidden;
