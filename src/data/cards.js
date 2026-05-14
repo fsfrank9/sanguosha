@@ -249,13 +249,13 @@
           engineHooks: ['canPlayCard:delayed-trick-dedup', 'playBingliang', 'evaluateDelayedTrick.bingliang']
         },
         shandian: {
-          summary: '置于自己判定区；判定阶段判定，黑桃 2-9 受 3 点雷电伤害，否则移至下家。',
+          summary: '置于自己判定区；判定阶段判定，黑桃 2-9 受 3 点雷电伤害，否则按 next-valid 链转移到下家判定区。',
           timing: 'playPhase',
           targets: 'self',
-          effect: '置入自己判定区（v7 PR-6: 自己判定区已有同名【闪电】时不合法）；判定 spade 2-9 → 受 3 点雷电伤害并弃【闪电】；否则移至下家判定区。',
+          effect: 'v7 PR-12: 非命中时按 spec 链转。1v1 中 下家=对手；若对手判定区已有同名【闪电】(PR-6 定义为非合法目标)，则下家的下家=自己，闪电留在自己判定区。命中时受 3 点雷电伤害并弃【闪电】。',
           frequency: 'unlimited',
           responseWindow: ['wuxie'],
-          engineHooks: ['canPlayCard:delayed-trick-dedup', 'playShandian', 'evaluateDelayedTrick.shandian', 'damage:nature=thunder']
+          engineHooks: ['canPlayCard:delayed-trick-dedup', 'playShandian', 'evaluateDelayedTrick.shandian', 'shandian-next-valid', 'damage:nature=thunder']
         },
 
         // ─── Equipment: weapons ───────────────────────────────────────
