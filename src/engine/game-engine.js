@@ -2016,7 +2016,17 @@
         var jiuCards = (responder === dyingActor)
           ? (responderState.hand || []).filter(function (c) { return c && c.type === 'jiu'; })
           : [];
-        if (!taoCards.length && !jiuCards.length) {
+        // v8 PR-C3: 急救 (华佗) — 回合外可将红色牌当桃使用
+        //   spec: gltjk card__hero__neutral.md 急救 "你于回合外可以将红色牌当桃使用"
+        //   触发条件: responder 装 jijiu + game.turn !== responder + 手牌有非桃非酒的红色牌
+        //   救援目标: 任意 (含他人)
+        var jijiuCards = [];
+        if (hasSkill(responderState, 'jijiu') && game.turn !== responder) {
+          jijiuCards = (responderState.hand || []).filter(function (c) {
+            return c && c.color === 'red' && c.type !== 'tao' && c.type !== 'jiu';
+          });
+        }
+        if (!taoCards.length && !jiuCards.length && !jijiuCards.length) {
           log(game, actorName(game, responder) + '没有可用的【桃】/【酒】，无法救援。');
           return { skipped: true };
         }
@@ -2030,23 +2040,28 @@
             actor: responder,
             dyingActor: dyingActor,
             taoIds: taoCards.map(function (c) { return c.id; }),
-            jiuIds: jiuCards.map(function (c) { return c.id; })
+            jiuIds: jiuCards.map(function (c) { return c.id; }),
+            jijiuIds: jijiuCards.map(function (c) { return c.id; })
           };
           return { paused: true };
         }
         // 'auto':
-        //   - 救自己优先：dying = self → 用 桃 优先（桃便宜，酒 Method II 也行）
-        //   - 救别人：在 1v1 AI 永不救对手；只在 dying = self 时触发
+        //   - 救自己优先：dying = self → 用 桃 优先 (桃便宜, 酒 Method II 次, 急救 最后)
+        //   - 救他人 (含 华佗 急救): 1v1 AI 默认不救对手, 但若 jijiu 可用 +
+        //     dying = 对手, 华佗 AI 仍然不救 (与原 v8 PR-A2 行为一致 — AI
+        //     不主动救敌). 玩家走 ask 路径.
         if (responder !== dyingActor) {
           log(game, actorName(game, responder) + '选择不救援。');
           return { skipped: true };
         }
-        // 自救 — 优先 桃
         if (taoCards.length) {
           return executeDyingRescue(game, responder, dyingActor, 'tao', taoCards[0].id);
         }
-        // 否则 酒 Method II
-        return executeDyingRescue(game, responder, dyingActor, 'jiu', jiuCards[0].id);
+        if (jiuCards.length) {
+          return executeDyingRescue(game, responder, dyingActor, 'jiu', jiuCards[0].id);
+        }
+        // 自救 — 急救 红色牌兜底
+        return executeDyingRescue(game, responder, dyingActor, 'jijiu', jijiuCards[0].id);
       }
 
       function executeDyingRescue(game, responder, dyingActor, kind, cardId) {
@@ -2074,6 +2089,25 @@
           log(game, actorName(game, responder) + '濒死时饮下【酒】（使用方法Ⅱ），回复 1 点体力。');
           return { healed: true };
         }
+        // v8 PR-C3: 急救 — 华佗回合外把红色牌当桃 (条件: hasSkill jijiu +
+        // turn !== responder + 卡是红色非桃非酒). source 卡 进 弃牌堆, 救
+        // 1 hp. spec 允许救任意角色 (含他人), 但通过 attemptDyingRescue
+        // auto path 已经过滤 — auto 不救他人; 玩家 ask 路径才可用此选项.
+        if (kind === 'jijiu') {
+          if (!hasSkill(responderState, 'jijiu') || game.turn === responder) {
+            // 条件不满足时回退
+            responderState.hand.splice(idx, 0, card);
+            return { skipped: true };
+          }
+          if (card.color !== 'red' || card.type === 'tao' || card.type === 'jiu') {
+            responderState.hand.splice(idx, 0, card);
+            return { skipped: true };
+          }
+          discardCard(game, card);
+          dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + 1);
+          log(game, actorName(game, responder) + '发动【急救】，将【' + card.name + '】当【桃】对' + actorName(game, dyingActor) + '使用，回复 1 点体力。');
+          return { healed: true };
+        }
         // 未知 kind
         responderState.hand.splice(idx, 0, card);
         return { skipped: true };
@@ -2096,12 +2130,16 @@
           game.pendingChoice = pending;
           return fail('请通过 cardId 指定要使用的【桃】/【酒】。');
         }
-        var allowed = (pending.taoIds || []).concat(pending.jiuIds || []);
+        var allowed = (pending.taoIds || []).concat(pending.jiuIds || []).concat(pending.jijiuIds || []);
         if (allowed.indexOf(cardId) < 0) {
           game.pendingChoice = pending;
           return fail('该牌不在救援可用列表中。');
         }
-        var kind = (pending.taoIds || []).indexOf(cardId) >= 0 ? 'tao' : 'jiu';
+        // v8 PR-C3: 三段 kind 判定 — 桃 / 酒 / 急救 (jijiu 红色当桃)
+        var kind;
+        if ((pending.taoIds || []).indexOf(cardId) >= 0) kind = 'tao';
+        else if ((pending.jiuIds || []).indexOf(cardId) >= 0) kind = 'jiu';
+        else kind = 'jijiu';
         var executeResult = executeDyingRescue(game, responder, dyingActor, kind, cardId);
         saved.actedOnce[responder] = true;
         if (!executeResult.healed) {
