@@ -290,9 +290,9 @@
         zhangba: {
           summary: '装备后，可将 2 张手牌当作 1 张【杀】使用或打出。',
           timing: 'passive',
-          effect: '激活时弃 2 张手牌作为 1 张虚拟【杀】使用/打出，仍受所有【杀】限制。',
+          effect: 'v7 PR-14: 使用 = Engine.playZhangbaSha(actor, [id1, id2]) 已存在；响应 = findResponseCard 在没有真实/转化 杀 时，consume 2 张手牌当 杀 响应（决斗/南蛮/借刀 等）。skillPreferences.zhangba="decline" 可禁用响应路径。',
           frequency: 'passive',
-          engineHooks: ['playZhangbaSha']
+          engineHooks: ['playZhangbaSha', 'findResponseCard:zhangba-fallback']
         },
         guanshi: {
           summary: '【杀】被【闪】抵消后，可弃 2 张牌令此【杀】强制命中。',
