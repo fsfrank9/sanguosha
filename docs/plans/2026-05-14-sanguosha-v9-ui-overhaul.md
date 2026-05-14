@@ -40,9 +40,10 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E10 | UI 审计 + 清理 (header 入口屏隐藏, 死代码 .layout/.side/.battlefield, 空 `<select>` options) + 20 条集成守护测试 | 🟢 PR #78 已合并 |
 | PR-E11 | 选将流程 bug 修复 (用户反馈: 选完不自动进游戏 + 应顺序选将主公先选不可返回) | 🟢 PR #79 已合并 |
 | PR-E12 | 进入游戏后界面清理 (隐藏与 v9 新元素重复 / 噪音的旧装饰: 双显日志, ::after 水印, ::before 大字, camp-ribbon, 武将台词) | 🟢 PR #80 已合并 |
-| PR-E13 | 进入游戏后界面清理 v2 (隐藏 .title-card / .status-banner / .log-overlay / v9.0.0 重影 + 新增中下 phase-prompt 横幅 + zone-panel 半透明) | 🟡 PR 待合并 |
+| PR-E13 | 进入游戏后界面清理 v2 (隐藏 .title-card / .status-banner / .log-overlay / v9.0.0 重影 + 新增中下 phase-prompt 横幅 + zone-panel 半透明) | 🟢 PR #81 已合并 |
+| PR-E14 | arena 清理 + 反贼徽章对称 + 手牌截断修复 + top-actions 浮顶 + 恢复滚动日志 | 🟡 PR 待合并 |
 
-总预估: **~2700-3400 LOC 变更**, 跨 13 个 review cycle。
+总预估: **~2700-3500 LOC 变更**, 跨 14 个 review cycle。
 
 ## 设计目标 (从参考截图提炼)
 
@@ -62,6 +63,49 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E14 落地 — arena 清理 + 反贼徽章对称 + 手牌修复 ✅
+
+**用户反馈截图** (PR-E13 合并后浏览器实测, 仍乱; 语气强烈):
+> 中间阶段那个框的内容能不能删掉, 占了那么大块面积什么用都没有
+> 最底下我的手牌区每张牌能不能显示全, 只有半截, 连文字都被截断我怎么知道是什么牌
+> 为什么把滚动日志删掉了, 明明参考图都有, 你删掉了我怎么知道状态
+> 最上面的那个主把文字挡住了你知道吗
+> 我方角色的身份去哪了, 你把主公的身份显示了却不显示反贼是什么逻辑
+> 最顶层留那么多空白干什么, 就放两个按钮吗
+> 所有改动提交之前先检查前一个 pr 的 merge 状态
+
+**7 处改动**:
+
+1. **阶段 panel 整个隐藏** — index.html .panel 改 `class="panel arena-phase-panel"` 加 id; layout.css `.arena-phase-panel { display: none }`. phase 提示信息已由 PR-E13 .phase-prompt 中下横幅展示. JS (renderPhaseTrack) 仍跑, 只是不可见
+2. **手牌截断修复** — layout.css `.hand-dock { overflow: hidden → visible }`; `.duel-table` grid 最后行 `minmax(128px, .9fr) → minmax(180px, 1.2fr)` 给卡牌高度; `height: calc(100vh - 92px) → calc(100vh - 36px)` (header 已 absolute 出, 不再占顶部)
+3. **滚动日志恢复** — zones.css `.side-log-panel { display: none !important → display: flex !important }`; layout.css `.side-log-panel grid-column: 2 → 1 / -1` (跨 arena-zone 全宽). PR-E13 已让 .log-overlay 彻底 display:none, 现 side-log 是唯一日志载体
+4. **lord-badge 重定位** — hero.css `.lord-badge` `top:8 right:8 w:30` → 共享规则 `.lord-badge, .rebel-badge { top:6 left:6 w:26 }`; `.hero-head { padding-left: 32px }` 给徽章留位. 解决 lord-badge 右上压 turn-badge "电脑" 文字问题
+5. **反贼徽章** — index.html 加 `.rebel-badge` × 2 (player + enemy, 默认 hidden); hero.css `.rebel-badge { background: radial-gradient(#5fc77e, #1f7a3a) }` 绿圆 "反"; dom-adapter `renderHero` `rebelBadge.hidden = role !== '反贼'` (与 lord 互斥). dom-adapter 缓存 2 新 id
+6. **top-actions 浮顶** — index.html `<nav class="top-actions">` 从 `<header>` 内移出 (放 header 之后, .game-frame 内); controls.css `.top-actions { position: absolute; top: 18; right: 86; z-index: 7 }` (避开右上 frame-share-btn at right:16); layout.css `.game-frame { position: relative }` (absolute 锚)
+7. **turn-badge 默认 hidden** — dom-adapter renderStatus: `"电脑" / "玩家"` 默认文字是冗余 (1v1 位置一目了然), 改为仅 "当前回合" 显示; 其余 hidden. 避免 lord-badge 改位后跟其他文字撞
+
+**新增测试** `tests/v9_pr_e14_arena_cleanup.test.mjs` (17 条守护):
+- 1 条 arena-phase-panel hide
+- 2 条 hand-dock overflow + duel-table grid
+- 2 条 side-log-panel display + grid-column
+- 2 条 lord/rebel-badge 共享规则 + hero-head padding
+- 3 条 rebel-badge HTML + CSS 绿色 + dom-adapter 缓存
+- 1 条 renderHero rebel/lord 互斥
+- 3 条 top-actions 移出 header + absolute 定位 + game-frame position:relative
+- 1 条 turn-badge 仅 "当前回合" 显示
+- 2 条 loadAllStyles() 回归
+
+**同步更新旧测试** (PR-E14 反转 / 重构):
+- `v9_pr_e12_ingame_cleanup`: 取消对 `.side-log-panel display:none` 的断言 (PR-E14 已恢复)
+- `v9_pr_e4_hero_portrait`: `.lord-badge` 拆分为共享规则 + 独立 background, 测试分别匹配
+
+**Test status**: 734 → 751 ✓ (+17 新守护); 现有 734 条无 regression. `build:check` 通过.
+
+**Process 遵守**:
+- PR-E13 (#81) merge 状态已通过 `mcp__github__pull_request_read` 确认 (`merged: true, merged_by: fsfrank9, merged_at: 2026-05-14T23:13:54Z`) 后才从最新 main 拉新 branch `claude/v9-pr-e14-arena-cleanup`. 不在已 merge PR 上加 commit.
+
+---
 
 ### PR-E13 落地 — 进入游戏后界面清理 v2 ✅
 
@@ -257,9 +301,9 @@ CSS `src/styles/zones.css`:
 
 ---
 
-## v9 方向 D 当前进度 (14 PR 已提交; 待用户验收)
+## v9 方向 D 当前进度 (15 PR 已提交; 待用户验收)
 
-PLAN + E0-E13 共 14 PR (1 PLAN + 13 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
+PLAN + E0-E14 共 15 PR (1 PLAN + 14 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
 
 | 子目标 | 提交 PR |
 |---|---|
@@ -276,11 +320,12 @@ PLAN + E0-E13 共 14 PR (1 PLAN + 13 实现) 已提交; 是否达成 v9-D 整体
 | 审计 + 清理 + 集成守护 | PR-E10 |
 | 选将流程 bug (顺序选 + auto-start) | PR-E11 |
 | 进入游戏后清理 (双显日志 + 旧水印) | PR-E12 |
-| **进入游戏后清理 v2 (title-card / status-banner / phase-prompt 横幅 / 半透明 zone-panel)** | **PR-E13** |
+| 进入游戏后清理 v2 (title-card / status-banner / phase-prompt / 半透明) | PR-E13 |
+| **arena 清理 + 反贼徽章 + 手牌修复 + top-actions 浮顶 + 恢复日志** | **PR-E14** |
 
 数据点:
-- 13 实现 PR + 1 PLAN, ~3400 LOC (CSS + HTML + JS + tests)
-- 734 测试 ✓ 全套通过 (起点 529 → 734, 新增 ~205 条守护)
+- 14 实现 PR + 1 PLAN, ~3500 LOC (CSS + HTML + JS + tests)
+- 751 测试 ✓ 全套通过 (起点 529 → 751, 新增 ~222 条守护)
 - 引擎零改动 (`src/engine/*` 全程不动)
 - 无 PNG 素材 (纯 CSS / Unicode / inline SVG / polygon clip)
 

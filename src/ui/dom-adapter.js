@@ -72,7 +72,8 @@
           'logOverlay', 'pauseBanner', 'statusBar', 'statusBarVersion', 'statusBarScore', 'statusBarTime',
           // v9 PR-E4: 主公徽章 — 右上角红圆 "主". 由 renderHero 据
           // game.roles[actor] 切换 hidden.
-          'playerLordBadge', 'enemyLordBadge',
+          // v9 PR-E14: 反贼徽章 — 同位置绿圆 "反". 与 lord-badge 互斥显示.
+          'playerLordBadge', 'enemyLordBadge', 'playerRebelBadge', 'enemyRebelBadge',
           // v9 PR-E5: 侧抽屉菜单 + 退出确认 modal
           'sideDrawer', 'drawerExitBtn', 'drawerRestartBtn', 'drawerHelpBtn', 'drawerCloseBtn',
           'exitConfirmModal', 'exitConfirmBackdrop', 'exitConfirmYesBtn', 'exitConfirmNoBtn',
@@ -174,11 +175,13 @@
         els[actor + 'Hero'].setAttribute('data-camp', state.camp);
         els[actor + 'Hero'].classList.toggle('is-chained', !!state.chained);
         // v9 PR-E4: 主公徽章 — 由 game.roles[actor] === '主公' 决定显隐.
+        // v9 PR-E14: 反贼徽章 — 同样由 game.roles[actor] === '反贼' 决定显隐.
+        //   用户反馈: 之前只显主公不显反贼, 信息不对称.
+        var role = game && game.roles && game.roles[actor];
         var lordBadge = els[actor + 'LordBadge'];
-        if (lordBadge) {
-          var isLord = !!(game && game.roles && game.roles[actor] === '主公');
-          lordBadge.hidden = !isLord;
-        }
+        if (lordBadge) lordBadge.hidden = role !== '主公';
+        var rebelBadge = els[actor + 'RebelBadge'];
+        if (rebelBadge) rebelBadge.hidden = role !== '反贼';
         if (els[actor + 'Ribbon']) els[actor + 'Ribbon'].textContent = state.camp;
         if (actor === 'player' && els.playerSkillBar) {
           els.playerSkillBar.innerHTML = (state.skills || []).map(function (skill) {
@@ -396,8 +399,15 @@
         }
         els.playerState.innerHTML = stateStatusMarkup('player', isGameOver ? (game.winner === 'player' ? '胜利' : '败北') : (isPlayerTurn ? '行动' : '等待'));
         els.enemyState.innerHTML = stateStatusMarkup('enemy', isGameOver ? (game.winner === 'enemy' ? '胜利' : '败北') : (!isPlayerTurn ? '行动' : '等待'));
-        els.playerTurnBadge.textContent = isPlayerTurn ? '当前回合' : '玩家';
-        els.enemyTurnBadge.textContent = !isPlayerTurn && !isGameOver ? '当前回合' : '电脑';
+        // v9 PR-E14: 之前默认显示 "电脑" / "玩家" 是冗余信息 (1v1 位置一目了然),
+        // 而且 turn-badge 在 hero-head 右侧与右上 lord/rebel-badge 重叠造成文字
+        // 被遮挡. 改成: 仅 "当前回合" 时显示, 其余 hidden.
+        var playerTurnActive = isPlayerTurn && !isGameOver;
+        var enemyTurnActive = !isPlayerTurn && !isGameOver;
+        els.playerTurnBadge.textContent = playerTurnActive ? '当前回合' : '';
+        els.playerTurnBadge.hidden = !playerTurnActive;
+        els.enemyTurnBadge.textContent = enemyTurnActive ? '当前回合' : '';
+        els.enemyTurnBadge.hidden = !enemyTurnActive;
         // v9 PR-E13: 中下 phase 横幅 (复用 .pause-banner brush 风格).
         // 内容: title (e.g. "你的回合" / "弃牌阶段"). 仅在非 pause 时显示 —
         // pendingChoice / enemyThinking 由 .pause-banner 接管, 避免双显.

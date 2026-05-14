@@ -52,24 +52,27 @@ test('v9 PR-E4: .heart.empty 改 grayscale + brightness 弱化 + 灰 gradient', 
 
 // ───── 主公徽章 lord-badge ───────────────────────────────────────────
 
-test('v9 PR-E4: hero.css 含 .lord-badge — 右上 红圆 + 白边', () => {
+test('v9 PR-E4: hero.css 含 .lord-badge — 圆形 + 白边 + 红 radial-gradient + 绝对定位', () => {
+  // PR-E14 把 position/size 等公共属性合并到 .lord-badge, .rebel-badge 共享规则,
+  // 独立 .lord-badge 规则只剩 background. 改去整个 hero.css 范围内做断言.
   assert.match(heroCss, /\.lord-badge\s*\{/);
-  const block = heroCss.match(/\.lord-badge\s*\{[\s\S]*?\n\s{4}\}/);
-  assert.ok(block);
-  // 绝对定位右上
-  assert.match(block[0], /position:\s*absolute/);
-  assert.match(block[0], /top:\s*\d/);
-  assert.match(block[0], /right:\s*\d/);
-  // 圆形
-  assert.match(block[0], /border-radius:\s*50%/);
-  // 红 radial-gradient
-  assert.match(block[0], /radial-gradient[\s\S]*?#c12018/);
-  // 白边
-  assert.match(block[0], /border:\s*2px\s+solid\s+#fff4d0/);
+  // 绝对定位 (在共享规则块): 用 `.lord-badge,\n    .rebel-badge {` 匹配
+  const shared = heroCss.match(/\.lord-badge,\s*\n\s*\.rebel-badge\s*\{[\s\S]*?\n\s{4}\}/);
+  assert.ok(shared, '共享规则块存在');
+  assert.match(shared[0], /position:\s*absolute/);
+  // PR-E14 改: top:6 left:6 (从 right 改 left, 避免 turn-badge 重叠)
+  assert.match(shared[0], /top:\s*\d/);
+  // 圆形 (共享)
+  assert.match(shared[0], /border-radius:\s*50%/);
+  // 白边 (共享)
+  assert.match(shared[0], /border:\s*2px\s+solid\s+#fff4d0/);
+  // 红 radial-gradient (独立 .lord-badge background)
+  assert.match(heroCss, /\.lord-badge\s*\{\s*\n\s*background:\s*radial-gradient[^}]*#c12018/);
 });
 
 test('v9 PR-E4: .lord-badge[hidden] 用 display:none !important 强制隐藏', () => {
-  assert.match(heroCss, /\.lord-badge\[hidden\]\s*\{[\s\S]*?display:\s*none\s*!important/);
+  // PR-E14 合并到 .lord-badge[hidden], .rebel-badge[hidden] { display: none !important }
+  assert.match(heroCss, /\.lord-badge\[hidden\][\s\S]{0,80}display:\s*none\s*!important/);
 });
 
 test('v9 PR-E4: index.html 两个 hero 元素都有 lord-badge (player + enemy)', () => {

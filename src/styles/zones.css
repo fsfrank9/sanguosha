@@ -21,11 +21,12 @@
       font-size: 14px;
     }
 
-    /* v9 PR-E12: 旧版 .side-log-panel (右侧滚动日志) 与 PR-E2 中央
-       overlay 重复显示最近条目. 隐藏以避免双显. 历史日志仍在 game.log
-       数据里, 后续可改成 hover 展开 / 单独 modal. */
+    /* v9 PR-E12: 旧版 .side-log-panel 与中央 overlay 双显被隐藏.
+       v9 PR-E14: 用户反馈 "为什么把滚动日志删掉了, 参考图都有". 中央
+       .log-overlay 已在 PR-E13 彻底 display:none, side-log 恢复显示作为
+       唯一日志载体. arena-zone grid 在 layout.css 调整给它全宽. */
     .side-log-panel {
-      display: none !important;
+      display: flex !important;
     }
 
     /* v9 PR-E2: 中央日志 overlay — 显示最近 4-6 条 game.log 大字白色.
