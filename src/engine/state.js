@@ -15,7 +15,9 @@
     // (需要访问目标手牌/装备/判定区做 2 张挑选, 不适合纯 boolean flag)
     hanbing: { hanbingPreventOnHit: true },
     // v8 PR-B2: 古锭刀 — 锁定技, 杀命中目标无手牌时 伤害+1
-    guding:  { gudingNoHandPlus1: true }
+    guding:  { gudingNoHandPlus1: true },
+    // v8 PR-B3: 朱雀羽扇 — 可将普通杀转化为火杀 (marker; 实际在 playSha 内)
+    zhuque:  { zhuqueShaToFire: true }
   };
 
   function equipmentSlots(state) {
