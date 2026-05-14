@@ -41,6 +41,8 @@
     flags.jiuUsedThisTurn = false;
     // v7 PR-15: 方天画戟 额外目标 +2 触发标记 (per-sha, 清零是 defensive)
     flags.fangtianBonus = false;
+    // v8 PR-C4: 青囊 出牌阶段限一次
+    flags.qingnangUsed = false;
   }
 
   function resetEndOfTurnState(state) {
@@ -61,6 +63,8 @@
     flags.jiuUsedThisTurn = false;
     // v7 PR-15: 方天画戟 标记也在回合结束时复位
     flags.fangtianBonus = false;
+    // v8 PR-C4: 青囊 一次性标记复位
+    flags.qingnangUsed = false;
   }
 
   export const PhaseRuntime = {
