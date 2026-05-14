@@ -32,8 +32,8 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E2 | 中央日志 overlay + 状态条 + 暂停 brush 横幅 | 🟢 PR #70 已合并 |
 | PR-E3 | 卡牌外观重设计 (corner 花色+点数 + 卡身色块 + 底部 label) | 🟢 PR #71 已合并 |
 | PR-E4 | 武将 portrait + HP 红方块 + 装备/判定区 + 技能 framed tag | 🟢 PR #72 已合并 |
-| PR-E5 | 左上"菜单"按钮 + 侧抽屉 + 退出确认 modal (卷轴风) | 🟡 PR 待合并 |
-| PR-E6 | pendingChoice modals 统一卷轴风 (13 个面板) | ⏸ 待开 |
+| PR-E5 | 左上"菜单"按钮 + 侧抽屉 + 退出确认 modal (卷轴风) | 🟢 PR #73 已合并 |
+| PR-E6 | pendingChoice modals 统一卷轴风 (13 个面板) | 🟡 PR 待合并 |
 | PR-E7 | action button 统一橙金装饰风 + 收尾细节 | ⏸ 待开 |
 | PR-E8 | **二级 splash + 一级 lobby** (3 模式卡, 仅 1V1 启用) | ⏸ 待开 |
 | PR-E9 | **选将界面重设计** (4×3 网格 + 势力 tag + 随机/点将 切换) | ⏸ 待开 |
@@ -58,6 +58,44 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E6 落地 — pendingChoice modals 统一卷轴风 ✅
+
+**实际改动**:
+
+只动 `src/styles/modals.css`. HTML / dom-adapter 不动 (13 个面板的 `.pending-prompt-panel` class 已经在; 复用 CSS 改样式即可全部升级).
+
+`.pending-prompt-panel` 升级:
+- 从原 inline 贴附手牌上方 → `position: fixed` + `top:50% left:50%` + `translate(-50%,-50%)` **center modal**
+- `z-index: 40`, `width: min(520px, 84vw)`, `max-height: 76vh; overflow-y: auto`
+- Cream paper bg (`linear-gradient(#fef0c8 → #f5dca0)`) + 1px `#b27632` 棕红 border + 0.55 大阴影 + inset 白边
+
+`.pending-prompt-panel::before` 充当**全屏 dim backdrop**:
+- `position: fixed; inset: 0`
+- `background: rgba(0,0,0,.45)` + `backdrop-filter: blur(2px)`
+- `z-index: -1` (在 panel 内容之后, 因 panel 是 fixed 创建 stacking context — backdrop 视觉位置仍在 panel 之下)
+
+子样式调整 (适配 cream bg):
+- `.pending-prompt-panel__hint`: 深红 `#7a3a14` 大字 15px + 居中 + 下方虚线分隔
+- `.__choices` / `.__actions`: `flex: 1 1 100%` + `justify-content: center`
+- `.prompt-card-choice`: cream-on-cream gradient (`#fff5d4 → #f0c878`) + 深棕 border + 深色字; `.selected` 金色高亮 (`#ffd68a → #d88427`) + 浅文本
+- 范围内 `.btn.small` 升级为小 `.btn-frame` 风 (橙 gradient + 棕 border + 900 大字)
+- 范围内 `.badge` / `.mini-card` 改深色 (适配 cream bg)
+
+`.pending-prompt-panel[hidden] { display: none !important }` **保留** (守 v8 HOTFIX #60 — 否则 13 面板全部永远可见盖手牌).
+
+**新增** `tests/v9_pr_e6_pending_scroll.test.mjs` (13 条守护):
+- 位置: `position: fixed` 居中
+- 卡身: cream paper + 棕红 border
+- backdrop: `::before` 全屏 + dim + blur
+- 子样式: hint 深红居中 + 虚线分隔 / choices/actions 100% flex + 居中
+- prompt-card-choice cream-on-cream + selected 金高亮
+- 范围内 `.btn.small` 升级 + `.badge` / `.mini-card` 覆写
+- 13 个 panel HTML 元素仍在 (向后兼容)
+- `[hidden]` override 仍生效 (守 HOTFIX #60)
+- 回归 loadAllStyles
+
+**Test status**: 607 → 620 ✓ (+13 新守护); 现有 607 条无 regression (含 PR-A1..A5 等老 pending 面板测试都还过 — 因为 class 名 + DOM 结构未变).
 
 ### PR-E5 落地 — 侧抽屉菜单 + 退出确认 modal (卷轴风) ✅
 
