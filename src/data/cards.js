@@ -148,13 +148,13 @@
           engineHooks: ['canPlayCard:guohe-1v1', 'resolveGuohe1v1', 'executeGuohe1v1Pick', 'resolveGuohe1v1PickChoice', 'pendingChoice:guohe-1v1-pick']
         },
         shunshou: {
-          summary: '获得距离 1 内一名其他角色的一张牌（手牌、装备区、判定区皆可）。',
+          summary: '1V1 变体：获得"有牌的对手"任意区域（手牌/装备/判定）的一张牌；无距离限制。',
           timing: 'playPhase',
-          targets: 'distance-1',
-          effect: '从目标选定区域中获得 1 张牌；不能对距离 > 1 使用（除非有【奇才】等无视距离效果）。',
+          targets: 'opponent-with-any-card',
+          effect: 'v7 PR-10: gltjk card__scroll.md 1V1 变体明文 "有牌的对手"，不再受距离 1 限制。任意区域 (手牌/装备/判定) 的牌均可获得；options.targetZone+targetCardId 直传指定，无指定则按 defaultTargetZone (优先手牌)。',
           frequency: 'unlimited',
           responseWindow: ['wuxie'],
-          engineHooks: ['playShunshou', 'removeTargetZoneCard']
+          engineHooks: ['canPlayCard:shunshou-no-distance', 'playShunshou', 'removeTargetZoneCard']
         },
         jiedao: {
           summary: '令一名装备武器且攻击范围内有合法【杀】目标的其他角色对该目标使用【杀】；不出则将其武器交给你。',

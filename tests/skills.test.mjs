@@ -766,34 +766,32 @@ test('黄月英【集智】 does not trigger for basic, equipment, delayed, or f
   assert.equal(illegal.deck.length, 1);
 });
 
-test('黄月英【奇才】 ignores distance limits for distance-limited trick cards', () => {
-  const blocked = skillGame('sunquan', 'caocao');
-  blocked.player.hand = [c('shunshou', { id: 'blocked-shunshou' })];
-  blocked.enemy.hand = [c('tao', { id: 'blocked-target-tao' })];
-  blocked.enemy.equipment.horsePlus = c('plus_horse', { id: 'blocked-plus-horse' });
+test('v7 PR-10: 顺手牵羊 (1V1) 无距离限制 — 任何角色（含/不含奇才）都能在距离 >1 时使用', () => {
+  // 1V1 spec: 顺手牵羊 "有牌的对手"，无距离限制。奇才 在 1V1 中实际为 no-op。
+  // 本测试既验证 1V1 距离合规，又确保 奇才 携带者不会因 spec 变更而出问题。
+  const nonQicai = skillGame('sunquan', 'caocao');
+  nonQicai.player.hand = [c('shunshou', { id: 'no-qicai-shunshou' })];
+  nonQicai.enemy.hand = [c('tao', { id: 'no-qicai-target-tao' })];
+  nonQicai.enemy.equipment.horsePlus = c('plus_horse', { id: 'no-qicai-plus-horse' });
+  const noPreview = Engine.canPlayCard(nonQicai, 'player', nonQicai.player.hand[0]);
+  assert.equal(Engine.distanceBetween(nonQicai, 'player', 'enemy'), 2, 'target +1 horse → distance 2');
+  assert.equal(noPreview.ok, true, '1V1 顺手 不再受距离限制（即便距离>1）');
+  const noResult = Engine.playCard(nonQicai, 'player', 'no-qicai-shunshou', { targetZone: 'hand', targetCardId: 'no-qicai-target-tao' });
+  assert.equal(noResult.ok, true);
+  assert.ok(ids(nonQicai.player.hand).includes('no-qicai-target-tao'), 'source 获得对手手牌');
 
-  const blockedPreview = Engine.canPlayCard(blocked, 'player', blocked.player.hand[0]);
-
-  assert.equal(Engine.distanceBetween(blocked, 'player', 'enemy'), 2, 'target +1 horse should put Shunshou target out of normal distance');
-  assert.equal(blockedPreview.ok, false, 'non-Qicai actors should not use distance-limited tricks beyond distance 1');
-  assert.match(blockedPreview.message, /距离不足/);
-  assert.deepEqual(ids(blocked.player.hand), ['blocked-shunshou']);
-  assert.deepEqual(ids(blocked.enemy.hand), ['blocked-target-tao']);
-
-  const game = skillGame('huangyueying', 'caocao');
-  game.player.hand = [c('shunshou', { id: 'qicai-shunshou' })];
-  game.enemy.hand = [c('tao', { id: 'qicai-target-tao' })];
-  game.enemy.equipment.horsePlus = c('plus_horse', { id: 'qicai-plus-horse' });
-  game.deck = [c('sha', { id: 'qicai-jizhi-draw' })];
-
-  const preview = Engine.canPlayCard(game, 'player', game.player.hand[0]);
-  const result = Engine.playCard(game, 'player', 'qicai-shunshou', { targetZone: 'hand', targetCardId: 'qicai-target-tao' });
-
-  assert.equal(Engine.distanceBetween(game, 'player', 'enemy'), 2);
+  const qicaiGame = skillGame('huangyueying', 'caocao');
+  qicaiGame.player.hand = [c('shunshou', { id: 'qicai-shunshou' })];
+  qicaiGame.enemy.hand = [c('tao', { id: 'qicai-target-tao' })];
+  qicaiGame.enemy.equipment.horsePlus = c('plus_horse', { id: 'qicai-plus-horse' });
+  qicaiGame.deck = [c('sha', { id: 'qicai-jizhi-draw' })];
+  const preview = Engine.canPlayCard(qicaiGame, 'player', qicaiGame.player.hand[0]);
+  const result = Engine.playCard(qicaiGame, 'player', 'qicai-shunshou', { targetZone: 'hand', targetCardId: 'qicai-target-tao' });
+  assert.equal(Engine.distanceBetween(qicaiGame, 'player', 'enemy'), 2);
   assert.equal(preview.ok, true, preview.message);
   assert.equal(result.ok, true, result.message);
-  assert.deepEqual(ids(game.player.hand).sort(), ['qicai-jizhi-draw', 'qicai-target-tao'].sort());
-  assert.ok(game.log.some((entry) => /顺手牵羊/.test(entry)), 'Qicai-enabled Shunshou should still resolve as the original trick');
+  assert.deepEqual(ids(qicaiGame.player.hand).sort(), ['qicai-jizhi-draw', 'qicai-target-tao'].sort());
+  assert.ok(qicaiGame.log.some((entry) => /顺手牵羊/.test(entry)), 'Qicai-enabled Shunshou should still resolve as the original trick');
 });
 
 test('陆逊【谦逊】 prevents Shunshou and Le Bu Si Shu from targeting him', () => {
