@@ -164,13 +164,12 @@
             <button class="btn small" id="randomEnemyHeroBtn">随机敌方</button>
           </div>
         </div>
+        <!-- v9 PR-E10: 旧 hero-select-panel 留作 state holder, options 由
+             populateHeroSelects 动态填充 (含 31 个标准+扩展包武将), HTML 不
+             再硬编码 11 个 stale options. -->
         <div class="hero-select-panel setup-grid" id="heroSelectPanel" style="display:none">
-          <label class="setup-side">我方武将
-            <select id="playerHeroSelect"><option value="liubei">刘备</option><option value="zhangfei">张飞</option><option value="guanyu">关羽</option><option value="zhaoyun">赵云</option><option value="sunquan">孙权</option><option value="huanggai">黄盖</option><option value="caocao">曹操</option><option value="machao">马超</option><option value="zhangliao">张辽</option><option value="zhouyu">周瑜</option><option value="zhugeliang">诸葛亮</option></select>
-          </label>
-          <label class="setup-side">敌方武将
-            <select id="enemyHeroSelect"><option value="liubei">刘备</option><option value="zhangfei">张飞</option><option value="guanyu">关羽</option><option value="zhaoyun">赵云</option><option value="sunquan">孙权</option><option value="huanggai">黄盖</option><option value="caocao" selected>曹操</option><option value="machao">马超</option><option value="zhangliao">张辽</option><option value="zhouyu">周瑜</option><option value="zhugeliang">诸葛亮</option></select>
-          </label>
+          <label class="setup-side">我方武将 <select id="playerHeroSelect"></select></label>
+          <label class="setup-side">敌方武将 <select id="enemyHeroSelect"></select></label>
         </div>
         <button class="btn primary" id="startGameBtn">进入二级游戏界面</button>
       </section>

@@ -36,7 +36,8 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E6 | pendingChoice modals 统一卷轴风 (13 个面板) | 🟢 PR #74 已合并 |
 | PR-E7 | action button 统一橙金装饰风 + 收尾细节 | 🟢 PR #75 已合并 |
 | PR-E8 | **二级 splash + 一级 lobby** (3 模式卡, 仅 1V1 启用) | 🟢 PR #76 已合并 |
-| PR-E9 | **选将界面重设计** (4×3 网格 + 势力 tag + 随机/点将 切换) | 🟡 PR 待合并 |
+| PR-E9 | **选将界面重设计** (4×3 网格 + 势力 tag + 随机/点将 切换) | 🟢 PR #77 已合并 |
+| PR-E10 | UI 审计 + 清理 (header 入口屏隐藏, 死代码 .layout/.side/.battlefield, 空 `<select>` options) + 20 条集成守护测试 | 🟡 PR 待合并 |
 
 总预估: **~2700-3200 LOC 变更**, 跨 10 个 review cycle。
 
@@ -58,6 +59,77 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E10 落地 — UI 审计 + 清理 + 集成守护 ✅
+
+用户反馈 PR-E9 "都还没检查旧的 ui 元素有没有清理干净, 都还没验收新的 ui 逻辑是否正确" — 本 PR 专门做这一轮审计 + 清理 + 集成守护 (是否通过验收由用户在浏览器实际验证后决定).
+
+**找到的问题**:
+
+1. **`<header>` 在所有屏都可见** — 含 "新开一局" / "结束回合" 按钮 + dev blurb, 在 splash / lobby 入口屏不该出现
+2. **死代码 CSS**: `.layout`, `.side`, `.battlefield` — 在 layout.css 定义但 HTML 不再使用 (v9 重构后)
+3. **过时 `<select>` options** — 硬编码 11 个标准包武将, 但 `populateHeroSelects()` init 时已用 31 个武将重新填充, 静态 options 是 stale
+
+**修复**:
+
+`src/ui/dom-adapter.js`:
+- 新增 `_toggleHeader(show)` 工具 fn — `document.querySelector('.game-frame > header').hidden = !show`
+- `showSplash()` / `showLobby()` 调 `_toggleHeader(false)`
+- `showSetup()` / `newGame()` 调 `_toggleHeader(true)`
+
+`src/styles/layout.css`:
+- 删除 `.layout { ... }`, `.side { ... }`, `.battlefield { ... }` 块
+- 响应式 @media 中也清理对应引用
+- 文件头注释更新
+
+`index.html`:
+- 旧 `<select id="playerHeroSelect">` 11 个 stale options → 空标签 `<select id="playerHeroSelect"></select>` (populateHeroSelects 动态填)
+- enemy select 同理
+
+`tests/css_split.test.mjs`:
+- 内容回归检查 `\.layout` 改为 `\.duel-table` / `\.game-frame` (.layout 已删)
+
+`tests/v27_regression.test.mjs`:
+- "双方英雄池一致" 测试改为检查 JS populateHeroSelects 用同一 fill 函数到两 select (而非静态 HTML option 比对)
+
+**新增** `tests/v9_pr_e10_audit.test.mjs` (20 条集成 + 清理守护):
+- 死代码清理: layout.css 不再有 .layout/.side/.battlefield 块 / 全局 css 无 .battlefield / `<select>` 无 stale options
+- header 显隐: `_toggleHeader` fn + showSplash/Lobby 调 false / showSetup/newGame 调 true
+- 屏互斥: showSplash/Lobby/Setup 4 屏 hidden 状态正确 / newGame 切到 duel-table
+- 入口流程: init → showSplash → splashEnter → showLobby / lobby1V1 → showSetup / startGameBtn → newGame / exitConfirm → showSetup
+- 选将 grid click 路径: 委托 closest [data-hero-id] / handleHeroPickCardClick 末尾调 renderHeroPickGrid / 首次选我方自动切到敌方
+- 4 主屏 HTML 都存在 + 初始 only splash unhidden
+- loadAllStyles 回归 (.duel-table / .hero-pick / .splash-screen / .game-frame 都在)
+
+**Test status**: 675 → 695 ✓ (+20 新守护); 现有 675 条无 regression (含 v27 + css_split 已同步).
+
+---
+
+## v9 方向 D 当前进度 (11 PR 已提交; 待用户验收)
+
+E0-E10 共 11 PR 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
+
+| 子目标 | 提交 PR |
+|---|---|
+| CSS 拆分基础 | PR-E0 |
+| 装饰外框 + 角落 widgets | PR-E1 |
+| 中央日志 + 状态条 + 暂停横幅 | PR-E2 |
+| 卡牌外观 (cream 卡身) | PR-E3 |
+| 武将 portrait + HP + 主公徽章 | PR-E4 |
+| 侧抽屉 + 退出 modal | PR-E5 |
+| pendingChoice 13 面板卷轴化 | PR-E6 |
+| action button 统一 | PR-E7 |
+| splash + lobby (新入口) | PR-E8 |
+| 选将 4×3 网格 | PR-E9 |
+| **审计 + 清理 + 集成守护** | **PR-E10** |
+
+数据点:
+- 11 PR, ~3200 LOC (CSS + HTML + JS + tests)
+- 695 测试 ✓ 全套通过 (起点 536 → 695, 新增 ~160 条守护)
+- 引擎零改动 (`src/engine/*` 全程不动)
+- 无 PNG 素材 (纯 CSS / Unicode / inline SVG / polygon clip)
+
+注: 测试 ✓ 不等于视觉/交互合格, 用户验收前都按"待验收"算.
 
 ### PR-E9 落地 — 选将界面 4×3 网格重设计 ✅
 
@@ -98,29 +170,6 @@ dom-adapter (`src/ui/dom-adapter.js`):
 **Test status**: 655 → 675 ✓ (+20 新守护); 现有 655 条无 regression.
 
 ---
-
-## 🎉 v9 方向 D 主体完工
-
-PR-E9 是 **v9-D UI 重制系列的最后一个 PR**. E0-E9 共 10 PR 全部落地后, v9-D 的 UI 整体目标达成:
-
-| 子目标 | 完成 PR |
-|---|---|
-| CSS 拆分基础 (953 行 → 9 文件) | PR-E0 |
-| 装饰外框 + 角落 widgets | PR-E1 |
-| 中央日志 overlay + 状态条 + 暂停横幅 | PR-E2 |
-| 卡牌外观 (cream 卡身 + 列式 corner + 5 group badge) | PR-E3 |
-| 武将 portrait + HP 红方块 + 主公徽章 + 技能 framed tag | PR-E4 |
-| 侧抽屉菜单 + 退出确认 modal (卷轴风) | PR-E5 |
-| pendingChoice 13 个面板统一卷轴风 | PR-E6 |
-| action button 统一橙金装饰风 | PR-E7 |
-| 二级 splash + 一级 lobby (新入口流程) | PR-E8 |
-| 选将界面 4×3 网格 (势力 tag + 双 tab) | PR-E9 |
-
-总计:
-- **10 PR**, **~3000 LOC** (CSS + HTML + JS + tests)
-- **675 测试 ✓ 全套通过** (v9-D 新增 **~140 条** 守护; 起点 536 → 675)
-- **引擎零改动** — 全部 UI 层 (`src/engine/*` 全程不动)
-- **无 PNG 素材** — 纯 CSS / Unicode / inline SVG / polygon clip
 
 ### PR-E8 落地 — 二级 splash + 一级 lobby ✅
 

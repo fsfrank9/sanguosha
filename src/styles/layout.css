@@ -1,8 +1,9 @@
 /* layout.css — Top-level containers and game arena grid.
-   Includes: .app, header, .layout, .panel, .battlefield, .duel-table,
-   opponent/player/arena zones, .side-log-panel, .hand-dock, .status-banner,
-   shared panel-base look (.title-card, .panel, .hero, .card, .rules),
-   responsive @media queries. */
+   v9 PR-E10: 删除死代码 .layout / .side / .battlefield (HTML 未使用).
+   Includes: .app, header, .panel, .duel-table, opponent/player/arena zones,
+   .side-log-panel, .hand-dock, .status-banner, .game-frame, .frame-corner-btn,
+   .side-drawer, .pause-banner, .status-bar, 共享 panel-base look,
+   响应式 @media. */
 
     .app {
       position: relative;        /* v9 PR-E1: 角落 widget 绝对定位锚 */
@@ -200,29 +201,12 @@
       border-radius: 20px;
     }
 
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(260px, 320px) 1fr minmax(260px, 320px);
-      gap: 16px;
-      align-items: stretch;
-    }
-
-    .side {
-      display: grid;
-      gap: 16px;
-      align-content: start;
-    }
+    /* v9 PR-E10: 删除死代码 — .layout / .side / .battlefield 在 v9 重构
+       后 HTML 不再使用. .panel 仍在 (skill bar / status banner panel 用). */
 
     .panel {
       padding: 10px;
       min-height: 0;
-    }
-
-    .battlefield {
-      display: grid;
-      grid-template-rows: auto auto 1fr auto;
-      gap: 16px;
-      min-height: 680px;
     }
 
     .status-banner {
@@ -386,11 +370,9 @@
     }
 
     @media (max-width: 980px) {
-      header,
-      .layout {
+      header {
         grid-template-columns: 1fr;
       }
-      .battlefield { min-height: auto; }
       .top-actions { justify-content: flex-start; }
     }
 
