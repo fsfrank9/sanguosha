@@ -124,10 +124,13 @@ v5.0 迁移计划与完成状态见：
 docs/plans/2026-05-13-sanguosha-v5-architecture.md  [已完成]
 ```
 
-v6.0 游戏逻辑正确性与重构计划见：
+游戏逻辑正确性与重构计划见 plan 文档（按主题分文件）：
 
 ```text
-docs/plans/2026-05-13-sanguosha-v6-logic-correctness.md  [v6.0 + v6.1 已完成]
+docs/plans/
+  2026-05-13-sanguosha-v6-logic-correctness.md      [v6.0 + v6.1 已完成]
+  2026-05-14-sanguosha-v7-card-rule-compliance.md   [v7  16/16 已完成 #27..#42]
+  2026-05-14-sanguosha-v8-ui-integration.md         [v8  进行中 — PR-0 已落 #44]
 ```
 
 ## 武将技能实现状态

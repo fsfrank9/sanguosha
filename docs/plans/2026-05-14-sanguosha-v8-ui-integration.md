@@ -1,0 +1,132 @@
+# v8 — UI 集成 + 装备扩展 + 技能扩充 + AI 进阶
+
+> 历史延续：本文档承接 `2026-05-14-sanguosha-v7-card-rule-compliance.md`。v7 把 gltjk 镜像里所有已实现牌/规则的 spec 偏差都修完了（16 PR / 116 测试）；v8 重心从"引擎合规"转向"玩家可感知" + "卡池/技能扩充"。
+
+## 缘起
+
+v7 把所有 spec 引擎逻辑写好了，但有两个客观存在的问题：
+
+1. **玩家在浏览器里感受不到大半工作量**。v7 引入 7 个新 pendingChoice + 3 个 pauseState 槽位 + 8 个 skillPreferences 切换键，引擎 API 全跑通，但 `dom-adapter.js` 完全没接面板。所有 v7 的"完整 spec 合规"目前**只能通过 `resolvePendingChoice({...})` 代码路径触发**。
+2. **卡牌面没花色 / 点数**。引擎一直有 `card.suit / card.rank / card.color`（火攻 / 倾国 / 武圣 / 闪电 判定 都依赖），但 UI 牌面只渲染 `name + label + desc + symbol`，玩家看不到花色 / 点数——所有"按花色 / 颜色"的决策都瞎做。**这是方向 1 的硬依赖**，已先于方向 1 落地（PR-0）。
+
+## 候选方向（按"用户感知 × 工作量"投入产出比排序）
+
+### 0. 牌面 suit + rank 可视化（**已落地 — PR #44**）
+
+引擎一直有 `card.suit / card.rank / card.color`，但 UI 牌面只渲染 `name + label + desc + symbol`，玩家看不到花色 / 点数。
+
+**落地内容（v8 PR-0 / PR #44）**：
+- `dom-adapter.js`：新增 `suitColorClass(suit)` / `suitRankBadge(card)` helper；`renderCard`（玩家手牌）右上角渲染 `♠/♥/♣/♦ + RANK`；`zoneCards`（装备区 / 判定区）名字后加 `mini-card-suit` 标记
+- `main.css`：新增 `.card-corner`（右上角定位 + 阴影）/ `.suit-red`（heart/diamond 红色）/ `.suit-black`（spade/club 浅色）/ `.mini-card-suit`
+- 对手手牌仍走 `miniBacks`（隐私保护，spec 要求手牌私有）
+- `tests/card_face_suit_rank.test.mjs`（7 条断言）覆盖 helper / 渲染调用 / CSS 类 / 红黑颜色 / 对手隐私
+
+这是方向 1（pendingChoice 面板）的硬依赖：面板里展示对手手牌内容（如过河 1V1 / 火攻展示牌）必须能看到 suit。
+
+### 1. UI 接 v7 新 pendingChoice 面板（**最高优先级 / 推荐起点**）
+
+v7 引入 7 个新 pendingChoice，引擎 API 全跑通但 `dom-adapter.js` 没接面板。
+
+| pendingChoice 类型 | 触发场景 | UI 需要展示 |
+|---|---|---|
+| `qilin-pick` | 装备麒麟弓 + 杀命中 + 对手有 2 匹马 | 列出 horseMinus / horsePlus，让 source 二选一或取消 |
+| `cixiong-fire` | 装备雌雄双股剑 + 异性目标杀指定后 | 询问 source 是否发动雌雄 |
+| `cixiong-choose` | 雌雄发动后 | 询问目标弃手牌 (展示手牌) 或令 source 摸 1 |
+| `jiedao-decision` | 借刀杀人对玩家 | 询问 player 是否用 杀；展示当前手牌中的 杀 |
+| `wugu-pick` | 五谷丰登 reveal 后 | 列出已亮出的 X 张牌，让 player 挑 1 张 |
+| `guohe-1v1-pick` | 过河拆桥 1V1 | 展示装备列表 + 对手手牌内容，二选一 + 选具体牌 |
+| `dying-rescue` | 玩家或 AI 进入濒死 | 列出可用 桃/酒，让 player 救援或放弃 |
+
+**suggested PR cuts**：
+- v8 PR-A1：通用 pendingChoice 面板框架（共用样式 / overlay / 关闭逻辑）
+- v8 PR-A2：qilin-pick + dying-rescue 面板（最容易被玩家触发）
+- v8 PR-A3：cixiong-fire / cixiong-choose 面板（双层）
+- v8 PR-A4：jiedao-decision + guohe-1v1-pick 面板（手牌内容展示）
+- v8 PR-A5：wugu-pick 面板（reveal 池）
+
+每个 PR 配 `visual_polish` 风格的 HTML 断言测试。
+
+### 2. 装备扩展（中优先级）
+
+gltjk `card__equipment.md` 列了 16 件武器/防具/坐骑/宝物；我们目前实现了 8 件，剩下 8 件全部缺：
+
+| 装备 | 类型 | 攻击范围 | 技能描述 | 实现难度 |
+|---|---|---|---|---|
+| 寒冰剑 | 武器 | 2 | 杀命中目标造成伤害时，若其有牌，可防止此伤害并依次弃其两张牌 | 中（中断 damage 流程） |
+| 古锭刀 | 武器 | 2 | 锁定技：杀命中目标无手牌时，伤害 +1 | 低（damage modify hook） |
+| 朱雀羽扇 | 武器 | 4 | 可将普通杀当火杀使用 / 视为使用杀改为视为使用火杀 | 中（card-as 转化） |
+| 银月枪 | 武器 | 3 | 回合外使用/打出黑色手牌时，可令攻击范围内一名角色面对 闪 检测 → 1dmg | 高（事件 hook） |
+| 吴六剑 | 武器 | 2 | 锁定技：同势力角色攻击范围 +1 | 1v1 无效（势力概念） |
+| 三尖两刃刀 | 武器 | 3 | 杀命中后，可弃 1 手牌选距离 1 内另一角色 1dmg | 1v1 无效（多目标） |
+| 飞龙夺凤 | 武器 | 2 | 国战专属 | 跳过 |
+| 太平要术 | 防具 | — | 国战专属 | 跳过 |
+| 木牛流马 | 宝物 | — | 移出手牌当"粮"放入装备区 | 高（新装备槽） |
+
+**suggested PR cuts**：
+- v8 PR-B1：寒冰剑（防止 + 双弃，参考 cixiong-pick 模式）
+- v8 PR-B2：古锭刀（damage modify hook 简单）
+- v8 PR-B3：朱雀羽扇（普通杀 → 火杀转化）
+- v8 PR-B4：银月枪（回合外触发 hook）
+
+1V1 无效的（吴六剑 / 三尖 / 飞龙 / 太平 / 木牛）先跳过或仅占位。
+
+### 3. 未实现的标准包技能（中长期）
+
+v6 plan 列了 17 个尚未接入的标准包技能（cache 完整但引擎没实现）：
+**激将 / 酒援 / 奇袭 / 国色 / 流离 / 连营 / 护驾 / 洛神 / 急救 / 青囊 / 巨象 / 烈刃 / 好施 / 缔盟 / 英魂 / 化身 / 新生**
+
+每个 1 PR，模仿 v6 phase 6B/6C 的 SkillRuntime hook + skill metadata 模式。
+
+**优先建议**：
+- 国色 / 流离 / 急救 / 青囊 / 洛神 在 1v1 中实用度高（参与 sha / 桃 / 判定 链）→ 先做
+- 激将 / 护驾 在 1v1 需要主公技或多人模式才有意义 → 缓做
+- 化身 / 烈刃 / 巨象 涉及新机制（角色变换、拼点、连环）→ 按需
+
+### 4. AI 进阶（横切优化）
+
+当前 AI 默认 `auto` 走启发式分支；v7 的新 toggles（qilin / cixiong / jiedao / guohe / dying / etc.）AI 都用最保守的简单策略。
+
+可以加：
+- **濒死 valuation**：AI 把"留 1 桃自救"看作显著价值，避免在还有桃时盲目交换
+- **借刀决策**：被借刀时如果"出杀+保武器"比"交武器"更有利就出杀；现在直接 `auto` 出杀
+- **雌雄目标决策**：target 是 player 还是 AI 时差异化（AI 通常该选"令 source 摸 1"减少自己手牌损失）
+- **expectimax 1-2 ply**：对仁德/反间/观星这类有显著状态变化的主动技用浅前瞻
+
+### 5. 多人模式 / 国战扩展（远期 / v9+）
+
+v5 架构是 1v1 hardcoded (`game.player` / `game.enemy`)。3+ 人需要一次性大重构：
+- `game.actors = ['p1', 'p2', 'p3', ...]` 列表化
+- `opponent()` 替换为 `nextActor()` / `prevActor()` / `allOthers()` 语义
+- 距离 / 攻击范围按座次计算
+- 身份系统（主公 / 忠臣 / 反贼 / 内奸）
+- 触发顺序（多名角色同时触发同一 hook 的逆时针顺序）
+- 濒死 spec 中 "嵌套循环" 和 "多名角色同时响应" 才有意义
+
+这是 v9 级别的项目，建议在 v8 各方向落地后再启动。
+
+---
+
+## v8 推荐起点
+
+按"用户感知 ÷ 工作量"投入产出比，建议先做 **方向 1（UI 集成）**——v7 已经把所有 spec-compliant 引擎逻辑写好，UI 是把这些价值翻译给玩家的最后一公里。每个 panel PR ≈ 100-200 行 dom-adapter 改动 + 一个 visual 测试，节奏快、效果立刻可见。
+
+UI 接完后再选：
+- 想继续做"卡池扩充感"→ **方向 2 装备**
+- 想做"武将多样性"→ **方向 3 技能**
+- 想"对战不那么僵硬"→ **方向 4 AI**
+
+---
+
+## 落地 PR 时间线
+
+| PR | 范围 | 状态 |
+|---|---|---|
+| PR-0 | 牌面 suit + rank 可视化 (方向 0) | 🟢 PR #44 已合并 |
+| _其余_ | _v8 方向 1..5_ | _按方向 1 → 2 → 3 → 4 顺序，5 留 v9+_ |
+
+## 测试增量
+
+| 文件 | 断言数 | PR |
+|---|---:|---|
+| `tests/card_face_suit_rank.test.mjs` | 7 | PR-0 |
+| _其余 PR 待开_ | — | — |
