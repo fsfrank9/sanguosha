@@ -123,8 +123,30 @@ UI 接完后再选：
 |---|---|---|
 | PR-0 | 牌面 suit + rank 可视化 (方向 0) | 🟢 PR #44 已合并 |
 | PR-A1 | 通用 pendingChoice 面板框架 (方向 1 基础) | 🟢 PR #46 已合并 |
-| PR-A2 | qilin-pick + dying-rescue 面板 | 🟡 PR 待合并 |
-| _其余_ | _v8 PR-A3..A5 + 方向 2/3/4_ | _按顺序推进_ |
+| PR-A2 | qilin-pick + dying-rescue 面板 | 🟢 PR #47 已合并 |
+| PR-A3 | cixiong-fire + cixiong-choose 面板（双层） | 🟡 PR 待合并 |
+| _其余_ | _v8 PR-A4..A5 + 方向 2/3/4_ | _按顺序推进_ |
+
+### PR-A3 落地 — cixiong-fire + cixiong-choose 面板（双层）
+
+雌雄双股剑触发时两个 pendingChoice 都接入 UI，串成完整双层交互流程。
+
+**cixiong-fire**（pending = `{kind, actor:sourceActor, target}`）：
+- 文案：`雌雄双股剑：对<对方>（异性）发动效果？目标二选一：弃 1 手牌 / 令你摸 1 张。`
+- 2 个按钮：`发动` → `{fire:true}` / `不发动` → `{decline:true}`
+
+**cixiong-choose**（pending = `{kind, actor:targetActor, sourceActor, handIds}`）：
+- 文案：`雌雄双股剑：<source 名>发动，弃 1 张手牌或令其摸 1 张。`
+- choices：手牌中每张牌一个 `promptCardChoice`，`dataAttrs cixiongDiscardCardId` → `{option:'discard', cardId}`
+- actions：`令对方摸 1 张` 按钮 → `{option:'draw'}`
+
+**双层串接**：source 选 fire → 引擎自动进 target 选 → 玩家选 discard/draw → 引擎续算 sha 流程（仁王/响应/八卦/贯石/青龙/伤害）。两个面板之间不需要额外编排，由 `pauseState.playSha` + `resolvePendingChoice` dispatch 接力。
+
+**改动**：
+- `index.html`：新增 `#cixiongFirePanel` + `#cixiongChoosePanel`，用 PR-A1 通用框架类
+- `dom-adapter.js`：`els` 缓存新增 8 个 id；`renderPendingChoice` 增 2 个分支；事件绑定增 4 个监听器
+
+**新增** `tests/pending_prompt_panels_a3.test.mjs`（13 条断言）：HTML 容器 / 框架类 / els 缓存 / 2 个 render 分支 / 文案关键字 / promptCardChoice 用法 / 4 个事件绑定 payload。
 
 ### PR-A2 落地 — qilin-pick + dying-rescue 面板
 
@@ -168,4 +190,5 @@ UI 接完后再选：
 | `tests/card_face_suit_rank.test.mjs` | 7 | PR-0 |
 | `tests/pending_prompt_framework.test.mjs` | 9 | PR-A1 |
 | `tests/pending_prompt_panels_a2.test.mjs` | 14 | PR-A2 |
+| `tests/pending_prompt_panels_a3.test.mjs` | 13 | PR-A3 |
 | _其余 PR 待开_ | — | — |
