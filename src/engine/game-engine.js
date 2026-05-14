@@ -2591,6 +2591,20 @@
         self.shaBonus = 0;
         log(game, actorName(game, actor) + '对' + actorName(game, targetActor) + '使用【' + card.name + '】。');
 
+        // v7 PR-15: gltjk card__equipment.md 方天画戟 — "若你使用的【杀】是
+        // 最后的手牌，你使用此【杀】的额外目标数上限+2"。1v1 中只有一名对手
+        // (额定 1 + 额外 0)，即便额外目标数上限+2 也无人可选；本 PR 仅做触发
+        // 记录 (log + flags.fangtianBonus) 作为多人模式 / future trick 的占位。
+        // 判定: sha 已从手牌移除，hand.length === 0 即上一刻该 sha 是最后一张。
+        // 每次 playSha 进入时先清旧标记，避免上次结算残留。
+        self.flags = self.flags || {};
+        self.flags.fangtianBonus = false;
+        var weaponNow = self.equipment && self.equipment.weapon;
+        if (weaponNow && weaponNow.type === 'fangtian' && self.hand.length === 0) {
+          self.flags.fangtianBonus = true;
+          log(game, '【方天画戟】触发：' + actorName(game, actor) + '使用最后一张手牌【杀】，额外目标数上限 +2 (1v1 中无额外可选目标)。');
+        }
+
         // v7 PR-4: 雌雄双股剑 fires at "指定目标后" (gltjk flow__use.md step 5).
         // 在响应窗口之前结算；若需要 source/target 的 pendingChoice，则把
         // sha 的剩余状态保存到 pauseState.playSha，由 resolveCixiong* 完成
