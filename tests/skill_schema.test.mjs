@@ -57,6 +57,8 @@ const VALID_TRIGGERS = new Set([
   'cardConvert',
   'targetValidation',
   'passive',
+  // v8 PR-C2: 流离触发时机 — "你成为【杀】的目标后"
+  'shaTargetedAfter',
 ]);
 const VALID_FREQUENCIES = new Set([
   'oncePerTurn',
