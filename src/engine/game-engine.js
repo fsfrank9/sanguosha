@@ -1003,9 +1003,8 @@
         log(game, actorName(game, actor) + '发动【苦肉】，失去 1 点体力并摸两张牌。');
         drawCards(game, actor, 2);
         if (self.hp <= 0 && game.phase !== 'gameover') {
-          game.phase = 'gameover';
-          game.winner = opponent(actor);
-          log(game, actorName(game, actor) + '因【苦肉】力竭，' + actorName(game, game.winner) + '获胜！');
+          // v7 PR-13: 苦肉 把 hp 降到 0 时，按 spec 进入濒死结算（不直接 game-over）
+          enterDying(game, actor, actor);
         }
         return success('苦肉完成。');
       }
@@ -1775,11 +1774,198 @@
         }
         if (game.phase === 'gameover') return true;
         if (target.hp <= 0) {
-          game.phase = 'gameover';
-          game.winner = sourceActor || opponent(targetActor);
-          log(game, actorName(game, game.winner) + '获胜！');
+          // v7 PR-13: gltjk flow__neardeath.md — 进入濒死结算，按顺序响应；
+          // 任何一名响应者将 hp 回复到 1+ 即存活；全部响应完毕仍为 0 才死亡。
+          enterDying(game, targetActor, sourceActor);
         }
         return true;
+      }
+
+      // v7 PR-13: 濒死结算流程 (gltjk flow__neardeath.md)。在 1v1 中：
+      //   - 响应者顺序 = 当前回合角色起按逆时针 = [turn-player, opponent]
+      //   - 每名响应者一次机会，按 skillPreferences.dying (auto/ask) 处理：
+      //     - 自救：可出【桃】或【酒】(使用方法Ⅱ, 仅 self)
+      //     - 救人：可出【桃】(仅 1v1 中 player 救 enemy 这种反直觉场景；
+      //              AI 永不救对手)
+      //   - 任何一次回复使 hp >= 1 → 存活，pauseState.dying 清空
+      //   - 全部响应完毕 hp 仍为 0 → 死亡 + game-over
+      function enterDying(game, dyingActor, sourceActor) {
+        if (!game.pauseState) game.pauseState = {};
+        if (game.pauseState.dying) {
+          // 既已在濒死结算中 (mid-rescue又出新濒死), 不重复进入
+          return;
+        }
+        log(game, actorName(game, dyingActor) + '体力为 0，进入濒死状态。');
+        var turnActor = game.turn || dyingActor;
+        var responderQueue = [turnActor];
+        if (opponent(turnActor) && opponent(turnActor) !== turnActor) {
+          responderQueue.push(opponent(turnActor));
+        }
+        game.pauseState.dying = {
+          actor: dyingActor,
+          source: sourceActor,
+          responders: responderQueue,
+          idx: 0,
+          actedOnce: {}
+        };
+        processDyingNext(game);
+      }
+
+      function processDyingNext(game) {
+        var saved = game.pauseState && game.pauseState.dying;
+        if (!saved) return null;
+        var dyingActor = saved.actor;
+        var dyingState = game[dyingActor];
+        if (!dyingState) return null;
+        // 存活检测：hp >= 1 → 结束濒死
+        if (dyingState.hp >= 1) {
+          log(game, actorName(game, dyingActor) + '脱离濒死状态。');
+          game.pauseState.dying = null;
+          return { saved: true };
+        }
+        // 全部响应完毕 → 死亡
+        while (saved.idx < saved.responders.length) {
+          var responder = saved.responders[saved.idx];
+          if (!game[responder]) {
+            saved.idx += 1;
+            continue;
+          }
+          // 跳过同一名响应者重复 (spec 简化: 1v1 中每个 responder 仅一次机会)
+          if (saved.actedOnce[responder]) {
+            saved.idx += 1;
+            continue;
+          }
+          var attemptResult = attemptDyingRescue(game, responder, dyingActor);
+          if (attemptResult && attemptResult.paused) {
+            return { paused: true };
+          }
+          if (attemptResult && attemptResult.healed) {
+            saved.actedOnce[responder] = true;
+            // 重新检查存活
+            if (dyingState.hp >= 1) {
+              log(game, actorName(game, dyingActor) + '脱离濒死状态。');
+              game.pauseState.dying = null;
+              return { saved: true };
+            }
+            // hp 仍 0 (在我们的引擎里不会发生，因为 hp 被 clamp 到 0；这里
+            // 保留为未来扩展) → 同一名响应者结束，进入下一名
+          }
+          saved.actedOnce[responder] = true;
+          saved.idx += 1;
+        }
+        // All responders exhausted, no save → die. 1v1 中胜者恒为对手。
+        log(game, actorName(game, dyingActor) + '没有人救援，死亡。');
+        game.phase = 'gameover';
+        game.winner = opponent(dyingActor);
+        log(game, actorName(game, game.winner) + '获胜！');
+        game.pauseState.dying = null;
+        return { died: true };
+      }
+
+      function attemptDyingRescue(game, responder, dyingActor) {
+        var responderState = game[responder];
+        var dyingState = game[dyingActor];
+        if (!responderState || !dyingState) return null;
+        var pref = (responderState.skillPreferences && responderState.skillPreferences.dying)
+          || (responder === 'player' ? 'ask' : 'auto');
+        var taoCards = (responderState.hand || []).filter(function (c) { return c && c.type === 'tao'; });
+        var jiuCards = (responder === dyingActor)
+          ? (responderState.hand || []).filter(function (c) { return c && c.type === 'jiu'; })
+          : [];
+        if (!taoCards.length && !jiuCards.length) {
+          log(game, actorName(game, responder) + '没有可用的【桃】/【酒】，无法救援。');
+          return { skipped: true };
+        }
+        if (pref === 'decline') {
+          log(game, actorName(game, responder) + '选择不救援。');
+          return { skipped: true };
+        }
+        if (pref === 'ask') {
+          game.pendingChoice = {
+            kind: 'dying-rescue',
+            actor: responder,
+            dyingActor: dyingActor,
+            taoIds: taoCards.map(function (c) { return c.id; }),
+            jiuIds: jiuCards.map(function (c) { return c.id; })
+          };
+          return { paused: true };
+        }
+        // 'auto':
+        //   - 救自己优先：dying = self → 用 桃 优先（桃便宜，酒 Method II 也行）
+        //   - 救别人：在 1v1 AI 永不救对手；只在 dying = self 时触发
+        if (responder !== dyingActor) {
+          log(game, actorName(game, responder) + '选择不救援。');
+          return { skipped: true };
+        }
+        // 自救 — 优先 桃
+        if (taoCards.length) {
+          return executeDyingRescue(game, responder, dyingActor, 'tao', taoCards[0].id);
+        }
+        // 否则 酒 Method II
+        return executeDyingRescue(game, responder, dyingActor, 'jiu', jiuCards[0].id);
+      }
+
+      function executeDyingRescue(game, responder, dyingActor, kind, cardId) {
+        var responderState = game[responder];
+        var dyingState = game[dyingActor];
+        if (!responderState || !dyingState) return { skipped: true };
+        var idx = responderState.hand.findIndex(function (c) { return c.id === cardId; });
+        if (idx < 0) return { skipped: true };
+        var card = responderState.hand.splice(idx, 1)[0];
+        if (kind === 'tao') {
+          discardCard(game, card);
+          dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + 1);
+          log(game, actorName(game, responder) + '对' + actorName(game, dyingActor) + '使用【桃】（濒死救援），回复 1 点体力。');
+          return { healed: true };
+        }
+        if (kind === 'jiu') {
+          // 酒 使用方法Ⅱ: 仅 self
+          if (responder !== dyingActor) {
+            // 不允许救他人时用酒；回退到不消耗
+            responderState.hand.splice(idx, 0, card);
+            return { skipped: true };
+          }
+          discardCard(game, card);
+          dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + 1);
+          log(game, actorName(game, responder) + '濒死时饮下【酒】（使用方法Ⅱ），回复 1 点体力。');
+          return { healed: true };
+        }
+        // 未知 kind
+        responderState.hand.splice(idx, 0, card);
+        return { skipped: true };
+      }
+
+      function resolveDyingRescueChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.dying;
+        if (!saved) return fail('找不到濒死结算的暂停状态。');
+        var responder = pending.actor;
+        var dyingActor = pending.dyingActor;
+        if (decision && (decision.decline || decision.skip)) {
+          log(game, actorName(game, responder) + '选择不救援。');
+          saved.actedOnce[responder] = true;
+          saved.idx += 1;
+          var nextOutcome = processDyingNext(game);
+          return (nextOutcome && (nextOutcome.saved || nextOutcome.died)) ? success('濒死结算完成。') : success('继续濒死结算。');
+        }
+        var cardId = decision && decision.cardId;
+        if (!cardId) {
+          game.pendingChoice = pending;
+          return fail('请通过 cardId 指定要使用的【桃】/【酒】。');
+        }
+        var allowed = (pending.taoIds || []).concat(pending.jiuIds || []);
+        if (allowed.indexOf(cardId) < 0) {
+          game.pendingChoice = pending;
+          return fail('该牌不在救援可用列表中。');
+        }
+        var kind = (pending.taoIds || []).indexOf(cardId) >= 0 ? 'tao' : 'jiu';
+        var executeResult = executeDyingRescue(game, responder, dyingActor, kind, cardId);
+        saved.actedOnce[responder] = true;
+        if (!executeResult.healed) {
+          saved.idx += 1;
+        }
+        var outcome = processDyingNext(game);
+        if (outcome && outcome.paused) return success('继续等待救援。');
+        return success('濒死结算完成。');
       }
 
       function findResponseCard(state, type) {
@@ -2031,6 +2217,9 @@
         }
         if (pending.kind === 'guohe-1v1-pick') {
           return resolveGuohe1v1PickChoice(game, pending, decision || {});
+        }
+        if (pending.kind === 'dying-rescue') {
+          return resolveDyingRescueChoice(game, pending, decision || {});
         }
         return fail('未知的选择类型：' + pending.kind);
       }

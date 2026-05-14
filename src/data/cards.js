@@ -101,22 +101,22 @@
           engineHooks: ['consumeResponse']
         },
         tao: {
-          summary: '出牌阶段对包括自己在内的一名已受伤的角色使用；濒死阶段对濒死者使用。',
+          summary: '出牌阶段对包括自己在内的一名已受伤的角色使用；濒死阶段任意角色对濒死者使用。',
           timing: 'playPhase+dying',
           targets: 'any-wounded-or-dying',
-          effect: '目标角色回复 1 点体力，不能超过体力上限；v7 PR-1: 支持通过 options.taoTarget 指定 player/enemy。',
+          effect: 'v7 PR-1: options.taoTarget 指定 player/enemy；v7 PR-13: 濒死阶段任意 responder 可在 pendingChoice "dying-rescue" 中用本牌救援濒死者。',
           frequency: 'unlimited',
           responseWindow: [],
-          engineHooks: ['playTao', 'options.taoTarget']
+          engineHooks: ['playTao', 'options.taoTarget', 'attemptDyingRescue:tao', 'executeDyingRescue:tao']
         },
         jiu: {
-          summary: '出牌阶段限一次，本回合下一张【杀】伤害 +1；濒死时回复 1 点体力。',
+          summary: '出牌阶段限一次，本回合下一张【杀】伤害 +1；濒死时(仅 self) 回复 1 点体力。',
           timing: 'playPhase+dying',
           targets: 'self',
-          effect: 'v7 PR-8: 出牌阶段限一次 (flags.jiuUsedThisTurn) — canPlayCard 检查 + resolve 时设标记；shaBonus = 1 (不累加)；shaBonus 在 resetActorTurnState / resetEndOfTurnState 时清零，spec "此回合内使用的下一张【杀】" 通过 turn-bound 状态实现。Method II (濒死) 在 PR-13 加。',
+          effect: 'v7 PR-8: 出牌阶段限一次 (flags.jiuUsedThisTurn) + shaBonus=1 不累加；v7 PR-13: 使用方法Ⅱ — 仅濒死者本人可在 pendingChoice "dying-rescue" 中饮酒回 1 体力。',
           frequency: 'oncePerTurn',
           responseWindow: [],
-          engineHooks: ['canPlayCard:jiu-once-per-turn', 'playJiu', 'flags.jiuUsedThisTurn', 'resetActorTurnState/resetEndOfTurnState']
+          engineHooks: ['canPlayCard:jiu-once-per-turn', 'playJiu', 'attemptDyingRescue:jiu', 'executeDyingRescue:jiu']
         },
 
         // ─── Trick cards (instant) ────────────────────────────────────
