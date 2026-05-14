@@ -46,33 +46,62 @@
       font-size: 12px;
     }
 
+    /* v9 PR-E4: skill-button 重设计为橙色 framed tag (类似截图 行殇/放逐)
+       覆盖 .mini-card 的暗底. 注意: 元素同时挂 .mini-card + .skill-button
+       两个 class, 通过 CSS 加载顺序 (controls.css 在 cards.css 之后)
+       让 skill-button 胜出. */
     .skill-button {
       cursor: pointer;
-      border: 1px solid rgba(255,214,138,.36);
-      border-radius: 999px;
-      color: var(--gold);
-      background: rgba(0,0,0,.24);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border: 1px solid #5b2f15;
+      border-radius: 6px;
+      background: linear-gradient(180deg, #f0a33a 0%, #c25a1a 58%, #8b3c10 100%);
+      color: #fff4d0;
       font-weight: 900;
+      font-size: 13px;
+      letter-spacing: .05em;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, .35);
+      box-shadow:
+        inset 0 1px rgba(255, 230, 180, .35),
+        0 2px 5px rgba(0, 0, 0, .35);
+      transition: filter .15s ease, transform .15s ease;
+    }
+
+    .skill-button:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
     }
 
     .skill-button:disabled {
       cursor: not-allowed;
       color: var(--muted);
       opacity: .58;
+      filter: grayscale(.5);
     }
 
-    .skill-status-todo {
+    .skill-button.skill-status-todo {
       border-style: dashed;
+      border-color: rgba(170, 170, 170, .7);
+      background: rgba(50, 30, 20, .55);
       color: #aeb7c9;
+      filter: none;
+      box-shadow: none;
     }
 
-    .skill-status-display {
-      color: #b7c5dd;
-      border-color: rgba(183,197,221,.28);
+    .skill-button.skill-status-display {
+      background: linear-gradient(180deg, #6b6b88, #3f3f55);
+      border-color: rgba(183, 197, 221, .35);
+      color: #d6def0;
     }
 
-    .skill-status-implemented {
-      box-shadow: inset 0 0 0 1px rgba(255,214,138,.08);
+    .skill-button.skill-status-implemented {
+      box-shadow:
+        inset 0 1px rgba(255, 230, 180, .42),
+        inset 0 0 0 1px rgba(255, 214, 138, .18),
+        0 2px 5px rgba(0, 0, 0, .35);
     }
 
     .discard-controls {
