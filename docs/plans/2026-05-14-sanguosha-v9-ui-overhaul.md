@@ -31,8 +31,8 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E1 | 整体布局重构 + 装饰外框 (橙红 striped border + 角落 widgets) | 🟢 PR #69 已合并 |
 | PR-E2 | 中央日志 overlay + 状态条 + 暂停 brush 横幅 | 🟢 PR #70 已合并 |
 | PR-E3 | 卡牌外观重设计 (corner 花色+点数 + 卡身色块 + 底部 label) | 🟢 PR #71 已合并 |
-| PR-E4 | 武将 portrait + HP 红方块 + 装备/判定区 + 技能 framed tag | 🟡 PR 待合并 |
-| PR-E5 | 左上"菜单"按钮 + 侧抽屉 + 退出确认 modal (卷轴风) | ⏸ 待开 |
+| PR-E4 | 武将 portrait + HP 红方块 + 装备/判定区 + 技能 framed tag | 🟢 PR #72 已合并 |
+| PR-E5 | 左上"菜单"按钮 + 侧抽屉 + 退出确认 modal (卷轴风) | 🟡 PR 待合并 |
 | PR-E6 | pendingChoice modals 统一卷轴风 (13 个面板) | ⏸ 待开 |
 | PR-E7 | action button 统一橙金装饰风 + 收尾细节 | ⏸ 待开 |
 | PR-E8 | **二级 splash + 一级 lobby** (3 模式卡, 仅 1V1 启用) | ⏸ 待开 |
@@ -58,6 +58,52 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E5 落地 — 侧抽屉菜单 + 退出确认 modal (卷轴风) ✅
+
+**实际改动**:
+
+HTML (`index.html`) 在 `.app` 内 (`.game-frame` 之前) 加 2 个新组件:
+- `<aside class="side-drawer" id="sideDrawer" hidden>` — 含 6 项: 退出 / 重开 / 等待 / 背景 / 变速 / 帮助 + 1 个收起按钮. 等待/背景/变速 用 `.is-placeholder` + `disabled` 标记 (待实现)
+- `<div class="scroll-modal" id="exitConfirmModal" hidden role="dialog">` — 含 backdrop + paper (两端 roll 装饰) + 标题/正文/按钮 (确定/取消)
+
+CSS:
+- **`layout.css`**:
+  - `.side-drawer` 绝对定位左侧 (`top:56 left:0 bottom:40 width:94`), 棕木 gradient (`#6f3d18 → #4d2a10`), 右下圆角, 重 box-shadow
+  - `[hidden]` 用 `transform: translateX(-100%)` 滑出 + `visibility:hidden`, 而非 display:none (保留滑入动画)
+  - `.side-drawer__item` 列式 (icon + label), `:hover` 半透明亮 + 右移 2px
+  - `.is-placeholder / :disabled` 灰化
+  - `.side-drawer__close` 底部收起按钮
+- **`modals.css`**:
+  - `.scroll-modal` 用 `position: fixed` + `grid place-items: center` 居中
+  - `.scroll-modal[hidden] { display: none !important }` (覆盖 grid)
+  - `.scroll-modal__paper` 米黄 cream gradient (`#fef0c8 → #f5dca0`) + 棕红 border + 大阴影
+  - `.scroll-modal__roll--left/right` 左右两端 26px 宽 卷起圆柱 gradient
+  - `.scroll-modal__title` 棕红大字 / `__body` 灰红正文 / `__actions` 按钮组
+  - **新增** `.btn-frame` 装饰按钮基类: 橙色 gradient + 棕 border + 双层 shadow; `--cancel` 绿色变体
+
+dom-adapter (`src/ui/dom-adapter.js`):
+- els 缓存追加 9 个新 ids (drawer 5 + modal 4)
+- 工具 fn: `openSideDrawer / closeSideDrawer / toggleSideDrawer / openExitConfirm / closeExitConfirm`
+- `frameMenuBtn` click **从 PR-E1 placeholder 替换为** `toggleSideDrawer`
+- `drawerExitBtn` click → `closeSideDrawer` + `openExitConfirm`
+- `drawerRestartBtn` click → `closeSideDrawer` + `showSetup` (复用现有 setup 屏)
+- `drawerHelpBtn` click → `closeSideDrawer` + alert (待 v10 接帮助文档)
+- `drawerCloseBtn` click → `closeSideDrawer`
+- `exitConfirmYesBtn` click → `closeExitConfirm` + `showSetup`
+- `exitConfirmNoBtn` / `exitConfirmBackdrop` click → `closeExitConfirm`
+- **Esc 键** keydown listener: 优先关 modal, 否则关 drawer
+
+更新 `tests/v9_pr_e1_layout_frame.test.mjs`: 把"main → game-frame"buffer 从 800 → 4000 (因 PR-E5 在中间塞了抽屉 + modal)
+
+**新增** `tests/v9_pr_e5_drawer_modal.test.mjs` (21 条守护):
+- HTML: aside.side-drawer + 6 项 + modal (paper/roll/title/body/actions) + role="dialog" + aria-modal
+- CSS layout: .side-drawer 全部子类 + [hidden] transform 滑出 + 绝对定位 + 棕木 gradient
+- CSS modals: .scroll-modal 全套 + [hidden] display:none !important + fixed/grid 居中 + paper cream + roll 左右两侧 + .btn-frame + --cancel
+- dom-adapter: 9 ids 缓存 / 5 工具 fn / frameMenuBtn 替换 placeholder / 各 click handler / Esc keydown
+- 回归 loadAllStyles
+
+**Test status**: 586 → 607 ✓ (+21 新守护); 现有 586 条无 regression。
 
 ### PR-E4 落地 — 武将 portrait + HP 红方块 + 主公徽章 + 技能 framed tag ✅
 
