@@ -154,6 +154,12 @@
           return triggerQingguoCardAs(context);
         }
       });
+      // v8 PR-C1: 国色 (大乔) onCardAs (方片 → 乐不思蜀, proactive only)
+      SkillRuntime.registerSkill(skillRegistry, 'guose', {
+        onCardAs: function (context) {
+          return triggerGuoseCardAs(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'zhiheng', {
         onActiveSkill: function (context) {
           return triggerZhihengActiveSkill(context);
@@ -957,6 +963,17 @@
         if (context.mode !== 'response' || context.asType !== 'shan') return null;
         var blackCard = firstMatchingCard(state, function (item) { return item.color === 'black'; });
         return blackCard ? { card: blackCard, asName: '闪', skillName: '倾国', priority: 10 } : null;
+      }
+
+      // v8 PR-C1: 国色 (大乔) — gltjk skill cache：
+      //   "出牌阶段，你可以将一张方片牌当【乐不思蜀】使用。"
+      // 仅 proactive 模式（出牌阶段主动用方片当乐），不影响 response 流程。
+      function triggerGuoseCardAs(context) {
+        var state = context.state;
+        if (!state || !hasSkill(state, 'guose')) return null;
+        if (context.mode !== 'proactive' || context.asType !== 'lebusishu') return null;
+        if (!context.card || context.card.suit !== 'diamond') return null;
+        return { card: context.card, asName: '乐不思蜀', skillName: '国色', priority: 10 };
       }
 
       function triggerZhihengActiveSkill(context) {
@@ -3355,16 +3372,26 @@
           original = cardOrId;
         }
         if (!original) return fail('找不到这张牌。');
-        if (asType !== 'sha') return fail('当前只支持转化为【杀】。');
+        // v8 PR-C1: 国色把方片当乐 — 扩展 asType 白名单
+        if (asType !== 'sha' && asType !== 'lebusishu') return fail('当前只支持转化为【杀】或【乐不思蜀】。');
         var cardAsContext = { mode: 'proactive', game: game, actor: actor, state: self, card: original, asType: asType };
         var conversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', cardAsContext));
         if (!conversion) return fail('当前武将不能这样转化。');
-        if (self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
-        var playable = canPlayCard(game, actor, virtualShaFromCard(original));
-        if (!playable.ok) return playable;
-        playable.skillName = conversion.skillName;
-        playable.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【杀】使用。';
-        return playable;
+        // 路径分支：杀 走原有 canPlayCard 检查；乐 走 virtualLebusishuFromCard
+        if (asType === 'sha') {
+          if (self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
+          var playableSha = canPlayCard(game, actor, virtualShaFromCard(original));
+          if (!playableSha.ok) return playableSha;
+          playableSha.skillName = conversion.skillName;
+          playableSha.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【杀】使用。';
+          return playableSha;
+        }
+        // lebusishu
+        var playableLebu = canPlayCard(game, actor, virtualLebusishuFromCard(original));
+        if (!playableLebu.ok) return playableLebu;
+        playableLebu.skillName = conversion.skillName;
+        playableLebu.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【乐不思蜀】使用。';
+        return playableLebu;
       }
 
       function playCardAs(game, actor, cardId, asType) {
@@ -3379,7 +3406,29 @@
         // cleared if it came from equipment (relevant for 关羽 卸下武器当杀).
         removeOwnCardFromAnyZone(self, cardId);
         log(game, actorName(game, actor) + playable.message);
+        if (asType === 'lebusishu') {
+          // v8 PR-C1: 国色 把方片当乐 — 直接放对手判定区, 复用 delayed-trick 流程
+          var virtualLebu = virtualLebusishuFromCard(original);
+          game[opponent(actor)].judgeArea.push(virtualLebu);
+          log(game, actorName(game, actor) + '将【乐不思蜀】置入' + actorName(game, opponent(actor)) + '的判定区。');
+          return success('国色 乐不思蜀 置入完成。');
+        }
         return playSha(game, actor, virtualShaFromCard(original));
+      }
+
+      // v8 PR-C1: 国色把方片视为乐不思蜀 — 构造虚拟卡 (保留原 suit / rank /
+      // physical card 以便弃牌正确; type/name/family 改为 lebusishu)
+      function virtualLebusishuFromCard(original) {
+        return {
+          id: original.id,
+          type: 'lebusishu',
+          name: '乐不思蜀',
+          family: 'delayed',
+          suit: original.suit,
+          color: original.color,
+          rank: original.rank,
+          physicalCard: original
+        };
       }
 
       function getGuanxingPreview(game, actor) {
