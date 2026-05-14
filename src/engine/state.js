@@ -17,7 +17,10 @@
     // v8 PR-B2: 古锭刀 — 锁定技, 杀命中目标无手牌时 伤害+1
     guding:  { gudingNoHandPlus1: true },
     // v8 PR-B3: 朱雀羽扇 — 可将普通杀转化为火杀 (marker; 实际在 playSha 内)
-    zhuque:  { zhuqueShaToFire: true }
+    zhuque:  { zhuqueShaToFire: true },
+    // v8 PR-B4: 银月枪 — 回合外用/打出黑色手牌时, 可令攻击范围内一名角色
+    // 选打闪或受 1 dmg (marker; 实际在 consumeResponse / consumeWuxie 内)
+    yinyue:  { yinyueOutOfTurnBlackHit: true }
   };
 
   function equipmentSlots(state) {
