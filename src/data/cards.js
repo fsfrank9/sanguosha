@@ -31,6 +31,7 @@
         guanshi: { name: '贯石斧', family: 'equipment', slot: 'weapon', range: 3, group: 'buff', label: '武器', symbol: '斧', desc: '杀被闪避后可弃两牌强制命中。' },
         fangtian: { name: '方天画戟', family: 'equipment', slot: 'weapon', range: 4, group: 'buff', label: '武器', symbol: '戟', desc: '最后手牌为杀时可额外指定目标。' },
         qilin: { name: '麒麟弓', family: 'equipment', slot: 'weapon', range: 5, group: 'buff', label: '武器', symbol: '弓', desc: '杀命中后可弃置目标坐骑。' },
+        hanbing: { name: '寒冰剑', family: 'equipment', slot: 'weapon', range: 2, group: 'buff', label: '武器', symbol: '冰', desc: '杀命中可防止伤害并依次弃目标两张牌。' },
         bagua: { name: '八卦阵', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '卦', desc: '需要出闪时可判定，红色视为出闪。' },
         renwang: { name: '仁王盾', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '盾', desc: '黑色【杀】对你无效。' },
         tengjia: { name: '藤甲', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '藤', desc: '普通杀/南蛮/万箭无效，火焰伤害 +1。' },
@@ -314,6 +315,13 @@
           effect: 'v7 PR-3: 触发时机为造成伤害（applyWeaponHitEffects 内）；目标 0 匹马则不触发；1 匹马默认弃；2 匹马按 skillPreferences.qilin = auto/ask/decline 处理（auto 缺省弃 +1 马，ask 发起 pendingChoice "qilin-pick"）。',
           frequency: 'passive',
           engineHooks: ['applyWeaponHitEffects → applyQilinDiscard', 'resolveQilinPickChoice', 'pendingChoice:qilin-pick']
+        },
+        hanbing: {
+          summary: '【杀】对目标造成伤害时，若其有牌，你可以防止此伤害并依次弃置其两张牌（任意区域）。',
+          timing: 'passive',
+          effect: 'v8 PR-B1: gltjk card__equipment.md "每当你使用【杀】对目标角色造成伤害时, 若其有牌, 你可以防止此伤害, 依次弃置其两张牌"。触发时机=damage() 函数内 hp 扣减前。skillPreferences.hanbing: auto (AI 默认, 触发) / decline (不触发, 让伤害正常结算) — 二者目前均为 player 默认 = auto (即不会暴露 pendingChoice; UI 后续 PR 可补 ask 面板)。AI 弃牌优先级: 装备区 > 判定区 > 手牌。',
+          frequency: 'passive',
+          engineHooks: ['damage:hanbingPrevent', 'applyHanbingDiscard']
         },
 
         // ─── Equipment: armor ─────────────────────────────────────────

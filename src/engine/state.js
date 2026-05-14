@@ -10,7 +10,10 @@
   var EQUIPMENT_EFFECTS = {
     zhuge:   { unlimitedSha: true },
     qinggang:{ ignoreArmorOnSha: true },
-    renwang: { blockBlackSha: true }
+    renwang: { blockBlackSha: true },
+    // v8 PR-B1: 寒冰剑 — marker; 实际逻辑在 game-engine.js damage() 内
+    // (需要访问目标手牌/装备/判定区做 2 张挑选, 不适合纯 boolean flag)
+    hanbing: { hanbingPreventOnHit: true }
   };
 
   function equipmentSlots(state) {

@@ -1315,6 +1315,56 @@
         return success('麒麟弓结算完成。');
       }
 
+      // v8 PR-B1: 寒冰剑 — 由 damage() 在 hp 扣减前调用。源装寒冰且
+      // sourceCard 是杀类时尝试触发。skillPreferences.hanbing:
+      //   'auto'  (默认): 触发 → 按 装备 > 判定 > 手牌优先级弃 2 张, 防止伤害
+      //   'decline':      不触发, 让伤害正常结算
+      // 返回 {prevented:true} 表示防止伤害成功; 否则返回 null。
+      // UI ask 模式待 PR-B1-bis 接入 pendingChoice 面板。
+      function applyHanbingPrevent(game, sourceActor, targetActor) {
+        var source = game[sourceActor];
+        var target = game[targetActor];
+        if (!source || !target) return null;
+        var weapon = source.equipment && source.equipment.weapon;
+        if (!weapon || weapon.type !== 'hanbing') return null;
+        // 数有效牌总数 (手牌 + 装备 + 判定区)
+        var equipsCount = equipmentList(target).length;
+        var handCount = (target.hand || []).length;
+        var judgeCount = (target.judgeArea || []).length;
+        if (equipsCount + handCount + judgeCount === 0) return null;
+        var pref = (source.skillPreferences && source.skillPreferences.hanbing) || 'auto';
+        if (pref === 'decline') {
+          log(game, actorName(game, sourceActor) + '选择不发动【寒冰剑】。');
+          return null;
+        }
+        // auto / 其它: 按 装备 > 判定 > 手牌 顺序弃 2 张
+        var discarded = 0;
+        var equips = equipmentList(target).slice();
+        for (var ei = 0; ei < equips.length && discarded < 2; ei += 1) {
+          loseEquipment(game, targetActor, equips[ei].slot);
+          discarded += 1;
+        }
+        var judges = (target.judgeArea || []).slice();
+        for (var ji = 0; ji < judges.length && discarded < 2; ji += 1) {
+          var jcard = target.judgeArea.shift();
+          if (jcard) {
+            discardCard(game, jcard);
+            log(game, '【寒冰剑】依次弃置' + actorName(game, targetActor) + '判定区【' + jcard.name + '】。');
+            discarded += 1;
+          }
+        }
+        while (discarded < 2 && (target.hand || []).length > 0) {
+          var hcard = target.hand.shift();
+          if (hcard) {
+            discardCard(game, hcard);
+            log(game, '【寒冰剑】依次弃置' + actorName(game, targetActor) + '手牌【' + hcard.name + '】。');
+            discarded += 1;
+          }
+        }
+        log(game, actorName(game, sourceActor) + '发动【寒冰剑】，防止本次伤害并依次弃置' + actorName(game, targetActor) + ' ' + discarded + ' 张牌。');
+        return { prevented: true, discarded: discarded };
+      }
+
       function applyWeaponHitEffects(game, actor, targetActor) {
         var weapon = game[actor].equipment && game[actor].equipment.weapon;
         if (!weapon) return;
@@ -1745,6 +1795,19 @@
         if (armor && !ignoreArmor && armor.type === 'baiyin' && amount > 1) {
           amount = 1;
           log(game, actorName(game, targetActor) + '的【白银狮子】将伤害防止至 1 点。');
+        }
+
+        // v8 PR-B1: 寒冰剑 — gltjk card__equipment.md：
+        //   "每当你使用【杀】对目标角色造成伤害时, 若其有牌, 你可以防止
+        //    此伤害, 依次弃置其两张牌。"
+        // 时机=hp 扣减前。源装寒冰 + sourceCard 是杀类 + amount > 0 + 目标
+        // 有任意牌 → 按 source.skillPreferences.hanbing 决定 auto/decline。
+        if (amount > 0 && sourceActor && sourceCard && isShaCard(sourceCard)) {
+          var hbResult = applyHanbingPrevent(game, sourceActor, targetActor);
+          if (hbResult && hbResult.prevented) {
+            if (sourceCard) discardCard(game, sourceCard);
+            return false;
+          }
         }
 
         if (amount <= 0) {
