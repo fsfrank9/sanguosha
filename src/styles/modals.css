@@ -1,0 +1,149 @@
+/* modals.css — Overlay panels and pendingChoice popups.
+   Includes: .pending-prompt-panel framework (v8 PR-A1) + .prompt-card-choice,
+   six *-mode-panel containers (tiesuo/target/huogong/conversion/guanxing/zhiheng),
+   .target-card-choices, .guanxing-card-choices, .target-card-choice,
+   .huogong-reveal/-cost-choices/-cost-choice + .unusable,
+   the [hidden] override block (v8 hotfix #60). */
+
+    /* v8 PR-A1: 通用 pendingChoice 面板框架。所有需要玩家做选择的面板
+       (guicai / yiji / fankui / qilin-pick / cixiong-* / jiedao / wugu /
+       guohe-1v1 / dying-rescue 等) 走这套样式; 旧 per-kind 类保留作向后
+       兼容 hook. */
+    .pending-prompt-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid rgba(255, 214, 138, 0.35);
+      border-radius: 10px;
+      background: rgba(20, 14, 6, 0.55);
+      align-items: center;
+      margin-top: 6px;
+    }
+    .pending-prompt-panel__hint {
+      flex-basis: 100%;
+      font-size: 13px;
+      color: #f2dba7;
+      font-weight: 600;
+    }
+    .pending-prompt-panel__choices {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      flex: 1 1 auto;
+    }
+    .pending-prompt-panel__actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .prompt-card-choice {
+      border: 1px solid rgba(255, 214, 138, 0.4);
+      background: rgba(0, 0, 0, 0.3);
+      color: #f2dba7;
+      padding: 5px 9px;
+      border-radius: 9px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s;
+    }
+    .prompt-card-choice:hover:not(:disabled) {
+      background: rgba(255, 214, 138, 0.18);
+    }
+    .prompt-card-choice.selected {
+      background: rgba(255, 214, 138, 0.32);
+      border-color: rgba(255, 214, 138, 0.7);
+    }
+    .prompt-card-choice:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* [hidden] override for both legacy mode-panels and the pending-prompt
+       framework. The .pending-prompt-panel[hidden] entry is v8 HOTFIX #60
+       — the framework's display:flex was overriding the HTML hidden
+       attribute, causing every prompt panel to be permanently visible. */
+    .duel-table[hidden],
+    .setup-screen[hidden],
+    .tiesuo-mode-panel[hidden],
+    .target-zone-panel[hidden],
+    .huogong-mode-panel[hidden],
+    .conversion-mode-panel[hidden],
+    .guanxing-mode-panel[hidden],
+    .zhiheng-mode-panel[hidden],
+    .pending-prompt-panel[hidden] { display: none !important; }
+
+    .tiesuo-mode-panel {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .target-zone-panel,
+    .huogong-mode-panel,
+    .conversion-mode-panel,
+    .guanxing-mode-panel,
+    .zhiheng-mode-panel {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      border: 1px solid rgba(255,214,138,.22);
+      border-radius: 14px;
+      padding: 6px;
+      background: rgba(0,0,0,.18);
+    }
+
+    .target-card-choices,
+    .guanxing-card-choices {
+      flex: 1 0 100%;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      padding-top: 4px;
+      border-top: 1px dashed rgba(255,214,138,.18);
+    }
+
+    .target-card-choice {
+      cursor: pointer;
+      color: #fff4d0;
+      border-color: rgba(255,214,138,.42);
+      background: rgba(88, 43, 22, .42);
+    }
+
+    .target-card-choice:hover {
+      transform: translateY(-1px);
+      border-color: rgba(255,214,138,.75);
+    }
+
+    .huogong-reveal {
+      color: #ffd68a;
+      border-color: rgba(255,120,80,.46);
+      background: rgba(120, 42, 20, .26);
+    }
+
+    .huogong-cost-choices {
+      flex: 1 0 100%;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      padding-top: 4px;
+      border-top: 1px dashed rgba(255,214,138,.18);
+    }
+
+    .huogong-cost-choice {
+      cursor: pointer;
+      border-color: rgba(255,214,138,.42);
+    }
+
+    .huogong-cost-choice.unusable {
+      opacity: .45;
+      cursor: not-allowed;
+      filter: grayscale(.45);
+      border-color: rgba(255,255,255,.12);
+    }

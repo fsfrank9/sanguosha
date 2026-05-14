@@ -26,8 +26,8 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 
 | PR | 范围 | 状态 |
 |---|---|---|
-| PLAN | 本文档 — v9 方向 D 完整计划 | 🟡 PR 待合并 |
-| PR-E0 | CSS 拆分基础 (`main.css` 953 行 → 8 个职责文件 + 1 entry) | ⏸ 待开 |
+| PLAN | 本文档 — v9 方向 D 完整计划 | 🟢 PR #67 已合并 |
+| PR-E0 | CSS 拆分基础 (`main.css` 953 行 → 8 个职责文件 + 1 entry) | 🟡 PR 待合并 |
 | PR-E1 | 整体布局重构 + 装饰外框 (橙红 striped border + 角落 widgets) | ⏸ 待开 |
 | PR-E2 | 中央日志 overlay + 状态条 + 暂停 brush 横幅 | ⏸ 待开 |
 | PR-E3 | 卡牌外观重设计 (corner 花色+点数 + 卡身色块 + 底部 label) | ⏸ 待开 |
@@ -58,6 +58,42 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E0 落地 — CSS 拆分基础 ✅
+
+**实际结果**:
+
+8 文件 (`src/styles/` 下) + 1 entry:
+
+| 文件 | LOC | 内容 |
+|---|---|---|
+| `tokens.css` | 52 | `:root` vars + `body`/`html`/font + `button,select font:inherit` |
+| `layout.css` | 182 | `.app`/`header`/`.layout`/`.panel`/`.battlefield`/`.duel-table`/`.status-banner`/`.hand-dock` + 共享 panel-base block + 响应式 `@media` |
+| `hero.css` | 190 | `.hero*`/`.hp-row`/`.heart`/`.camp-ribbon`/`.stat-grid`/`.damage-float` + `@keyframes floatDamage` + 链状态 |
+| `cards.css` | 150 | `.hand`/`.card*`/`.card-corner`/`.suit-*`/`.mini-card*`/`.empty-hand` |
+| `zones.css` | 69 | `.log*`/`.zone-panel`/`.judge-area`/`.equipment-area`/`.skill-bar`/`.phase-track`/`.phase-step` |
+| `modals.css` | 149 | `.pending-prompt-*` + 6 `*-mode-panel` + `[hidden]` override (含 HOTFIX #60) + `.target-card-choices`/`.huogong-*` |
+| `controls.css` | 93 | `.btn` + 变种 + `.skill-button` + `.skill-status-*` + `.discard-controls` + `.shake` + `@keyframes shake` |
+| `setup.css` | 105 | `.title-card` + `h1` + `.subtitle` + `.setup-*` + `.hero-select-panel` + `.rules` |
+| **`main.css`** | **14** | 仅 8 个 `@import` (顺序: tokens → layout → 组件 → setup) |
+
+总: 1004 lines (原 953, +51 来自文件标题注释)。
+
+**测试辅助** `tests/helpers/load-styles.mjs`:
+- 暴露 `loadAllStyles()` 把 8 个分文件按顺序拼成单字符串
+- 暴露 `SPLIT_CSS_FILES` 数组
+- 10 个原读取 `main.css` 的 test 文件改用 `loadAllStyles()` (零行为差异)
+
+**新增** `tests/css_split.test.mjs` (7 条守护):
+- 8 分文件都存在
+- `SPLIT_CSS_FILES` 与实际一致
+- `main.css` 不含具体 CSS 规则 (仅 `@import` + 注释)
+- `@import` 顺序 (tokens 第一 / setup 最后)
+- 每个分文件首行是 `/* ... */` 说明注释
+- `loadAllStyles()` 返回拼接结果含原内容片段
+- `index.html` 仍引用 `main.css` (入口不动)
+
+**Test status**: 529 → 536 ✓ (+7 新守护); 现有 528 条无 regression。`build:check` 通过。
 
 ### PR-E0 — CSS 拆分基础
 **目标**: 把 953 行的单一 `main.css` 拆成职责单一的文件, 为后续视觉重构留余地。

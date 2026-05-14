@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { loadAllStyles } from './helpers/load-styles.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const cssSource = fs.readFileSync(path.join(root, 'src/styles/main.css'), 'utf8');
+const cssSource = loadAllStyles();
 const adapterSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 

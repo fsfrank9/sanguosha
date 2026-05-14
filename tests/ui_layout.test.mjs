@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { loadAllStyles } from './helpers/load-styles.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const html = [
   fs.readFileSync(path.join(root, 'index.html'), 'utf8'),
-  fs.readFileSync(path.join(root, 'src/styles/main.css'), 'utf8'),
+  loadAllStyles(),
 ].join('\n');
 
 function test(name, fn) {
