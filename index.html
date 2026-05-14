@@ -280,6 +280,16 @@
           <div class="cixiong-choose-choices pending-prompt-panel__choices" id="cixiongChooseChoices" aria-live="polite"></div>
           <button class="btn small" id="cixiongChooseDrawBtn">令对方摸 1 张</button>
         </div>
+        <div class="jiedao-decision-panel pending-prompt-panel" id="jiedaoDecisionPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="jiedaoDecisionHint">借刀杀人：对方用借刀，你出杀还是交武器？</span>
+          <button class="btn small" id="jiedaoDecisionFireBtn">出杀</button>
+          <button class="btn small" id="jiedaoDecisionDeclineBtn">不出，交武器</button>
+        </div>
+        <div class="guohe-pick-panel pending-prompt-panel" id="guohePickPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="guohePickHint">过河拆桥（1V1）：选择弃 1 张装备 或 观看对方手牌后弃 1 张</span>
+          <div class="guohe-pick-equipment pending-prompt-panel__choices" id="guohePickEquipment" aria-live="polite"></div>
+          <div class="guohe-pick-hand pending-prompt-panel__choices" id="guohePickHand" aria-live="polite"></div>
+        </div>
         <div class="hand" id="playerHand"></div>
       </section>
     </section>

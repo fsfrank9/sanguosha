@@ -124,8 +124,30 @@ UI 接完后再选：
 | PR-0 | 牌面 suit + rank 可视化 (方向 0) | 🟢 PR #44 已合并 |
 | PR-A1 | 通用 pendingChoice 面板框架 (方向 1 基础) | 🟢 PR #46 已合并 |
 | PR-A2 | qilin-pick + dying-rescue 面板 | 🟢 PR #47 已合并 |
-| PR-A3 | cixiong-fire + cixiong-choose 面板（双层） | 🟡 PR 待合并 |
-| _其余_ | _v8 PR-A4..A5 + 方向 2/3/4_ | _按顺序推进_ |
+| PR-A3 | cixiong-fire + cixiong-choose 面板（双层） | 🟢 PR #48 已合并 |
+| PR-A4 | jiedao-decision + guohe-1v1-pick 面板 | 🟡 PR 待合并 |
+| _其余_ | _v8 PR-A5 + 方向 2/3/4_ | _按顺序推进_ |
+
+### PR-A4 落地 — jiedao-decision + guohe-1v1-pick 面板
+
+把 v7 引擎里两个"手牌内容展示"型 pendingChoice 接入 UI。
+
+**jiedao-decision**（pending = `{kind, actor:opponentActor, sourceActor}`）：
+- 文案展示 source 名 + 玩家手中可用 杀 / 火杀 / 雷杀 的张数（从 `game.player.hand` 现查）
+- 2 个按钮：`出杀` → `{fire:true}` / `不出，交武器` → `{decline:true}`
+- spec 提示：不交武器就要出杀；出杀后引擎走标准 sha 流程
+
+**guohe-1v1-pick**（pending = `{kind, actor:sourceActor, target, equipment:[...], hand:[...]}`）：
+- 双区域 choices：装备区列表 + 手牌列表（spec 选项 2 "观看目标角色的手牌"，pending 中已暴露完整手牌内容）
+- 每张牌一个 `promptCardChoice`，`dataAttrs guoheZone='equipment'|'hand'` + `guoheCardId`
+- 共享 `handleGuohePickClick` handler，两容器绑同一函数 → `{zone, cardId}`
+- 文案说明 `观看后弃` 语义对应 spec
+
+**改动**：
+- `index.html`：新增 `#jiedaoDecisionPanel`（hint + 2 btn）+ `#guohePickPanel`（hint + equipment 列表 + hand 列表）
+- `dom-adapter.js`：`els` 缓存新增 8 个 id；`renderPendingChoice` 增 2 个分支；事件绑定增 4 个监听器（fire/decline + 共享 click handler）
+
+**新增** `tests/pending_prompt_panels_a4.test.mjs`（13 条断言）：HTML 容器 / 框架类 / els 缓存 / 2 个 render 分支 / 文案关键字 / 共享 handler / `{zone, cardId}` payload。
 
 ### PR-A3 落地 — cixiong-fire + cixiong-choose 面板（双层）
 
@@ -191,4 +213,5 @@ UI 接完后再选：
 | `tests/pending_prompt_framework.test.mjs` | 9 | PR-A1 |
 | `tests/pending_prompt_panels_a2.test.mjs` | 14 | PR-A2 |
 | `tests/pending_prompt_panels_a3.test.mjs` | 13 | PR-A3 |
+| `tests/pending_prompt_panels_a4.test.mjs` | 13 | PR-A4 |
 | _其余 PR 待开_ | — | — |
