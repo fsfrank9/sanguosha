@@ -502,6 +502,60 @@
       font-size: 11px;
     }
 
+    /* v8 PR-A1: 通用 pendingChoice 面板框架。所有需要玩家做选择的面板
+       (guicai / yiji / fankui / qilin-pick / cixiong-* / jiedao / wugu /
+       guohe-1v1 / dying-rescue 等) 走这套样式; 旧 per-kind 类保留作向后
+       兼容 hook. */
+    .pending-prompt-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid rgba(255, 214, 138, 0.35);
+      border-radius: 10px;
+      background: rgba(20, 14, 6, 0.55);
+      align-items: center;
+      margin-top: 6px;
+    }
+    .pending-prompt-panel__hint {
+      flex-basis: 100%;
+      font-size: 13px;
+      color: #f2dba7;
+      font-weight: 600;
+    }
+    .pending-prompt-panel__choices {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      flex: 1 1 auto;
+    }
+    .pending-prompt-panel__actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .prompt-card-choice {
+      border: 1px solid rgba(255, 214, 138, 0.4);
+      background: rgba(0, 0, 0, 0.3);
+      color: #f2dba7;
+      padding: 5px 9px;
+      border-radius: 9px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s;
+    }
+    .prompt-card-choice:hover:not(:disabled) {
+      background: rgba(255, 214, 138, 0.18);
+    }
+    .prompt-card-choice.selected {
+      background: rgba(255, 214, 138, 0.32);
+      border-color: rgba(255, 214, 138, 0.7);
+    }
+    .prompt-card-choice:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .empty-hand {
       border: 1px dashed rgba(255, 214, 138, .25);
       color: var(--muted);
