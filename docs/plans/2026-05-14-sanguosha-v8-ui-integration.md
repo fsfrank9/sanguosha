@@ -122,11 +122,27 @@ UI 接完后再选：
 | PR | 范围 | 状态 |
 |---|---|---|
 | PR-0 | 牌面 suit + rank 可视化 (方向 0) | 🟢 PR #44 已合并 |
-| _其余_ | _v8 方向 1..5_ | _按方向 1 → 2 → 3 → 4 顺序，5 留 v9+_ |
+| PR-A1 | 通用 pendingChoice 面板框架 (方向 1 基础) | 🟡 PR 待合并 |
+| _其余_ | _v8 PR-A2..A5 + 方向 2/3/4_ | _按顺序推进_ |
+
+### PR-A1 落地 — 通用 pendingChoice 面板框架
+
+为方向 1 后续 4 个面板 PR (A2..A5) 立 foundation。引入共享 CSS / HTML / JS 模板，避免给 7 个新 pendingChoice 类型各自硬编码 7 套 markup。
+
+**改动**：
+- `main.css`：新增 `.pending-prompt-panel` (容器) / `.__hint` (顶部提示) / `.__choices` (牌列表) / `.__actions` (按钮行) / `.prompt-card-choice` (统一牌按钮，含 `hover` / `selected` / `:disabled` 状态)
+- `dom-adapter.js`：新增 `promptCardChoice(card, opts)` helper — 接受 `{dataAttrs, title, selected, prefix, suffix, extraClass, disabled}`；输出 `<button class="mini-card prompt-card-choice [extraClass] [selected]" data-...>[prefix]【name】♠ 5[suffix]</button>`
+- `dom-adapter.js`：重构 guicai 候选 + fankui 装备/判定区项目用上 `promptCardChoice`（保留旧 per-kind 类 `guicai-candidate` / `fankui-zone-btn` 作向后兼容，事件 binding 不变）
+- `index.html`：6 个既有 `*PromptPanel` 容器追加 `pending-prompt-panel` 类；6 个 `*PromptHint` 追加 `pending-prompt-panel__hint` 类；4 个 choices 容器（guicaiCandidates / yijiCandidates / fankuiZones / ganglieSourceCandidates）追加 `pending-prompt-panel__choices` 类
+
+**新增** `tests/pending_prompt_framework.test.mjs`（9 条断言）：CSS 四件套 + 状态类 / helper 存在 + 选项完整 / guicai 已迁移 / fankui 已迁移 / 6 容器追加新类 / 6 hint 追加新类 / 4 choices 追加新类。
+
+下一步 PR-A2 (qilin-pick + dying-rescue) 直接复用这套样式 + helper，预计每个新面板 ≈ 50-80 行 dom-adapter 代码。
 
 ## 测试增量
 
 | 文件 | 断言数 | PR |
 |---|---:|---|
 | `tests/card_face_suit_rank.test.mjs` | 7 | PR-0 |
+| `tests/pending_prompt_framework.test.mjs` | 9 | PR-A1 |
 | _其余 PR 待开_ | — | — |

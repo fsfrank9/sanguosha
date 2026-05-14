@@ -397,6 +397,45 @@
           + '</span>';
       }
 
+      // v8 PR-A1: 通用 pendingChoice 牌按钮 — 所有面板都用统一模板。
+      // opts: {
+      //   dataAttrs: { camelCaseKey: value } → data-camel-case-key="value"
+      //   title: button tooltip
+      //   selected: bool — adds 'selected' class
+      //   prefix: string before 【name】
+      //   suffix: string after suit+rank
+      //   extraClass: extra class names (space-separated)
+      //   disabled: bool
+      // }
+      function promptCardChoice(card, opts) {
+        opts = opts || {};
+        var attrs = '';
+        var dataAttrs = opts.dataAttrs || {};
+        Object.keys(dataAttrs).forEach(function (k) {
+          var kebab = k.replace(/[A-Z]/g, function (c) { return '-' + c.toLowerCase(); });
+          attrs += ' data-' + kebab + '="' + escapeHtml(String(dataAttrs[k])) + '"';
+        });
+        var cls = 'mini-card prompt-card-choice';
+        if (opts.selected) cls += ' selected';
+        if (opts.extraClass) cls += ' ' + opts.extraClass;
+        var suit = suitLabel(card.suit);
+        var rank = card.rank ? String(card.rank).toUpperCase() : '';
+        var suitRank = (suit || rank)
+          ? ' <span class="mini-card-suit ' + suitColorClass(card.suit) + '">'
+            + escapeHtml(suit) + (suit && rank ? ' ' : '') + escapeHtml(rank) + '</span>'
+          : '';
+        return '<button class="' + cls + '"'
+          + attrs
+          + (opts.title ? ' title="' + escapeHtml(opts.title) + '"' : '')
+          + (opts.disabled ? ' disabled' : '')
+          + '>'
+          + escapeHtml(opts.prefix || '')
+          + '【' + escapeHtml(card.name) + '】'
+          + suitRank
+          + escapeHtml(opts.suffix || '')
+          + '</button>';
+      }
+
       var yijiGiveSelection = [];
 
       function renderPendingChoice() {
@@ -423,11 +462,14 @@
                 ' ' + escapeHtml(String(pending.judgementCard.rank || '')) + '</span>';
             }
             if (els.guicaiCandidates) {
+              // v8 PR-A1: 用 promptCardChoice 统一模板（保留 .guicai-candidate
+              // 类作向后兼容 — 事件绑定通过 data-guicai-card-id 走）
               els.guicaiCandidates.innerHTML = pending.candidates.map(function (card) {
-                return '<button class="mini-card guicai-candidate" data-guicai-card-id="' + escapeHtml(card.id) +
-                  '" title="选这张作为新的判定牌">' +
-                  escapeHtml('【' + card.name + '】' + suitLabel(card.suit) + ' ' + (card.rank || '')) +
-                  '</button>';
+                return promptCardChoice(card, {
+                  dataAttrs: { guicaiCardId: card.id },
+                  title: '选这张作为新的判定牌',
+                  extraClass: 'guicai-candidate'
+                });
               }).join('') || '<span class="mini-card">手牌为空，必须跳过</span>';
             }
           } else {
@@ -495,14 +537,20 @@
                 '的一张牌（手牌随机；装备/判定区可指定）';
             }
             if (els.fankuiZones) {
+              // v8 PR-A1: equipment / judge 走 promptCardChoice，hand 走特殊"随机"按钮
               els.fankuiZones.innerHTML = pending.zones.map(function (entry) {
                 if (entry.zone === 'hand') {
-                  return '<button class="mini-card fankui-zone-btn" data-fankui-zone="hand">手牌（随机 1 张，共 ' + entry.count + ' 张）</button>';
+                  return '<button class="mini-card prompt-card-choice fankui-zone-btn" data-fankui-zone="hand">'
+                    + '手牌（随机 1 张，共 ' + entry.count + ' 张）</button>';
                 }
-                var label = (entry.zone === 'equipment' ? '装备区' : '判定区') +
-                  '【' + entry.name + '】' + suitLabel(entry.suit) + ' ' + (entry.rank || '');
-                return '<button class="mini-card fankui-zone-btn" data-fankui-zone="' + entry.zone +
-                  '" data-fankui-card-id="' + escapeHtml(entry.cardId) + '">' + escapeHtml(label) + '</button>';
+                return promptCardChoice(
+                  { name: entry.name, suit: entry.suit, rank: entry.rank },
+                  {
+                    dataAttrs: { fankuiZone: entry.zone, fankuiCardId: entry.cardId },
+                    extraClass: 'fankui-zone-btn',
+                    prefix: entry.zone === 'equipment' ? '装备区' : '判定区'
+                  }
+                );
               }).join('') || '<span class="mini-card">对方没有可获得的牌</span>';
             }
           } else {

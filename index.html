@@ -224,39 +224,39 @@
           <button class="btn small" id="zhihengConfirmBtn">确认制衡</button>
           <button class="btn small" id="zhihengCancelBtn">取消</button>
         </div>
-        <div class="guicai-prompt-panel" id="guicaiPromptPanel" hidden>
-          <span class="badge" id="guicaiPromptHint">鬼才：选择手牌替换判定，或跳过</span>
+        <div class="guicai-prompt-panel pending-prompt-panel" id="guicaiPromptPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="guicaiPromptHint">鬼才：选择手牌替换判定，或跳过</span>
           <div class="guicai-original" id="guicaiOriginalCard" aria-live="polite"></div>
-          <div class="guicai-candidates" id="guicaiCandidates" aria-live="polite"></div>
+          <div class="guicai-candidates pending-prompt-panel__choices" id="guicaiCandidates" aria-live="polite"></div>
           <button class="btn small" id="guicaiDeclineBtn">不发动</button>
         </div>
-        <div class="yiji-prompt-panel" id="yijiPromptPanel" hidden>
-          <span class="badge" id="yijiPromptHint">遗计：勾选要交给对方的牌</span>
-          <div class="yiji-candidates" id="yijiCandidates" aria-live="polite"></div>
+        <div class="yiji-prompt-panel pending-prompt-panel" id="yijiPromptPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="yijiPromptHint">遗计：勾选要交给对方的牌</span>
+          <div class="yiji-candidates pending-prompt-panel__choices" id="yijiCandidates" aria-live="polite"></div>
           <button class="btn small" id="yijiKeepAllBtn">全部留己</button>
           <button class="btn small" id="yijiConfirmBtn">确认分配</button>
         </div>
-        <div class="fanjian-prompt-panel" id="fanjianPromptPanel" hidden>
-          <span class="badge" id="fanjianPromptHint">反间：猜花色</span>
-          <div class="fanjian-zone-row">
+        <div class="fanjian-prompt-panel pending-prompt-panel" id="fanjianPromptPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="fanjianPromptHint">反间：猜花色</span>
+          <div class="fanjian-zone-row pending-prompt-panel__actions">
             <button class="btn small" id="fanjianSpadeBtn" data-fanjian-suit="spade">♠ 黑桃</button>
             <button class="btn small" id="fanjianHeartBtn" data-fanjian-suit="heart">♥ 红桃</button>
             <button class="btn small" id="fanjianClubBtn" data-fanjian-suit="club">♣ 梅花</button>
             <button class="btn small" id="fanjianDiamondBtn" data-fanjian-suit="diamond">♦ 方片</button>
           </div>
         </div>
-        <div class="fankui-prompt-panel" id="fankuiPromptPanel" hidden>
-          <span class="badge" id="fankuiPromptHint">反馈：选择获得对方的一张牌</span>
-          <div class="fankui-zone" id="fankuiZones" aria-live="polite"></div>
+        <div class="fankui-prompt-panel pending-prompt-panel" id="fankuiPromptPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="fankuiPromptHint">反馈：选择获得对方的一张牌</span>
+          <div class="fankui-zone pending-prompt-panel__choices" id="fankuiZones" aria-live="polite"></div>
         </div>
-        <div class="ganglie-fire-panel" id="gangliePromptPanel" hidden>
-          <span class="badge" id="gangliePromptHint">刚烈：是否对来源发动？</span>
+        <div class="ganglie-fire-panel pending-prompt-panel" id="gangliePromptPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="gangliePromptHint">刚烈：是否对来源发动？</span>
           <button class="btn small" id="ganglieFireBtn">发动判定</button>
           <button class="btn small" id="ganglieDeclineBtn">不发动</button>
         </div>
-        <div class="ganglie-source-panel" id="ganglieSourcePanel" hidden>
-          <span class="badge" id="ganglieSourceHint">刚烈：选择弃 2 张牌 或 受 1 点伤害</span>
-          <div class="ganglie-candidates" id="ganglieSourceCandidates" aria-live="polite"></div>
+        <div class="ganglie-source-panel pending-prompt-panel" id="ganglieSourcePanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="ganglieSourceHint">刚烈：选择弃 2 张牌 或 受 1 点伤害</span>
+          <div class="ganglie-candidates pending-prompt-panel__choices" id="ganglieSourceCandidates" aria-live="polite"></div>
           <button class="btn small" id="ganglieSourceConfirmBtn">确认弃 2 张</button>
           <button class="btn small" id="ganglieSourceTakeDamageBtn">受 1 点伤害</button>
         </div>
