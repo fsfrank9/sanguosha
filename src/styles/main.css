@@ -642,7 +642,12 @@
     .huogong-mode-panel[hidden],
     .conversion-mode-panel[hidden],
     .guanxing-mode-panel[hidden],
-    .zhiheng-mode-panel[hidden] { display: none !important; }
+    .zhiheng-mode-panel[hidden],
+    /* v8 hotfix (regression from PR-A1): .pending-prompt-panel 的
+       display:flex 覆盖了 hidden attribute, 导致所有 pendingChoice
+       面板 (guicai/yiji/fankui/qilin/cixiong/jiedao/wugu/guohe/dying-rescue
+       等) 永远可见, 盖住手牌区。补上 [hidden] 强制 display:none. */
+    .pending-prompt-panel[hidden] { display: none !important; }
 
     .setup-screen {
       flex: 1 1 auto;
