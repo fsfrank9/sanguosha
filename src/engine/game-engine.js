@@ -927,9 +927,13 @@
           return { suspendedForGuicai: true };
         }
         // Auto path (pref === 'auto', AI default, or non-pausable judgement):
-        // hand[0] from holder. Discard the original judgement card and swap
-        // in the replacement.
-        var replacement = holderState.hand[0];
+        // v8 PR-D2: 不再 hand[0], 改 lowest-score 手牌 (scoreCardForAI). 鬼才
+        // 把手牌投出当作新判定牌, 选最不值钱的减少损失. 注意: 这里不优化
+        // 判定结果合不合适 (那需要 outcome lookahead, 留给 D3+).
+        var sortedGuicai = holderState.hand
+          .map(function (card) { return { card: card, score: scoreCardForAI(game, holder, card) }; })
+          .sort(function (a, b) { return a.score - b.score; });
+        var replacement = sortedGuicai[0].card;
         var paidCard = removeCardFromHand(holderState, replacement.id);
         if (!paidCard) return null;
         discardCard(game, originalCard);
@@ -1536,9 +1540,15 @@
         var targetPref = (target.skillPreferences && target.skillPreferences.cixiongResponse)
           || (targetActor === 'player' ? 'ask' : 'auto');
         if (targetPref === 'auto') {
-          // AI default heuristic: discard one hand card (don't help the
-          // attacker top up a hand). Picks hand[0] for determinism.
-          var dropped = target.hand.splice(0, 1)[0];
+          // v8 PR-D2: 不再 deterministic 取 hand[0], 而是按 scoreCardForAI
+          // 挑最不值钱的牌弃置 (受 hp/对方资源情况影响). 这样 target 留下
+          // 真正有威胁的牌 (高分: 桃/无中/未用杀/酒).
+          var sortedCixiong = target.hand
+            .map(function (card) { return { card: card, score: scoreCardForAI(game, targetActor, card) }; })
+            .sort(function (a, b) { return a.score - b.score; });
+          var worstCard = sortedCixiong[0].card;
+          var worstIdx = target.hand.findIndex(function (c) { return c.id === worstCard.id; });
+          var dropped = target.hand.splice(worstIdx, 1)[0];
           discardCard(game, dropped);
           log(game, actorName(game, targetActor) + '因【雌雄双股剑】弃置【' + dropped.name + '】。');
           return null;
@@ -1636,10 +1646,17 @@
           };
           return success('【过河拆桥】等待发动者选择…');
         }
-        // 'auto' → 装备优先，否则手牌
+        // v8 PR-D2: 'auto' → 装备优先, 按 slot 影响排 (weapon > armor >
+        // horsePlus > horseMinus). 武器影响进攻最大, 防具次之, 马最末.
+        // 无装备时弃手牌, 手牌为空才完全无效。手牌信息对 source 是隐藏的,
+        // 所以 hand[0] 随机选可接受。
         var equips = equipmentList(target);
         if (equips.length) {
-          return executeGuohe1v1Pick(game, sourceActor, targetActor, 'equipment', equips[0].card.id);
+          var slotPriority = { weapon: 1, armor: 2, horsePlus: 3, horseMinus: 4 };
+          var sortedEquips = equips.slice().sort(function (a, b) {
+            return (slotPriority[a.slot] || 9) - (slotPriority[b.slot] || 9);
+          });
+          return executeGuohe1v1Pick(game, sourceActor, targetActor, 'equipment', sortedEquips[0].card.id);
         }
         if (target.hand.length) {
           return executeGuohe1v1Pick(game, sourceActor, targetActor, 'hand', target.hand[0].id);
@@ -1697,7 +1714,15 @@
           var pref = (pickerState && pickerState.skillPreferences && pickerState.skillPreferences.wugu)
             || (picker === 'player' ? 'ask' : 'auto');
           if (pref === 'auto') {
-            var picked = pool.shift();
+            // v8 PR-D2: 不再 pool.shift() 取首张, 改 pick 最高分 (scoreCardForAI
+            // 看自身受伤情况 / 已用杀 等). AI 抓到最对自己有用的那张.
+            var bestPoolIdx = 0;
+            var bestPoolScore = -Infinity;
+            for (var pi = 0; pi < pool.length; pi += 1) {
+              var ps = scoreCardForAI(game, picker, pool[pi]);
+              if (ps > bestPoolScore) { bestPoolScore = ps; bestPoolIdx = pi; }
+            }
+            var picked = pool.splice(bestPoolIdx, 1)[0];
             pickerState.hand.push(picked);
             log(game, actorName(game, picker) + '从【五谷丰登】获得【' + picked.name + '】。');
             idx += 1;

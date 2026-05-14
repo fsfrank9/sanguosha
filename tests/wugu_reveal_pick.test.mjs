@@ -23,20 +23,22 @@ function deckCard(id, type, name, extra) {
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
 
-test('v7 PR-7: 1v1 X=2 — auto path: source 取顶张, opponent 取剩余 1 张', () => {
+test('v7 PR-7 / v8 PR-D2: 1v1 X=2 — auto path 按 scoreCard 挑最高分, 不再 deterministic 取顶张', () => {
   const game = makeGame();
   game.player.skillPreferences.wugu = 'auto';
+  game.enemy.skillPreferences.wugu = 'auto';
+  // 让 player 受伤, 桃应是高分; sha 中等; shan 0
+  game.player.hp = game.player.maxHp - 1;
   // deck.pop() → top of deck = last array element
+  // 让 top=shan (低分), mid=sha (中分), bottom=tao (高分 for wounded player)
+  // X=2 → reveal top 2 = [shan, sha] (pool 顺序: revealed[0]=top=shan, [1]=mid=sha)
   game.deck = [deckCard('bottom', 'tao', '桃'), deckCard('mid', 'sha', '杀'), deckCard('top', 'shan', '闪')];
   dealWugu(game.player, 'wugu-auto');
   Engine.playCard(game, 'player', 'wugu-auto');
-  // X=2 → reveal pop two from top → revealed = [top='shan', mid='sha']
-  // pool = [shan, sha]; auto picks index 0 = shan → player gets shan
-  // pool = [sha]; only 1 left → opponent gets sha
-  assert.ok(game.player.hand.some((c) => c.id === 'top'), 'player got the top revealed card');
-  assert.ok(game.enemy.hand.some((c) => c.id === 'mid'), 'enemy got the second revealed card');
-  // bottom card was not revealed; deck still has it
-  assert.ok(game.deck.some((c) => c.id === 'bottom'));
+  // pool = [shan, sha]; player AI 挑 高分 sha (闪 score 0 vs 杀 score >0)
+  assert.ok(game.player.hand.some((c) => c.id === 'mid'), 'player AI picked higher-scoring 杀, not deterministic 闪');
+  assert.ok(game.enemy.hand.some((c) => c.id === 'top'), 'enemy got remaining 闪');
+  assert.ok(game.deck.some((c) => c.id === 'bottom'), '未参加 reveal 的 桃 仍在 deck');
 });
 
 test('v7 PR-7: player ask → pendingChoice "wugu-pick" with full pool', () => {
