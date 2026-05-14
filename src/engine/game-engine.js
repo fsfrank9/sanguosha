@@ -2664,6 +2664,20 @@
         self.usedOrRespondedSha = true;
         var amount = 1 + (self.shaBonus || 0);
         self.shaBonus = 0;
+        // v8 PR-B3: 朱雀羽扇 — gltjk card__equipment.md "你可以将一张普通
+        // 【杀】当火【杀】使用; 你可以将视为使用【杀】改为视为使用火【杀】"。
+        // 现处理: 装备朱雀 + 普通杀 (card.type === 'sha') 且
+        // skillPreferences.zhuque !== 'decline' → 转化为 火杀 (mutate type
+        // 让 damage() 走 fire nature 路径)。已是 fire_sha / thunder_sha 不
+        // 重复转。card-as 虚拟杀 (zhangba / wusheng / longdan 等的 virtual)
+        // 也走此路径因为它们 card.type === 'sha'。
+        var zhuqueWeapon = self.equipment && self.equipment.weapon;
+        if (zhuqueWeapon && zhuqueWeapon.type === 'zhuque' && card.type === 'sha'
+            && (!self.skillPreferences || self.skillPreferences.zhuque !== 'decline')) {
+          card.type = 'fire_sha';
+          card.name = '火杀';
+          log(game, actorName(game, actor) + '发动【朱雀羽扇】，将【杀】转化为【火杀】。');
+        }
         log(game, actorName(game, actor) + '对' + actorName(game, targetActor) + '使用【' + card.name + '】。');
 
         // v7 PR-15: gltjk card__equipment.md 方天画戟 — "若你使用的【杀】是

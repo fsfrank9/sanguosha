@@ -33,6 +33,7 @@
         qilin: { name: '麒麟弓', family: 'equipment', slot: 'weapon', range: 5, group: 'buff', label: '武器', symbol: '弓', desc: '杀命中后可弃置目标坐骑。' },
         hanbing: { name: '寒冰剑', family: 'equipment', slot: 'weapon', range: 2, group: 'buff', label: '武器', symbol: '冰', desc: '杀命中可防止伤害并依次弃目标两张牌。' },
         guding: { name: '古锭刀', family: 'equipment', slot: 'weapon', range: 2, group: 'buff', label: '武器', symbol: '锭', desc: '锁定技：杀命中目标无手牌时，伤害 +1。' },
+        zhuque: { name: '朱雀羽扇', family: 'equipment', slot: 'weapon', range: 4, group: 'buff', label: '武器', symbol: '朱', desc: '可将普通【杀】当火【杀】使用。' },
         bagua: { name: '八卦阵', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '卦', desc: '需要出闪时可判定，红色视为出闪。' },
         renwang: { name: '仁王盾', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '盾', desc: '黑色【杀】对你无效。' },
         tengjia: { name: '藤甲', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '藤', desc: '普通杀/南蛮/万箭无效，火焰伤害 +1。' },
@@ -330,6 +331,13 @@
           effect: 'v8 PR-B2: gltjk card__equipment.md "锁定技, 每当你使用【杀】对目标角色造成伤害时, 若其没有手牌, 你令伤害值+1"。锁定技 — 强制触发, 无 skillPreferences。在 damage() 流程内 tengjia 之后、baiyin 之前生效, 这样 baiyin 仍能把 2 点 clamp 回 1 点。',
           frequency: 'passive',
           engineHooks: ['damage:gudingNoHandPlus1']
+        },
+        zhuque: {
+          summary: '可将普通【杀】当【火杀】使用；可将视为使用【杀】改为视为使用【火杀】。',
+          timing: 'passive',
+          effect: 'v8 PR-B3: gltjk card__equipment.md 朱雀羽扇 "你可以将一张普通【杀】当火【杀】使用; 你可以将视为使用【杀】改为视为使用火【杀】"。在 playSha 入口处, 装朱雀 + sourceCard.type === "sha" 时 mutate card.type → "fire_sha" 并改名称, 让 damage() 走 fire nature (藤甲变 +1 而非防止)。card-as 虚拟杀 (zhangba/wusheng/longdan) 也走此路径因为它们 card.type === "sha"。skillPreferences.zhuque = "decline" 可禁用。',
+          frequency: 'passive',
+          engineHooks: ['playSha:zhuqueShaToFire']
         },
 
         // ─── Equipment: armor ─────────────────────────────────────────
