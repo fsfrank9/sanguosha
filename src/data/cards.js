@@ -121,13 +121,13 @@
 
         // ─── Trick cards (instant) ────────────────────────────────────
         wuzhong: {
-          summary: '立即摸 2 张牌。',
+          summary: '对包括你在内的一名角色使用；目标摸 2 张牌。',
           timing: 'playPhase',
-          targets: 'self',
-          effect: '从牌堆摸 2 张牌。',
+          targets: 'any-actor',
+          effect: 'v7 PR-16: gltjk 1V1/界限突破/国-标 明文 "使用目标：包括你在内的一名角色"。options.wuzhongTarget 可指定 player/enemy；缺省=发动者。1v1 中给对手摸 2 是反直觉操作，AI 永不这样做；保留 API 仅为 spec 合规。',
           frequency: 'unlimited',
           responseWindow: ['wuxie'],
-          engineHooks: ['playWuzhong']
+          engineHooks: ['playWuzhong', 'options.wuzhongTarget']
         },
         juedou: {
           summary: '对一名其他角色使用；双方轮流打出【杀】，先打不出的一方受到对方造成的 1 点伤害。',
