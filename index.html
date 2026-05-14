@@ -142,14 +142,34 @@
           <button class="btn small" id="randomRolesBtn">随机主公/反贼</button>
           <button class="btn small" id="confirmHeroPickBtn">确认当前选择</button>
         </div>
-        <div class="hero-select-panel setup-grid" id="heroSelectPanel">
+        <!-- v9 PR-E9: 选将网格 — 替代旧 <select> 下拉. 顶部 tabs 切换
+             我方/敌方, 中部 4 列武将网格 (含势力 tag), 右下角 preview.
+             旧 hero-select-panel 仍保留 (style:hidden) 作 state holder
+             供 newGame 读取 select.value. -->
+        <div class="hero-pick" id="heroPick">
+          <div class="hero-pick__prompt" id="heroPickPrompt">您是主公，请选将</div>
+          <div class="hero-pick__tabs">
+            <button type="button" class="hero-pick-tab is-active" data-side="player" id="heroPickPlayerTab">
+              <span class="hero-pick-tab__label">我方</span>
+              <span class="hero-pick-tab__value" id="heroPickPlayerValue">未选</span>
+            </button>
+            <button type="button" class="hero-pick-tab" data-side="enemy" id="heroPickEnemyTab">
+              <span class="hero-pick-tab__label">敌方</span>
+              <span class="hero-pick-tab__value" id="heroPickEnemyValue">未选</span>
+            </button>
+          </div>
+          <div class="hero-pick__grid" id="heroPickGrid" aria-live="polite"></div>
+          <div class="hero-pick__random-row">
+            <button class="btn small" id="randomPlayerHeroBtn">随机我方</button>
+            <button class="btn small" id="randomEnemyHeroBtn">随机敌方</button>
+          </div>
+        </div>
+        <div class="hero-select-panel setup-grid" id="heroSelectPanel" style="display:none">
           <label class="setup-side">我方武将
             <select id="playerHeroSelect"><option value="liubei">刘备</option><option value="zhangfei">张飞</option><option value="guanyu">关羽</option><option value="zhaoyun">赵云</option><option value="sunquan">孙权</option><option value="huanggai">黄盖</option><option value="caocao">曹操</option><option value="machao">马超</option><option value="zhangliao">张辽</option><option value="zhouyu">周瑜</option><option value="zhugeliang">诸葛亮</option></select>
-            <button class="btn small" id="randomPlayerHeroBtn">随机我方</button>
           </label>
           <label class="setup-side">敌方武将
             <select id="enemyHeroSelect"><option value="liubei">刘备</option><option value="zhangfei">张飞</option><option value="guanyu">关羽</option><option value="zhaoyun">赵云</option><option value="sunquan">孙权</option><option value="huanggai">黄盖</option><option value="caocao" selected>曹操</option><option value="machao">马超</option><option value="zhangliao">张辽</option><option value="zhouyu">周瑜</option><option value="zhugeliang">诸葛亮</option></select>
-            <button class="btn small" id="randomEnemyHeroBtn">随机敌方</button>
           </label>
         </div>
         <button class="btn primary" id="startGameBtn">进入二级游戏界面</button>

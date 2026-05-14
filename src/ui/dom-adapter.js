@@ -79,6 +79,9 @@
           // v9 PR-E8: 二级 splash + 一级 lobby
           'splashScreen', 'splashEnterBtn',
           'lobbyScreen', 'lobbyKofBtn', 'lobby1v1Btn', 'lobbyHellBtn',
+          // v9 PR-E9: 选将网格 — 替代旧 <select> 下拉
+          'heroPick', 'heroPickPrompt', 'heroPickPlayerTab', 'heroPickEnemyTab',
+          'heroPickPlayerValue', 'heroPickEnemyValue', 'heroPickGrid',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -1491,6 +1494,64 @@
         fill(els.playerHeroSelect, currentPlayer);
         fill(els.enemyHeroSelect, currentEnemy);
         ensureDistinctHeroes('player');
+        renderHeroPickGrid();
+      }
+
+      // v9 PR-E9: 选将网格 state + render. 跟踪当前在为哪一方选将,
+      // 点 hero card → 更新对应 <select>.value (旧 state holder) + 重渲染
+      // 高亮. 切 tab 切换 currentPickSide. random 按钮仍走旧 randomizeHero.
+      var currentPickSide = 'player';
+
+      function renderHeroPickGrid() {
+        if (!els.heroPickGrid) return;
+        var heroes = Object.keys(Engine.HERO_CATALOG).map(function (id) { return Engine.HERO_CATALOG[id]; })
+          .sort(function (a, b) { return heroSortKey(a).localeCompare(heroSortKey(b), 'zh-Hans-CN'); });
+        var playerVal = els.playerHeroSelect ? els.playerHeroSelect.value : '';
+        var enemyVal = els.enemyHeroSelect ? els.enemyHeroSelect.value : '';
+        els.heroPickGrid.innerHTML = heroes.map(function (hero) {
+          var classes = ['hero-pick-card', 'hero-pick-card--camp-' + (hero.camp || '?')];
+          if (hero.id === playerVal) classes.push('is-player-selected');
+          if (hero.id === enemyVal) classes.push('is-enemy-selected');
+          return '<button type="button" class="' + classes.join(' ') + '" data-hero-id="' + escapeHtml(hero.id) + '">'
+            + '<span class="hero-pick-card__camp">' + escapeHtml(hero.camp || '?') + '</span>'
+            + '<span class="hero-pick-card__name">' + escapeHtml(hero.name) + '</span>'
+            + '</button>';
+        }).join('');
+        // tab values + prompt
+        if (els.heroPickPlayerValue) {
+          var pH = Engine.HERO_CATALOG[playerVal];
+          els.heroPickPlayerValue.textContent = pH ? pH.name : '未选';
+        }
+        if (els.heroPickEnemyValue) {
+          var eH = Engine.HERO_CATALOG[enemyVal];
+          els.heroPickEnemyValue.textContent = eH ? eH.name : '未选';
+        }
+        if (els.heroPickPlayerTab) els.heroPickPlayerTab.classList.toggle('is-active', currentPickSide === 'player');
+        if (els.heroPickEnemyTab) els.heroPickEnemyTab.classList.toggle('is-active', currentPickSide === 'enemy');
+        if (els.heroPickPrompt) {
+          els.heroPickPrompt.textContent = currentPickSide === 'player'
+            ? (playerRole === '主公' ? '您是主公，请选将' : '您是反贼，请选将')
+            : '请选择您的对手!';
+        }
+      }
+
+      function handleHeroPickCardClick(heroId) {
+        if (!heroId) return;
+        var targetSelect = currentPickSide === 'player' ? els.playerHeroSelect : els.enemyHeroSelect;
+        if (!targetSelect) return;
+        targetSelect.value = heroId;
+        ensureDistinctHeroes(currentPickSide);
+        // 第一次选完我方自动切到敌方; 否则停在当前
+        if (currentPickSide === 'player' && !els.enemyHeroSelect.value) {
+          currentPickSide = 'enemy';
+        }
+        renderHeroPickGrid();
+      }
+
+      function handleHeroPickTabClick(side) {
+        if (side !== 'player' && side !== 'enemy') return;
+        currentPickSide = side;
+        renderHeroPickGrid();
       }
 
       function optionValues(select) {
@@ -1524,6 +1585,7 @@
         var pool = optionValues(select).filter(function (value) { return value !== other; });
         select.value = pool[Math.floor(Math.random() * pool.length)];
         ensureDistinctHeroes(side);
+        renderHeroPickGrid();  // v9 PR-E9: 同步 grid 高亮
       }
 
       function updateDraftUI() {
@@ -1843,6 +1905,19 @@
           var result = Engine.resolvePendingChoice(game, { decline: true });
           if (!result.ok) renderLog();
           render();
+        });
+        // v9 PR-E9: 选将网格 — card click → 设当前 pick side 的 hero;
+        // tab click → 切换 pick side.
+        if (els.heroPickGrid) els.heroPickGrid.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-hero-id]');
+          if (!btn) return;
+          handleHeroPickCardClick(btn.getAttribute('data-hero-id'));
+        });
+        if (els.heroPickPlayerTab) els.heroPickPlayerTab.addEventListener('click', function () {
+          handleHeroPickTabClick('player');
+        });
+        if (els.heroPickEnemyTab) els.heroPickEnemyTab.addEventListener('click', function () {
+          handleHeroPickTabClick('enemy');
         });
         // v9 PR-E8: splash click → lobby; lobby 1V1 → setup; KOF/炼狱 placeholder.
         if (els.splashEnterBtn) els.splashEnterBtn.addEventListener('click', showLobby);

@@ -35,8 +35,8 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E5 | 左上"菜单"按钮 + 侧抽屉 + 退出确认 modal (卷轴风) | 🟢 PR #73 已合并 |
 | PR-E6 | pendingChoice modals 统一卷轴风 (13 个面板) | 🟢 PR #74 已合并 |
 | PR-E7 | action button 统一橙金装饰风 + 收尾细节 | 🟢 PR #75 已合并 |
-| PR-E8 | **二级 splash + 一级 lobby** (3 模式卡, 仅 1V1 启用) | 🟡 PR 待合并 |
-| PR-E9 | **选将界面重设计** (4×3 网格 + 势力 tag + 随机/点将 切换) | ⏸ 待开 |
+| PR-E8 | **二级 splash + 一级 lobby** (3 模式卡, 仅 1V1 启用) | 🟢 PR #76 已合并 |
+| PR-E9 | **选将界面重设计** (4×3 网格 + 势力 tag + 随机/点将 切换) | 🟡 PR 待合并 |
 
 总预估: **~2700-3200 LOC 变更**, 跨 10 个 review cycle。
 
@@ -58,6 +58,69 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E9 落地 — 选将界面 4×3 网格重设计 ✅
+
+**实际改动**:
+
+HTML (`index.html`) 在 `.setup-card` 内, `role-draft-panel` 之后, 新增 `<div class="hero-pick">`:
+- `.hero-pick__prompt` 黑底黄字 brush 横幅 ("您是主公，请选将" / "请选择您的对手!")
+- `.hero-pick__tabs` 我方/敌方 两 tab (默认 player `.is-active`, 显示已选 hero 名)
+- `.hero-pick__grid` 4 列武将网格 (max-height + 滚动)
+- `.hero-pick__random-row` 随机我方/随机敌方 按钮
+
+旧 `.hero-select-panel` 仍存在但加 `style="display:none"` (保留作 state holder, `newGame` 仍读 `<select>.value`).
+
+CSS (`src/styles/setup.css`):
+- `.hero-pick__prompt` 黑底 + 黄字 + brush 多 box-shadow (与 splash `__enter` 同源)
+- `.hero-pick-tab` 暗底 + 金边, `.is-active` 高亮 (`#ffd68a` border + var(--gold) 文本)
+- `.hero-pick__grid` `display: grid; grid-template-columns: repeat(4, minmax(0, 1fr))` + `max-height: 320px` + `overflow-y: auto`
+- `.hero-pick-card` cream gradient + 2px 棕 border + 双层 shadow + camp tag (绝对定位左上)
+- 4 个 camp 配色: `--camp-魏` 蓝 `#2a648c` / `--camp-蜀` 绿 `#2d8c4c` / `--camp-吴` 红 `#b54322` / `--camp-群` 灰 `#5a4830`
+- `.is-player-selected` 蓝光 inset shadow / `.is-enemy-selected` 红光 inset shadow
+
+dom-adapter (`src/ui/dom-adapter.js`):
+- els 缓存追加 7 个新 ids
+- 新增 `currentPickSide` 状态变量 (默认 `'player'`)
+- `renderHeroPickGrid()`: 从 `Engine.HERO_CATALOG` 渲染所有武将 → card; 标记 selected; 更新 tab values + prompt
+- `handleHeroPickCardClick(heroId)`: 设当前 side 的 `<select>.value` + `ensureDistinctHeroes` + 重渲染; 第一次选完我方自动切到敌方
+- `handleHeroPickTabClick(side)`: 切换 `currentPickSide`
+- `populateHeroSelects()` 末尾调 `renderHeroPickGrid()` (showSetup 时同步)
+- `randomizeHero()` 末尾调 `renderHeroPickGrid()` (高亮同步)
+- bindEvents 接入 heroPickGrid click (event delegation) + 两 tab click
+
+**新增** `tests/v9_pr_e9_hero_grid.test.mjs` (20 条守护):
+- HTML: `.hero-pick` + 4 子部分 / 两 tab + data-side + is-active 默认 player / __label+__value / 旧 hero-select-panel display:none / random 按钮移到 random-row
+- CSS: `.hero-pick` 全套 selectors / `.hero-pick__prompt` brush 风 / `.hero-pick-tab.is-active` 高亮 / `.hero-pick__grid` 4 列 grid + 滚动 / `.hero-pick-card` cream + 4 camp 颜色 / 选中态蓝/红光
+- dom-adapter: 7 ids + 3 fn + currentPickSide / renderHeroPickGrid 从 Catalog 取 / cardClick 改 select.value + 重渲染 / populate 末尾调 / randomize 末尾调 / bindEvents 接入 3 click
+- 回归 loadAllStyles
+
+**Test status**: 655 → 675 ✓ (+20 新守护); 现有 655 条无 regression.
+
+---
+
+## 🎉 v9 方向 D 主体完工
+
+PR-E9 是 **v9-D UI 重制系列的最后一个 PR**. E0-E9 共 10 PR 全部落地后, v9-D 的 UI 整体目标达成:
+
+| 子目标 | 完成 PR |
+|---|---|
+| CSS 拆分基础 (953 行 → 9 文件) | PR-E0 |
+| 装饰外框 + 角落 widgets | PR-E1 |
+| 中央日志 overlay + 状态条 + 暂停横幅 | PR-E2 |
+| 卡牌外观 (cream 卡身 + 列式 corner + 5 group badge) | PR-E3 |
+| 武将 portrait + HP 红方块 + 主公徽章 + 技能 framed tag | PR-E4 |
+| 侧抽屉菜单 + 退出确认 modal (卷轴风) | PR-E5 |
+| pendingChoice 13 个面板统一卷轴风 | PR-E6 |
+| action button 统一橙金装饰风 | PR-E7 |
+| 二级 splash + 一级 lobby (新入口流程) | PR-E8 |
+| 选将界面 4×3 网格 (势力 tag + 双 tab) | PR-E9 |
+
+总计:
+- **10 PR**, **~3000 LOC** (CSS + HTML + JS + tests)
+- **675 测试 ✓ 全套通过** (v9-D 新增 **~140 条** 守护; 起点 536 → 675)
+- **引擎零改动** — 全部 UI 层 (`src/engine/*` 全程不动)
+- **无 PNG 素材** — 纯 CSS / Unicode / inline SVG / polygon clip
 
 ### PR-E8 落地 — 二级 splash + 一级 lobby ✅
 
