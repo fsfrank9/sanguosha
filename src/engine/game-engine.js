@@ -3680,18 +3680,126 @@
         return fail('这个技能的主动效果尚未实现。');
       }
 
+      // v8 PR-D1: AI 评估辅助 — non-destructive estimators that count cards
+      // a state could play / respond as 杀 or 闪, including card-as conversion
+      // paths (武圣 红→杀, 龙胆 杀↔闪, 倾国 黑→闪, 丈八 双手当杀).
+      // 不消耗任何牌, 只读 state. 用于 scoreCardForAI 评估对手回应能力。
+      function aiEstimateShaCount(state) {
+        if (!state) return 0;
+        var count = (state.hand || []).filter(function (c) { return isShaType(c.type); }).length;
+        // 武圣: 红色手牌 + 红色装备 可当杀。已计为 sha 的不重复计入。
+        if (hasSkill(state, 'wusheng')) {
+          count += (state.hand || []).filter(function (c) {
+            return c.color === 'red' && !isShaType(c.type);
+          }).length;
+          ['weapon', 'armor', 'horsePlus', 'horseMinus'].forEach(function (slot) {
+            var eq = state.equipment && state.equipment[slot];
+            if (eq && eq.color === 'red') count += 1;
+          });
+        }
+        // 龙胆: 闪 ↔ 杀, 这里只计 闪 → 杀 方向 (用 estimateShanCount 时反过来)
+        if (hasSkill(state, 'longdan')) {
+          count += (state.hand || []).filter(function (c) { return c.type === 'shan'; }).length;
+        }
+        // 丈八: 任意两张手牌当杀。保守取剩余手牌的一半 (排除已计入的 sha / wusheng-red)。
+        if (state.equipment && state.equipment.weapon && state.equipment.weapon.type === 'zhangba'
+            && (state.hand || []).length >= 2) {
+          var sparePool = (state.hand || []).filter(function (c) {
+            if (isShaType(c.type)) return false;
+            if (hasSkill(state, 'wusheng') && c.color === 'red') return false;
+            if (hasSkill(state, 'longdan') && c.type === 'shan') return false;
+            return true;
+          });
+          count += Math.floor(sparePool.length / 2);
+        }
+        return count;
+      }
+
+      function aiEstimateShanCount(state) {
+        if (!state) return 0;
+        var count = (state.hand || []).filter(function (c) { return c.type === 'shan'; }).length;
+        // 龙胆: 杀 → 闪
+        if (hasSkill(state, 'longdan')) {
+          count += (state.hand || []).filter(function (c) { return isShaType(c.type); }).length;
+        }
+        // 倾国: 黑色手牌 → 闪
+        if (hasSkill(state, 'qingguo')) {
+          count += (state.hand || []).filter(function (c) {
+            return c.color === 'black' && c.type !== 'shan';
+          }).length;
+        }
+        return count;
+      }
+
+      // v8 PR-D1: 出牌/锦囊 score 精细化。对 桃 / 杀 / 决斗 / 锦囊 都按
+      // 双方资源 + 自身受伤情况 给梯度分数, 替代原 v6 的 binary heuristic.
       function scoreCardForAI(game, actor, card) {
         var self = game[actor];
         var target = game[opponent(actor)];
-        if (card.type === 'tao') return self.hp < self.maxHp ? 100 : -100;
+
+        // 桃: hp 缺口梯度。critical (hp=1) > 多伤 > 轻伤; 满血给负分阻止 AI 用。
+        if (card.type === 'tao') {
+          if (self.hp >= self.maxHp) return -100;
+          if (self.hp === 1) return 200;
+          var deficit = self.maxHp - self.hp;
+          if (deficit >= 2) return 120;
+          return 80;
+        }
+
+        // 无中生有: 永远值钱 (1 张换 2 张)
         if (card.type === 'wuzhong') return 90;
-        if (card.type === 'jiu') return (!self.usedSha && self.hand.some(function (c) { return isShaType(c.type); })) ? 82 : -10;
-        if (isShaType(card.type)) return (self.usedSha && !canUseUnlimitedSha(self)) ? -100 : (target.hand.some(function (c) { return c.type === 'shan'; }) ? 45 : 78);
-        if (card.type === 'juedou') return self.hand.filter(function (c) { return isShaType(c.type); }).length >= target.hand.filter(function (c) { return isShaType(c.type); }).length ? 70 : 15;
-        if (card.type === 'nanman') return target.hand.some(function (c) { return isShaType(c.type); }) ? 35 : 72;
-        if (card.type === 'wanjian') return target.hand.some(function (c) { return c.type === 'shan'; }) ? 35 : 72;
-        if (card.type === 'guohe') return target.hand.length ? 62 : -100;
-        if (card.type === 'shunshou') return target.hand.length ? 66 : -100;
+
+        // 酒: 仅当持手中有可用杀且本回合未出过杀 → buff 杀; 否则浪费
+        if (card.type === 'jiu') {
+          var hasShaToBoost = !self.usedSha && self.hand.some(function (c) { return isShaType(c.type); });
+          return hasShaToBoost ? 82 : -10;
+        }
+
+        // 杀: 看目标可响应闪数量 (含 longdan/qingguo 转化); 0 闪 → 高分, 多闪 → 低
+        if (isShaType(card.type)) {
+          if (self.usedSha && !canUseUnlimitedSha(self)) return -100;
+          var targetShans = aiEstimateShanCount(target);
+          if (targetShans === 0) return 85;
+          if (targetShans === 1) return 60;
+          return 35;
+        }
+
+        // 决斗: 估算双方"互响应杀"链。我方杀数 vs 对方杀数 (含 武圣/龙胆 转化)。
+        if (card.type === 'juedou') {
+          var ourSha = aiEstimateShaCount(self);
+          var theirSha = aiEstimateShaCount(target);
+          if (ourSha > theirSha) return 75;
+          if (ourSha === theirSha) return 40;
+          return 10;
+        }
+
+        // 南蛮: 对方无杀响应 → 1 dmg, 否则等于浪费 (chip 评分降低)
+        if (card.type === 'nanman') {
+          return aiEstimateShaCount(target) === 0 ? 80 : 30;
+        }
+
+        // 万箭: 对方无闪响应 → 1 dmg
+        if (card.type === 'wanjian') {
+          return aiEstimateShanCount(target) === 0 ? 80 : 30;
+        }
+
+        // 过河拆桥: 算目标 手牌 + 装备 总数
+        if (card.type === 'guohe') {
+          var equipSlots = ['weapon', 'armor', 'horsePlus', 'horseMinus'];
+          var equipCount = equipSlots.filter(function (slot) {
+            return target.equipment && target.equipment[slot];
+          }).length;
+          var total = (target.hand || []).length + equipCount;
+          if (total === 0) return -100;
+          if (total >= 3) return 70;
+          return 50;
+        }
+
+        // 顺手: 仅看对方手牌 (spec 1v1 只能拿手牌)
+        if (card.type === 'shunshou') {
+          return (target.hand || []).length > 0 ? 65 : -100;
+        }
+
         if (card.family === 'equipment') return 50;
         if (card.family === 'delayed') return 48;
         return 0;
@@ -3940,6 +4048,10 @@
         aiChooseCard: aiChooseCard,
         aiChooseSkillAction: aiChooseSkillAction,
         aiTakeAction: aiTakeAction,
+        // v8 PR-D1: 暴露 AI 评估辅助 (供测试 + 未来扩展)
+        aiScoreCard: scoreCardForAI,
+        aiEstimateShaCount: aiEstimateShaCount,
+        aiEstimateShanCount: aiEstimateShanCount,
         runAITurn: runAITurn,
         opponent: opponent
       };
