@@ -41,9 +41,10 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E11 | 选将流程 bug 修复 (用户反馈: 选完不自动进游戏 + 应顺序选将主公先选不可返回) | 🟢 PR #79 已合并 |
 | PR-E12 | 进入游戏后界面清理 (隐藏与 v9 新元素重复 / 噪音的旧装饰: 双显日志, ::after 水印, ::before 大字, camp-ribbon, 武将台词) | 🟢 PR #80 已合并 |
 | PR-E13 | 进入游戏后界面清理 v2 (隐藏 .title-card / .status-banner / .log-overlay / v9.0.0 重影 + 新增中下 phase-prompt 横幅 + zone-panel 半透明) | 🟢 PR #81 已合并 |
-| PR-E14 | arena 清理 + 反贼徽章对称 + 手牌截断修复 + top-actions 浮顶 + 恢复滚动日志 | 🟡 PR 待合并 |
+| PR-E14 | arena 清理 + 反贼徽章对称 + 手牌截断修复 + top-actions 浮顶 + 恢复滚动日志 | 🟢 PR #82 已合并 |
+| PR-E15 | polish (top-actions 移角色卡上方 + stat-grid 隐藏 + deck info 移技能 panel + 删 time + 角落按钮往外) | 🟡 PR 待合并 |
 
-总预估: **~2700-3500 LOC 变更**, 跨 14 个 review cycle。
+总预估: **~2700-3600 LOC 变更**, 跨 15 个 review cycle。
 
 ## 设计目标 (从参考截图提炼)
 
@@ -63,6 +64,42 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E15 落地 — 5 处 polish ✅
+
+**用户反馈截图** (PR-E14 合并后浏览器实测, 5 条):
+> 1. 重新选将和结束出牌这两个按钮的位置是不是不对, 应该在我的角色卡上面一点的位置才合理吧
+> 2. 双方角色卡里的手牌和状态是用来干什么的, 为什么文字只显示了半截
+> 3. 最下面那个数字 (132)... 应该显示在武将技能卡最右边往上一点
+> 4. 最右下角的时间没必要了吧, 直接删了
+> 5. 分享和菜单的按钮是不是应该再往外一点呢
+
+**5 处改动 (引擎零改动)**:
+
+1. **top-actions 移到角色卡上方** — `controls.css .top-actions { top: auto; bottom: 320px; right: 28px }` (从 PR-E14 的 `top:18 right:86` 改). anchor 仍是 .game-frame (relative). bottom = hand-dock min 180 + player-zone min 110 + gap 24 ≈ 320, 让按钮浮在 .player-zone 顶上方右侧.
+2. **stat-grid 隐藏** — `hero.css .stat-grid { display: none }` (从 grid + columns + margin → display:none). 信息冗余 — hand count 已在敌方 .small-card-row 显示, state text 已被 turn-badge + phase-prompt 替代.
+3. **deck info 移到玩家技能 panel-title** — index.html 在 `<div class="panel-title">武将技能 + #playerSkillDeckInfo</div>`; dom-adapter 缓存 `playerSkillDeckInfo` + `renderStatus` 写入 `'牌堆 X · 弃牌 Y'`. .panel-title 是 flex space-between, badge 自动右对齐.
+4. **时间删除** — `.status-bar__time` 加入 `.status-bar__version, .status-bar__score, .status-bar__time { display: none }` 共享规则. 整个底部 .status-bar 三元素全 hide. score 已重定位 (改动 3).
+5. **frame-corner-btn 再往外** — `.frame-corner-btn--menu { top: -8px; left: 6px }` / `--share { top: -8px; right: 6px }` (从 `top:4 left/right:22` 改). 按钮浮到 frame 条纹边框之上, 紧贴 .app 边缘.
+
+**新增测试** `tests/v9_pr_e15_polish.test.mjs` (7 条守护):
+- 1 top-actions 新定位
+- 1 stat-grid hide
+- 2 deck info HTML + dom-adapter
+- 1 status-bar 三元素 hide
+- 1 frame-corner-btn 往外
+- 1 loadAllStyles() 回归
+
+**同步更新旧测试**:
+- `v9_pr_e13_ingame_cleanup_v2`: `.status-bar__version` 断言 (改为共享规则匹配)
+- `v9_pr_e14_arena_cleanup`: `.top-actions` 位置具体值不再精确断言 (改由 PR-E15 守护)
+
+**Test status**: 751 → 758 ✓ (+7 新守护); 现有 751 条无 regression. `build:check` 通过.
+
+**Process 遵守**:
+- PR-E14 (#82) merge 状态已通过 `mcp__github__pull_request_read` 确认 (`merged: true, merged_at: 2026-05-14T23:37:23Z`) 后才从最新 main 拉新 branch `claude/v9-pr-e15-polish`. 不在已 merge PR 上加 commit.
+
+---
 
 ### PR-E14 落地 — arena 清理 + 反贼徽章对称 + 手牌修复 ✅
 
@@ -301,9 +338,9 @@ CSS `src/styles/zones.css`:
 
 ---
 
-## v9 方向 D 当前进度 (15 PR 已提交; 待用户验收)
+## v9 方向 D 当前进度 (16 PR 已提交; 待用户验收)
 
-PLAN + E0-E14 共 15 PR (1 PLAN + 14 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
+PLAN + E0-E15 共 16 PR (1 PLAN + 15 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
 
 | 子目标 | 提交 PR |
 |---|---|
@@ -321,11 +358,12 @@ PLAN + E0-E14 共 15 PR (1 PLAN + 14 实现) 已提交; 是否达成 v9-D 整体
 | 选将流程 bug (顺序选 + auto-start) | PR-E11 |
 | 进入游戏后清理 (双显日志 + 旧水印) | PR-E12 |
 | 进入游戏后清理 v2 (title-card / status-banner / phase-prompt / 半透明) | PR-E13 |
-| **arena 清理 + 反贼徽章 + 手牌修复 + top-actions 浮顶 + 恢复日志** | **PR-E14** |
+| arena 清理 + 反贼徽章 + 手牌修复 + top-actions 浮顶 + 恢复日志 | PR-E14 |
+| **5 处 polish (按钮移位 / stat-grid / deck info / 删 time / 角落往外)** | **PR-E15** |
 
 数据点:
-- 14 实现 PR + 1 PLAN, ~3500 LOC (CSS + HTML + JS + tests)
-- 751 测试 ✓ 全套通过 (起点 529 → 751, 新增 ~222 条守护)
+- 15 实现 PR + 1 PLAN, ~3600 LOC (CSS + HTML + JS + tests)
+- 758 测试 ✓ 全套通过 (起点 529 → 758, 新增 ~229 条守护)
 - 引擎零改动 (`src/engine/*` 全程不动)
 - 无 PNG 素材 (纯 CSS / Unicode / inline SVG / polygon clip)
 

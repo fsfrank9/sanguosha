@@ -123,12 +123,13 @@ test('v9 PR-E14: index.html .top-actions 从 <header> 内移出 (header 之后, 
   assert.match(html, /<\/header>\s*<!--[\s\S]*?-->\s*<nav class="top-actions">/);
 });
 
-test('v9 PR-E14: controls.css .top-actions position: absolute + 右上定位', () => {
+test('v9 PR-E14: controls.css .top-actions position: absolute (PR-E15 调整具体位置)', () => {
+  // PR-E14 把 .top-actions 改 absolute. PR-E15 进一步把位置从右上改到
+  // "角色卡上方" (top:auto + bottom:320), 这里只守护 absolute + 右侧锚.
   const block = controlsCss.match(/\.top-actions\s*\{[\s\S]*?\n\s{4}\}/);
   assert.ok(block);
   assert.match(block[0], /position:\s*absolute/);
-  assert.match(block[0], /top:\s*18px/);
-  assert.match(block[0], /right:\s*86px/);
+  assert.match(block[0], /right:\s*\d+px/);
 });
 
 test('v9 PR-E14: layout.css .game-frame position: relative (.top-actions absolute 锚)', () => {

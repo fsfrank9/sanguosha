@@ -82,14 +82,16 @@
       margin-bottom: 2px;
     }
 
+    /* v9 PR-E15: 位置 4px/22px → -8px/6px, 让按钮再往外一点 (浮到 frame border
+       条纹之上, 紧贴 .app 边缘). 用户反馈 "应该再往外一点呢". */
     .frame-corner-btn--menu {
-      top: 4px;
-      left: 22px;
+      top: -8px;
+      left: 6px;
     }
 
     .frame-corner-btn--share {
-      top: 4px;
-      right: 22px;
+      top: -8px;
+      right: 6px;
       background: var(--frame-corner-gold);
       color: #221008;
     }
@@ -342,9 +344,13 @@
     }
 
     /* v9 PR-E13: 旧 v9.0.0 版本号 absolute bottom: 2px 在 .duel-table 上,
-       与 .hand-dock 卡牌底部重叠成水印重影. 版本号在底部状态条上意义不大,
-       隐藏只留 score (牌堆/弃牌数) + time. */
-    .status-bar__version {
+       与 .hand-dock 卡牌底部重叠成水印重影. 版本号在底部状态条上意义不大.
+       v9 PR-E15: score (牌堆/弃牌数) 也移到玩家技能 panel-title 右侧
+       (#playerSkillDeckInfo, 用户反馈位置应在 "武将技能卡最右边往上一点");
+       time 用户反馈 "没必要直接删了". .status-bar 三个子元素全 hide. */
+    .status-bar__version,
+    .status-bar__score,
+    .status-bar__time {
       display: none;
     }
 

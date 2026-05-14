@@ -85,7 +85,9 @@
           'heroPickPlayerValue', 'heroPickEnemyValue', 'heroPickGrid',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn',
           // v9 PR-E13: 进入游戏后 UI 清理 v2 — 标题卡 hidden 控制 + 新中下 phase 横幅
-          'titleCard', 'phasePrompt', 'phasePromptBrush'
+          'titleCard', 'phasePrompt', 'phasePromptBrush',
+          // v9 PR-E15: 牌堆/弃牌 数字从底部 .status-bar 移到玩家技能 panel-title 右侧
+          'playerSkillDeckInfo'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
       }
@@ -389,7 +391,11 @@
 
         els.statusTitle.textContent = title;
         els.statusText.textContent = text;
-        els.deckInfo.textContent = '牌堆 ' + game.deck.length + ' · 弃牌 ' + game.discard.length;
+        var deckText = '牌堆 ' + game.deck.length + ' · 弃牌 ' + game.discard.length;
+        els.deckInfo.textContent = deckText;
+        // v9 PR-E15: 玩家技能 panel-title 右侧同步显示 (替代底部 .status-bar__score
+        // 数字, 用户反馈数字应在 "武将技能卡最右边往上一点").
+        if (els.playerSkillDeckInfo) els.playerSkillDeckInfo.textContent = deckText;
         els.endTurnBtn.disabled = !isPlayerTurn || isGameOver || enemyThinking || discardNeeded;
         els.endTurnBtn.textContent = game.phase === 'play' ? '结束出牌' : '结束回合';
         els.handHint.textContent = discardNeeded ? ('弃牌：已选 ' + selectedDiscardIds.length + ' / ' + Engine.getDiscardCount(game, 'player')) : (isPlayerTurn && !isGameOver ? '点击卡牌使用' : '等待回合');
