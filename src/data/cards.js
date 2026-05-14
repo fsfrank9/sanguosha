@@ -302,11 +302,11 @@
           engineHooks: ['playSha:guanshiForce']
         },
         fangtian: {
-          summary: '使用【杀】时若手牌仅余此【杀】，可额外指定 1 个目标。',
+          summary: '若使用的【杀】是最后的手牌，本【杀】额外目标数上限 +2。',
           timing: 'passive',
-          effect: '出牌阶段若【杀】是当前手牌唯一一张，方天画戟允许该【杀】指定 +1 目标。当前 1v1 引擎尚未实现多目标【杀】。',
+          effect: 'v7 PR-15: 已在 playSha 内做触发记录 (log + flags.fangtianBonus)；1v1 中只有 1 名对手 (额定 1 + 额外 0)，+2 上限无人可选，仅为多人/future trick 占位。turn-start/turn-end 复位 flags.fangtianBonus。',
           frequency: 'passive',
-          engineHooks: ['playSha:fangtianTargets']
+          engineHooks: ['playSha:fangtianTrigger', 'flags.fangtianBonus']
         },
         qilin: {
           summary: '【杀】对目标造成伤害时，你可以弃置其装备区里的一张坐骑牌。',
