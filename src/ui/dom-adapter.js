@@ -70,6 +70,9 @@
           'frameMenuBtn', 'frameShareBtn',
           // v9 PR-E2: 中央日志 overlay + 暂停 brush 横幅 + 底部状态条
           'logOverlay', 'pauseBanner', 'statusBar', 'statusBarVersion', 'statusBarScore', 'statusBarTime',
+          // v9 PR-E4: 主公徽章 — 右上角红圆 "主". 由 renderHero 据
+          // game.roles[actor] 切换 hidden.
+          'playerLordBadge', 'enemyLordBadge',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -159,6 +162,12 @@
         els[actor + 'HandCount'].textContent = state.hand.length;
         els[actor + 'Hero'].setAttribute('data-camp', state.camp);
         els[actor + 'Hero'].classList.toggle('is-chained', !!state.chained);
+        // v9 PR-E4: 主公徽章 — 由 game.roles[actor] === '主公' 决定显隐.
+        var lordBadge = els[actor + 'LordBadge'];
+        if (lordBadge) {
+          var isLord = !!(game && game.roles && game.roles[actor] === '主公');
+          lordBadge.hidden = !isLord;
+        }
         if (els[actor + 'Ribbon']) els[actor + 'Ribbon'].textContent = state.camp;
         if (actor === 'player' && els.playerSkillBar) {
           els.playerSkillBar.innerHTML = (state.skills || []).map(function (skill) {

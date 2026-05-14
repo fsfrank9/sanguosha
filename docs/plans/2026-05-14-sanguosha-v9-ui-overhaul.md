@@ -30,8 +30,8 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E0 | CSS 拆分基础 (`main.css` 953 行 → 8 个职责文件 + 1 entry) | 🟢 PR #68 已合并 |
 | PR-E1 | 整体布局重构 + 装饰外框 (橙红 striped border + 角落 widgets) | 🟢 PR #69 已合并 |
 | PR-E2 | 中央日志 overlay + 状态条 + 暂停 brush 横幅 | 🟢 PR #70 已合并 |
-| PR-E3 | 卡牌外观重设计 (corner 花色+点数 + 卡身色块 + 底部 label) | 🟡 PR 待合并 |
-| PR-E4 | 武将 portrait + HP 红方块 + 装备/判定区 + 技能 framed tag | ⏸ 待开 |
+| PR-E3 | 卡牌外观重设计 (corner 花色+点数 + 卡身色块 + 底部 label) | 🟢 PR #71 已合并 |
+| PR-E4 | 武将 portrait + HP 红方块 + 装备/判定区 + 技能 framed tag | 🟡 PR 待合并 |
 | PR-E5 | 左上"菜单"按钮 + 侧抽屉 + 退出确认 modal (卷轴风) | ⏸ 待开 |
 | PR-E6 | pendingChoice modals 统一卷轴风 (13 个面板) | ⏸ 待开 |
 | PR-E7 | action button 统一橙金装饰风 + 收尾细节 | ⏸ 待开 |
@@ -58,6 +58,39 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E4 落地 — 武将 portrait + HP 红方块 + 主公徽章 + 技能 framed tag ✅
+
+**实际改动**:
+
+CSS:
+- **`hero.css`**:
+  - `.heart` 从圆形 ♥ 改 18×22 矩形块: red linear-gradient + 多层 inset/outer box-shadow 立体感, `font-size: 0 / color: transparent` 隐藏原 ♥ 字符 (保留语义)
+  - `.heart.empty` grayscale + brightness 弱化 + 灰 gradient
+  - **新增** `.lord-badge`: 绝对定位右上 (top:8px right:8px) 30×30 圆形, 红色 radial-gradient + 2px 白边 + 红光阴影; `[hidden]` 用 `display: none !important` 强制隐藏
+- **`controls.css`**:
+  - `.skill-button` 重设计为橙色 gradient (`#f0a33a → #c25a1a → #8b3c10`) + 棕色 border + 浅文本色 (类似截图 行殇 / 放逐 风格)
+  - `:hover` brightness + transform / `:disabled` opacity / `skill-status-todo` 灰 dashed / `-display` 灰蓝 / `-implemented` 加金 inset (向后兼容旧 modifier)
+
+HTML (`index.html`):
+- 两个 `<article class="hero">` 元素都加 `<span class="lord-badge" hidden aria-label="主公">主</span>` (放在 `.hero-aura` 之后, `.camp-ribbon` 之前)
+
+dom-adapter (`src/ui/dom-adapter.js`):
+- els 缓存追加 `playerLordBadge` / `enemyLordBadge`
+- `renderHero(actor)` 加 lord badge 切换: `lordBadge.hidden = !(game.roles[actor] === '主公')`
+
+**新增** `tests/v9_pr_e4_hero_portrait.test.mjs` (13 条守护):
+- `.heart` 矩形块 (border-radius 4px / 18×22 / 红 gradient / 多 box-shadow)
+- `.heart` 隐藏 ♥ 字符 (font-size:0 + color:transparent)
+- `.heart.empty` 灰化
+- `.lord-badge` 右上红圆白边 + `[hidden]` 强制隐
+- 两 hero 元素都有 lord-badge
+- dom-adapter 缓存 + renderHero 切换逻辑
+- `.skill-button` 橙色 gradient + 棕 border + `:hover` / `:disabled`
+- 3 个 skill-status 修饰类保留
+- 回归 `loadAllStyles()`
+
+**Test status**: 573 → 586 ✓ (+13 新守护); 现有 573 条无 regression。
 
 ### PR-E3 落地 — 卡牌外观重设计 ✅
 
