@@ -2811,9 +2811,18 @@
         }
 
         if (card.type === 'wuzhong') {
+          // v7 PR-16: gltjk card__scroll.md 无中生有 (1V1/界限突破/国-标):
+          //   "使用目标: 包括你在内的一名角色"。options.wuzhongTarget 可指定
+          //   'player' / 'enemy'; 未指定时默认 = actor。
           discardCard(game, card);
-          log(game, actorName(game, actor) + '使用【无中生有】。');
-          drawCards(game, actor, 2);
+          var wzTargetActor = (options.wuzhongTarget === 'player' || options.wuzhongTarget === 'enemy')
+            ? options.wuzhongTarget
+            : actor;
+          if (!game[wzTargetActor]) {
+            return fail('无效的【无中生有】目标。');
+          }
+          log(game, actorName(game, actor) + '使用【无中生有】' + (wzTargetActor === actor ? '' : '令' + actorName(game, wzTargetActor)) + '摸两张牌。');
+          drawCards(game, wzTargetActor, 2);
           return finishTrickUse(game, actor, card, success('摸两张牌。'), options);
         }
 
