@@ -63,6 +63,8 @@
           'jiedaoDecisionPanel', 'jiedaoDecisionHint', 'jiedaoDecisionFireBtn', 'jiedaoDecisionDeclineBtn',
           'guohePickPanel', 'guohePickHint', 'guohePickEquipment', 'guohePickHand',
           'wuguPickPanel', 'wuguPickHint', 'wuguPickChoices',
+          // v8 hotfix-2: 洛神 (luoshen-continue) 面板 — 准备阶段连续判定决定
+          'luoshenPromptPanel', 'luoshenPromptHint', 'luoshenContinueBtn', 'luoshenStopBtn',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -747,6 +749,18 @@
             els.wuguPickPanel.hidden = true;
           }
         }
+        // v8 hotfix-2: 洛神 (luoshen-continue) — 准备阶段每次判定前询问
+        if (els.luoshenPromptPanel) {
+          if (kind === 'luoshen-continue' && pending.actor === 'player') {
+            els.luoshenPromptPanel.hidden = false;
+            if (els.luoshenPromptHint) {
+              els.luoshenPromptHint.textContent =
+                '洛神：是否进行判定？黑色获得入手, 红色结束流程';
+            }
+          } else {
+            els.luoshenPromptPanel.hidden = true;
+          }
+        }
         // v8 PR-A2: 濒死救援 — responder 用 桃/酒 救援（酒仅自救）
         if (els.dyingRescuePanel) {
           if (kind === 'dying-rescue' && pending.actor === 'player') {
@@ -1037,6 +1051,18 @@
             selectedHint: function (count) { return '反间：已选 ' + count + ' / 1 张'; },
             emptyMessage: '请选择一张牌发动【反间】。',
             options: { guessedSuit: 'spade' }
+          },
+          // v8 PR-C4: 青囊 — 弃 1 手牌, target 默认走 engine 推断
+          // (对方受伤 → 对方; 否则自己; 都满血则 fail)。多目标 picker UI
+          // 留给方向 1 后续 panel PR.
+          qingnang: {
+            name: '青囊',
+            min: 1,
+            max: 1,
+            cardHint: '选择一张手牌弃置发动【青囊】',
+            startHint: '青囊：弃 1 手牌, 令一名受伤的角色回 1 体力 (默认对方受伤优先, 否则自己)',
+            selectedHint: function (count) { return '青囊：已选 ' + count + ' / 1 张'; },
+            emptyMessage: '请选择一张手牌发动【青囊】。'
           }
         };
         return configs[skillId] || null;
@@ -1286,6 +1312,14 @@
           if (pending && pending.kind === 'guanxing-reorder' && pending.actor === 'player') {
             showGuanxingPanelFromPending();
           }
+          render();
+          return;
+        }
+        // v8 PR-C5: 洛神 — 准备阶段自动触发 + 走 pendingChoice (luoshen-continue).
+        // 出牌阶段的按钮点击不做任何事（按钮通常 disabled, 此处是 defensive）。
+        // luoshen-continue 面板由 dying-rescue 框架以后续 PR-A6 接入；目前
+        // 若残留 pendingChoice 则提示玩家用 Engine.resolvePendingChoice 决定。
+        if (skillId === 'luoshen') {
           render();
           return;
         }
@@ -1696,6 +1730,17 @@
           if (!btn) return;
           var cardId = btn.getAttribute('data-wugu-card-id');
           var result = Engine.resolvePendingChoice(game, { cardId: cardId });
+          if (!result.ok) renderLog();
+          render();
+        });
+        // v8 hotfix-2: 洛神 continue / stop 按钮
+        if (els.luoshenContinueBtn) els.luoshenContinueBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, {});
+          if (!result.ok) renderLog();
+          render();
+        });
+        if (els.luoshenStopBtn) els.luoshenStopBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { decline: true });
           if (!result.ok) renderLog();
           render();
         });

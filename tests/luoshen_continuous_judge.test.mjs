@@ -5,6 +5,9 @@ import { Engine } from './helpers/load-engine.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const heroesSrc = fs.readFileSync(path.join(root, 'src/data/heroes.js'), 'utf8');
+const htmlSrc = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const adapterSrc = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+const skillStatusSrc = fs.readFileSync(path.join(root, 'src/data/skill-status.js'), 'utf8');
 
 function c(type, overrides = {}) {
   return Engine.makeTestCard(type, overrides);
@@ -207,6 +210,37 @@ test('v8 PR-C5: AI (enemy) 甄姬 pref undefined → 默认 auto, 自动连续�
   assert.ok(game.enemy.hand.some((card) => card.id === 'black-claim'), '黑色入手');
   assert.ok(game.discard.some((card) => card.id === 'red-stop'));
   assert.equal(game.pendingChoice, null, 'AI 不暂停');
+});
+
+test('v8 hotfix-2: luoshen / qingnang 已注册到 IMPLEMENTED_SKILL_IDS (不再"未实现")', () => {
+  assert.match(skillStatusSrc, /'luoshen'/);
+  assert.match(skillStatusSrc, /'qingnang'/);
+  assert.match(skillStatusSrc, /'guose'/);
+  assert.match(skillStatusSrc, /'liuli'/);
+  assert.match(skillStatusSrc, /'jijiu'/);
+  assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes('luoshen'));
+  assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes('qingnang'));
+  assert.ok(Engine.ACTIVE_SKILL_IDS.includes('qingnang'), 'qingnang 主动技 → 应在 ACTIVE');
+  assert.ok(Engine.ACTIVE_SKILL_IDS.includes('luoshen'), 'luoshen 需要点击决定 → ACTIVE');
+});
+
+test('v8 hotfix-2: index.html 含 luoshenPromptPanel + 按钮', () => {
+  assert.match(htmlSrc, /id="luoshenPromptPanel"/);
+  assert.match(htmlSrc, /id="luoshenContinueBtn"/);
+  assert.match(htmlSrc, /id="luoshenStopBtn"/);
+  assert.match(htmlSrc, /pending-prompt-panel[^"]*"\s+id="luoshenPromptPanel"/);
+});
+
+test('v8 hotfix-2: dom-adapter 接入 luoshen-continue 渲染 + click 绑定', () => {
+  assert.match(adapterSrc, /luoshenPromptPanel/);
+  assert.match(adapterSrc, /kind === 'luoshen-continue'/);
+  // 两按钮都接 resolvePendingChoice
+  assert.match(adapterSrc, /luoshenContinueBtn[\s\S]{0,200}resolvePendingChoice/);
+  assert.match(adapterSrc, /luoshenStopBtn[\s\S]{0,200}resolvePendingChoice\(game,\s*\{\s*decline:\s*true\s*\}/);
+});
+
+test('v8 hotfix-2: qingnang cardSkillConfig 已在 dom-adapter 注册', () => {
+  assert.match(adapterSrc, /qingnang:\s*\{[\s\S]{0,500}name:\s*'青囊'/);
 });
 
 for (const [name, fn] of tests) {

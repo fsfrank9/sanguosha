@@ -294,6 +294,13 @@
           <span class="badge pending-prompt-panel__hint" id="wuguPickHint">五谷丰登：从亮出的牌中选 1 张</span>
           <div class="wugu-pick-choices pending-prompt-panel__choices" id="wuguPickChoices" aria-live="polite"></div>
         </div>
+        <div class="luoshen-prompt-panel pending-prompt-panel" id="luoshenPromptPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="luoshenPromptHint">洛神：是否进行判定？黑色获得入手, 红色结束</span>
+          <div class="luoshen-actions pending-prompt-panel__actions">
+            <button class="btn small" id="luoshenContinueBtn">判定</button>
+            <button class="btn small" id="luoshenStopBtn">结束</button>
+          </div>
+        </div>
         <div class="hand" id="playerHand"></div>
       </section>
     </section>

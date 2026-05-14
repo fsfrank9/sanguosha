@@ -136,7 +136,8 @@ UI 接完后再选：
 | PR-C3 | 急救（华佗：回合外红色当桃，接濒死流程） | 🟢 PR #57 已合并 |
 | PR-C4 | 青囊（华佗：出牌阶段限一次，弃 1 手牌令受伤角色回 1 hp） | 🟢 PR #58 已合并 |
 | PR-C5 | 洛神（甄姬：准备阶段连续黑色判定获得，方向 3 收尾） | 🟡 PR #59 待合并 |
-| HOTFIX | `.pending-prompt-panel[hidden]` CSS 覆盖修复（PR-A1 引入的 regression：display:flex 覆盖了 hidden 属性 → 所有 pendingChoice 面板永远可见 + 盖住手牌区） | 🟡 PR 待合并 |
+| HOTFIX | `.pending-prompt-panel[hidden]` CSS 覆盖修复（PR-A1 引入的 regression：display:flex 覆盖了 hidden 属性 → 所有 pendingChoice 面板永远可见 + 盖住手牌区） | 🟢 PR #60 已合并 |
+| HOTFIX-2 | v8 PR-C1..C5 5 个新技能注册到 `IMPLEMENTED_SKILL_IDS`（之前 UI 一直显示"未实现"）+ qingnang `cardSkillConfig` + 洛神 prompt panel UI + 测试守护 | 🟡 PR 待合并 |
 | _其余_ | _方向 4 AI 进阶_ | _按顺序推进_ |
 
 ### PR-C5 落地 — 洛神（甄姬：准备阶段连续黑色判定获得）
