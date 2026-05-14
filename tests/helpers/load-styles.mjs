@@ -23,6 +23,7 @@ const SPLIT_FILES = [
   'modals.css',
   'controls.css',
   'setup.css',
+  'entry.css',
 ];
 
 export function loadAllStyles() {

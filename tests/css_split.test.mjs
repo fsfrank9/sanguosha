@@ -17,17 +17,17 @@ const stylesDir = path.join(root, 'src', 'styles');
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
 
-test('v9 PR-E0: 8 个分文件都存在', () => {
-  const expected = ['tokens.css', 'layout.css', 'hero.css', 'cards.css', 'zones.css', 'modals.css', 'controls.css', 'setup.css'];
+test('v9 PR-E0: 分文件都存在 (含 v9 PR-E8 加的 entry.css)', () => {
+  const expected = ['tokens.css', 'layout.css', 'hero.css', 'cards.css', 'zones.css', 'modals.css', 'controls.css', 'setup.css', 'entry.css'];
   for (const name of expected) {
     const full = path.join(stylesDir, name);
     assert.ok(fs.existsSync(full), `${name} should exist in src/styles/`);
   }
 });
 
-test('v9 PR-E0: SPLIT_CSS_FILES 暴露 8 个文件名 (与实际拆分一致)', () => {
-  assert.equal(SPLIT_CSS_FILES.length, 8);
-  assert.deepEqual(SPLIT_CSS_FILES, ['tokens.css', 'layout.css', 'hero.css', 'cards.css', 'zones.css', 'modals.css', 'controls.css', 'setup.css']);
+test('v9 PR-E0: SPLIT_CSS_FILES 暴露所有分文件名 (E0 8 个 + E8 entry.css = 9)', () => {
+  assert.equal(SPLIT_CSS_FILES.length, 9);
+  assert.deepEqual(SPLIT_CSS_FILES, ['tokens.css', 'layout.css', 'hero.css', 'cards.css', 'zones.css', 'modals.css', 'controls.css', 'setup.css', 'entry.css']);
 });
 
 test('v9 PR-E0: main.css 不再含具体 CSS 规则 (只剩 @import + 注释)', () => {
@@ -42,14 +42,14 @@ test('v9 PR-E0: main.css 不再含具体 CSS 规则 (只剩 @import + 注释)', 
     }
   }
   // 必须含 8 个 @import
-  assert.equal((main.match(/@import\s+['"]\.\//g) || []).length, 8, 'main.css should @import all 8 split files');
+  assert.equal((main.match(/@import\s+['"]\.\//g) || []).length, 9, 'main.css should @import all 9 split files (E0 8 + E8 entry.css)');
 });
 
-test('v9 PR-E0: main.css @import 顺序 (tokens 在第一, setup 在最后)', () => {
+test('v9 PR-E0: main.css @import 顺序 (tokens 在第一; v9 PR-E8 后 entry.css 在最后)', () => {
   const main = fs.readFileSync(path.join(stylesDir, 'main.css'), 'utf8');
   const importLines = main.split('\n').filter((l) => /^\s*@import\s+['"]/.test(l));
   assert.match(importLines[0], /tokens\.css/, '第一个 @import 应是 tokens.css (foundation)');
-  assert.match(importLines[importLines.length - 1], /setup\.css/, '最后一个 @import 应是 setup.css (可能 override)');
+  assert.match(importLines[importLines.length - 1], /entry\.css/, '最后一个 @import 应是 entry.css (PR-E8)');
 });
 
 test('v9 PR-E0: 每个分文件首行是 comment 标题 (说明职责)', () => {

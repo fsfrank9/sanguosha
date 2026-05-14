@@ -1,0 +1,266 @@
+/* entry.css — v9 PR-E8 入口屏: 二级 splash + 一级 lobby.
+   Includes: .splash-screen (+ __bg / __messages / __enter),
+   .lobby-screen (+ __topbar / __user / __avatar / __user-info /
+   __user-name / __user-vip / __currency / __modes / __nav),
+   .lobby-mode-card (+ --active / --placeholder + __icon / __title /
+   __sub), .lobby-nav-item. */
+
+    /* v9 PR-E8: 二级 splash — 山景背景 + 中央提示 + 底部 brush 按钮 */
+    .splash-screen {
+      flex: 1 1 auto;
+      min-height: 0;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+      overflow: hidden;
+    }
+
+    .splash-screen[hidden] {
+      display: none !important;
+    }
+
+    /* 山景背景 — CSS-only 几层 polygon-clip 模拟剪影 */
+    .splash-screen__bg {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% 20%, rgba(255, 200, 130, .35), transparent 60%),
+        linear-gradient(180deg, #1f1814 0%, #2c1f17 30%, #3a2818 60%, #4a3520 100%);
+    }
+
+    .splash-screen__bg::before,
+    .splash-screen__bg::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 40%;
+      bottom: 0;
+    }
+
+    .splash-screen__bg::before {
+      bottom: 20%;
+      height: 30%;
+      background: linear-gradient(180deg, transparent, rgba(80, 60, 100, .55));
+      clip-path: polygon(0 100%, 10% 60%, 20% 78%, 32% 38%, 44% 70%, 56% 30%, 68% 65%, 80% 45%, 92% 72%, 100% 60%, 100% 100%);
+    }
+
+    .splash-screen__bg::after {
+      background: linear-gradient(180deg, transparent, rgba(40, 30, 50, .85));
+      clip-path: polygon(0 100%, 8% 40%, 22% 65%, 38% 28%, 52% 60%, 66% 22%, 80% 55%, 95% 35%, 100% 50%, 100% 100%);
+    }
+
+    .splash-screen__messages {
+      position: relative;
+      z-index: 1;
+      max-width: 720px;
+      text-align: center;
+      color: rgba(255, 244, 220, 0.92);
+      font-size: clamp(15px, 1.8vw, 22px);
+      font-weight: 700;
+      line-height: 1.9;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, .65), 0 0 4px rgba(0, 0, 0, .5);
+    }
+
+    .splash-screen__messages p {
+      margin: 0 0 4px;
+    }
+
+    .splash-screen__enter {
+      position: relative;
+      z-index: 1;
+      margin-top: 48px;
+      padding: 10px 32px;
+      border: none;
+      background: rgba(0, 0, 0, 0.78);
+      color: #ffd900;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: .2em;
+      border-radius: 2px 14px 4px 10px;
+      cursor: pointer;
+      box-shadow:
+        5px 0 0 -2px rgba(0, 0, 0, 0.72),
+        -4px 1px 0 -3px rgba(0, 0, 0, 0.78),
+        3px -2px 0 -1px rgba(0, 0, 0, 0.65);
+      text-shadow: 0 1px 0 rgba(0, 0, 0, .9);
+      transition: filter .15s ease;
+    }
+
+    .splash-screen__enter:hover {
+      filter: brightness(1.15);
+    }
+
+    /* v9 PR-E8: 一级 lobby — 顶部用户信息 / 中部 3 模式卡 / 底部 nav */
+    .lobby-screen {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 16px 24px;
+      gap: 16px;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 10%, rgba(255, 200, 130, .18), transparent 70%),
+        linear-gradient(180deg, rgba(31, 17, 13, .92), rgba(15, 10, 8, .96));
+    }
+
+    .lobby-screen[hidden] {
+      display: none !important;
+    }
+
+    .lobby-screen__topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 214, 138, .32);
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(58, 31, 21, .65), rgba(20, 12, 8, .8));
+    }
+
+    .lobby-screen__user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .lobby-screen__avatar {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 25%, #ffe4a3, #c25a1a 75%);
+      border: 2px solid #5b2f15;
+      color: #2a120a;
+      font-size: 20px;
+      font-weight: 900;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, .45);
+    }
+
+    .lobby-screen__user-name {
+      color: var(--gold);
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: .04em;
+    }
+
+    .lobby-screen__user-vip {
+      color: #f0a33a;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      margin-top: 2px;
+    }
+
+    .lobby-screen__currency {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: 1px solid rgba(255, 214, 138, .42);
+      border-radius: 999px;
+      background: rgba(0, 0, 0, .42);
+      color: var(--gold);
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .lobby-screen__currency-icon {
+      font-size: 17px;
+    }
+
+    .lobby-screen__modes {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      align-content: center;
+    }
+
+    .lobby-mode-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 30px 18px;
+      border: 3px solid #d2a04a;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fff5d4 0%, #f0c266 50%, #c97f25 100%);
+      color: #2a120a;
+      cursor: pointer;
+      box-shadow:
+        inset 0 1px rgba(255, 245, 215, .65),
+        inset 0 0 0 2px rgba(255, 235, 180, .35),
+        0 8px 18px rgba(0, 0, 0, .42);
+      transition: filter .18s ease, transform .15s ease;
+      text-align: center;
+    }
+
+    .lobby-mode-card:hover:not(:disabled) {
+      filter: brightness(1.08);
+      transform: translateY(-4px);
+    }
+
+    .lobby-mode-card--active {
+      border-color: #ffd68a;
+      background: linear-gradient(180deg, #fff5d4 0%, #ffce5e 50%, #d88427 100%);
+    }
+
+    .lobby-mode-card--placeholder {
+      cursor: not-allowed;
+      filter: grayscale(.5) brightness(.78);
+    }
+
+    .lobby-mode-card__icon {
+      font-size: 36px;
+      line-height: 1;
+    }
+
+    .lobby-mode-card__title {
+      font-size: 18px;
+      font-weight: 1000;
+      letter-spacing: .18em;
+      color: #5b2f15;
+      text-shadow: 0 1px 0 rgba(255, 235, 180, .65);
+    }
+
+    .lobby-mode-card__sub {
+      font-size: 11px;
+      color: #5b2f15;
+      opacity: .8;
+      letter-spacing: .06em;
+    }
+
+    .lobby-screen__nav {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .lobby-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 4px;
+      border: 1px solid rgba(255, 214, 138, .26);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, .32);
+      color: var(--muted);
+      cursor: not-allowed;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      opacity: .7;
+    }
+
+    .lobby-nav-item span {
+      font-size: 20px;
+    }
