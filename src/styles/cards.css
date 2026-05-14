@@ -205,13 +205,21 @@
       min-height: 30px;
     }
 
+    /* v9 PR-E7: .mini-card 微调 — 更深棕底 + 金边, 用于装备区 / 判定区
+       小卡 token. 与 hero portrait 配色协调. (pending panel 内部已经
+       在 modals.css 单独覆写为 cream 风, 不受此处影响.) */
     .mini-card {
-      border: 1px solid rgba(255, 214, 138, .25);
-      background: rgba(0,0,0,.2);
-      color: #f2dba7;
-      padding: 4px 7px;
-      border-radius: 9px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 9px;
+      border: 1px solid rgba(255, 214, 138, .38);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(43, 24, 17, .65), rgba(20, 12, 8, .8));
+      color: #f3deb2;
       font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .03em;
     }
 
     .card.discard-selected {

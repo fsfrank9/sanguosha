@@ -85,16 +85,20 @@
       box-shadow: 0 8px 18px rgba(0,0,0,.22);
     }
 
+    /* v9 PR-E7: .badge 微调 — 更明确的边框 + 轻金色调, 与 .btn 系列协调.
+       仍保持 transparent/dark 底, 用于 hero 元素 / status 区域. */
     .badge {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 4px 9px;
-      border: 1px solid rgba(255, 214, 138, .28);
+      padding: 4px 10px;
+      border: 1px solid rgba(255, 214, 138, .38);
       border-radius: 999px;
-      color: var(--muted);
-      background: rgba(0,0,0,.16);
-      font-size: 13px;
+      color: #f3deb2;
+      background: rgba(0, 0, 0, .24);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .04em;
       white-space: nowrap;
     }
 
