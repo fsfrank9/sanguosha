@@ -1942,8 +1942,24 @@
         if (trick.type === 'shandian' && outcome.hit) {
           damage(game, actor, outcome.damage, null, '【闪电】');
         } else if (trick.type === 'shandian' && outcome.moveToNext) {
-          game[opponent(actor)].judgeArea.push(trick);
-          log(game, '【闪电】移至' + actorName(game, opponent(actor)) + '的判定区。');
+          // v7 PR-12: gltjk card__scroll.md 注 — "若其下家不是此【闪电】的
+          // 合法目标，则将对应的实体牌置入其下家的下家的判定区，以此类推。
+          // 若所有角色都不是此【闪电】的合法目标，则将对应的实体牌置入其
+          // 判定区。" 在 1v1 中只有 2 名角色：下家=对手；下家的下家=自己。
+          // PR-6 已定义 "判定区里有同名延时锦囊的角色 = 非合法目标"。
+          var foeActor = opponent(actor);
+          var foeState = game[foeActor];
+          var foeAlreadyShandian = (foeState.judgeArea || []).some(function (j) {
+            return j && j.type === 'shandian';
+          });
+          if (foeAlreadyShandian) {
+            // 对手已有 闪电 → 非合法目标 → 全部不合法 → 回到自己
+            game[actor].judgeArea.push(trick);
+            log(game, '【闪电】移动失败（对手判定区已有同名牌），留在' + actorName(game, actor) + '的判定区。');
+          } else {
+            foeState.judgeArea.push(trick);
+            log(game, '【闪电】移至' + actorName(game, foeActor) + '的判定区。');
+          }
         }
         resolveJudgementCard(game, actor, state, reason, judgementCard);
         if (outcome.discardTrick) discardCard(game, trick);
