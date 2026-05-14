@@ -2113,6 +2113,13 @@
             log(game, actorName(game, actor) + '打出【' + response.card.name + '】响应' + reason + '。');
           }
         }
+        // v8 PR-B4: 银月枪 — 回合外打出黑色手牌触发
+        if (game.turn !== actor) {
+          var blackCards = response.extraCards && response.extraCards.length
+            ? response.extraCards.filter(function (c) { return c && c.color === 'black'; })
+            : (response.card && response.card.color === 'black' ? [response.card] : []);
+          if (blackCards.length > 0) triggerYinyueQiang(game, actor);
+        }
         return true;
       }
 
@@ -2128,7 +2135,36 @@
           result: success('无懈可击响应成功。'),
           options: { response: true }
         });
+        // v8 PR-B4: 银月枪 — 回合外用黑色手牌 (无懈) 触发
+        if (game.turn !== actor && card.color === 'black') {
+          triggerYinyueQiang(game, actor);
+        }
         return true;
+      }
+
+      // v8 PR-B4: 银月枪 — gltjk SP 010：
+      //   "每当你于回合外使用或打出黑色手牌时, 你可以令你攻击范围内的一名
+      //    角色选择是否打出【闪】, 若其选择否, 你对其造成1点伤害"。
+      // 1v1 中: 目标 = opponent (即原事件 source); 攻击范围检测用
+      // canReachWithSha (银月 range=3, 1v1 默认距离 1 ≤ 3 → 总成立)。
+      // skillPreferences.yinyue = 'auto' (默认触发) / 'decline' (跳过)。
+      function triggerYinyueQiang(game, holderActor) {
+        var holder = game[holderActor];
+        if (!holder) return;
+        var weapon = holder.equipment && holder.equipment.weapon;
+        if (!weapon || weapon.type !== 'yinyue') return;
+        var targetActor = opponent(holderActor);
+        if (!targetActor || !game[targetActor]) return;
+        if (!canReachWithSha(game, holderActor, targetActor)) return;
+        var pref = (holder.skillPreferences && holder.skillPreferences.yinyue) || 'auto';
+        if (pref === 'decline') {
+          log(game, actorName(game, holderActor) + '选择不发动【银月枪】。');
+          return;
+        }
+        log(game, actorName(game, holderActor) + '发动【银月枪】，令' + actorName(game, targetActor) + '出闪或受 1 点伤害。');
+        if (!consumeResponse(game, targetActor, 'shan', '【银月枪】')) {
+          damage(game, targetActor, 1, holderActor, '【银月枪】');
+        }
       }
 
       function judge(game, actor, reason, opts) {

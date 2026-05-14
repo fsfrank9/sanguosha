@@ -34,6 +34,7 @@
         hanbing: { name: '寒冰剑', family: 'equipment', slot: 'weapon', range: 2, group: 'buff', label: '武器', symbol: '冰', desc: '杀命中可防止伤害并依次弃目标两张牌。' },
         guding: { name: '古锭刀', family: 'equipment', slot: 'weapon', range: 2, group: 'buff', label: '武器', symbol: '锭', desc: '锁定技：杀命中目标无手牌时，伤害 +1。' },
         zhuque: { name: '朱雀羽扇', family: 'equipment', slot: 'weapon', range: 4, group: 'buff', label: '武器', symbol: '朱', desc: '可将普通【杀】当火【杀】使用。' },
+        yinyue: { name: '银月枪', family: 'equipment', slot: 'weapon', range: 3, group: 'buff', label: '武器', symbol: '月', desc: '回合外打出黑色手牌可令攻击范围内角色出闪或受 1 dmg。' },
         bagua: { name: '八卦阵', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '卦', desc: '需要出闪时可判定，红色视为出闪。' },
         renwang: { name: '仁王盾', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '盾', desc: '黑色【杀】对你无效。' },
         tengjia: { name: '藤甲', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '藤', desc: '普通杀/南蛮/万箭无效，火焰伤害 +1。' },
@@ -338,6 +339,13 @@
           effect: 'v8 PR-B3: gltjk card__equipment.md 朱雀羽扇 "你可以将一张普通【杀】当火【杀】使用; 你可以将视为使用【杀】改为视为使用火【杀】"。在 playSha 入口处, 装朱雀 + sourceCard.type === "sha" 时 mutate card.type → "fire_sha" 并改名称, 让 damage() 走 fire nature (藤甲变 +1 而非防止)。card-as 虚拟杀 (zhangba/wusheng/longdan) 也走此路径因为它们 card.type === "sha"。skillPreferences.zhuque = "decline" 可禁用。',
           frequency: 'passive',
           engineHooks: ['playSha:zhuqueShaToFire']
+        },
+        yinyue: {
+          summary: '回合外使用/打出黑色手牌时，可令攻击范围内一名角色选打闪或受 1 dmg。',
+          timing: 'passive',
+          effect: 'v8 PR-B4: gltjk SP 010 银月枪 "每当你于回合外使用或打出黑色手牌时, 你可以令你攻击范围内的一名角色选择是否打出【闪】, 若其选择否, 你对其造成1点伤害"。在 consumeResponse / consumeWuxie 尾部检查 game.turn !== actor + 弃置卡颜色 === black + 装银月 → triggerYinyueQiang。 1v1 中目标 = opponent (即原事件 source)。skillPreferences.yinyue = "decline" 可禁用; 默认 auto。',
+          frequency: 'passive',
+          engineHooks: ['consumeResponse:yinyueTrigger', 'consumeWuxie:yinyueTrigger', 'triggerYinyueQiang']
         },
 
         // ─── Equipment: armor ─────────────────────────────────────────
