@@ -147,3 +147,113 @@
       filter: grayscale(.45);
       border-color: rgba(255,255,255,.12);
     }
+
+    /* v9 PR-E5: 卷轴风 modal — 米黄纸身 + 两端卷起 + 棕红装饰按钮.
+       供退出确认 / 帮助等弹窗用 (后续 PR-E6 接 pendingChoice 也会复用). */
+    .scroll-modal {
+      position: fixed;
+      z-index: 50;
+      inset: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    .scroll-modal[hidden] {
+      display: none !important;
+    }
+
+    .scroll-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, .45);
+      backdrop-filter: blur(2px);
+    }
+
+    .scroll-modal__paper {
+      position: relative;
+      z-index: 1;
+      width: min(420px, 80vw);
+      padding: 28px 50px 22px;
+      background: linear-gradient(180deg, #fef0c8 0%, #f5dca0 100%);
+      border: 1px solid #b27632;
+      border-radius: 6px;
+      box-shadow:
+        0 12px 32px rgba(0, 0, 0, .55),
+        inset 0 0 0 1px rgba(255, 255, 255, .35);
+      color: #3a2010;
+    }
+
+    .scroll-modal__roll {
+      position: absolute;
+      top: -6px;
+      bottom: -6px;
+      width: 26px;
+      border-radius: 26px;
+      background: linear-gradient(180deg, #d8a665 0%, #b27632 50%, #8e5824 100%);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, .35),
+        inset 0 -1px 0 rgba(0, 0, 0, .3),
+        0 8px 18px rgba(0, 0, 0, .35);
+    }
+
+    .scroll-modal__roll--left  { left: -16px; }
+    .scroll-modal__roll--right { right: -16px; }
+
+    .scroll-modal__title {
+      font-size: 22px;
+      font-weight: 900;
+      color: #7a3a14;
+      text-align: center;
+      margin-bottom: 14px;
+      letter-spacing: .14em;
+      text-shadow: 0 1px 0 rgba(255, 235, 200, .65);
+    }
+
+    .scroll-modal__body {
+      font-size: 14px;
+      color: #5b2f15;
+      line-height: 1.65;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .scroll-modal__body strong {
+      color: #c4172a;
+    }
+
+    .scroll-modal__actions {
+      display: flex;
+      justify-content: center;
+      gap: 22px;
+    }
+
+    /* v9 PR-E5: 装饰金边按钮 — 卷轴 modal / 后续 action 区都用. */
+    .btn-frame {
+      position: relative;
+      padding: 8px 22px;
+      border: 2px solid #5b2f15;
+      border-radius: 4px;
+      background: linear-gradient(180deg, #f0a33a 0%, #c25a1a 60%, #8b3c10 100%);
+      color: #fff4d0;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: .18em;
+      cursor: pointer;
+      box-shadow:
+        inset 0 1px rgba(255, 230, 180, .45),
+        0 3px 8px rgba(0, 0, 0, .42);
+      transition: filter .15s ease, transform .12s ease;
+    }
+
+    .btn-frame--cancel {
+      background: linear-gradient(180deg, #6fc05a 0%, #2f8b3a 70%, #1d5d22 100%);
+    }
+
+    .btn-frame:hover:not(:disabled) {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    .btn-frame:active:not(:disabled) {
+      transform: translateY(1px);
+    }

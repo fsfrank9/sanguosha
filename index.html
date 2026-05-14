@@ -18,6 +18,51 @@
       <span class="frame-corner-btn__icon" aria-hidden="true">🪶</span>
       <span class="frame-corner-btn__label">分享</span>
     </button>
+    <!-- v9 PR-E5: 侧抽屉菜单 (左上"菜单"按钮触发) + 退出确认 modal.
+         默认 hidden; frameMenuBtn click 切换 sideDrawer; 抽屉里 退出
+         按钮触发 exitConfirmModal, modal 确定回到 setup 屏. -->
+    <aside class="side-drawer" id="sideDrawer" hidden aria-label="主菜单">
+      <button class="side-drawer__item" id="drawerExitBtn" type="button">
+        <span class="side-drawer__icon" aria-hidden="true">❌</span>
+        <span class="side-drawer__label">退出</span>
+      </button>
+      <button class="side-drawer__item" id="drawerRestartBtn" type="button">
+        <span class="side-drawer__icon" aria-hidden="true">☘</span>
+        <span class="side-drawer__label">重开</span>
+      </button>
+      <button class="side-drawer__item is-placeholder" type="button" disabled title="待实现">
+        <span class="side-drawer__icon" aria-hidden="true">⏳</span>
+        <span class="side-drawer__label">等待</span>
+      </button>
+      <button class="side-drawer__item is-placeholder" type="button" disabled title="待实现">
+        <span class="side-drawer__icon" aria-hidden="true">🎨</span>
+        <span class="side-drawer__label">背景</span>
+      </button>
+      <button class="side-drawer__item is-placeholder" type="button" disabled title="待实现">
+        <span class="side-drawer__icon" aria-hidden="true">⚡</span>
+        <span class="side-drawer__label">变速</span>
+      </button>
+      <button class="side-drawer__item" id="drawerHelpBtn" type="button">
+        <span class="side-drawer__icon" aria-hidden="true">ℹ</span>
+        <span class="side-drawer__label">帮助</span>
+      </button>
+      <button class="side-drawer__close" id="drawerCloseBtn" type="button" aria-label="收起菜单">⌃</button>
+    </aside>
+
+    <div class="scroll-modal" id="exitConfirmModal" hidden role="dialog" aria-modal="true" aria-labelledby="exitConfirmTitle">
+      <div class="scroll-modal__backdrop" id="exitConfirmBackdrop"></div>
+      <div class="scroll-modal__paper">
+        <div class="scroll-modal__roll scroll-modal__roll--left" aria-hidden="true"></div>
+        <div class="scroll-modal__roll scroll-modal__roll--right" aria-hidden="true"></div>
+        <div class="scroll-modal__title" id="exitConfirmTitle">退出确认</div>
+        <div class="scroll-modal__body">游戏尚未结束，退出将返回选将界面。是否确认<strong>退出</strong>？</div>
+        <div class="scroll-modal__actions">
+          <button class="btn-frame btn-frame--confirm" id="exitConfirmYesBtn" type="button">确定</button>
+          <button class="btn-frame btn-frame--cancel" id="exitConfirmNoBtn" type="button">取消</button>
+        </div>
+      </div>
+    </div>
+
     <div class="game-frame">
     <header>
       <section class="title-card">

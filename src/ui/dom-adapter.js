@@ -73,6 +73,9 @@
           // v9 PR-E4: 主公徽章 — 右上角红圆 "主". 由 renderHero 据
           // game.roles[actor] 切换 hidden.
           'playerLordBadge', 'enemyLordBadge',
+          // v9 PR-E5: 侧抽屉菜单 + 退出确认 modal
+          'sideDrawer', 'drawerExitBtn', 'drawerRestartBtn', 'drawerHelpBtn', 'drawerCloseBtn',
+          'exitConfirmModal', 'exitConfirmBackdrop', 'exitConfirmYesBtn', 'exitConfirmNoBtn',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -336,6 +339,16 @@
         var mm = String(now.getMinutes()).padStart(2, '0');
         els.statusBarTime.textContent = hh + ':' + mm;
       }
+
+      // v9 PR-E5: 侧抽屉 + 退出确认 modal 显隐工具.
+      function openSideDrawer() { if (els.sideDrawer) els.sideDrawer.hidden = false; }
+      function closeSideDrawer() { if (els.sideDrawer) els.sideDrawer.hidden = true; }
+      function toggleSideDrawer() {
+        if (!els.sideDrawer) return;
+        els.sideDrawer.hidden = !els.sideDrawer.hidden;
+      }
+      function openExitConfirm() { if (els.exitConfirmModal) els.exitConfirmModal.hidden = false; }
+      function closeExitConfirm() { if (els.exitConfirmModal) els.exitConfirmModal.hidden = true; }
 
       function stateStatusMarkup(actor, base) {
         var chained = game && game[actor] && game[actor].chained;
@@ -1811,16 +1824,43 @@
           if (!result.ok) renderLog();
           render();
         });
-        // v9 PR-E1: 角落 widgets click placeholder. 不绑定真行为, 仅在 console
-        // 留 trace, PR-E5 接入侧抽屉时替换。
-        if (els.frameMenuBtn) els.frameMenuBtn.addEventListener('click', function () {
-          if (window.console && window.console.info) {
-            window.console.info('[v9 PR-E1] 菜单 click — 侧抽屉将在 PR-E5 接入');
-          }
-        });
+        // v9 PR-E5: 角落"菜单"按钮 — 切换侧抽屉显隐。"分享"仍是 placeholder.
+        if (els.frameMenuBtn) els.frameMenuBtn.addEventListener('click', toggleSideDrawer);
         if (els.frameShareBtn) els.frameShareBtn.addEventListener('click', function () {
           if (window.console && window.console.info) {
             window.console.info('[v9 PR-E1] 分享 click — placeholder');
+          }
+        });
+        // v9 PR-E5: 侧抽屉项 click handlers
+        if (els.drawerExitBtn) els.drawerExitBtn.addEventListener('click', function () {
+          closeSideDrawer();
+          openExitConfirm();
+        });
+        if (els.drawerRestartBtn) els.drawerRestartBtn.addEventListener('click', function () {
+          closeSideDrawer();
+          showSetup();
+        });
+        if (els.drawerHelpBtn) els.drawerHelpBtn.addEventListener('click', function () {
+          closeSideDrawer();
+          if (window.alert) {
+            window.alert('三国杀 1v1 · 在线版 (v9 UI 重制中)\\n源码: github.com/fsfrank9/sanguosha');
+          }
+        });
+        if (els.drawerCloseBtn) els.drawerCloseBtn.addEventListener('click', closeSideDrawer);
+        // v9 PR-E5: 退出确认 modal handlers
+        if (els.exitConfirmYesBtn) els.exitConfirmYesBtn.addEventListener('click', function () {
+          closeExitConfirm();
+          showSetup();
+        });
+        if (els.exitConfirmNoBtn) els.exitConfirmNoBtn.addEventListener('click', closeExitConfirm);
+        if (els.exitConfirmBackdrop) els.exitConfirmBackdrop.addEventListener('click', closeExitConfirm);
+        // Esc 键 关闭 modal / drawer
+        window.addEventListener('keydown', function (e) {
+          if (e.key !== 'Escape') return;
+          if (els.exitConfirmModal && !els.exitConfirmModal.hidden) {
+            closeExitConfirm();
+          } else if (els.sideDrawer && !els.sideDrawer.hidden) {
+            closeSideDrawer();
           }
         });
         // v8 PR-A2: 濒死救援面板
