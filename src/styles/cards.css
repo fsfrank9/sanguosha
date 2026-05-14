@@ -1,121 +1,192 @@
 /* cards.css — Hand cards, card-as-button + utility cards.
-   Includes: .hand, .card (+ group variants attack/defense/heal/trick/buff),
-   .card-name/-type/-desc/-symbol/-corner, .suit-red/-black, .mini-card-suit,
-   .empty-hand, .small-card-row, .mini-card, .card.discard-selected. */
+   v9 PR-E3: 重新设计为 cream 卡身 + 棕色装饰边框 + 左上 corner 花色+点数
+   + 中央大字名字 + 底部右下类型 badge (group-color). 不加插画.
+
+   Includes: .hand, .card (+ group variants), .card-name/-type/-desc/-symbol/
+   -corner (+ __rank/__suit children), .suit-red/-black (root + .card 内覆写),
+   .mini-card-suit, .empty-hand, .small-card-row, .mini-card,
+   .card.discard-selected. */
 
     .hand {
       display: flex;
       flex-wrap: nowrap;
-      gap: 8px;
+      gap: 10px;
       align-items: stretch;
       overflow-x: auto;
       overflow-y: hidden;
-      padding-bottom: 4px;
+      padding: 6px 4px 8px;
       scroll-snap-type: x proximity;
     }
 
+    /* v9 PR-E3: 卡身从原 dark gradient 改 cream/yellow base + 棕色装饰框. */
     .card {
-      flex: 0 0 112px;
-      width: 112px;
-      min-height: 84px;
+      flex: 0 0 120px;
+      width: 120px;
+      min-height: 168px;
       padding: 6px;
-      border-radius: 16px;
+      border-radius: 10px;
       scroll-snap-align: start;
-      text-align: left;
-      color: var(--text);
+      text-align: center;
+      color: #2a160a;
       cursor: pointer;
       position: relative;
       overflow: hidden;
-      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, filter .15s ease;
+      background: linear-gradient(180deg, #fff5d4 0%, #f9e4a8 45%, #e3c577 100%);
+      border: 2px solid #5b2f15;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 235, 180, 0.7),
+        inset 0 0 0 3px rgba(91, 47, 21, 0.32),
+        0 4px 10px rgba(0, 0, 0, 0.35);
+      transition: transform .15s ease, box-shadow .15s ease, filter .15s ease, border-color .15s ease;
     }
 
+    /* v9 PR-E3: 关闭原 .card::before 黄色圆形装饰 (当时为 dark bg 设计)
+       与新 cream bg 不搭. */
     .card::before {
-      content: "";
-      position: absolute;
-      inset: -35% -35% auto auto;
-      width: 110px;
-      height: 110px;
-      border-radius: 50%;
-      background: rgba(255, 214, 138, .1);
+      content: none;
     }
 
-    .card.attack { background: linear-gradient(160deg, rgba(106, 27, 24, .95), rgba(40, 18, 14, .95)); }
-    .card.defense { background: linear-gradient(160deg, rgba(29, 74, 88, .95), rgba(20, 25, 32, .95)); }
-    .card.heal { background: linear-gradient(160deg, rgba(31, 91, 52, .95), rgba(18, 33, 22, .95)); }
-    .card.trick { background: linear-gradient(160deg, rgba(90, 55, 119, .95), rgba(27, 18, 38, .95)); }
-    .card.buff { background: linear-gradient(160deg, rgba(116, 76, 20, .95), rgba(45, 26, 10, .95)); }
+    /* v9 PR-E3: 取消原 group 颜色 (它们针对 dark bg 设计).
+       group accent 现在通过 .card-type badge 颜色体现. */
+    .card.attack,
+    .card.defense,
+    .card.heal,
+    .card.trick,
+    .card.buff {
+      background: linear-gradient(180deg, #fff5d4 0%, #f9e4a8 45%, #e3c577 100%);
+    }
 
     .card:hover:not(:disabled) {
-      transform: translateY(-4px) rotate(-.4deg);
-      border-color: rgba(255, 214, 138, .78);
-      box-shadow: 0 20px 42px rgba(0,0,0,.36), 0 0 0 1px rgba(255, 214, 138, .22) inset;
+      transform: translateY(-6px) rotate(-.5deg);
+      filter: brightness(1.04);
+      border-color: #7a3f1c;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 235, 180, 0.85),
+        inset 0 0 0 3px rgba(91, 47, 21, 0.55),
+        0 14px 30px rgba(0, 0, 0, 0.42);
     }
 
     .card:disabled {
-      opacity: .56;
+      opacity: .58;
       cursor: not-allowed;
-      filter: grayscale(.3);
+      filter: grayscale(.4) brightness(0.9);
     }
 
+    /* 中央大字名字 — 绝对定位垂直水平居中 */
     .card-name {
-      position: relative;
-      font-size: 17px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 92%;
+      font-size: 16px;
       font-weight: 1000;
-      color: #fff4d0;
-      text-shadow: 0 2px 10px rgba(0,0,0,.35);
-    }
-
-    .card-type {
-      position: relative;
-      display: inline-block;
-      margin-top: 3px;
-      padding: 1px 7px;
-      border-radius: 999px;
       color: #2a160a;
-      background: var(--gold);
-      font-weight: 800;
-      font-size: 12px;
+      text-shadow: 0 1px 0 rgba(255, 220, 150, 0.72);
+      letter-spacing: .04em;
+      line-height: 1.1;
+      text-align: center;
+      z-index: 1;
     }
 
+    /* 底部右下类型 badge — group-specific accent color */
+    .card-type {
+      position: absolute;
+      bottom: 4px;
+      right: 6px;
+      margin: 0;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      color: #fff;
+      background: #c84527;
+      z-index: 1;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, .25);
+    }
+
+    .card.attack .card-type  { background: #c84527; }
+    .card.defense .card-type { background: #2a648c; }
+    .card.heal .card-type    { background: #2d8c4c; }
+    .card.trick .card-type   { background: #7d3b8c; }
+    .card.buff .card-type    { background: #a06520; }
+
+    /* 描述行 — 名字下方小灰字, 单行截断 */
     .card-desc {
-      position: relative;
-      margin-top: 4px;
-      color: #f3deb2;
-      line-height: 1.35;
-      font-size: 12px;
+      position: absolute;
+      bottom: 22px;
+      left: 6px;
+      right: 6px;
+      margin: 0;
+      font-size: 11px;
+      color: #5b2f15;
+      line-height: 1.25;
+      text-align: center;
+      opacity: .62;
       display: -webkit-box;
-      -webkit-line-clamp: 1;
+      -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
+      z-index: 1;
     }
 
+    /* 背景水印符号 — 居中半透明, 给卡身加视觉层次 */
     .card-symbol {
       position: absolute;
-      right: 10px;
-      bottom: 4px;
-      font-size: 34px;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 64px;
       line-height: 1;
-      opacity: .14;
+      opacity: .08;
       font-weight: 900;
+      color: #5b2f15;
     }
 
-    /* v8 PR-0: 牌面右上角 花色 + 点数 */
+    /* v8 PR-0 + v9 PR-E3: 左上 corner 花色 + 点数 (从原右上改左上, 与
+       参考卡牌惯例一致). rank 在上, suit 在下, 列式排列. */
     .card-corner {
       position: absolute;
-      top: 6px;
-      right: 10px;
-      font-size: 14px;
-      font-weight: 800;
+      top: 4px;
+      left: 6px;
+      right: auto;
+      font-weight: 900;
       letter-spacing: 0.5px;
       line-height: 1;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+      text-shadow: 0 1px 0 rgba(255, 235, 180, 0.7);
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      z-index: 2;
     }
+
+    .card-corner__rank {
+      font-size: 17px;
+      line-height: 1;
+    }
+
+    .card-corner__suit {
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    /* mini-card-suit (装备区/判定区) 仍走 dark bg → 浅色花色 */
     .suit-red { color: #ff7878; }
     .suit-black { color: #d8d8d8; }
     .mini-card-suit {
       margin-left: 4px;
       font-weight: 700;
       font-size: 11px;
+    }
+
+    /* v9 PR-E3: 在 .card 上下文 (cream bg) 覆写花色色 — 红用深红, 黑用近黑 */
+    .card .suit-red {
+      color: #c4172a;
+    }
+    .card .suit-black {
+      color: #1a1a1a;
     }
 
     .empty-hand {
@@ -144,7 +215,11 @@
     }
 
     .card.discard-selected {
-      outline: 3px solid rgba(255, 86, 86, .86);
+      outline: 3px solid #ff5656;
+      outline-offset: 2px;
       transform: translateY(-10px);
-      box-shadow: 0 18px 40px rgba(255, 80, 65, .2), 0 0 0 1px rgba(255,255,255,.08) inset;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 235, 180, 0.85),
+        inset 0 0 0 3px rgba(91, 47, 21, 0.55),
+        0 18px 40px rgba(255, 80, 65, .35);
     }

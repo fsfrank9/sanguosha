@@ -445,12 +445,17 @@
         return (suit === 'heart' || suit === 'diamond') ? 'suit-red' : 'suit-black';
       }
 
+      // v9 PR-E3: corner 重构为列式 (rank 在上, suit 在下), 输出嵌套 span
+      // 让 CSS 能分别控制 size / spacing. 兼容旧 .card-corner / .suit-red
+      // / .suit-black class 选择器, 子 span 加 __rank / __suit 修饰.
       function suitRankBadge(card) {
         if (!card || (!card.suit && !card.rank)) return '';
         var suit = suitLabel(card.suit);
         var rank = card.rank ? String(card.rank).toUpperCase() : '';
+        var rankSpan = rank ? '<span class="card-corner__rank">' + escapeHtml(rank) + '</span>' : '';
+        var suitSpan = suit ? '<span class="card-corner__suit">' + escapeHtml(suit) + '</span>' : '';
         return '<span class="card-corner ' + suitColorClass(card.suit) + '">'
-          + escapeHtml(suit) + (suit && rank ? ' ' : '') + escapeHtml(rank)
+          + rankSpan + suitSpan
           + '</span>';
       }
 
