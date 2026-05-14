@@ -240,10 +240,10 @@
           engineHooks: ['canPlayCard:delayed-trick-dedup', 'playLebusishu', 'evaluateDelayedTrick.lebusishu']
         },
         bingliang: {
-          summary: '置于距离 1 内目标判定区；目标判定阶段判定，非梅花则跳过本回合摸牌阶段。',
+          summary: '1V1 变体：置于对手判定区（无距离限制）；目标判定阶段判定，非梅花则跳过本回合摸牌阶段。',
           timing: 'playPhase',
-          targets: 'distance-1',
-          effect: '置入目标判定区（v7 PR-6: 同判定区已有同名【兵粮寸断】时不合法）；判定花色非 club → 跳过摸牌阶段。',
+          targets: 'opponent',
+          effect: 'v7 PR-11: gltjk card__scroll.md 1V1 变体 "使用目标：对手"，不再受距离 1 限制。置入目标判定区 (PR-6: 同判定区已有同名时不合法)；判定花色非 club → 跳过摸牌阶段。',
           frequency: 'unlimited',
           responseWindow: ['wuxie'],
           engineHooks: ['canPlayCard:delayed-trick-dedup', 'playBingliang', 'evaluateDelayedTrick.bingliang']
