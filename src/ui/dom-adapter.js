@@ -60,6 +60,8 @@
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
           'cixiongFirePanel', 'cixiongFireHint', 'cixiongFireBtn', 'cixiongFireDeclineBtn',
           'cixiongChoosePanel', 'cixiongChooseHint', 'cixiongChooseChoices', 'cixiongChooseDrawBtn',
+          'jiedaoDecisionPanel', 'jiedaoDecisionHint', 'jiedaoDecisionFireBtn', 'jiedaoDecisionDeclineBtn',
+          'guohePickPanel', 'guohePickHint', 'guohePickEquipment', 'guohePickHand',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -664,6 +666,59 @@
             }
           } else {
             els.cixiongChoosePanel.hidden = true;
+          }
+        }
+        // v8 PR-A4: 借刀杀人决策 — 出杀 or 交武器
+        if (els.jiedaoDecisionPanel) {
+          if (kind === 'jiedao-decision' && pending.actor === 'player') {
+            els.jiedaoDecisionPanel.hidden = false;
+            if (els.jiedaoDecisionHint) {
+              var jdShas = ((game.player && game.player.hand) || []).filter(function (c) {
+                return c && (c.type === 'sha' || c.type === 'fire_sha' || c.type === 'thunder_sha');
+              });
+              els.jiedaoDecisionHint.textContent =
+                '借刀杀人：' + actorDisplayName(pending.sourceActor) +
+                '令你对其出【杀】（手中可用 ' + jdShas.length + ' 张【杀】），否则把武器交给对方。';
+            }
+          } else {
+            els.jiedaoDecisionPanel.hidden = true;
+          }
+        }
+        // v8 PR-A4: 过河拆桥 1V1 — source 二选一（弃装备 / 看手并弃）
+        if (els.guohePickPanel) {
+          if (kind === 'guohe-1v1-pick' && pending.actor === 'player') {
+            els.guohePickPanel.hidden = false;
+            if (els.guohePickHint) {
+              els.guohePickHint.textContent =
+                '过河拆桥（1V1）：弃 ' + actorDisplayName(pending.target) +
+                ' 装备区 1 张牌，或观看其手牌后弃其中 1 张。';
+            }
+            if (els.guohePickEquipment) {
+              var equipList = pending.equipment || [];
+              els.guohePickEquipment.innerHTML = equipList.length
+                ? '<span class="mini-card">装备区：</span>' + equipList.map(function (entry) {
+                    return promptCardChoice(entry, {
+                      dataAttrs: { guoheZone: 'equipment', guoheCardId: entry.cardId },
+                      title: '弃这张装备',
+                      extraClass: 'guohe-equip-choice'
+                    });
+                  }).join('')
+                : '<span class="mini-card">装备区：空</span>';
+            }
+            if (els.guohePickHand) {
+              var handList = pending.hand || [];
+              els.guohePickHand.innerHTML = handList.length
+                ? '<span class="mini-card">手牌（spec：观看后弃）：</span>' + handList.map(function (entry) {
+                    return promptCardChoice(entry, {
+                      dataAttrs: { guoheZone: 'hand', guoheCardId: entry.cardId },
+                      title: '弃这张手牌',
+                      extraClass: 'guohe-hand-choice'
+                    });
+                  }).join('')
+                : '<span class="mini-card">手牌：空</span>';
+            }
+          } else {
+            els.guohePickPanel.hidden = true;
           }
         }
         // v8 PR-A2: 濒死救援 — responder 用 桃/酒 救援（酒仅自救）
@@ -1580,6 +1635,29 @@
           if (!result.ok) renderLog();
           render();
         });
+        // v8 PR-A4: 借刀杀人决策面板
+        if (els.jiedaoDecisionFireBtn) els.jiedaoDecisionFireBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { fire: true });
+          if (!result.ok) renderLog();
+          render();
+        });
+        if (els.jiedaoDecisionDeclineBtn) els.jiedaoDecisionDeclineBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { decline: true });
+          if (!result.ok) renderLog();
+          render();
+        });
+        // v8 PR-A4: 过河拆桥 1V1 面板 — equipment + hand 共享同一 click handler
+        function handleGuohePickClick(event) {
+          var btn = event.target.closest('[data-guohe-zone]');
+          if (!btn) return;
+          var zone = btn.getAttribute('data-guohe-zone');
+          var cardId = btn.getAttribute('data-guohe-card-id');
+          var result = Engine.resolvePendingChoice(game, { zone: zone, cardId: cardId });
+          if (!result.ok) renderLog();
+          render();
+        }
+        if (els.guohePickEquipment) els.guohePickEquipment.addEventListener('click', handleGuohePickClick);
+        if (els.guohePickHand) els.guohePickHand.addEventListener('click', handleGuohePickClick);
         // v8 PR-A2: 濒死救援面板
         if (els.dyingRescueChoices) els.dyingRescueChoices.addEventListener('click', function (event) {
           var btn = event.target.closest('[data-dying-rescue-card-id]');
