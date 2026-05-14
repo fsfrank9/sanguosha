@@ -160,6 +160,15 @@
           return triggerGuoseCardAs(context);
         }
       });
+      // v8 PR-C2: 流离 (大乔) onShaTargeted — 杀指定目标后 大乔 可弃 1 牌
+      // 把杀转移给"攻击范围内的一名其他角色 (且必须为源此【杀】的合法目标)"。
+      // 1v1 中可候选 = 仅源, 但源对自己不能用杀 → 0 合法目标 → 静默不触发。
+      // 多人模式启用后此 hook 自动生效。
+      SkillRuntime.registerSkill(skillRegistry, 'liuli', {
+        onShaTargeted: function (context) {
+          return triggerLiuliOnShaTargeted(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'zhiheng', {
         onActiveSkill: function (context) {
           return triggerZhihengActiveSkill(context);
@@ -963,6 +972,49 @@
         if (context.mode !== 'response' || context.asType !== 'shan') return null;
         var blackCard = firstMatchingCard(state, function (item) { return item.color === 'black'; });
         return blackCard ? { card: blackCard, asName: '闪', skillName: '倾国', priority: 10 } : null;
+      }
+
+      // v8 PR-C2: 流离 (大乔) — gltjk card__hero__wu.md：
+      //   "每当你成为【杀】的目标时, 你可以弃置一张牌并选择你攻击范围内的一名
+      //    角色, 将此【杀】转移给该角色。"
+      // ◆ 目标须为源此【杀】的合法目标 (不检测距离)。
+      // 1v1 注: 攻击范围内除大乔外只剩源, 而源不能用杀指自己 → 候选恒空 →
+      // 函数返回 null, 流离 静默不触发。多人模式下 hook 自动产生候选, 但
+      // 实际 transfer / pendingChoice 暂留未来 PR。
+      // 返回结构 (multi-player 预留):
+      //   { paused: true, candidates: [...] } 若需要 pendingChoice
+      //   { transferred: true, newTarget: 'p3' } 若自动转移
+      //   null  若无可行转移 (1v1 默认)
+      function triggerLiuliOnShaTargeted(context) {
+        var target = context.target;
+        if (!target || !hasSkill(target, 'liuli')) return null;
+        // 必须有可弃牌 (手牌 / 装备区 / 判定区)
+        var totalCards = (target.hand || []).length
+          + equipmentList(target).length
+          + (target.judgeArea || []).length;
+        if (totalCards === 0) return null;
+        // 候选 = 大乔攻击范围内 & 非自己 & 非源 & 源此杀的合法目标
+        var game = context.game;
+        var targetActor = context.targetActor;
+        var sourceActor = context.sourceActor;
+        var candidates = [];
+        // 1v1 中 game 只有 player / enemy 两个 actor — 框架性遍历, 多人模式
+        // 时只需扩展 game.actors 列表即可生效
+        ['player', 'enemy'].forEach(function (a) {
+          if (a === targetActor) return;
+          if (a === sourceActor) return;  // spec 限定: 须为源的杀合法目标; 源对自己永远非法
+          if (!game[a]) return;
+          // 攻击范围检测: target 的 weaponRange 覆盖 a (距离 ≤ range)
+          if (!canReachWithSha(game, targetActor, a)) return;
+          // 须为源此杀的合法目标 (sourceCard 的 onCardTarget 检测)
+          var protection = cardTargetProtection(game, sourceActor, a, context.card, '杀');
+          if (protection) return;
+          candidates.push(a);
+        });
+        if (candidates.length === 0) return null;
+        // 多人模式扩展点: 此处应 pendingChoice 让大乔挑候选 + 弃牌
+        // 1v1 不会到达这里, 留空逻辑作 reserved scaffolding
+        return null;
       }
 
       // v8 PR-C1: 国色 (大乔) — gltjk skill cache：
@@ -2757,6 +2809,17 @@
           game.pauseState.playSha = { actor: actor, card: card, amount: amount };
           return success('【雌雄双股剑】结算中…');
         }
+
+        // v8 PR-C2: 流离 (大乔) — 杀指定目标后 触发 hook (1v1 中目标候选恒空,
+        // 实际为 no-op; 多人模式扩展点)
+        SkillRuntime.runHook(skillRegistry, 'onShaTargeted', {
+          game: game,
+          sourceActor: actor,
+          targetActor: targetActor,
+          target: game[targetActor],
+          card: card
+        });
+
         return continueShaAfterCixiong(game, actor, card, amount);
       }
 
