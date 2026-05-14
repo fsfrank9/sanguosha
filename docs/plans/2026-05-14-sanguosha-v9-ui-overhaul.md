@@ -33,8 +33,8 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E3 | 卡牌外观重设计 (corner 花色+点数 + 卡身色块 + 底部 label) | 🟢 PR #71 已合并 |
 | PR-E4 | 武将 portrait + HP 红方块 + 装备/判定区 + 技能 framed tag | 🟢 PR #72 已合并 |
 | PR-E5 | 左上"菜单"按钮 + 侧抽屉 + 退出确认 modal (卷轴风) | 🟢 PR #73 已合并 |
-| PR-E6 | pendingChoice modals 统一卷轴风 (13 个面板) | 🟡 PR 待合并 |
-| PR-E7 | action button 统一橙金装饰风 + 收尾细节 | ⏸ 待开 |
+| PR-E6 | pendingChoice modals 统一卷轴风 (13 个面板) | 🟢 PR #74 已合并 |
+| PR-E7 | action button 统一橙金装饰风 + 收尾细节 | 🟡 PR 待合并 |
 | PR-E8 | **二级 splash + 一级 lobby** (3 模式卡, 仅 1V1 启用) | ⏸ 待开 |
 | PR-E9 | **选将界面重设计** (4×3 网格 + 势力 tag + 随机/点将 切换) | ⏸ 待开 |
 
@@ -58,6 +58,48 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E7 落地 — action button 统一橙金装饰风 + utility 收尾 ✅
+
+**实际改动** (只动 CSS):
+
+`controls.css` 重写 `.btn` 基类:
+- 橙金 gradient (`#f0a33a → #c25a1a → #8b3c10`) — 与 `.btn-frame` 同色板
+- 1px 棕色 border (`#5b2f15`)
+- 浅文本 `#fff4d0` + 800 字重 + 0.08em letter-spacing + text-shadow
+- 双层 box-shadow (inset 高光 + outer 阴影)
+- `:hover` `brightness(1.1)` + translateY -1px
+- `:active` translateY 1px (按下反馈)
+- `:disabled` opacity .48 + grayscale .4
+
+`.btn.primary` 改更亮的金色 (`#ffe4a3 → #e69a39 → #b9532d`) + 深文本 `#2a120a` + 更亮 inset, 适合"新开一局"等主操作。
+
+`.btn.small`: 紧凑变体 `min-height: 30px / padding: 6px 14px / border-radius: 6px / letter-spacing: .12em`.
+
+`hero.css` `.badge` 微调:
+- 12px 字 + 700 字重 + 0.04em letter-spacing
+- 边框 alpha 从 .28 → .38 (与 `.btn` 协调)
+- 文本 `#f3deb2`, 底 `rgba(0,0,0,.24)`
+
+`cards.css` `.mini-card` 微调 (顶级, 非 pending 范围内):
+- `display: inline-flex` 配 suit/rank 子元素
+- gradient 暗棕底 (`rgba(43,24,17,.65) → rgba(20,12,8,.8)`)
+- 金边 + 700 字重 + 8px 圆角
+
+**保持不冲突**:
+- `.pending-prompt-panel .btn.small` 范围覆写仍生效 (cream 风 modal 内)
+- `.pending-prompt-panel .mini-card` 范围覆写仍生效
+
+**新增** `tests/v9_pr_e7_button_unify.test.mjs` (13 条守护):
+- `.btn` 橙金 gradient + 棕 border + 浅文本 + 双 shadow
+- `:hover` / `:active` / `:disabled` 状态
+- `.btn.primary` 更亮金色 + 深文本
+- `.btn.small` 紧凑变体
+- `.badge` / `.mini-card` 收尾值
+- pending panel 内覆写仍生效 (回归)
+- `loadAllStyles()` 含新 `.btn` 规则
+
+**Test status**: 620 → 633 ✓ (+13 新守护); 现有 620 条无 regression (所有 v8/v9 旧测试都还过).
 
 ### PR-E6 落地 — pendingChoice modals 统一卷轴风 ✅
 

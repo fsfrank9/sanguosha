@@ -11,39 +11,58 @@
       justify-content: flex-end;
     }
 
+    /* v9 PR-E7: 全局 .btn 统一为橙金装饰风 — 与 .btn-frame 视觉一致,
+       但保留 .btn 的轻盈圆角 (pill) 用于 header / setup / mode-panel
+       等"轻"动作场景. .btn-frame 仍是 modal 内突出的方形装饰按钮. */
     .btn {
-      border: 1px solid rgba(255, 214, 138, .38);
+      border: 1px solid #5b2f15;
       border-radius: 999px;
-      padding: 10px 16px;
-      background: linear-gradient(180deg, rgba(255, 214, 138, .18), rgba(160, 75, 31, .28));
-      color: var(--text);
+      padding: 9px 18px;
+      background: linear-gradient(180deg, #f0a33a 0%, #c25a1a 60%, #8b3c10 100%);
+      color: #fff4d0;
+      font-weight: 800;
+      letter-spacing: .08em;
       cursor: pointer;
-      transition: transform .15s ease, border-color .15s ease, background .15s ease, opacity .15s ease;
-      box-shadow: inset 0 1px rgba(255,255,255,.1), 0 10px 24px rgba(0,0,0,.16);
+      text-shadow: 0 1px 0 rgba(0, 0, 0, .35);
+      box-shadow:
+        inset 0 1px rgba(255, 230, 180, .42),
+        0 4px 10px rgba(0, 0, 0, .35);
+      transition: filter .15s ease, transform .12s ease, opacity .15s ease;
     }
 
     .btn:hover:not(:disabled) {
+      filter: brightness(1.1);
       transform: translateY(-1px);
-      border-color: rgba(255, 214, 138, .75);
-      background: linear-gradient(180deg, rgba(255, 214, 138, .25), rgba(201, 83, 36, .34));
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(1px);
     }
 
     .btn:disabled {
       opacity: .48;
       cursor: not-allowed;
+      filter: grayscale(.4);
     }
 
+    /* .btn.primary — 更亮的金色 (用于 "新开一局" 等主操作) */
     .btn.primary {
+      background: linear-gradient(180deg, #ffe4a3 0%, #e69a39 52%, #b9532d 100%);
       color: #2a120a;
-      border-color: rgba(255, 224, 154, .85);
-      background: linear-gradient(180deg, #ffe4a3, #e69a39 52%, #b9532d);
-      font-weight: 800;
+      text-shadow: 0 1px 0 rgba(255, 235, 200, .65);
+      border-color: #5b2f15;
+      box-shadow:
+        inset 0 1px rgba(255, 245, 215, .65),
+        0 5px 12px rgba(0, 0, 0, .38);
     }
 
+    /* .btn.small — 紧凑变体 */
     .btn.small {
       min-height: 30px;
-      padding: 6px 10px;
+      padding: 6px 14px;
       font-size: 12px;
+      letter-spacing: .12em;
+      border-radius: 6px;
     }
 
     /* v9 PR-E4: skill-button 重设计为橙色 framed tag (类似截图 行殇/放逐)
