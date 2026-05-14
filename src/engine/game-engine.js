@@ -1792,6 +1792,18 @@
           }
         }
 
+        // v8 PR-B2: 古锭刀 — gltjk card__equipment.md "锁定技, 每当你使用
+        // 【杀】对目标角色造成伤害时, 若其没有手牌, 你令伤害值+1"。
+        // 时机=tengjia 之后、baiyin 之前; 这样 baiyin 仍能把 2 点 clamp
+        // 回 1 点 (符合两件装备同时生效时的 spec 互动)。
+        if (sourceActor && sourceCard && isShaCard(sourceCard) && amount > 0) {
+          var gudingWeapon = game[sourceActor].equipment && game[sourceActor].equipment.weapon;
+          if (gudingWeapon && gudingWeapon.type === 'guding' && (target.hand || []).length === 0) {
+            amount += 1;
+            log(game, actorName(game, sourceActor) + '的【古锭刀】令' + actorName(game, targetActor) + '无手牌伤害 +1。');
+          }
+        }
+
         if (armor && !ignoreArmor && armor.type === 'baiyin' && amount > 1) {
           amount = 1;
           log(game, actorName(game, targetActor) + '的【白银狮子】将伤害防止至 1 点。');

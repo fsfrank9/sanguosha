@@ -13,7 +13,9 @@
     renwang: { blockBlackSha: true },
     // v8 PR-B1: 寒冰剑 — marker; 实际逻辑在 game-engine.js damage() 内
     // (需要访问目标手牌/装备/判定区做 2 张挑选, 不适合纯 boolean flag)
-    hanbing: { hanbingPreventOnHit: true }
+    hanbing: { hanbingPreventOnHit: true },
+    // v8 PR-B2: 古锭刀 — 锁定技, 杀命中目标无手牌时 伤害+1
+    guding:  { gudingNoHandPlus1: true }
   };
 
   function equipmentSlots(state) {
