@@ -122,8 +122,30 @@ UI 接完后再选：
 | PR | 范围 | 状态 |
 |---|---|---|
 | PR-0 | 牌面 suit + rank 可视化 (方向 0) | 🟢 PR #44 已合并 |
-| PR-A1 | 通用 pendingChoice 面板框架 (方向 1 基础) | 🟡 PR 待合并 |
-| _其余_ | _v8 PR-A2..A5 + 方向 2/3/4_ | _按顺序推进_ |
+| PR-A1 | 通用 pendingChoice 面板框架 (方向 1 基础) | 🟢 PR #46 已合并 |
+| PR-A2 | qilin-pick + dying-rescue 面板 | 🟡 PR 待合并 |
+| _其余_ | _v8 PR-A3..A5 + 方向 2/3/4_ | _按顺序推进_ |
+
+### PR-A2 落地 — qilin-pick + dying-rescue 面板
+
+把 v7 引擎里两个最常被玩家触发的 pendingChoice 接到浏览器 UI 上，用 PR-A1 的通用框架与 helper。
+
+**qilin-pick**（pending = `{kind, actor, target, horseSlots:[...]}`）：
+- 文案：`麒麟弓：<对方名> 装备区有 2 匹坐骑，选一匹弃置（spec：一张），或不发动`
+- choices：每匹坐骑一个 `promptCardChoice`，prefix 标 `+1 马` / `-1 马`，dataAttrs `qilinSlot`
+- actions：`不发动` 按钮 → `resolvePendingChoice({decline:true})`
+
+**dying-rescue**（pending = `{kind, actor, dyingActor, taoIds, jiuIds}`）：
+- 文案根据 `actor === dyingActor` 区分自救 vs 救他人
+- choices：从 responder 手牌中按 taoIds + jiuIds 渲染，suffix 标 ` · 桃` / ` · 酒Ⅱ`，dataAttrs `dyingRescueCardId`
+- actions：`不救援` 按钮 → `resolvePendingChoice({decline:true})`
+
+**改动**：
+- `index.html`：新增 `#qilinPickPanel` + `#dyingRescuePanel`（含 hint / choices / decline 子元素），用 PR-A1 通用框架类
+- `dom-adapter.js`：`els` 缓存新增 8 个 id；`renderPendingChoice` 末尾增 2 个分支；事件绑定增 4 个监听器
+- 新增 helper `actorDisplayName(actor)` 用于面板文案（区别于 `actorName()` 的"我方/对方"措辞）
+
+**新增** `tests/pending_prompt_panels_a2.test.mjs`（14 条断言）：HTML 容器 / 框架类 / els 缓存 / render 分支 / 文案差异 / suffix 标识 / 4 个事件绑定 payload 正确。
 
 ### PR-A1 落地 — 通用 pendingChoice 面板框架
 
@@ -145,4 +167,5 @@ UI 接完后再选：
 |---|---:|---|
 | `tests/card_face_suit_rank.test.mjs` | 7 | PR-0 |
 | `tests/pending_prompt_framework.test.mjs` | 9 | PR-A1 |
+| `tests/pending_prompt_panels_a2.test.mjs` | 14 | PR-A2 |
 | _其余 PR 待开_ | — | — |

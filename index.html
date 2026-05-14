@@ -260,6 +260,16 @@
           <button class="btn small" id="ganglieSourceConfirmBtn">确认弃 2 张</button>
           <button class="btn small" id="ganglieSourceTakeDamageBtn">受 1 点伤害</button>
         </div>
+        <div class="qilin-pick-panel pending-prompt-panel" id="qilinPickPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="qilinPickHint">麒麟弓：选择要弃置的对方坐骑（spec：弃一张）</span>
+          <div class="qilin-pick-choices pending-prompt-panel__choices" id="qilinPickChoices" aria-live="polite"></div>
+          <button class="btn small" id="qilinDeclineBtn">不发动</button>
+        </div>
+        <div class="dying-rescue-panel pending-prompt-panel" id="dyingRescuePanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="dyingRescueHint">濒死救援：用【桃】或【酒】救援</span>
+          <div class="dying-rescue-choices pending-prompt-panel__choices" id="dyingRescueChoices" aria-live="polite"></div>
+          <button class="btn small" id="dyingRescueDeclineBtn">不救援</button>
+        </div>
         <div class="hand" id="playerHand"></div>
       </section>
     </section>
