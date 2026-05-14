@@ -1,0 +1,150 @@
+/* cards.css — Hand cards, card-as-button + utility cards.
+   Includes: .hand, .card (+ group variants attack/defense/heal/trick/buff),
+   .card-name/-type/-desc/-symbol/-corner, .suit-red/-black, .mini-card-suit,
+   .empty-hand, .small-card-row, .mini-card, .card.discard-selected. */
+
+    .hand {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 8px;
+      align-items: stretch;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 4px;
+      scroll-snap-type: x proximity;
+    }
+
+    .card {
+      flex: 0 0 112px;
+      width: 112px;
+      min-height: 84px;
+      padding: 6px;
+      border-radius: 16px;
+      scroll-snap-align: start;
+      text-align: left;
+      color: var(--text);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, filter .15s ease;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: -35% -35% auto auto;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: rgba(255, 214, 138, .1);
+    }
+
+    .card.attack { background: linear-gradient(160deg, rgba(106, 27, 24, .95), rgba(40, 18, 14, .95)); }
+    .card.defense { background: linear-gradient(160deg, rgba(29, 74, 88, .95), rgba(20, 25, 32, .95)); }
+    .card.heal { background: linear-gradient(160deg, rgba(31, 91, 52, .95), rgba(18, 33, 22, .95)); }
+    .card.trick { background: linear-gradient(160deg, rgba(90, 55, 119, .95), rgba(27, 18, 38, .95)); }
+    .card.buff { background: linear-gradient(160deg, rgba(116, 76, 20, .95), rgba(45, 26, 10, .95)); }
+
+    .card:hover:not(:disabled) {
+      transform: translateY(-4px) rotate(-.4deg);
+      border-color: rgba(255, 214, 138, .78);
+      box-shadow: 0 20px 42px rgba(0,0,0,.36), 0 0 0 1px rgba(255, 214, 138, .22) inset;
+    }
+
+    .card:disabled {
+      opacity: .56;
+      cursor: not-allowed;
+      filter: grayscale(.3);
+    }
+
+    .card-name {
+      position: relative;
+      font-size: 17px;
+      font-weight: 1000;
+      color: #fff4d0;
+      text-shadow: 0 2px 10px rgba(0,0,0,.35);
+    }
+
+    .card-type {
+      position: relative;
+      display: inline-block;
+      margin-top: 3px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      color: #2a160a;
+      background: var(--gold);
+      font-weight: 800;
+      font-size: 12px;
+    }
+
+    .card-desc {
+      position: relative;
+      margin-top: 4px;
+      color: #f3deb2;
+      line-height: 1.35;
+      font-size: 12px;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-symbol {
+      position: absolute;
+      right: 10px;
+      bottom: 4px;
+      font-size: 34px;
+      line-height: 1;
+      opacity: .14;
+      font-weight: 900;
+    }
+
+    /* v8 PR-0: 牌面右上角 花色 + 点数 */
+    .card-corner {
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      line-height: 1;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+    }
+    .suit-red { color: #ff7878; }
+    .suit-black { color: #d8d8d8; }
+    .mini-card-suit {
+      margin-left: 4px;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
+    .empty-hand {
+      border: 1px dashed rgba(255, 214, 138, .25);
+      color: var(--muted);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      background: rgba(0,0,0,.12);
+    }
+
+    .small-card-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 30px;
+    }
+
+    .mini-card {
+      border: 1px solid rgba(255, 214, 138, .25);
+      background: rgba(0,0,0,.2);
+      color: #f2dba7;
+      padding: 4px 7px;
+      border-radius: 9px;
+      font-size: 12px;
+    }
+
+    .card.discard-selected {
+      outline: 3px solid rgba(255, 86, 86, .86);
+      transform: translateY(-10px);
+      box-shadow: 0 18px 40px rgba(255, 80, 65, .2), 0 0 0 1px rgba(255,255,255,.08) inset;
+    }

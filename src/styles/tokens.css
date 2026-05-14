@@ -1,0 +1,52 @@
+/* tokens.css — Design tokens + global reset + page base.
+   Foundation layer: CSS custom properties, body/html, font-family,
+   universal box-sizing. Imported first so other files can use vars. */
+
+    :root {
+      color-scheme: dark;
+      --bg: #120b09;
+      --panel: rgba(43, 24, 17, 0.88);
+      --panel-2: rgba(69, 35, 22, 0.88);
+      --line: rgba(255, 213, 138, 0.22);
+      --gold: #ffd68a;
+      --gold-2: #f0a33a;
+      --red: #d5452f;
+      --green: #58bd7d;
+      --blue: #79b9ff;
+      --text: #fff5df;
+      --muted: #d3b98a;
+      --shadow: rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      height: 100vh;
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(226, 68, 45, 0.22), transparent 32rem),
+        radial-gradient(circle at 88% 18%, rgba(255, 214, 138, 0.15), transparent 28rem),
+        linear-gradient(135deg, #160806 0%, #24100b 46%, #0c0706 100%);
+      overflow: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.11;
+      background-image:
+        linear-gradient(30deg, transparent 0 48%, rgba(255, 214, 138, .35) 49% 51%, transparent 52% 100%),
+        linear-gradient(150deg, transparent 0 48%, rgba(255, 214, 138, .2) 49% 51%, transparent 52% 100%);
+      background-size: 72px 72px;
+      mix-blend-mode: screen;
+    }
+
+    button,
+    select {
+      font: inherit;
+    }

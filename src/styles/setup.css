@@ -1,0 +1,105 @@
+/* setup.css — Title card, setup/hero-select page, rules block.
+   Includes: .title-card (+ ::after), h1, .subtitle, .setup-screen,
+   .setup-card, .setup-grid, .setup-side, .hero-select-panel, .rules. */
+
+    .title-card {
+      padding: 10px 14px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .title-card::after {
+      content: "魏 蜀 吴 群";
+      position: absolute;
+      right: 18px;
+      top: 10px;
+      color: rgba(255, 214, 138, .08);
+      font-size: 60px;
+      font-weight: 900;
+      letter-spacing: .15em;
+      white-space: nowrap;
+    }
+
+    h1 {
+      margin: 0;
+      position: relative;
+      z-index: 1;
+      font-size: clamp(22px, 2.8vw, 34px);
+      letter-spacing: .06em;
+      color: var(--gold);
+      text-shadow: 0 4px 20px rgba(255, 155, 43, .25);
+    }
+
+    .subtitle {
+      margin-top: 6px;
+      position: relative;
+      z-index: 1;
+      color: var(--muted);
+      line-height: 1.35;
+      font-size: 13px;
+    }
+
+    .setup-screen {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .setup-card {
+      width: min(860px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 22px;
+      background: linear-gradient(180deg, rgba(65, 32, 21, .92), rgba(31, 17, 13, .92));
+      box-shadow: 0 24px 60px rgba(0,0,0,.32), inset 0 1px rgba(255,255,255,.08);
+    }
+
+    .setup-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .setup-side {
+      border: 1px solid rgba(255,214,138,.18);
+      border-radius: 18px;
+      padding: 14px;
+      background: rgba(0,0,0,.18);
+    }
+
+    .hero-select-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+    }
+
+    .hero-select-panel select,
+    .setup-side select {
+      min-width: 150px;
+      border: 1px solid rgba(255,214,138,.3);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: var(--text);
+      background: rgba(0,0,0,.32);
+    }
+
+    .rules {
+      padding: 16px;
+      color: #edd4a3;
+      line-height: 1.56;
+    }
+
+    .rules ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+
+    .rules li { margin: 4px 0; }
+
+    /* Currently hidden via display:none; kept for future help/rules screen. */
+    .rules { display: none; }
