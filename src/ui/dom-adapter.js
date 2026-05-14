@@ -230,6 +230,8 @@
         if (!discardMode && !cardSkill && !playable.ok) disabled = true;
         return [
           '<button class="card ', card.group, selected ? ' discard-selected' : '', '" data-card-id="', escapeHtml(card.id), '" ', disabled ? 'disabled' : '', ' title="', escapeHtml(playable.message), '">',
+          // v8 PR-0: 牌面右上角 花色 + 点数
+          suitRankBadge(card),
           '<div class="card-name">【', escapeHtml(card.name), '】</div>',
           '<div class="card-type">', escapeHtml(card.label), '</div>',
           '<div class="card-desc">', escapeHtml(card.desc), '</div>',
@@ -316,7 +318,16 @@
 
       function zoneCards(cards, emptyText) {
         if (!cards || !cards.length) return '<span class="mini-card">' + escapeHtml(emptyText) + '</span>';
-        return cards.map(function (card) { return '<span class="mini-card">' + escapeHtml(card.name) + '</span>'; }).join('');
+        // v8 PR-0: 装备区 / 判定区 等公开区域 → 显示 花色 + 点数 (suit-class 颜色)
+        return cards.map(function (card) {
+          var suit = suitLabel(card.suit);
+          var rank = card.rank ? String(card.rank).toUpperCase() : '';
+          var meta = (suit || rank)
+            ? ' <span class="mini-card-suit ' + suitColorClass(card.suit) + '">'
+              + escapeHtml(suit) + (suit && rank ? ' ' : '') + escapeHtml(rank) + '</span>'
+            : '';
+          return '<span class="mini-card">' + escapeHtml(card.name) + meta + '</span>';
+        }).join('');
       }
 
       function equipmentCards(equipment) {
@@ -368,6 +379,22 @@
 
       function suitLabel(suit) {
         return { spade: '♠', heart: '♥', club: '♣', diamond: '♦' }[suit] || suit || '';
+      }
+
+      // v8 PR-0: 牌面 花色 + 点数 可视化。spec 中所有牌都有 suit/rank/color，
+      // 玩家做"火攻同花色弃"、"倾国黑色当闪"、"武圣红色当杀"等决策必须能看到。
+      // 红 (heart/diamond) 用红色，黑 (spade/club) 用浅色；rank 用大写。
+      function suitColorClass(suit) {
+        return (suit === 'heart' || suit === 'diamond') ? 'suit-red' : 'suit-black';
+      }
+
+      function suitRankBadge(card) {
+        if (!card || (!card.suit && !card.rank)) return '';
+        var suit = suitLabel(card.suit);
+        var rank = card.rank ? String(card.rank).toUpperCase() : '';
+        return '<span class="card-corner ' + suitColorClass(card.suit) + '">'
+          + escapeHtml(suit) + (suit && rank ? ' ' : '') + escapeHtml(rank)
+          + '</span>';
       }
 
       var yijiGiveSelection = [];

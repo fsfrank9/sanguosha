@@ -483,6 +483,25 @@
       font-weight: 900;
     }
 
+    /* v8 PR-0: 牌面右上角 花色 + 点数 */
+    .card-corner {
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      line-height: 1;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+    }
+    .suit-red { color: #ff7878; }
+    .suit-black { color: #d8d8d8; }
+    .mini-card-suit {
+      margin-left: 4px;
+      font-weight: 700;
+      font-size: 11px;
+    }
+
     .empty-hand {
       border: 1px dashed rgba(255, 214, 138, .25);
       color: var(--muted);
