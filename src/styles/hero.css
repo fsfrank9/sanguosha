@@ -21,21 +21,10 @@
       mix-blend-mode: screen;
     }
 
+    /* v9 PR-E12: .camp-ribbon 与 PR-E4 主公徽章 + 势力 camp tag 重复,
+       且倾斜带状视觉过强. 隐藏以减噪. */
     .camp-ribbon {
-      position: absolute;
-      z-index: 2;
-      right: -36px;
-      top: 22px;
-      width: 132px;
-      transform: rotate(35deg);
-      text-align: center;
-      padding: 5px 0;
-      color: #2a120a;
-      background: linear-gradient(180deg, #ffe4a3, #d88427);
-      border: 1px solid rgba(255,255,255,.32);
-      box-shadow: 0 8px 18px rgba(0,0,0,.28);
-      font-weight: 1000;
-      letter-spacing: .18em;
+      display: none;
     }
 
     .hero.enemy {
@@ -46,15 +35,10 @@
       background: linear-gradient(180deg, rgba(26, 51, 39, .88), rgba(18, 24, 18, .9));
     }
 
+    /* v9 PR-E12: 旧版本用 ::before 把势力名大字 "蜀"/"魏" 当水印.
+       与主公徽章 + 卡片右下角 camp 标识 重复, 大字尺寸压头. 隐藏. */
     .hero::before {
-      content: attr(data-camp);
-      position: absolute;
-      right: 14px;
-      top: 6px;
-      color: rgba(255,255,255,.06);
-      font-size: 92px;
-      font-weight: 900;
-      line-height: 1;
+      content: none;
     }
 
     .hero-head {
@@ -102,17 +86,10 @@
       white-space: nowrap;
     }
 
+    /* v9 PR-E12: 武将台词 "凌波微步..." 等是文字噪音, 不增加游戏信息.
+       隐藏以减噪. 数据仍在 state.quote, 后续可考虑 hover tooltip 展示. */
     .quote {
-      position: relative;
-      color: #e9d3a4;
-      font-size: 13px;
-      line-height: 1.35;
-      min-height: 0;
-      margin: 4px 0 6px;
-      display: -webkit-box;
-      -webkit-line-clamp: 1;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+      display: none;
     }
 
     .hp-row {

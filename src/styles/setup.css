@@ -8,16 +8,10 @@
       overflow: hidden;
     }
 
+    /* v9 PR-E12: 旧版本 ::after 大字水印 "魏 蜀 吴 群". 在 v9 装饰外框
+       + 角落 widgets 之上重复装饰. 隐藏以减噪. */
     .title-card::after {
-      content: "魏 蜀 吴 群";
-      position: absolute;
-      right: 18px;
-      top: 10px;
-      color: rgba(255, 214, 138, .08);
-      font-size: 60px;
-      font-weight: 900;
-      letter-spacing: .15em;
-      white-space: nowrap;
+      content: none;
     }
 
     h1 {
