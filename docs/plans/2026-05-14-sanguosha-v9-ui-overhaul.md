@@ -39,9 +39,10 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E9 | **选将界面重设计** (4×3 网格 + 势力 tag + 随机/点将 切换) | 🟢 PR #77 已合并 |
 | PR-E10 | UI 审计 + 清理 (header 入口屏隐藏, 死代码 .layout/.side/.battlefield, 空 `<select>` options) + 20 条集成守护测试 | 🟢 PR #78 已合并 |
 | PR-E11 | 选将流程 bug 修复 (用户反馈: 选完不自动进游戏 + 应顺序选将主公先选不可返回) | 🟢 PR #79 已合并 |
-| PR-E12 | 进入游戏后界面清理 (隐藏与 v9 新元素重复 / 噪音的旧装饰: 双显日志, ::after 水印, ::before 大字, camp-ribbon, 武将台词) | 🟡 PR 待合并 |
+| PR-E12 | 进入游戏后界面清理 (隐藏与 v9 新元素重复 / 噪音的旧装饰: 双显日志, ::after 水印, ::before 大字, camp-ribbon, 武将台词) | 🟢 PR #80 已合并 |
+| PR-E13 | 进入游戏后界面清理 v2 (隐藏 .title-card / .status-banner / .log-overlay / v9.0.0 重影 + 新增中下 phase-prompt 横幅 + zone-panel 半透明) | 🟡 PR 待合并 |
 
-总预估: **~2700-3300 LOC 变更**, 跨 12 个 review cycle。
+总预估: **~2700-3400 LOC 变更**, 跨 13 个 review cycle。
 
 ## 设计目标 (从参考截图提炼)
 
@@ -61,6 +62,59 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E13 落地 — 进入游戏后界面清理 v2 ✅
+
+**用户反馈截图** (PR-E12 合并后浏览器实测, 仍乱):
+> 还是很乱, 你去对比一下别人的
+
+**对比参考截图找到的问题** (PR-E12 之外):
+
+1. `<header>` 内 `.title-card` (h1 + .subtitle 长描述) 占顶部 ~12% 高度, 参考图游戏屏完全没有这一坨, 只剩角落 menu/share
+2. `.status-banner` 大棕色"你的回合"块 + 长解释文字 "点击底部手牌出牌..." 是冗余, 参考图改成简短黄字黑笔触横幅
+3. 中央 `.log-overlay` 仍与左侧 status-banner + 中间 skill-bar 重叠 (PR-E12 只调位置, 没彻底解决)
+4. `.status-bar__version` v9.0.0 与手牌 dock 重叠形成水印重影
+5. `.zone-panel` 深棕渐变 (rgba .78/.82) 不透明背景压视觉, 参考图 widget 半透明融入背景
+
+**实际改动** (引擎零改动 / DOM 仅加 1 个新元素):
+
+HTML `index.html`:
+- `.title-card` 加 `id="titleCard"` 以便 hidden 控制
+- 在 `.duel-table` 内 (pause-banner 旁) 加新 `.phase-prompt` + `.phase-prompt__brush` 元素
+
+JS `src/ui/dom-adapter.js`:
+- 缓存 3 个新 id: `titleCard` / `phasePrompt` / `phasePromptBrush`
+- `_toggleHeader(show, mode)` 加 mode 参数; mode === 'game' 时隐藏 titleCard, 仅留 .top-actions 角落按钮
+- `newGame` 调 `_toggleHeader(true, 'game')`; `showSetup` 调 `_toggleHeader(true, 'setup')`
+- `renderStatus` 末尾写入 `phasePromptBrush.textContent = title`; pendingChoice / enemyThinking 时 phasePrompt hidden (由 .pause-banner 接管, 避免双显)
+
+CSS `src/styles/layout.css`:
+- `.status-banner { display: none }` (整个块隐藏; deckInfo 数据仍写, 等价信息已由 status-bar__score 在底部展示)
+- 新增 `.phase-prompt` (absolute, bottom: 22%, z-index: 6) + `.phase-prompt__brush` (黑底 #ffd900 黄字, 多 box-shadow 笔触感, 复用 .pause-banner__brush 同源风格)
+- `.status-bar__version { display: none }` (避免 v9.0.0 与手牌重影)
+
+CSS `src/styles/zones.css`:
+- `.log-overlay { display: none }` (彻底隐藏, 历史日志数据仍在 game.log)
+- `.zone-panel` 背景 rgba 从 `.78/.82` 降到 `.32/.42` (半透明融入背景)
+
+**新增测试** `tests/v9_pr_e13_ingame_cleanup_v2.test.mjs` (13 条守护):
+- 2 条 HTML 结构 (titleCard id + phase-prompt 元素)
+- 4 条 dom-adapter (id 缓存 + _toggleHeader 签名 + 调用站点 + renderStatus 写入)
+- 5 条 CSS hide / 新增 / 透明化
+- 2 条 loadAllStyles() 回归
+
+**同步更新旧测试** (signature 改动):
+- `tests/v9_pr_e10_audit.test.mjs`: `_toggleHeader(show)` → `_toggleHeader(show, mode)` + 两 call site 改 `(true, 'setup')` / `(true, 'game')`
+- `tests/v9_pr_e2_center_log.test.mjs`: duel-table 内 lookup 窗口 800 → 1200 (.phase-prompt 加入后字符数增加)
+
+**Test status**: 721 → 734 ✓ (+13 新守护); 现有 721 条无 regression. `build:check` 通过.
+
+**显式不在范围**:
+- 不加真实武将立绘 / 卡牌插画 (违反"无 PNG"约束, 留给 v10+ 立绘方向)
+- 不动 game.log 数据写入 (renderLog 仍 push, 只是 overlay 不显示)
+- 不动 engine, 不动 newGame / phase 流程
+
+---
 
 ### PR-E12 落地 — 进入游戏后界面清理 ✅
 
@@ -203,9 +257,9 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 
 ---
 
-## v9 方向 D 当前进度 (13 PR 已提交; 待用户验收)
+## v9 方向 D 当前进度 (14 PR 已提交; 待用户验收)
 
-PLAN + E0-E12 共 13 PR (1 PLAN + 12 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
+PLAN + E0-E13 共 14 PR (1 PLAN + 13 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
 
 | 子目标 | 提交 PR |
 |---|---|
@@ -221,11 +275,12 @@ PLAN + E0-E12 共 13 PR (1 PLAN + 12 实现) 已提交; 是否达成 v9-D 整体
 | 选将 4×3 网格 | PR-E9 |
 | 审计 + 清理 + 集成守护 | PR-E10 |
 | 选将流程 bug (顺序选 + auto-start) | PR-E11 |
-| **进入游戏后界面清理** | **PR-E12** |
+| 进入游戏后清理 (双显日志 + 旧水印) | PR-E12 |
+| **进入游戏后清理 v2 (title-card / status-banner / phase-prompt 横幅 / 半透明 zone-panel)** | **PR-E13** |
 
 数据点:
-- 12 实现 PR + 1 PLAN, ~3300 LOC (CSS + HTML + JS + tests)
-- 721 测试 ✓ 全套通过 (起点 529 → 721, 新增 ~192 条守护)
+- 13 实现 PR + 1 PLAN, ~3400 LOC (CSS + HTML + JS + tests)
+- 734 测试 ✓ 全套通过 (起点 529 → 734, 新增 ~205 条守护)
 - 引擎零改动 (`src/engine/*` 全程不动)
 - 无 PNG 素材 (纯 CSS / Unicode / inline SVG / polygon clip)
 

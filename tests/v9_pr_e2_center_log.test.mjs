@@ -20,10 +20,10 @@ test('v9 PR-E2: index.html 在 .duel-table 内含 logOverlay / pauseBanner / sta
   assert.match(html, /id="logOverlay"/);
   assert.match(html, /id="pauseBanner"/);
   assert.match(html, /id="statusBar"/);
-  // 必须在 .duel-table 内 (绝对定位锚)
-  assert.match(html, /<section class="duel-table"[\s\S]{0,800}id="logOverlay"/);
-  assert.match(html, /<section class="duel-table"[\s\S]{0,800}id="pauseBanner"/);
-  assert.match(html, /<section class="duel-table"[\s\S]{0,800}id="statusBar"/);
+  // 必须在 .duel-table 内 (绝对定位锚). PR-E13 加 .phase-prompt 后窗口扩到 1200.
+  assert.match(html, /<section class="duel-table"[\s\S]{0,1200}id="logOverlay"/);
+  assert.match(html, /<section class="duel-table"[\s\S]{0,1200}id="pauseBanner"/);
+  assert.match(html, /<section class="duel-table"[\s\S]{0,1200}id="statusBar"/);
 });
 
 test('v9 PR-E2: pauseBanner 默认 hidden + 含 brush 文本', () => {
