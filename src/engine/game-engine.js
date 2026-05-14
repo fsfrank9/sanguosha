@@ -1987,7 +1987,34 @@
           var responseContext = { mode: 'response', state: state, asType: 'sha' };
           var conversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', responseContext));
           // Same: support equipment-zone sources for 武圣 's response path.
-          return conversion ? { card: removeOwnCardFromAnyZone(state, conversion.card.id), asName: conversion.asName, skillName: conversion.skillName } : null;
+          if (conversion) return { card: removeOwnCardFromAnyZone(state, conversion.card.id), asName: conversion.asName, skillName: conversion.skillName };
+          // v7 PR-14: 丈八蛇矛 — "你可以将两张手牌当【杀】使用或打出"
+          //   响应路径：装备 丈八 且手牌 >= 2 时，consume 2 张手牌当 杀 响应。
+          //   spec 是 optional，但响应窗口缺省"自动出杀"——保留旧行为。
+          //   skillPreferences.zhangba = 'decline' 可禁用。
+          if (state.equipment && state.equipment.weapon
+              && state.equipment.weapon.type === 'zhangba'
+              && state.hand.length >= 2
+              && (!state.skillPreferences || state.skillPreferences.zhangba !== 'decline')) {
+            var zbFirst = state.hand.shift();
+            var zbSecond = state.hand.shift();
+            return {
+              card: {
+                id: 'zhangba-resp-' + zbFirst.id + '-' + zbSecond.id,
+                type: 'sha',
+                name: '丈八杀',
+                suit: zbFirst.suit,
+                color: zbFirst.color,
+                rank: zbFirst.rank,
+                physicalCard: null,
+                virtual: true
+              },
+              asName: '杀',
+              skillName: '丈八蛇矛',
+              extraCards: [zbFirst, zbSecond]
+            };
+          }
+          return null;
         }
         card = removeFirstCardOfType(state, type);
         return card ? { card: card, asName: card.name, skillName: null } : null;
@@ -1997,11 +2024,19 @@
         var response = findResponseCard(game[actor], type);
         if (!response) return false;
         if (type === 'sha' && actor === game.turn) game[actor].usedOrRespondedSha = true;
-        discardCard(game, response.card);
-        if (response.skillName) {
-          log(game, actorName(game, actor) + '发动【' + response.skillName + '】，将【' + response.card.name + '】当【' + response.asName + '】响应' + reason + '。');
+        if (response.extraCards && response.extraCards.length) {
+          // v7 PR-14: 丈八蛇矛 响应 — 弃两张物理手牌，虚拟杀不进弃牌堆
+          response.extraCards.forEach(function (real) { discardCard(game, real); });
+          log(game, actorName(game, actor) + '发动【' + response.skillName + '】，将【'
+            + response.extraCards.map(function (c) { return c.name; }).join('】、【')
+            + '】当【' + response.asName + '】响应' + reason + '。');
         } else {
-          log(game, actorName(game, actor) + '打出【' + response.card.name + '】响应' + reason + '。');
+          discardCard(game, response.card);
+          if (response.skillName) {
+            log(game, actorName(game, actor) + '发动【' + response.skillName + '】，将【' + response.card.name + '】当【' + response.asName + '】响应' + reason + '。');
+          } else {
+            log(game, actorName(game, actor) + '打出【' + response.card.name + '】响应' + reason + '。');
+          }
         }
         return true;
       }
