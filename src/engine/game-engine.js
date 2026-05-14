@@ -184,6 +184,11 @@
           return triggerRendeActiveSkill(context);
         }
       });
+      SkillRuntime.registerSkill(skillRegistry, 'qingnang', {
+        onActiveSkill: function (context) {
+          return triggerQingnangActiveSkill(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'fanjian', {
         onActiveSkill: function (context) {
           return triggerFanjianActiveSkill(context);
@@ -202,7 +207,8 @@
         zhiheng: true,
         kurou: true,
         rende: true,
-        fanjian: true
+        fanjian: true,
+        qingnang: true
       };
 
       function cardTargetProtection(game, actor, targetActor, card, displayName) {
@@ -1076,6 +1082,41 @@
           enterDying(game, actor, actor);
         }
         return success('苦肉完成。');
+      }
+
+      // v8 PR-C4: 青囊 (华佗) — gltjk card__hero__neutral.md:
+      //   "出牌阶段限一次，你可以弃置一张手牌并选择一名已受伤的角色，
+      //    令其回复 1 点体力。"
+      // 1v1 实现：target 可为 'player' / 'enemy' / 'self'，最终由
+      // options.target 决定；未指定时默认对方（若对方受伤），否则自身。
+      function triggerQingnangActiveSkill(context) {
+        if (context.skillId !== 'qingnang') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        var cardIds = context.cardIds || [];
+        var options = context.options || {};
+        if (!self || !hasSkill(self, 'qingnang')) return null;
+        if (self.flags.qingnangUsed) return fail('【青囊】每回合限一次。');
+        if (!cardIds.length) return fail('请选择要弃置的一张手牌。');
+        var targetActor = options.target || options.targetActor;
+        if (targetActor === 'self') targetActor = actor;
+        if (targetActor !== 'player' && targetActor !== 'enemy') {
+          var opp = game[opponent(actor)];
+          if (opp && opp.hp < opp.maxHp) targetActor = opponent(actor);
+          else if (self.hp < self.maxHp) targetActor = actor;
+          else return fail('没有已受伤的角色，无法发动【青囊】。');
+        }
+        var target = game[targetActor];
+        if (!target) return fail('目标无效。');
+        if (target.hp >= target.maxHp) return fail('目标未受伤，不能发动【青囊】。');
+        var costCard = removeCardFromHand(self, cardIds[0]);
+        if (!costCard) return fail('选择的手牌不存在。');
+        discardCard(game, costCard);
+        self.flags.qingnangUsed = true;
+        target.hp = Math.min(target.maxHp, target.hp + 1);
+        log(game, actorName(game, actor) + '发动【青囊】，弃置【' + costCard.name + '】，令' + actorName(game, targetActor) + '回复 1 点体力。');
+        return success('青囊完成。');
       }
 
       function triggerRendeActiveSkill(context) {
@@ -3663,6 +3704,15 @@
               .sort(function (a, b) { return a.score - b.score; });
           }
           if (candidates.length) return { skillId: 'zhiheng', cardIds: [candidates[0].card.id] };
+        }
+
+        // 青囊: heal whenever 自身 is wounded and 有手牌可弃。优先自救；
+        // 自己满血但对方受伤时不会触发（不应该给敌人回血）。
+        if (hasSkill(self, 'qingnang') && !self.flags.qingnangUsed && self.hand.length > 0 && self.hp < self.maxHp) {
+          var qingnangCandidates = self.hand
+            .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
+            .sort(function (a, b) { return a.score - b.score; });
+          return { skillId: 'qingnang', cardIds: [qingnangCandidates[0].card.id], options: { target: actor } };
         }
 
         // 反间: opportunistic chip damage. The opponent guesses a suit
