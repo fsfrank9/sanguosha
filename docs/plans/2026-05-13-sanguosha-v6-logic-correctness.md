@@ -1094,6 +1094,18 @@ if (weapon.type === 'qilin') {
 
 v7 把 gltjk 镜像里所有已实现牌/规则的 spec 偏差都修完了。剩下的工作分四个方向，按"用户感知度 × 工作量"做了优先级排序：
 
+### 0. 牌面 suit + rank 可视化（**已先于方向 1 落地**）
+
+v8 起步时用户指出："目前我们的牌上是没有花色和数字的，这是个很大的问题"。引擎一直有 `card.suit / card.rank / card.color`（火攻 / 倾国 / 武圣 / 闪电 判定 都依赖），但 UI 牌面只渲染 `name + label + desc + symbol`，玩家看不到花色 / 点数——所有"按花色 / 颜色"的决策都瞎做。
+
+**v8 PR-0 已落地**（🟡 PR 待合并）：
+- `dom-adapter.js`：新增 `suitColorClass(suit)` / `suitRankBadge(card)` helper；`renderCard`（玩家手牌）右上角渲染 `♠/♥/♣/♦ + RANK`；`zoneCards`（装备区 / 判定区）名字后加 `mini-card-suit` 标记
+- `main.css`：新增 `.card-corner`（右上角定位 + 阴影） / `.suit-red`（heart/diamond 红色） / `.suit-black`（spade/club 浅色） / `.mini-card-suit`
+- 对手手牌仍走 `miniBacks`（隐私保护，spec 要求手牌私有）
+- `tests/card_face_suit_rank.test.mjs`（7 条断言）覆盖 helper / 渲染调用 / CSS 类 / 红黑颜色 / 对手隐私
+
+这是方向 1（pendingChoice 面板）的硬依赖：面板里展示对手手牌内容（如过河 1V1 / 火攻展示牌）必须能看到 suit。
+
 ### 1. UI 接 v7 新 pendingChoice 面板（最高优先级）
 
 v7 引入 7 个新 pendingChoice + 3 个 pauseState 槽位，引擎 API 全跑通，但 `dom-adapter.js` 还没接面板——意味着对玩家来说，所有 v7 的"完整 spec 合规"目前**只能通过代码 API 体验**，浏览器里用不到。
