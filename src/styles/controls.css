@@ -4,20 +4,17 @@
    .skill-button (+ :disabled), .skill-status-todo/-display/-implemented,
    .discard-controls, .shake + @keyframes shake. */
 
-    /* v9 PR-E14: 移出 header, absolute 锚到 .game-frame.
-       v9 PR-E15: 位置从右上 (top:18 right:86) 改到 "我的角色卡上面一点"
-       (用户反馈). hand-dock 高度 ~180 + player-zone ~110 + gap 24, 取
-       bottom 约 320, 让按钮浮在 player-zone 顶上方右侧. */
-    .top-actions {
-      position: absolute;
-      z-index: 7;
-      top: auto;
-      right: 28px;
-      bottom: 320px;
+    /* v9 PR-E14/E15: .top-actions absolute 浮顶 / 浮玩家卡上.
+       v9 PR-E16: 用户反馈"重新选将和结束回合干脆删除", 真删 (HTML + CSS).
+       重开局走 drawerRestartBtn (PR-E5 side-drawer); 结束回合走 #handDiscardBtn
+       (hand-dock 内). */
+
+    /* v9 PR-E16: hand-dock 内新加 .hand-actions — 3 按钮 (确认 / 取消 / 结束回合).
+       与 .discard-controls 同行 (hand-title flex), gap 间隔. */
+    .hand-actions {
       display: flex;
+      gap: 8px;
       flex-wrap: wrap;
-      gap: 10px;
-      justify-content: flex-end;
     }
 
     /* v9 PR-E7: 全局 .btn 统一为橙金装饰风 — 与 .btn-frame 视觉一致,

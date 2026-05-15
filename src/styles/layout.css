@@ -261,35 +261,12 @@
       overflow: hidden;
     }
 
-    /* v9 PR-E2: 暂停 brush 横幅. 在 .duel-table 上居中, 等待 pendingChoice
-       或 enemyThinking 时显示. brush 效果用 box-shadow 多偏移模拟不规则
-       笔触边缘 (无图片). */
-    .pause-banner {
-      position: absolute;
-      left: 50%;
-      bottom: 28%;
-      transform: translateX(-50%);
-      z-index: 7;
-      pointer-events: none;
-    }
+    /* v9 PR-E2: 暂停 brush 横幅 (.pause-banner / __brush).
+       v9 PR-E16: 用户反馈 "别人回合或判定回合显示游戏已暂停, 逻辑不对".
+       这两种场景应由 .phase-prompt + 具体 modal 接管, 整个 .pause-banner
+       DOM + CSS 删除. .phase-prompt 仍保留 (PR-E13 加, 常驻 phase 提示). */
 
-    .pause-banner__brush {
-      display: inline-block;
-      padding: 6px 28px;
-      color: #ffcb46;
-      font-size: 20px;
-      font-weight: 800;
-      letter-spacing: .14em;
-      background: rgba(0, 0, 0, 0.78);
-      border-radius: 2px 14px 4px 10px;
-      box-shadow:
-        5px 0 0 -2px rgba(0, 0, 0, 0.72),
-        -4px 1px 0 -3px rgba(0, 0, 0, 0.78),
-        3px -2px 0 -1px rgba(0, 0, 0, 0.65);
-      text-shadow: 0 1px 0 rgba(0, 0, 0, .9);
-    }
-
-    /* v9 PR-E13: 中下 phase 横幅 — 黄字黑笔触, 复用 .pause-banner 风格.
+    /* v9 PR-E13: 中下 phase 横幅 — 黄字黑笔触.
        常驻显示当前 phase 提示 (e.g. "你的回合"). 位置 bottom 22% — 比
        .pause-banner 28% 低一些, 错开 (pendingChoice 时此横幅 hidden,
        由 .pause-banner 接管). */

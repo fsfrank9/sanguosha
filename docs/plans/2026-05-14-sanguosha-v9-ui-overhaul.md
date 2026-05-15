@@ -42,9 +42,10 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E12 | 进入游戏后界面清理 (隐藏与 v9 新元素重复 / 噪音的旧装饰: 双显日志, ::after 水印, ::before 大字, camp-ribbon, 武将台词) | 🟢 PR #80 已合并 |
 | PR-E13 | 进入游戏后界面清理 v2 (隐藏 .title-card / .status-banner / .log-overlay / v9.0.0 重影 + 新增中下 phase-prompt 横幅 + zone-panel 半透明) | 🟢 PR #81 已合并 |
 | PR-E14 | arena 清理 + 反贼徽章对称 + 手牌截断修复 + top-actions 浮顶 + 恢复滚动日志 | 🟢 PR #82 已合并 |
-| PR-E15 | polish (top-actions 移角色卡上方 + stat-grid 隐藏 + deck info 移技能 panel + 删 time + 角落按钮往外) | 🟡 PR 待合并 |
+| PR-E15 | polish (top-actions 移角色卡上方 + stat-grid 隐藏 + deck info 移技能 panel + 删 time + 角落按钮往外) | 🟢 PR #83 已合并 |
+| PR-E16 | hand-actions (真删 top-actions + 删 pause-banner + 加确认/取消/弃牌 3 按钮 + select-then-confirm + pending modal 统一 dispatch) | 🟡 PR 待合并 |
 
-总预估: **~2700-3600 LOC 变更**, 跨 15 个 review cycle。
+总预估: **~2700-3700 LOC 变更**, 跨 16 个 review cycle。
 
 ## 设计目标 (从参考截图提炼)
 
@@ -64,6 +65,62 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E16 落地 — hand-actions 重构 ✅
+
+**用户反馈截图** (PR-E15 合并后浏览器实测, 4 条; 语气强烈"越改越乱""真的过分"):
+> 1. 重新选将和结束回合这两个按钮干脆删除得了, 我说的是真正那种删除, 不是隐藏
+> 2. 我的手牌区那个点击卡牌使用换成三个按钮: 确认, 取消, 弃牌; 点了牌之后要点确认才会使用; 弃牌就是结束回合进入起牌阶段
+> 3. 在别人回合或者判定回合为什么我这里要显示游戏已暂停, 这个逻辑不对
+> 4. 所有要确认的技能的确认和取消用第 2 步里加的确认和取消按钮
+
+**4 处改动 (引擎零改动)**:
+
+1. **真删 .top-actions** — `index.html` 整个 `<nav class="top-actions">` 块删除 (含 `#newGameBtn` + `#endTurnBtn`). dom-adapter 移除两个 id 缓存; 删除 `els.newGameBtn.addEventListener('click', showSetup)` / `els.endTurnBtn.addEventListener('click', ...)` 监听; `renderStatus` 内 `els.endTurnBtn.disabled / textContent` 引用迁移到 `els.handDiscardBtn`. CSS `controls.css` `.top-actions` 规则删除. 重开局功能走 `drawerRestartBtn` (PR-E5 side-drawer 已有), 结束回合走新 `#handDiscardBtn`.
+
+2. **hand-dock 加 3 按钮 + select-then-confirm**:
+   - HTML: `.hand-actions` 容器 + `#handConfirmBtn`/`#handCancelBtn`/`#handDiscardBtn` 3 按钮
+   - JS: 加 `selectedHandCardId` state; `playerHand` click 在 `_shouldSelectFirst()` 为 true (play 阶段无 pending / 无 skill-select / 非 discard) 时仅 set `selectedHandCardId` + 高亮 + render (不立即 usePlayerCard); 复用 `.discard-selected` CSS 高亮选中
+   - JS: `handConfirmBtn` click → `_handConfirm()`; `handCancelBtn` click → `_handCancel()`; `handDiscardBtn` click → 原 endTurn 流程 (finishPlayPhase + advancePhase + endTurn)
+   - CSS `controls.css` `.hand-actions { display: flex; gap: 8px }`
+   - handHint 文本: "点击卡牌选中, 再按'确认'" / "已选, 点'确认'使用"
+
+3. **删除 .pause-banner**:
+   - HTML: `<div class="pause-banner" id="pauseBanner">` 块删除
+   - dom-adapter: `'pauseBanner'` 移出缓存; `renderPauseBanner` 改为 no-op (避免删除调用站点风险, render() 仍调用)
+   - CSS `layout.css` `.pause-banner` + `.pause-banner__brush` 规则块删除. `.phase-prompt__brush` (PR-E13, 复用同笔触风格) 仍保留作 phase 提示
+
+4. **pending modal 统一 dispatch**:
+   - dom-adapter: `PENDING_MODAL_DISPATCH` 注册表 (15 项), 每项 `{ panelId, confirmBtnId, cancelBtnId }`
+     - 覆盖 luoshen / guanxing / zhiheng / ganglie (+ ganglieSource) / cixiongFire / jiedaoDecision / yiji / qilin / guicai / huogong / tiesuo / conversion / target / exitConfirm
+   - `_firstVisibleDispatch()` 找第一个 `!panel.hidden` 的注册项
+   - `_clickIfEnabled(btnId)` 安全调用 `btn.click()` (检查 hidden/disabled)
+   - `_handConfirm` / `_handCancel`: 先 dispatch 到 visible modal 对应 button, 否则 fallback (confirm 走 confirmDiscardBtn / playCard; cancel 走清选中)
+   - modal 内原按钮 (luoshenContinueBtn 等) **保留** 作为兼容入口; hand 区按钮仅作为统一 dispatch
+
+**新增测试** `tests/v9_pr_e16_hand_actions.test.mjs` (15 条守护):
+- 3 条 top-actions 真删 (HTML + JS 缓存 + CSS)
+- 5 条 hand-actions HTML + JS state + 绑定 + dispatch
+- 3 条 pause-banner 真删 (HTML + JS no-op + CSS)
+- 3 条 dispatch 注册表 + _handConfirm/_handCancel 内部走 dispatch
+- 1 条 loadAllStyles() 回归
+
+**同步更新旧测试** (PR-E16 反转 / 删除):
+- `v9_pr_e2_center_log`: 5 条断言 (pauseBanner / brush / cache id / loadAllStyles)
+- `v9_pr_e14_arena_cleanup`: 2 条 top-actions 断言
+- `v9_pr_e15_polish`: 2 条 top-actions 断言
+
+**Test status**: 758 → 772 ✓ (+14 净); `build:check` 通过.
+
+**Process 遵守**:
+- PR-E15 (#83) merge 状态已通过 `mcp__github__pull_request_read` 确认 (`merged: true, merged_at: 2026-05-14T23:56:23Z`) 后才从最新 main 拉新 branch `claude/v9-pr-e16-hand-actions`. 不在已 merge PR 上加 commit.
+
+**不在范围**:
+- 不动 engine, 不动 game.log, 不动 phase 流程
+- 复杂 multi-button modal (fanjian 4 花色 / tiesuo 4 选项 / yiji 分配) 保留 modal 内按钮作为主入口; hand 区 confirm/cancel 只处理"是/否"二选一 modal 类型
+- 真实立绘 / 卡牌插画 (无 PNG 约束)
+
+---
 
 ### PR-E15 落地 — 5 处 polish ✅
 
@@ -338,9 +395,9 @@ CSS `src/styles/zones.css`:
 
 ---
 
-## v9 方向 D 当前进度 (16 PR 已提交; 待用户验收)
+## v9 方向 D 当前进度 (17 PR 已提交; 待用户验收)
 
-PLAN + E0-E15 共 16 PR (1 PLAN + 15 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
+PLAN + E0-E16 共 17 PR (1 PLAN + 16 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
 
 | 子目标 | 提交 PR |
 |---|---|
@@ -359,11 +416,12 @@ PLAN + E0-E15 共 16 PR (1 PLAN + 15 实现) 已提交; 是否达成 v9-D 整体
 | 进入游戏后清理 (双显日志 + 旧水印) | PR-E12 |
 | 进入游戏后清理 v2 (title-card / status-banner / phase-prompt / 半透明) | PR-E13 |
 | arena 清理 + 反贼徽章 + 手牌修复 + top-actions 浮顶 + 恢复日志 | PR-E14 |
-| **5 处 polish (按钮移位 / stat-grid / deck info / 删 time / 角落往外)** | **PR-E15** |
+| 5 处 polish (按钮移位 / stat-grid / deck info / 删 time / 角落) | PR-E15 |
+| **hand-actions 重构 (top-actions/pause-banner 真删 + 3 按钮 + 统一 dispatch)** | **PR-E16** |
 
 数据点:
-- 15 实现 PR + 1 PLAN, ~3600 LOC (CSS + HTML + JS + tests)
-- 758 测试 ✓ 全套通过 (起点 529 → 758, 新增 ~229 条守护)
+- 16 实现 PR + 1 PLAN, ~3700 LOC (CSS + HTML + JS + tests)
+- 772 测试 ✓ 全套通过 (起点 529 → 772, 新增 ~243 条守护)
 - 引擎零改动 (`src/engine/*` 全程不动)
 - 无 PNG 素材 (纯 CSS / Unicode / inline SVG / polygon clip)
 
