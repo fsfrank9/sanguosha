@@ -84,8 +84,7 @@
           // v9 PR-E5: 侧抽屉菜单 + 退出确认 modal
           'sideDrawer', 'drawerExitBtn', 'drawerRestartBtn', 'drawerHelpBtn', 'drawerCloseBtn',
           'exitConfirmModal', 'exitConfirmBackdrop', 'exitConfirmYesBtn', 'exitConfirmNoBtn',
-          // v9 PR-E8: 二级 splash + 一级 lobby
-          'splashScreen', 'splashEnterBtn',
+          // v9 PR-E8: 一级 lobby (v9 PR-E18: 二级 splash 已删除).
           'lobbyScreen', 'lobbyKofBtn', 'lobby1v1Btn', 'lobbyHellBtn',
           // v9 PR-E9: 选将网格 — 替代旧 <select> 下拉
           'heroPick', 'heroPickPrompt', 'heroPickPlayerTab', 'heroPickEnemyTab',
@@ -1723,8 +1722,7 @@
         hideConversionPanel();
         hideGuanxingPanel();
         exitSkillSelectMode();
-        // v9 PR-E8: 切到 setup 时, 隐藏 splash / lobby
-        if (els.splashScreen) els.splashScreen.hidden = true;
+        // v9 PR-E8: 切到 setup 时, 隐藏 lobby (v9 PR-E18: splash 已删).
         if (els.lobbyScreen) els.lobbyScreen.hidden = true;
         if (els.setupScreen) els.setupScreen.hidden = false;
         if (els.duelTable) els.duelTable.hidden = true;
@@ -1736,26 +1734,16 @@
         assignRandomRoles();
       }
 
-      // v9 PR-E8: 入口屏切换 — splash → lobby → setup → game.
-      // v9 PR-E10: 同时切换 <header> 显隐 — splash/lobby 不显示 dev header,
-      // setup/game 显示 (含 "新开一局" / "结束回合" 按钮). 用 querySelector
-      // 取 header 避免增加 els id.
-      // v9 PR-E13: 加 mode 参数 — 游戏中 (mode='game') 隐藏 .title-card
-      // (h1 + .subtitle 占顶部 ~12%, 信息冗余), 只保留 .top-actions 角落按钮.
+      // v9 PR-E8: 入口屏切换 — lobby → setup → game (v9 PR-E18: splash 已删).
+      // v9 PR-E10: 同时切换 <header> 显隐 — lobby 不显示 dev header,
+      // setup/game 显示. 用 querySelector 取 header 避免增加 els id.
+      // v9 PR-E13: 加 mode 参数 — 游戏中 (mode='game') 隐藏 .title-card.
       function _toggleHeader(show, mode) {
         var header = document.querySelector('.game-frame > header');
         if (header) header.hidden = !show;
         if (els.titleCard) els.titleCard.hidden = !show || mode === 'game';
       }
-      function showSplash() {
-        if (els.splashScreen) els.splashScreen.hidden = false;
-        if (els.lobbyScreen) els.lobbyScreen.hidden = true;
-        if (els.setupScreen) els.setupScreen.hidden = true;
-        if (els.duelTable) els.duelTable.hidden = true;
-        _toggleHeader(false);
-      }
       function showLobby() {
-        if (els.splashScreen) els.splashScreen.hidden = true;
         if (els.lobbyScreen) els.lobbyScreen.hidden = false;
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = true;
@@ -2144,12 +2132,8 @@
         if (els.heroPickEnemyTab) els.heroPickEnemyTab.addEventListener('click', function () {
           handleHeroPickTabClick('enemy');
         });
-        // v9 PR-E8: splash click → lobby; lobby 1V1 → setup; KOF/炼狱 placeholder.
-        if (els.splashEnterBtn) els.splashEnterBtn.addEventListener('click', showLobby);
-        if (els.splashScreen) els.splashScreen.addEventListener('click', function (e) {
-          if (e.target === els.splashEnterBtn) return;
-          showLobby();
-        });
+        // v9 PR-E8: lobby 1V1 → setup; KOF/炼狱 placeholder.
+        // v9 PR-E18: splash 屏已删, 启动直接进 lobby.
         if (els.lobby1v1Btn) els.lobby1v1Btn.addEventListener('click', showSetup);
         if (els.lobbyKofBtn) els.lobbyKofBtn.addEventListener('click', function () {
           if (window.alert) window.alert('KOF 模式 — 待开发 (v10+ 计划)');
@@ -2249,5 +2233,5 @@
       initElements();
       populateHeroSelects();
       bindEvents();
-      // v9 PR-E8: 启动从 splash 屏开始, 点击进 lobby, 选 1V1 进 setup
-      showSplash();
+      // v9 PR-E18: 启动直接进 lobby (二级 splash 已删), 选 1V1 进 setup
+      showLobby();

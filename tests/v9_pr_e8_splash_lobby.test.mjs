@@ -1,4 +1,5 @@
-// v9 PR-E8 守护测试: 二级 splash 屏 + 一级 lobby 屏 (新入口流程).
+// v9 PR-E8 守护测试: 一级 lobby 屏 (入口流程).
+// v9 PR-E18: 二级 splash 屏已删除 — 相关守护已撤, 仅保留 lobby 守护.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,43 +18,32 @@ function test(name, fn) { tests.push([name, fn]); }
 
 // ───── HTML 结构 ─────────────────────────────────────────────────────
 
-test('v9 PR-E8: index.html 含 <section class="splash-screen" id="splashScreen"> (默认显示)', () => {
-  assert.match(html, /<section class="splash-screen" id="splashScreen">/);
-  // splash 默认无 hidden (作为入口首屏)
-  assert.doesNotMatch(html, /<section class="splash-screen" id="splashScreen"[^>]*hidden/);
+test('v9 PR-E8/E18: index.html 含 <section class="lobby-screen" id="lobbyScreen"> (启动首屏)', () => {
+  assert.match(html, /<section class="lobby-screen" id="lobbyScreen"[^>]*>/);
 });
 
-test('v9 PR-E8: index.html 含 <section class="lobby-screen" id="lobbyScreen" hidden> (启动后由 splash click 唤起)', () => {
-  assert.match(html, /<section class="lobby-screen" id="lobbyScreen" hidden>/);
+test('v9 PR-E18: index.html 不再含 splash-screen (二级 splash 已删)', () => {
+  assert.doesNotMatch(html, /class="splash-screen"/);
+  assert.doesNotMatch(html, /id="splashScreen"/);
+  assert.doesNotMatch(html, /id="splashEnterBtn"/);
 });
 
-test('v9 PR-E8: setup-screen 改 hidden (新流程 splash → lobby → setup)', () => {
-  // PR-E8 之后 setup-screen 默认 hidden, 等 lobby 1V1 唤起
+test('v9 PR-E8: setup-screen 默认 hidden (新流程 lobby → setup)', () => {
   assert.match(html, /<section class="setup-screen" id="setupScreen" hidden>/);
-});
-
-test('v9 PR-E8: splash 含 __bg / __messages / __enter 三块', () => {
-  assert.match(html, /class="splash-screen__bg"/);
-  assert.match(html, /class="splash-screen__messages"/);
-  assert.match(html, /id="splashEnterBtn"/);
-  assert.match(html, /class="splash-screen__enter"/);
 });
 
 test('v9 PR-E8: lobby 含 topbar (avatar + name + currency) + 3 模式卡 + 5 nav', () => {
   assert.match(html, /class="lobby-screen__topbar"/);
   assert.match(html, /class="lobby-screen__avatar"/);
   assert.match(html, /class="lobby-screen__currency"/);
-  // 3 模式卡 ids
   assert.match(html, /id="lobbyKofBtn"/);
   assert.match(html, /id="lobby1v1Btn"/);
   assert.match(html, /id="lobbyHellBtn"/);
-  // 5 nav items
   const navCount = (html.match(/class="lobby-nav-item"/g) || []).length;
   assert.equal(navCount, 5, 'lobby 底部 nav 应有 5 项');
 });
 
 test('v9 PR-E8: lobby 模式卡 — KOF/炼狱 用 --placeholder + disabled, 1V1 用 --active', () => {
-  // 抓出每个 button 的完整标签 (class 和 id 出现顺序无关)
   const kof = html.match(/<button[^>]*id="lobbyKofBtn"[^>]*>/);
   const hell = html.match(/<button[^>]*id="lobbyHellBtn"[^>]*>/);
   const v1 = html.match(/<button[^>]*id="lobby1v1Btn"[^>]*>/);
@@ -68,27 +58,10 @@ test('v9 PR-E8: lobby 模式卡 — KOF/炼狱 用 --placeholder + disabled, 1V1
 
 // ───── CSS 入口屏样式 ───────────────────────────────────────────────
 
-test('v9 PR-E8: entry.css 含 .splash-screen + __bg / __messages / __enter', () => {
-  assert.match(entryCss, /\.splash-screen\s*\{/);
-  assert.match(entryCss, /\.splash-screen__bg\s*\{/);
-  assert.match(entryCss, /\.splash-screen__messages\s*\{/);
-  assert.match(entryCss, /\.splash-screen__enter\s*\{/);
-});
-
-test('v9 PR-E8: splash __bg 用 polygon clip 模拟山景剪影 (::before + ::after)', () => {
-  assert.match(entryCss, /\.splash-screen__bg::before/);
-  assert.match(entryCss, /\.splash-screen__bg::after/);
-  // 至少一个 clip-path: polygon
-  assert.match(entryCss, /\.splash-screen__bg::before\s*\{[\s\S]*?clip-path:\s*polygon/);
-});
-
-test('v9 PR-E8: splash __enter 黑色 brush 横幅风 (与中央日志暂停横幅同源 box-shadow 偏移)', () => {
-  const block = entryCss.match(/\.splash-screen__enter\s*\{[\s\S]*?\n\s{4}\}/);
-  assert.ok(block);
-  assert.match(block[0], /background:\s*rgba\(0,\s*0,\s*0/);
-  assert.match(block[0], /color:\s*#ffd900/);
-  // 多 box-shadow 偏移
-  assert.match(block[0], /box-shadow:[\s\S]*?,[\s\S]*?,/);
+test('v9 PR-E18: entry.css 不再含 .splash-screen 系列规则', () => {
+  assert.doesNotMatch(entryCss, /\.splash-screen\s*\{/);
+  assert.doesNotMatch(entryCss, /\.splash-screen__bg/);
+  assert.doesNotMatch(entryCss, /\.splash-screen__enter/);
 });
 
 test('v9 PR-E8: entry.css 含 .lobby-screen + __topbar / __user / __avatar / __currency / __modes / __nav', () => {
@@ -121,8 +94,7 @@ test('v9 PR-E8: .lobby-screen__modes 用 grid 3 列', () => {
   assert.match(block[0], /grid-template-columns:\s*repeat\(3/);
 });
 
-test('v9 PR-E8: .splash-screen / .lobby-screen [hidden] display:none !important', () => {
-  assert.match(entryCss, /\.splash-screen\[hidden\]\s*\{[\s\S]*?display:\s*none\s*!important/);
+test('v9 PR-E8: .lobby-screen [hidden] display:none !important', () => {
   assert.match(entryCss, /\.lobby-screen\[hidden\]\s*\{[\s\S]*?display:\s*none\s*!important/);
 });
 
@@ -135,53 +107,48 @@ test('v9 PR-E8: main.css @import entry.css (放最后)', () => {
 
 // ───── dom-adapter 接入 ──────────────────────────────────────────────
 
-test('v9 PR-E8: dom-adapter 缓存 splash + lobby 6 个 ids', () => {
-  ['splashScreen', 'splashEnterBtn', 'lobbyScreen', 'lobbyKofBtn', 'lobby1v1Btn', 'lobbyHellBtn'].forEach(function (id) {
+test('v9 PR-E8/E18: dom-adapter 缓存 lobby 4 个 ids (splash 2 个已删)', () => {
+  ['lobbyScreen', 'lobbyKofBtn', 'lobby1v1Btn', 'lobbyHellBtn'].forEach(function (id) {
     const re = new RegExp("'" + id + "'");
     assert.match(adapter, re, '应缓存 ' + id);
   });
 });
 
-test('v9 PR-E8: dom-adapter 暴露 showSplash + showLobby (新增) + showSetup (旧, 已兼容)', () => {
-  assert.match(adapter, /function showSplash\(\)/);
+test('v9 PR-E18: dom-adapter 不再缓存 splashScreen / splashEnterBtn, 不再含 showSplash', () => {
+  assert.doesNotMatch(adapter, /'splashScreen'/);
+  assert.doesNotMatch(adapter, /'splashEnterBtn'/);
+  assert.doesNotMatch(adapter, /function showSplash\(\)/);
+});
+
+test('v9 PR-E8: dom-adapter 暴露 showLobby + showSetup', () => {
   assert.match(adapter, /function showLobby\(\)/);
   assert.match(adapter, /function showSetup\(\)/);
 });
 
-test('v9 PR-E8: showSetup 同时隐藏 splash + lobby (新流程兼容)', () => {
+test('v9 PR-E8: showSetup 隐藏 lobby', () => {
   const fn = adapter.match(/function showSetup\(\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /els\.splashScreen[\s\S]{0,80}hidden\s*=\s*true/);
   assert.match(fn[0], /els\.lobbyScreen[\s\S]{0,80}hidden\s*=\s*true/);
 });
 
-test('v9 PR-E8: 启动入口从 showSetup → showSplash (新入口流程)', () => {
-  // 末尾的初始化调用应是 showSplash (允许中间夹注释)
-  const init = adapter.match(/initElements\(\);[\s\S]{0,200}bindEvents\(\);[\s\S]{0,200}showSplash\(\);/);
-  assert.ok(init, '入口应改为 showSplash');
-  // 不应再有 bindEvents() 后直接 showSetup() 作为初始化
-  assert.doesNotMatch(adapter, /bindEvents\(\);\s*showSetup\(\);/);
-});
-
-test('v9 PR-E8: splashEnterBtn / splashScreen click → showLobby', () => {
-  assert.match(adapter, /els\.splashEnterBtn\.addEventListener\('click',\s*showLobby\)/);
-  // splashScreen 整屏 click 也走 showLobby
-  assert.match(adapter, /els\.splashScreen\.addEventListener\('click'/);
+test('v9 PR-E18: 启动入口为 showLobby (splash 已删)', () => {
+  const init = adapter.match(/initElements\(\);[\s\S]{0,200}bindEvents\(\);[\s\S]{0,200}showLobby\(\);/);
+  assert.ok(init, '入口应为 showLobby');
+  assert.doesNotMatch(adapter, /bindEvents\(\);\s*showSplash\(\);/);
 });
 
 test('v9 PR-E8: lobby1v1Btn click → showSetup; KOF/炼狱 placeholder alert', () => {
   assert.match(adapter, /els\.lobby1v1Btn\.addEventListener\('click',\s*showSetup\)/);
-  // KOF + 炼狱 click 显示 alert
   assert.match(adapter, /els\.lobbyKofBtn[\s\S]{0,200}KOF[\s\S]{0,80}待开发/);
   assert.match(adapter, /els\.lobbyHellBtn[\s\S]{0,200}炼狱[\s\S]{0,80}待开发/);
 });
 
 // ───── 全套回归 ──────────────────────────────────────────────────────
 
-test('v9 PR-E8: loadAllStyles() 拼接结果含 entry.css 内容 (回归)', () => {
-  assert.match(css, /\.splash-screen\s*\{/);
+test('v9 PR-E8/E18: loadAllStyles() 拼接结果含 lobby 规则, 不含 splash 规则', () => {
   assert.match(css, /\.lobby-screen\s*\{/);
   assert.match(css, /\.lobby-mode-card\s*\{/);
+  assert.doesNotMatch(css, /\.splash-screen\s*\{/);
 });
 
 for (const [name, fn] of tests) {

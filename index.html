@@ -75,17 +75,8 @@
          一级界面. 改用: 重开局走 side-drawer (PR-E5 已有), 结束回合走
          hand-dock 内新加 #handDiscardBtn. -->
 
-    <!-- v9 PR-E8: 二级 splash 屏 — 入口提示, 点击进入 lobby -->
-    <section class="splash-screen" id="splashScreen">
-      <div class="splash-screen__bg" aria-hidden="true"></div>
-      <div class="splash-screen__messages" aria-live="polite">
-        <p>** 三国杀 · 1v1 模块化版 **</p>
-        <p>** 引擎纯 ES 模块 + GitHub Pages 静态发布 **</p>
-        <p>** 已实现 31 个标准包/扩展包技能, 8 件装备, 完整 spec 校对 **</p>
-        <p>&amp;&amp; v9 UI 重制阶段, 持续迭代中 ^_^</p>
-      </div>
-      <button type="button" class="splash-screen__enter" id="splashEnterBtn">请点击屏幕开始游戏</button>
-    </section>
+    <!-- v9 PR-E18: 删除二级 splash 屏 (纯文字介绍, 无功能, 用户反馈"完全没必要").
+         启动直接进 lobby. lobby → setup → game. -->
 
     <!-- v9 PR-E8: 一级 lobby 屏 — 3 模式卡 + 用户信息条 + 底部 nav -->
     <section class="lobby-screen" id="lobbyScreen" hidden>

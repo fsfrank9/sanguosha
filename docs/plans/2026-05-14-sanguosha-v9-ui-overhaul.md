@@ -44,9 +44,10 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E14 | arena 清理 + 反贼徽章对称 + 手牌截断修复 + top-actions 浮顶 + 恢复滚动日志 | 🟢 PR #82 已合并 |
 | PR-E15 | polish (top-actions 移角色卡上方 + stat-grid 隐藏 + deck info 移技能 panel + 删 time + 角落按钮往外) | 🟢 PR #83 已合并 |
 | PR-E16 | hand-actions (真删 top-actions + 删 pause-banner + 加确认/取消/弃牌 3 按钮 + select-then-confirm + pending modal 统一 dispatch) | 🟢 PR #84 已合并 |
-| PR-E17 | 真删 .phase-prompt 横幅 + .hand-dock overflow 修复 (containment) | 🟡 PR 待合并 |
+| PR-E17 | 真删 .phase-prompt 横幅 + .hand-dock overflow 修复 (containment) | 🟢 PR #85 已合并 |
+| PR-E18 | 删除二级 splash 屏 (纯文字介绍无功能) — 启动直接进 lobby | 🟡 PR 待合并 |
 
-总预估: **~2700-3700 LOC 变更**, 跨 17 个 review cycle。
+总预估: **~2700-3700 LOC 变更**, 跨 18 个 review cycle。
 
 ## 设计目标 (从参考截图提炼)
 
@@ -66,6 +67,45 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E18 落地 — 删除二级 splash 屏 ✅
+
+**用户反馈** (PR-E17 合并后, 探讨性问题):
+> 目前这个游戏是不是有好多级界面, 最开始显示的这一级 (splash) 是不是完全没必要存在的
+
+界面层级原为 4 级: **splash (纯文字介绍) → lobby (3 模式卡) → setup (选将) → game**.
+splash 屏只展示文字 + "请点击屏幕开始游戏" 按钮, 无任何功能, 纯粹多一次点击.
+
+用户经 AskUserQuestion 选择 **"只删 splash"** (lobby 保留, 以后 KOF/地狱 模式做出来还能用).
+
+**改动 (引擎零改动)**:
+
+- HTML `index.html`: `<section class="splash-screen" id="splashScreen">` 整块删除 (含 `__bg` / `__messages` / `__enter` / `#splashEnterBtn`)
+- CSS `entry.css`: `.splash-screen` + `__bg` (+ `::before`/`::after`) + `__messages` (+ `p`) + `__enter` (+ `:hover`) + `[hidden]` 全部规则删除; 文件头注释更新
+- JS `dom-adapter.js`:
+  - `'splashScreen'` / `'splashEnterBtn'` 移出 id 缓存
+  - `showSplash()` 函数删除
+  - `showSetup()` 内 `els.splashScreen.hidden` 引用删除
+  - `splashEnterBtn` / `splashScreen` click 监听删除
+  - 启动入口 `showSplash()` → `showLobby()`
+
+**新增测试** `tests/v9_pr_e18_drop_splash.test.mjs` (10 条守护):
+- 1 splash HTML 真删
+- 2 splash CSS 真删 + lobby 保留
+- 5 splash JS (缓存 / showSplash / 监听 / 启动入口 / showSetup) 真删
+- 1 showLobby 正常
+- 1 loadAllStyles() 回归
+
+**同步更新旧测试** (splash 删除):
+- `v9_pr_e8_splash_lobby`: 整文件重写 — 移除全部 splash 守护, 保留 lobby 守护 + 加 splash 真删反向断言
+- `v9_pr_e10_audit`: showSplash / splash 互斥 / 入口流程 / 4 主屏 等 5 条断言改为 lobby-only
+
+**Test status**: 774 → 780 ✓; `build:check` 通过.
+
+**Process 遵守**:
+- PR-E17 (#85) merge 状态已通过 `mcp__github__pull_request_read` 确认 (`merged: true, merged_at: 2026-05-15T02:10:26Z`) 后才从最新 main 拉新 branch `claude/v9-pr-e18-drop-splash`. 不在已 merge PR 上加 commit.
+
+---
 
 ### PR-E17 落地 — 真删 phase-prompt + hand-dock overflow 修复 ✅
 
@@ -426,9 +466,9 @@ CSS `src/styles/zones.css`:
 
 ---
 
-## v9 方向 D 当前进度 (18 PR 已提交; 待用户验收)
+## v9 方向 D 当前进度 (19 PR 已提交; 待用户验收)
 
-PLAN + E0-E17 共 18 PR (1 PLAN + 17 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
+PLAN + E0-E18 共 19 PR (1 PLAN + 18 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
 
 | 子目标 | 提交 PR |
 |---|---|
@@ -449,11 +489,12 @@ PLAN + E0-E17 共 18 PR (1 PLAN + 17 实现) 已提交; 是否达成 v9-D 整体
 | arena 清理 + 反贼徽章 + 手牌修复 + top-actions 浮顶 + 恢复日志 | PR-E14 |
 | 5 处 polish (按钮移位 / stat-grid / deck info / 删 time / 角落) | PR-E15 |
 | hand-actions 重构 (top-actions/pause-banner 真删 + 3 按钮 + 统一 dispatch) | PR-E16 |
-| **真删 .phase-prompt + .hand-dock overflow 修复** | **PR-E17** |
+| 真删 .phase-prompt + .hand-dock overflow 修复 | PR-E17 |
+| **删除二级 splash 屏 (启动直接进 lobby)** | **PR-E18** |
 
 数据点:
-- 17 实现 PR + 1 PLAN, ~3700 LOC (CSS + HTML + JS + tests)
-- 774 测试 ✓ 全套通过 (起点 529 → 774, 新增 ~245 条守护)
+- 18 实现 PR + 1 PLAN, ~3700 LOC (CSS + HTML + JS + tests)
+- 780 测试 ✓ 全套通过 (起点 529 → 780, 新增 ~251 条守护)
 - 引擎零改动 (`src/engine/*` 全程不动)
 - 无 PNG 素材 (纯 CSS / Unicode / inline SVG / polygon clip)
 

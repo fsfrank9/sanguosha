@@ -50,11 +50,9 @@ test('v9 PR-E10: dom-adapter 含 _toggleHeader 工具 fn', () => {
   assert.match(adapter, /document\.querySelector\(\s*['"]\.game-frame\s*>\s*header['"]\s*\)/);
 });
 
-test('v9 PR-E10: showSplash / showLobby 调用 _toggleHeader(false) 隐藏 header', () => {
-  const splash = adapter.match(/function showSplash\(\)\s*\{[\s\S]*?\n\s{6}\}/);
+test('v9 PR-E10: showLobby 调用 _toggleHeader(false) 隐藏 header (PR-E18: splash 已删)', () => {
   const lobby = adapter.match(/function showLobby\(\)\s*\{[\s\S]*?\n\s{6}\}/);
-  assert.ok(splash && lobby);
-  assert.match(splash[0], /_toggleHeader\(false\)/);
+  assert.ok(lobby);
   assert.match(lobby[0], /_toggleHeader\(false\)/);
 });
 
@@ -69,28 +67,19 @@ test('v9 PR-E10: showSetup / newGame 调用 _toggleHeader(true, mode) 显示 hea
 
 // ───── 屏切换互斥逻辑 ────────────────────────────────────────────────
 
-test('v9 PR-E10: showSplash 互斥 — splash hidden=false, 其余 3 屏 hidden=true', () => {
-  const fn = adapter.match(/function showSplash\(\)\s*\{[\s\S]*?\n\s{6}\}/);
-  assert.ok(fn);
-  assert.match(fn[0], /splashScreen[\s\S]*?hidden\s*=\s*false/);
-  assert.match(fn[0], /lobbyScreen[\s\S]*?hidden\s*=\s*true/);
-  assert.match(fn[0], /setupScreen[\s\S]*?hidden\s*=\s*true/);
-  assert.match(fn[0], /duelTable[\s\S]*?hidden\s*=\s*true/);
-});
+// PR-E18: showSplash 已删除. 屏切换互斥从 lobby 开始 (lobby / setup / game).
 
-test('v9 PR-E10: showLobby 互斥 — lobby hidden=false, 其余 3 屏 hidden=true', () => {
+test('v9 PR-E10: showLobby 互斥 — lobby hidden=false, setup/duel-table hidden=true', () => {
   const fn = adapter.match(/function showLobby\(\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /splashScreen[\s\S]*?hidden\s*=\s*true/);
   assert.match(fn[0], /lobbyScreen[\s\S]*?hidden\s*=\s*false/);
   assert.match(fn[0], /setupScreen[\s\S]*?hidden\s*=\s*true/);
   assert.match(fn[0], /duelTable[\s\S]*?hidden\s*=\s*true/);
 });
 
-test('v9 PR-E10: showSetup 互斥 — setup hidden=false, 其余 3 屏 hidden=true', () => {
+test('v9 PR-E10: showSetup 互斥 — setup hidden=false, lobby/duel-table hidden=true', () => {
   const fn = adapter.match(/function showSetup\(\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /splashScreen[\s\S]*?hidden\s*=\s*true/);
   assert.match(fn[0], /lobbyScreen[\s\S]*?hidden\s*=\s*true/);
   assert.match(fn[0], /setupScreen[\s\S]*?hidden\s*=\s*false/);
   assert.match(fn[0], /duelTable[\s\S]*?hidden\s*=\s*true/);
@@ -105,11 +94,8 @@ test('v9 PR-E10: newGame 切到 duel-table — setup hidden=true, duel-table hid
 
 // ───── 入口流程 click 链 ─────────────────────────────────────────────
 
-test('v9 PR-E10: 入口流程 init → showSplash → splashEnterBtn click → showLobby', () => {
-  // 初始化调用 showSplash
-  assert.match(adapter, /bindEvents\(\);[\s\S]{0,200}showSplash\(\)/);
-  // splashEnterBtn → showLobby
-  assert.match(adapter, /els\.splashEnterBtn\.addEventListener\('click',\s*showLobby\)/);
+test('v9 PR-E10/E18: 入口流程 init → showLobby (splash 已删, 启动直接进 lobby)', () => {
+  assert.match(adapter, /bindEvents\(\);[\s\S]{0,200}showLobby\(\)/);
 });
 
 test('v9 PR-E10: lobby1v1Btn click → showSetup', () => {
@@ -151,17 +137,15 @@ test('v9 PR-E10/E11: handleHeroPickCardClick 推进 pickStep + 切换 currentPic
 
 // ───── 整合: 全屏 hidden 状态守护 ────────────────────────────────────
 
-test('v9 PR-E10: 4 个主屏 (splash/lobby/setup/duel-table) 在 HTML 中都存在', () => {
-  ['splashScreen', 'lobbyScreen', 'setupScreen', 'duelTable'].forEach(function (id) {
+test('v9 PR-E10/E18: 3 个主屏 (lobby/setup/duel-table) 在 HTML 中都存在 (splash 已删)', () => {
+  ['lobbyScreen', 'setupScreen', 'duelTable'].forEach(function (id) {
     const re = new RegExp('id="' + id + '"');
     assert.match(html, re, '应有 ' + id);
   });
+  assert.doesNotMatch(html, /id="splashScreen"/);
 });
 
-test('v9 PR-E10: 初始 HTML 只有 splash 未 hidden, 其余 3 屏 hidden', () => {
-  // splash 默认显示
-  assert.doesNotMatch(html, /<section class="splash-screen" id="splashScreen"[^>]*hidden/);
-  // 其余 3 屏 hidden
+test('v9 PR-E10/E18: 初始 HTML 3 屏都 hidden (showLobby 在启动时 unhide lobby)', () => {
   assert.match(html, /<section class="lobby-screen" id="lobbyScreen" hidden/);
   assert.match(html, /<section class="setup-screen" id="setupScreen" hidden/);
   assert.match(html, /<section class="duel-table" id="duelTable" hidden/);
@@ -169,10 +153,10 @@ test('v9 PR-E10: 初始 HTML 只有 splash 未 hidden, 其余 3 屏 hidden', () 
 
 // ───── 全套 + build 回归 ─────────────────────────────────────────────
 
-test('v9 PR-E10: loadAllStyles() 仍含核心规则 (回归)', () => {
+test('v9 PR-E10: loadAllStyles() 仍含核心规则 (回归; PR-E18 splash 已删)', () => {
   assert.match(css, /\.duel-table\s*\{/);
   assert.match(css, /\.hero-pick\s*\{/);
-  assert.match(css, /\.splash-screen\s*\{/);
+  assert.match(css, /\.lobby-screen\s*\{/);
   assert.match(css, /\.game-frame\s*\{/);
 });
 
