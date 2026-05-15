@@ -153,8 +153,8 @@ test('v9 PR-E5: drawerRestartBtn click → showSetup (复用现有 setup 屏)', 
   assert.match(adapter, /els\.drawerRestartBtn[\s\S]{0,200}showSetup/);
 });
 
-test('v9 PR-E5: exitConfirmYesBtn click → closeExitConfirm + showSetup', () => {
-  assert.match(adapter, /els\.exitConfirmYesBtn[\s\S]{0,200}closeExitConfirm[\s\S]{0,100}showSetup/);
+test('v9 PR-E5/E19: exitConfirmYesBtn click → closeExitConfirm + showLobby (PR-E19 改: 退出回大厅)', () => {
+  assert.match(adapter, /els\.exitConfirmYesBtn[\s\S]{0,200}closeExitConfirm[\s\S]{0,100}showLobby/);
 });
 
 test('v9 PR-E5: exitConfirmNoBtn + backdrop click → closeExitConfirm', () => {

@@ -106,8 +106,8 @@ test('v9 PR-E10: startGameBtn click → newGame (旧逻辑不破)', () => {
   assert.match(adapter, /els\.startGameBtn\.addEventListener\('click',\s*newGame\)/);
 });
 
-test('v9 PR-E10: 退出 modal 确认 → showSetup (回选将, 不回 lobby — 简化)', () => {
-  assert.match(adapter, /els\.exitConfirmYesBtn[\s\S]{0,200}closeExitConfirm[\s\S]{0,100}showSetup/);
+test('v9 PR-E10/E19: 退出 modal 确认 → showLobby (PR-E19 改: 退出回大厅一级页面)', () => {
+  assert.match(adapter, /els\.exitConfirmYesBtn[\s\S]{0,200}closeExitConfirm[\s\S]{0,100}showLobby/);
 });
 
 // ───── 选将 grid click 路径完整 ──────────────────────────────────────

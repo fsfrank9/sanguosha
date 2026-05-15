@@ -66,6 +66,12 @@
       transition: filter .15s ease, transform .15s ease;
     }
 
+    /* v9 PR-E19: .frame-corner-btn { display: inline-flex } 会覆盖 [hidden]
+       默认的 display:none, 故需显式 !important 规则. 仅游戏内显示. */
+    .frame-corner-btn[hidden] {
+      display: none !important;
+    }
+
     .frame-corner-btn:hover {
       filter: brightness(1.1);
       transform: translateY(1px);

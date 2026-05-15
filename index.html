@@ -8,19 +8,20 @@
 </head>
 <body data-version="6.1">
   <main class="app">
-    <!-- v9 PR-E1: 角落 widget — 左上 菜单 / 右上 分享. placeholder click,
-         PR-E5 接入侧抽屉. 浮在 .game-frame 条纹边框上方. -->
-    <button type="button" class="frame-corner-btn frame-corner-btn--menu" id="frameMenuBtn" aria-label="菜单（待 PR-E5 接入侧抽屉）">
+    <!-- v9 PR-E1: 角落 widget — 左上 菜单 / 右上 分享.
+         v9 PR-E19: 默认 hidden — 仅游戏内 (game 屏) 显示. 菜单含退出/重开,
+         在 lobby/setup 入口屏无意义. JS _toggleCornerButtons 控制显隐. -->
+    <button type="button" class="frame-corner-btn frame-corner-btn--menu" id="frameMenuBtn" hidden aria-label="菜单">
       <span class="frame-corner-btn__icon" aria-hidden="true">📒</span>
       <span class="frame-corner-btn__label">菜单</span>
     </button>
-    <button type="button" class="frame-corner-btn frame-corner-btn--share" id="frameShareBtn" aria-label="分享（占位）">
+    <button type="button" class="frame-corner-btn frame-corner-btn--share" id="frameShareBtn" hidden aria-label="分享（占位）">
       <span class="frame-corner-btn__icon" aria-hidden="true">🪶</span>
       <span class="frame-corner-btn__label">分享</span>
     </button>
     <!-- v9 PR-E5: 侧抽屉菜单 (左上"菜单"按钮触发) + 退出确认 modal.
-         默认 hidden; frameMenuBtn click 切换 sideDrawer; 抽屉里 退出
-         按钮触发 exitConfirmModal, modal 确定回到 setup 屏. -->
+         默认 hidden; frameMenuBtn click 切换 sideDrawer.
+         v9 PR-E19: 重开 → 回选将屏 (setup); 退出 → 回大厅 (lobby). -->
     <aside class="side-drawer" id="sideDrawer" hidden aria-label="主菜单">
       <button class="side-drawer__item" id="drawerExitBtn" type="button">
         <span class="side-drawer__icon" aria-hidden="true">❌</span>
@@ -55,7 +56,7 @@
         <div class="scroll-modal__roll scroll-modal__roll--left" aria-hidden="true"></div>
         <div class="scroll-modal__roll scroll-modal__roll--right" aria-hidden="true"></div>
         <div class="scroll-modal__title" id="exitConfirmTitle">退出确认</div>
-        <div class="scroll-modal__body">游戏尚未结束，退出将返回选将界面。是否确认<strong>退出</strong>？</div>
+        <div class="scroll-modal__body">游戏尚未结束，退出将返回大厅。是否确认<strong>退出</strong>？</div>
         <div class="scroll-modal__actions">
           <button class="btn-frame btn-frame--confirm" id="exitConfirmYesBtn" type="button">确定</button>
           <button class="btn-frame btn-frame--cancel" id="exitConfirmNoBtn" type="button">取消</button>
