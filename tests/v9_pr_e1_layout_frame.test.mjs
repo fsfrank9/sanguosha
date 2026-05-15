@@ -73,11 +73,12 @@ test('v9 PR-E1: index.html 含 frameMenuBtn + frameShareBtn 按钮', () => {
   assert.match(html, /class="frame-corner-btn frame-corner-btn--share"/);
 });
 
-test('v9 PR-E1: index.html 用 .game-frame 包裹 header/setup-screen/duel-table', () => {
-  // 验证 .game-frame 开标签出现在 main.app 内 + header 之前.
+test('v9 PR-E1: index.html 用 .game-frame 包裹各屏 (PR-E20: header 已删)', () => {
+  // 验证 .game-frame 开标签出现在 main.app 内.
   // 注: v9 PR-E5 在 .app 内 .game-frame 前还塞了侧抽屉 + modal, 故 buffer
-  // 放宽到 4000 char.
-  assert.match(html, /<main class="app">[\s\S]{0,4000}<div class="game-frame">[\s\S]{0,200}<header>/);
+  // 放宽到 4000 char. PR-E20 删除 <header>, 改为验证 game-frame 内含 lobby-screen.
+  assert.match(html, /<main class="app">[\s\S]{0,4000}<div class="game-frame">/);
+  assert.match(html, /<div class="game-frame">[\s\S]{0,600}<section class="lobby-screen"/);
   // 验证闭合标签 (</main> 之前)
   assert.match(html, /<\/div><!-- \/\.game-frame -->\s*<\/main>/);
 });

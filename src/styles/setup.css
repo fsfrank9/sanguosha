@@ -1,37 +1,8 @@
-/* setup.css — Title card, setup/hero-select page, rules block.
-   Includes: .title-card (+ ::after), h1, .subtitle, .setup-screen,
-   .setup-card, .setup-grid, .setup-side, .hero-select-panel, .rules. */
-
-    .title-card {
-      padding: 10px 14px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* v9 PR-E12: 旧版本 ::after 大字水印 "魏 蜀 吴 群". 在 v9 装饰外框
-       + 角落 widgets 之上重复装饰. 隐藏以减噪. */
-    .title-card::after {
-      content: none;
-    }
-
-    h1 {
-      margin: 0;
-      position: relative;
-      z-index: 1;
-      font-size: clamp(22px, 2.8vw, 34px);
-      letter-spacing: .06em;
-      color: var(--gold);
-      text-shadow: 0 4px 20px rgba(255, 155, 43, .25);
-    }
-
-    .subtitle {
-      margin-top: 6px;
-      position: relative;
-      z-index: 1;
-      color: var(--muted);
-      line-height: 1.35;
-      font-size: 13px;
-    }
+/* setup.css — setup/hero-select page, rules block.
+   v9 PR-E20: .title-card / ::after / h1 / .subtitle 规则已删除 (整个 <header>
+   + .title-card DOM 删除, 用户反馈"选将界面标题栏删了").
+   Includes: .setup-screen, .setup-card, .setup-grid, .setup-side,
+   .hero-select-panel, .rules. */
 
     .setup-screen {
       flex: 1 1 auto;

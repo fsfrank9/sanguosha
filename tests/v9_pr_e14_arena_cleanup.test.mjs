@@ -117,13 +117,9 @@ test('v9 PR-E14: renderHero 据 roles[actor] === "反贼" 切换 rebelBadge.hidd
 
 // ───── 6. top-actions 移出 header + absolute 浮顶 ─────────────────────
 
-test('v9 PR-E14: index.html .top-actions 从 <header> 内移出 (PR-E16 后整个删除)', () => {
-  // PR-E14 把 .top-actions 移出 header (header 之后 sibling). PR-E16 整个删除.
-  // header 内 / 整个 html 都不应再含 .top-actions.
-  const headerBlock = html.match(/<header>[\s\S]*?<\/header>/);
-  assert.ok(headerBlock);
-  assert.doesNotMatch(headerBlock[0], /class="top-actions"/);
+test('v9 PR-E14: index.html 不含 .top-actions (PR-E16 删除; PR-E20 连 <header> 也删)', () => {
   assert.doesNotMatch(html, /<nav class="top-actions">/);
+  assert.doesNotMatch(html, /class="top-actions"/);
 });
 
 test('v9 PR-E14: controls.css .top-actions 规则已删除 (PR-E16; PR-E14 absolute → PR-E15 浮顶 → PR-E16 真删)', () => {

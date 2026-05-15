@@ -41,29 +41,9 @@ test('v9 PR-E10: <select> 不再硬编码 stale options (由 JS 动态填充)', 
   assert.doesNotMatch(enemySel[0], /<option/);
 });
 
-// ───── header 显隐逻辑 ───────────────────────────────────────────────
-
-test('v9 PR-E10: dom-adapter 含 _toggleHeader 工具 fn', () => {
-  // PR-E13 加 mode 参数, signature 改 (show, mode)
-  assert.match(adapter, /function _toggleHeader\(show,\s*mode\)/);
-  // 用 querySelector 取 header
-  assert.match(adapter, /document\.querySelector\(\s*['"]\.game-frame\s*>\s*header['"]\s*\)/);
-});
-
-test('v9 PR-E10: showLobby 调用 _toggleHeader(false) 隐藏 header (PR-E18: splash 已删)', () => {
-  const lobby = adapter.match(/function showLobby\(\)\s*\{[\s\S]*?\n\s{6}\}/);
-  assert.ok(lobby);
-  assert.match(lobby[0], /_toggleHeader\(false\)/);
-});
-
-test('v9 PR-E10: showSetup / newGame 调用 _toggleHeader(true, mode) 显示 header', () => {
-  const setupFn = adapter.match(/function showSetup\(\)\s*\{[\s\S]*?\n\s{6}\}/);
-  const newGameFn = adapter.match(/function newGame\(\)\s*\{[\s\S]*?\n\s{6}\}/);
-  assert.ok(setupFn && newGameFn);
-  // PR-E13: 加 mode 参数 (setup / game) 控制 title-card 显隐
-  assert.match(setupFn[0], /_toggleHeader\(true,\s*['"]setup['"]\)/);
-  assert.match(newGameFn[0], /_toggleHeader\(true,\s*['"]game['"]\)/);
-});
+// ───── 屏切换逻辑 ────────────────────────────────────────────────────
+// PR-E20: <header> + .title-card 整块删除, _toggleHeader 函数已移除.
+// 原 "header 显隐逻辑" 3 条守护已撤.
 
 // ───── 屏切换互斥逻辑 ────────────────────────────────────────────────
 

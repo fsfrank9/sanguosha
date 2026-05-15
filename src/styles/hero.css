@@ -1,8 +1,9 @@
 /* hero.css — Hero portraits + HP + camp ribbon + status.
    Includes: .hero (+ .enemy/.player variants), .hero-aura, .hero::before,
-   .camp-ribbon, .hero-head, .hero-name, .version-pill, .badge, .quote,
+   .camp-ribbon, .hero-head, .hero-name, .badge, .quote,
    .hp-row, .heart, .damage-float + @keyframes floatDamage, .stat-grid,
-   .stat, .chain-status + .hero.is-chained. */
+   .stat, .chain-status + .hero.is-chained.
+   (v9 PR-E20: .version-pill 规则已删 — title-card 整体删除.) */
 
     .hero {
       padding: 10px;
@@ -59,18 +60,8 @@
       color: var(--gold);
     }
 
-    .version-pill {
-      display: inline-flex;
-      align-items: center;
-      margin-left: 10px;
-      padding: 5px 10px;
-      border-radius: 999px;
-      color: #2a120a;
-      background: linear-gradient(180deg, #ffe4a3, #d88427);
-      font-size: 14px;
-      vertical-align: middle;
-      box-shadow: 0 8px 18px rgba(0,0,0,.22);
-    }
+    /* v9 PR-E20: .version-pill 规则已删 — 它只用于 .title-card 内 h1 的
+       "v6.1 规则合规版" pill, title-card 整体已删除. */
 
     /* v9 PR-E7: .badge 微调 — 更明确的边框 + 轻金色调, 与 .btn 系列协调.
        仍保持 transparent/dark 底, 用于 hero 元素 / status 区域. */

@@ -46,9 +46,10 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E16 | hand-actions (真删 top-actions + 删 pause-banner + 加确认/取消/弃牌 3 按钮 + select-then-confirm + pending modal 统一 dispatch) | 🟢 PR #84 已合并 |
 | PR-E17 | 真删 .phase-prompt 横幅 + .hand-dock overflow 修复 (containment) | 🟢 PR #85 已合并 |
 | PR-E18 | 删除二级 splash 屏 (纯文字介绍无功能) — 启动直接进 lobby | 🟢 PR #86 已合并 |
-| PR-E19 | 角落菜单 game-only + 退出回大厅 / 重开回选将 逻辑修正 | 🟡 PR 待合并 |
+| PR-E19 | 角落菜单 game-only + 退出回大厅 / 重开回选将 逻辑修正 | 🟢 PR #87 已合并 |
+| PR-E20 | 删除顶部 header + title-card 标题栏 (各屏均不需要) | 🟡 PR 待合并 |
 
-总预估: **~2700-3700 LOC 变更**, 跨 19 个 review cycle。
+总预估: **~2700-3700 LOC 变更**, 跨 20 个 review cycle。
 
 ## 设计目标 (从参考截图提炼)
 
@@ -68,6 +69,45 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E20 落地 — 删除顶部 header + title-card 标题栏 ✅
+
+**用户反馈** (PR-E19 合并后):
+> 选将界面的最上面那个标题栏删了吧
+
+`<header>` 内只剩 `.title-card` (h1 "三国杀·1v1 模块化版 v6.1 规则合规版" + `.subtitle` 长描述; `.top-actions` 已在 PR-E16 删). title-card 在 game 屏 (PR-E13) 已隐藏, lobby 屏 `_toggleHeader(false)` 整个 header 隐, 现 setup 也要删 → 各屏均不需要, 整个 `<header>` + `.title-card` 删除.
+
+**改动 (引擎零改动)**:
+
+- **HTML** `index.html`: `<header>` + `<section class="title-card">` (h1 + `.version-pill` + `.subtitle`) 整块删除
+- **CSS**:
+  - `setup.css`: `.title-card` / `.title-card::after` / `h1` / `.subtitle` 规则删除
+  - `layout.css`: `header` 规则删除; 共享 panel-base 选择器列表移出 `.title-card`; `@media (max-width:980px)` 块删除 (内含 `header` + `.top-actions`, 两 DOM 都已删); `@media 560px` 内 `.title-card` 移出
+  - `hero.css`: `.version-pill` 规则删除 (仅 title-card h1 用)
+- **JS** `dom-adapter.js`:
+  - `_toggleHeader(show, mode)` 函数删除 (无 header/titleCard 可切)
+  - `'titleCard'` 移出 id 缓存
+  - `showLobby` / `showSetup` / `newGame` 内 3 处 `_toggleHeader(...)` 调用删除
+
+**新增测试** `tests/v9_pr_e20_drop_header.test.mjs` (9 条守护):
+- 1 HTML header/title-card/h1/version-pill/subtitle 真删
+- 3 JS _toggleHeader / titleCard / querySelector 真删
+- 3 CSS (setup / layout / hero) 规则真删
+- 2 loadAllStyles 回归 + .game-frame 保留
+
+**同步更新旧测试**:
+- `v9_pr_e1_layout_frame`: game-frame 包裹断言改为 lobby-screen (原 header)
+- `v9_pr_e10_audit`: `_toggleHeader` 3 条 header 显隐守护撤
+- `v9_pr_e12_ingame_cleanup`: `.title-card::after` 2 条守护撤
+- `v9_pr_e13_ingame_cleanup_v2`: title-card id / `_toggleHeader` 3 条守护撤
+- `v9_pr_e14_arena_cleanup`: `<header>` block 断言改为纯 top-actions 真删
+
+**Test status**: 788 → 789 ✓; `build:check` 通过.
+
+**Process 遵守**:
+- PR-E19 (#87) merge 状态已通过 `mcp__github__pull_request_read` 确认 (`merged: true, merged_at: 2026-05-15T09:39:12Z`) 后才从最新 main 拉新 branch `claude/v9-pr-e20-drop-header`. 不在已 merge PR 上加 commit.
+
+---
 
 ### PR-E19 落地 — 角落菜单 game-only + 退出/重开 逻辑修正 ✅
 
@@ -510,9 +550,9 @@ CSS `src/styles/zones.css`:
 
 ---
 
-## v9 方向 D 当前进度 (20 PR 已提交; 待用户验收)
+## v9 方向 D 当前进度 (21 PR 已提交; 待用户验收)
 
-PLAN + E0-E19 共 20 PR (1 PLAN + 19 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
+PLAN + E0-E20 共 21 PR (1 PLAN + 20 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
 
 | 子目标 | 提交 PR |
 |---|---|
@@ -535,11 +575,12 @@ PLAN + E0-E19 共 20 PR (1 PLAN + 19 实现) 已提交; 是否达成 v9-D 整体
 | hand-actions 重构 (top-actions/pause-banner 真删 + 3 按钮 + 统一 dispatch) | PR-E16 |
 | 真删 .phase-prompt + .hand-dock overflow 修复 | PR-E17 |
 | 删除二级 splash 屏 (启动直接进 lobby) | PR-E18 |
-| **角落菜单 game-only + 退出回大厅 / 重开回选将** | **PR-E19** |
+| 角落菜单 game-only + 退出回大厅 / 重开回选将 | PR-E19 |
+| **删除顶部 header + title-card 标题栏** | **PR-E20** |
 
 数据点:
-- 19 实现 PR + 1 PLAN, ~3700 LOC (CSS + HTML + JS + tests)
-- 788 测试 ✓ 全套通过 (起点 529 → 788, 新增 ~259 条守护)
+- 20 实现 PR + 1 PLAN, ~3700 LOC (CSS + HTML + JS + tests)
+- 789 测试 ✓ 全套通过 (起点 529 → 789, 新增 ~260 条守护)
 - 引擎零改动 (`src/engine/*` 全程不动)
 - 无 PNG 素材 (纯 CSS / Unicode / inline SVG / polygon clip)
 
