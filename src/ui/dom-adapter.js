@@ -90,10 +90,7 @@
           'heroPick', 'heroPickPrompt', 'heroPickPlayerTab', 'heroPickEnemyTab',
           'heroPickPlayerValue', 'heroPickEnemyValue', 'heroPickGrid',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn',
-          // v9 PR-E13: 进入游戏后 UI 清理 v2 — 标题卡 hidden 控制 + 新中下 phase 横幅
-          // v9 PR-E17: phasePrompt / phasePromptBrush 已从 HTML 删除 (用户反馈
-          // "你的回合那个位置太碍眼"). 缓存中也移出.
-          'titleCard',
+          // v9 PR-E20: titleCard 已从 HTML 删除 (含整个顶部 header), 缓存移出.
           // v9 PR-E15: 牌堆/弃牌 数字从底部 .status-bar 移到玩家技能 panel-title 右侧
           'playerSkillDeckInfo',
           // v9 PR-E16: hand-dock 内 3 个新按钮 (确认 / 取消 / 结束回合).
@@ -1726,9 +1723,9 @@
         if (els.lobbyScreen) els.lobbyScreen.hidden = true;
         if (els.setupScreen) els.setupScreen.hidden = false;
         if (els.duelTable) els.duelTable.hidden = true;
-        _toggleHeader(true, 'setup');  // v9 PR-E10: setup 显示 header (含新开一局)
         _toggleCornerButtons(false);   // v9 PR-E19: setup 入口屏不显示菜单/分享
         // v9 PR-E16: endTurnBtn / newGameBtn DOM 已删, 不再设置.
+        // v9 PR-E20: 顶部 header + 标题栏已删, 屏切换不再切 header.
         populateHeroSelects();
         // v9 PR-E11: 入 setup 自动随机身份 (assignRandomRoles 内部已重置
         // 选将状态 + renderHeroPickGrid). 用户可点 "随机主公/反贼" 重抽.
@@ -1736,16 +1733,9 @@
       }
 
       // v9 PR-E8: 入口屏切换 — lobby → setup → game (v9 PR-E18: splash 已删).
-      // v9 PR-E10: 同时切换 <header> 显隐 — lobby 不显示 dev header,
-      // setup/game 显示. 用 querySelector 取 header 避免增加 els id.
-      // v9 PR-E13: 加 mode 参数 — 游戏中 (mode='game') 隐藏 .title-card.
-      function _toggleHeader(show, mode) {
-        var header = document.querySelector('.game-frame > header');
-        if (header) header.hidden = !show;
-        if (els.titleCard) els.titleCard.hidden = !show || mode === 'game';
-      }
       // v9 PR-E19: 角落 widget (菜单 / 分享) 仅游戏内显示. 菜单含退出/重开,
       // 在 lobby/setup 入口屏无意义. lobby/setup 隐藏, game 显示.
+      // v9 PR-E20: 顶部 header + 标题栏已删, 屏切换不再切 header.
       function _toggleCornerButtons(show) {
         if (els.frameMenuBtn) els.frameMenuBtn.hidden = !show;
         if (els.frameShareBtn) els.frameShareBtn.hidden = !show;
@@ -1754,7 +1744,6 @@
         if (els.lobbyScreen) els.lobbyScreen.hidden = false;
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = true;
-        _toggleHeader(false);
         _toggleCornerButtons(false);
       }
 
@@ -1773,8 +1762,7 @@
         game = Engine.newGame({ seed: Date.now(), playerHero: playerHero, enemyHero: enemyHero, playerRole: playerRole, enemyRole: enemyRole, startWithFirstTurn: true });
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = false;
-        // v9 PR-E16: newGameBtn DOM 已删, 不再设置 textContent.
-        _toggleHeader(true, 'game');  // v9 PR-E10: 游戏中也显示 header; v9 PR-E13: 但隐藏 .title-card 大标题描述
+        // v9 PR-E16: newGameBtn DOM 已删. v9 PR-E20: 顶部 header 已删.
         _toggleCornerButtons(true);   // v9 PR-E19: 游戏内才显示菜单/分享角落按钮
         render();
         maybeStartEnemyTurn();

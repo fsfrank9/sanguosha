@@ -65,12 +65,9 @@
     </div>
 
     <div class="game-frame">
-    <header>
-      <section class="title-card" id="titleCard">
-        <h1>三国杀 · 1v1 模块化版 <span class="version-pill">v6.1 规则合规版</span></h1>
-        <div class="subtitle">纯 HTML/CSS/JavaScript 原生 ES 模块加载，GitHub Pages 静态发布。已支持面对面 1v1、标准+军争核心牌组、26 个已实现技能全部对照官方 spec、玩家可选技能的暂停-恢复 UI 选择流程。</div>
-      </section>
-    </header>
+    <!-- v9 PR-E20: 删除顶部 header + title-card 标题栏 (h1 + subtitle 长描述).
+         用户反馈"选将界面最上面那个标题栏删了". 标题栏在 game 屏 (PR-E13)
+         已隐藏, lobby 屏整个隐, 现 setup 也删 → 各屏均不需要, 整块删除. -->
     <!-- v9 PR-E16: 真删 .top-actions (PR-E14/E15 浮顶按钮). 用户反馈
          "重新选将"/"结束回合"按钮没必要, 而且会显示在 splash/lobby/setup
          一级界面. 改用: 重开局走 side-drawer (PR-E5 已有), 结束回合走

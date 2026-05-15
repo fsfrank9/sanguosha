@@ -42,13 +42,8 @@ test('v9 PR-E12: hero.css 隐藏 .quote (武将台词文字噪音)', () => {
   assert.match(block[0], /display:\s*none/);
 });
 
-// ───── setup.css: title-card watermark ────────────────────────────────
-
-test('v9 PR-E12: setup.css 隐藏 .title-card::after (旧版 "魏 蜀 吴 群" 大字水印)', () => {
-  const block = setupCss.match(/\.title-card::after\s*\{[\s\S]*?\n\s{4}\}/);
-  assert.ok(block, 'setup.css 应保留 .title-card::after 规则块');
-  assert.match(block[0], /content:\s*none/);
-});
+// PR-E20: .title-card / ::after 整块删除 (用户反馈"选将界面标题栏删了").
+// PR-E12 的 .title-card::after 守护已撤.
 
 // ───── zones.css: side-log + log-overlay 调整 ─────────────────────────
 
@@ -76,8 +71,7 @@ test('v9 PR-E12: loadAllStyles() 拼接含 .camp-ribbon + .quote 隐藏 (回归;
   assert.match(css, /\.quote\s*\{[\s\S]*?display:\s*none/);
 });
 
-test('v9 PR-E12: loadAllStyles() 拼接含 .title-card::after + .hero::before content:none (回归)', () => {
-  assert.match(css, /\.title-card::after\s*\{[\s\S]*?content:\s*none/);
+test('v9 PR-E12: loadAllStyles() 拼接含 .hero::before content:none (回归; PR-E20 title-card 已删)', () => {
   assert.match(css, /\.hero::before\s*\{[\s\S]*?content:\s*none/);
 });
 

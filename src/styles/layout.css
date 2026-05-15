@@ -188,19 +188,12 @@
       background: rgba(255, 235, 180, .26);
     }
 
-    header {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 8px;
-      flex: 0 0 auto;
-    }
+    /* v9 PR-E20: header 规则已删 — <header> + .title-card DOM 整块删除. */
 
-    /* Shared panel-base look — used by .title-card / .panel / .hero / .card
-       / .rules. Kept here next to layout containers; the components in
+    /* Shared panel-base look — used by .panel / .hero / .card / .rules.
+       (v9 PR-E20: 旧标题栏已删, 从此选择器列表移出.)
+       Kept here next to layout containers; the components in
        their own files only add specifics. */
-    .title-card,
     .panel,
     .hero,
     .card,
@@ -387,16 +380,12 @@
       display: none;
     }
 
-    @media (max-width: 980px) {
-      header {
-        grid-template-columns: 1fr;
-      }
-      .top-actions { justify-content: flex-start; }
-    }
+    /* v9 PR-E20: @media 980px 块已删 — 内含 header / .top-actions 规则,
+       两者 DOM 都已删除 (PR-E20 / PR-E16). */
 
     @media (max-width: 560px) {
       .app { width: min(100vw - 16px, 1220px); padding-top: 12px; }
-      .title-card, .panel, .hero, .rules, .status-banner { border-radius: 16px; }
+      .panel, .hero, .rules, .status-banner { border-radius: 16px; }
       .status-banner { align-items: flex-start; flex-direction: column; }
       .hand { overflow-x: auto; }
       .card { flex-basis: 112px; min-height: 150px; padding: 10px; }

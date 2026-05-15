@@ -23,31 +23,10 @@ const zonesCss = fs.readFileSync(path.join(stylesDir, 'zones.css'), 'utf8');
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
 
-// ───── HTML: 加 id + 新 phase-prompt ────────────────────────────────────
+// PR-E17: .phase-prompt DOM 已删. PR-E20: .title-card + <header> + _toggleHeader
+// 全部删除 (用户反馈"选将界面标题栏删了"). 相关守护已撤.
 
-test('v9 PR-E13: index.html .title-card 加 id="titleCard"', () => {
-  assert.match(html, /<section class="title-card" id="titleCard">/);
-});
-
-// PR-E17: .phase-prompt DOM 已删 (用户反馈 "你的回合那个位置太碍眼"). 守护已撤.
-
-// ───── dom-adapter: 缓存 + _toggleHeader + renderStatus ────────────────
-
-test('v9 PR-E13: dom-adapter 缓存 titleCard (PR-E17 后 phasePrompt/phasePromptBrush 已删)', () => {
-  assert.match(adapter, /'titleCard'/);
-});
-
-test('v9 PR-E13: _toggleHeader 加 mode 参数 — game 模式隐藏 titleCard', () => {
-  const fn = adapter.match(/function _toggleHeader\([\s\S]*?\n\s{6}\}/);
-  assert.ok(fn);
-  assert.match(fn[0], /function _toggleHeader\(show,\s*mode\)/);
-  assert.match(fn[0], /titleCard\.hidden\s*=\s*!show\s*\|\|\s*mode\s*===\s*['"]game['"]/);
-});
-
-test('v9 PR-E13: newGame 调 _toggleHeader(true, "game"); showSetup 调 _toggleHeader(true, "setup")', () => {
-  assert.match(adapter, /_toggleHeader\(true,\s*['"]game['"]\)/);
-  assert.match(adapter, /_toggleHeader\(true,\s*['"]setup['"]\)/);
-});
+// ───── dom-adapter: renderStatus ─────────────────────────────────────
 
 // PR-E17: renderStatus 内 phasePromptBrush.textContent 写入逻辑已删 (DOM 已 delete).
 // 此守护改为弱化版: renderStatus 仍存在并被调用即可.
