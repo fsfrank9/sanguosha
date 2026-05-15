@@ -4,6 +4,10 @@
       var game = null;
       var enemyThinking = false;
       var selectedDiscardIds = [];
+      // v9 PR-E16: play 阶段选-后-确认 模式. 点 hand-card 仅 set 此 id +
+      // 高亮; #handConfirmBtn 触发后才真正 usePlayerCard. discard / skill /
+      // pending response 等模式仍是即时行为 (sentinel 在 click handler 判断).
+      var selectedHandCardId = null;
       var pendingTiesuoCardId = null;
       var pendingTargetCardId = null;
       var pendingTargetZone = null;
@@ -32,7 +36,9 @@
 
       function initElements() {
         [
-          'newGameBtn', 'endTurnBtn', 'startGameBtn', 'randomPlayerHeroBtn', 'randomEnemyHeroBtn',
+          // v9 PR-E16: newGameBtn / endTurnBtn 已删 (top-actions 真删).
+          // 重开局走 drawerRestartBtn (PR-E5); 结束回合走 handDiscardBtn.
+          'startGameBtn', 'randomPlayerHeroBtn', 'randomEnemyHeroBtn',
           'setupScreen', 'duelTable', 'enemyHero', 'playerHero', 'enemyName', 'playerName',
           'enemyCamp', 'playerCamp', 'enemyQuote', 'playerQuote', 'enemyHp', 'playerHp',
           'enemyHandCount', 'playerHandCount', 'enemyState', 'playerState', 'statusTitle',
@@ -69,7 +75,8 @@
           // PR-E5 接入侧抽屉.
           'frameMenuBtn', 'frameShareBtn',
           // v9 PR-E2: 中央日志 overlay + 暂停 brush 横幅 + 底部状态条
-          'logOverlay', 'pauseBanner', 'statusBar', 'statusBarVersion', 'statusBarScore', 'statusBarTime',
+          // v9 PR-E16: pauseBanner 已删 (HTML). renderPauseBanner 仍存在但 no-op.
+          'logOverlay', 'statusBar', 'statusBarVersion', 'statusBarScore', 'statusBarTime',
           // v9 PR-E4: 主公徽章 — 右上角红圆 "主". 由 renderHero 据
           // game.roles[actor] 切换 hidden.
           // v9 PR-E14: 反贼徽章 — 同位置绿圆 "反". 与 lord-badge 互斥显示.
@@ -87,7 +94,9 @@
           // v9 PR-E13: 进入游戏后 UI 清理 v2 — 标题卡 hidden 控制 + 新中下 phase 横幅
           'titleCard', 'phasePrompt', 'phasePromptBrush',
           // v9 PR-E15: 牌堆/弃牌 数字从底部 .status-bar 移到玩家技能 panel-title 右侧
-          'playerSkillDeckInfo'
+          'playerSkillDeckInfo',
+          // v9 PR-E16: hand-dock 内 3 个新按钮 (确认 / 取消 / 结束回合).
+          'handConfirmBtn', 'handCancelBtn', 'handDiscardBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
       }
@@ -263,7 +272,11 @@
         var disabled = game.turn !== 'player' || game.phase === 'gameover' || enemyThinking;
         var discardMode = game.turn === 'player' && game.phase === 'discard' && Engine.needsDiscard(game, 'player') && !enemyThinking;
         var cardSkill = game.turn === 'player' && game.phase === 'play' && !enemyThinking ? activeCardSkillConfig() : null;
-        var selected = selectedDiscardIds.indexOf(card.id) >= 0 || selectedSkillCardIds.indexOf(card.id) >= 0;
+        // v9 PR-E16: play-confirm 选中态 (selectedHandCardId) 也走 .discard-selected
+        // class 高亮 (复用现有样式, 避免新增 CSS).
+        var selected = selectedDiscardIds.indexOf(card.id) >= 0 ||
+                       selectedSkillCardIds.indexOf(card.id) >= 0 ||
+                       (selectedHandCardId === card.id);
         var action = playerCardAction(card);
         var playable = discardMode || cardSkill ? { ok: true, message: cardSkill ? cardSkill.cardHint : '选择这张牌作为弃牌' } : action.playable;
         if (!discardMode && !cardSkill && !playable.ok) disabled = true;
@@ -326,13 +339,11 @@
         }).join('');
       }
 
-      // v9 PR-E2: 暂停 brush 横幅 — 等待玩家选择 (pendingChoice 存在)
-      // 或 enemyThinking 中时显示。游戏结束时也复用作 game-over 提示。
+      // v9 PR-E2: 暂停 brush 横幅 — 等待玩家选择 / 电脑思考时显示.
+      // v9 PR-E16: 用户反馈 "别人回合或判定回合显示游戏已暂停, 逻辑不对".
+      // .pause-banner DOM 已删, 该函数保留为 no-op (避免删除调用站点风险).
       function renderPauseBanner() {
-        if (!els.pauseBanner) return;
-        var pending = game && Engine.getPendingChoice(game);
-        var showPause = !!(game && (pending || enemyThinking) && game.phase !== 'gameover');
-        els.pauseBanner.hidden = !showPause;
+        return;
       }
 
       // v9 PR-E2: 底部状态条 — 版本 (硬编码 v9) / 分数占位 (用牌堆张数作
@@ -396,9 +407,36 @@
         // v9 PR-E15: 玩家技能 panel-title 右侧同步显示 (替代底部 .status-bar__score
         // 数字, 用户反馈数字应在 "武将技能卡最右边往上一点").
         if (els.playerSkillDeckInfo) els.playerSkillDeckInfo.textContent = deckText;
-        els.endTurnBtn.disabled = !isPlayerTurn || isGameOver || enemyThinking || discardNeeded;
-        els.endTurnBtn.textContent = game.phase === 'play' ? '结束出牌' : '结束回合';
-        els.handHint.textContent = discardNeeded ? ('弃牌：已选 ' + selectedDiscardIds.length + ' / ' + Engine.getDiscardCount(game, 'player')) : (isPlayerTurn && !isGameOver ? '点击卡牌使用' : '等待回合');
+        // v9 PR-E16: endTurnBtn 删除, 替代 #handDiscardBtn — 同语义 (结束回合 →
+        // 弃牌阶段 → 起牌阶段). discard 阶段需先弃牌, 此时仍允许点击 (但 _handDiscard
+        // 会 short-circuit 回 render). text 在 play 阶段 "结束出牌", 其余 "结束回合".
+        if (els.handDiscardBtn) {
+          els.handDiscardBtn.disabled = !isPlayerTurn || isGameOver || enemyThinking;
+          els.handDiscardBtn.textContent = game.phase === 'play' ? '结束出牌' : '结束回合';
+        }
+        // v9 PR-E16: hand-confirm / hand-cancel 启用条件
+        // confirm: 有 visible modal 注册 / 有 selectedHandCardId / 弃牌阶段已选够
+        // cancel: 有 visible modal 注册 / 有 selectedHandCardId / 弃牌阶段已选
+        var pendingDispatch = _firstVisibleDispatch();
+        var canConfirm = false;
+        var canCancel = false;
+        if (pendingDispatch) {
+          canConfirm = !!(pendingDispatch.confirmBtnId && els[pendingDispatch.confirmBtnId] &&
+                          !els[pendingDispatch.confirmBtnId].hidden && !els[pendingDispatch.confirmBtnId].disabled);
+          canCancel = !!(pendingDispatch.cancelBtnId && els[pendingDispatch.cancelBtnId] &&
+                         !els[pendingDispatch.cancelBtnId].hidden && !els[pendingDispatch.cancelBtnId].disabled);
+        } else if (isPlayerTurn && !isGameOver && !enemyThinking) {
+          if (discardNeeded) {
+            canConfirm = selectedDiscardIds.length >= Engine.getDiscardCount(game, 'player');
+            canCancel = selectedDiscardIds.length > 0;
+          } else {
+            canConfirm = !!selectedHandCardId;
+            canCancel = !!selectedHandCardId;
+          }
+        }
+        if (els.handConfirmBtn) els.handConfirmBtn.disabled = !canConfirm;
+        if (els.handCancelBtn) els.handCancelBtn.disabled = !canCancel;
+        els.handHint.textContent = discardNeeded ? ('弃牌：已选 ' + selectedDiscardIds.length + ' / ' + Engine.getDiscardCount(game, 'player')) : (isPlayerTurn && !isGameOver ? (selectedHandCardId ? '已选, 点"确认"使用' : '点击卡牌选中, 再按"确认"') : '等待回合');
         if (els.confirmDiscardBtn) {
           els.confirmDiscardBtn.hidden = !discardNeeded;
           els.confirmDiscardBtn.disabled = !discardNeeded || selectedDiscardIds.length < Engine.getDiscardCount(game, 'player');
@@ -1696,8 +1734,7 @@
         if (els.setupScreen) els.setupScreen.hidden = false;
         if (els.duelTable) els.duelTable.hidden = true;
         _toggleHeader(true, 'setup');  // v9 PR-E10: setup 显示 header (含新开一局)
-        if (els.endTurnBtn) els.endTurnBtn.disabled = true;
-        if (els.newGameBtn) els.newGameBtn.textContent = '重新选将';
+        // v9 PR-E16: endTurnBtn / newGameBtn DOM 已删, 不再设置.
         populateHeroSelects();
         // v9 PR-E11: 入 setup 自动随机身份 (assignRandomRoles 内部已重置
         // 选将状态 + renderHeroPickGrid). 用户可点 "随机主公/反贼" 重抽.
@@ -1745,10 +1782,97 @@
         game = Engine.newGame({ seed: Date.now(), playerHero: playerHero, enemyHero: enemyHero, playerRole: playerRole, enemyRole: enemyRole, startWithFirstTurn: true });
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = false;
-        if (els.newGameBtn) els.newGameBtn.textContent = '重新选将';
+        // v9 PR-E16: newGameBtn DOM 已删, 不再设置 textContent.
         _toggleHeader(true, 'game');  // v9 PR-E10: 游戏中也显示 header; v9 PR-E13: 但隐藏 .title-card 大标题描述
         render();
         maybeStartEnemyTurn();
+      }
+
+      // v9 PR-E16: pending modal 与 hand-confirm/cancel 的统一 dispatch 注册表.
+      // 各 modal 显示时, hand-confirm 触发 .confirm 对应 button.click(),
+      // hand-cancel 同理. 没注册的 modal 仍保留自己内部按钮 (兼容).
+      var PENDING_MODAL_DISPATCH = [
+        { panelId: 'luoshenPromptPanel',    confirmBtnId: 'luoshenContinueBtn',     cancelBtnId: 'luoshenStopBtn' },
+        { panelId: 'guanxingModePanel',     confirmBtnId: 'guanxingConfirmBtn',     cancelBtnId: 'guanxingDeclineBtn' },
+        { panelId: 'zhihengModePanel',      confirmBtnId: 'zhihengConfirmBtn',      cancelBtnId: 'zhihengCancelBtn' },
+        { panelId: 'gangliePromptPanel',    confirmBtnId: 'ganglieFireBtn',         cancelBtnId: 'ganglieDeclineBtn' },
+        { panelId: 'ganglieSourcePanel',    confirmBtnId: 'ganglieSourceConfirmBtn', cancelBtnId: 'ganglieSourceTakeDamageBtn' },
+        { panelId: 'cixiongFirePanel',      confirmBtnId: 'cixiongFireBtn',         cancelBtnId: 'cixiongFireDeclineBtn' },
+        { panelId: 'jiedaoDecisionPanel',   confirmBtnId: 'jiedaoDecisionFireBtn',  cancelBtnId: 'jiedaoDecisionDeclineBtn' },
+        { panelId: 'yijiPromptPanel',       confirmBtnId: 'yijiConfirmBtn',         cancelBtnId: 'yijiKeepAllBtn' },
+        { panelId: 'qilinPickPanel',        confirmBtnId: null,                     cancelBtnId: 'qilinDeclineBtn' },
+        { panelId: 'guicaiPromptPanel',     confirmBtnId: null,                     cancelBtnId: 'guicaiDeclineBtn' },
+        { panelId: 'huogongModePanel',      confirmBtnId: null,                     cancelBtnId: 'huogongCancelBtn' },
+        { panelId: 'tiesuoModePanel',       confirmBtnId: null,                     cancelBtnId: 'tiesuoCancelBtn' },
+        { panelId: 'conversionModePanel',   confirmBtnId: null,                     cancelBtnId: 'conversionCancelBtn' },
+        { panelId: 'targetZonePanel',       confirmBtnId: null,                     cancelBtnId: 'targetCancelBtn' },
+        { panelId: 'exitConfirmModal',      confirmBtnId: 'exitConfirmYesBtn',      cancelBtnId: 'exitConfirmNoBtn' }
+      ];
+
+      function _firstVisibleDispatch() {
+        for (var i = 0; i < PENDING_MODAL_DISPATCH.length; i += 1) {
+          var entry = PENDING_MODAL_DISPATCH[i];
+          var panel = els[entry.panelId];
+          if (panel && !panel.hidden) return entry;
+        }
+        return null;
+      }
+
+      function _clickIfEnabled(btnId) {
+        if (!btnId) return false;
+        var btn = els[btnId];
+        if (!btn || btn.hidden || btn.disabled) return false;
+        btn.click();
+        return true;
+      }
+
+      // 何时点 hand-card 触发"选中-后-确认"模式 (而非直接 usePlayerCard).
+      function _shouldSelectFirst() {
+        if (!game || game.turn !== 'player' || enemyThinking) return false;
+        if (game.phase !== 'play') return false;
+        if (Engine.needsDiscard(game, 'player')) return false;
+        if (activeCardSkillConfig()) return false;
+        if (Engine.getPendingChoice(game)) return false;
+        if (_firstVisibleDispatch()) return false;
+        return true;
+      }
+
+      function _handConfirm() {
+        // 1. 任何 visible pending modal → 触发对应 confirm
+        var dispatch = _firstVisibleDispatch();
+        if (dispatch && _clickIfEnabled(dispatch.confirmBtnId)) return;
+        // 2. 弃牌阶段 → 提交弃牌
+        if (game && game.turn === 'player' && game.phase === 'discard' &&
+            Engine.needsDiscard(game, 'player')) {
+          if (els.confirmDiscardBtn && !els.confirmDiscardBtn.hidden &&
+              !els.confirmDiscardBtn.disabled) {
+            els.confirmDiscardBtn.click();
+            return;
+          }
+        }
+        // 3. selected hand card → playCard
+        if (selectedHandCardId) {
+          var cardId = selectedHandCardId;
+          selectedHandCardId = null;
+          usePlayerCard(cardId);
+        }
+      }
+
+      function _handCancel() {
+        // 1. 任何 visible pending modal → 触发对应 cancel
+        var dispatch = _firstVisibleDispatch();
+        if (dispatch && _clickIfEnabled(dispatch.cancelBtnId)) return;
+        // 2. 清 hand-card 选中
+        if (selectedHandCardId) {
+          selectedHandCardId = null;
+          render();
+          return;
+        }
+        // 3. 弃牌阶段 清弃牌选中
+        if (game && game.phase === 'discard' && selectedDiscardIds.length > 0) {
+          selectedDiscardIds = [];
+          render();
+        }
       }
 
       function bindEvents() {
@@ -1757,7 +1881,8 @@
           tickStatusBarTime();
           window.setInterval(tickStatusBarTime, 60 * 1000);
         }
-        els.newGameBtn.addEventListener('click', showSetup);
+        // v9 PR-E16: 删除 newGameBtn / endTurnBtn 监听 (DOM 已真删). 重开局
+        // 走 drawerRestartBtn (PR-E5 已绑定); 结束回合走 handDiscardBtn.
         if (els.startGameBtn) els.startGameBtn.addEventListener('click', newGame);
         if (els.randomPlayerHeroBtn) els.randomPlayerHeroBtn.addEventListener('click', function () { randomizeHero('player'); });
         if (els.randomEnemyHeroBtn) els.randomEnemyHeroBtn.addEventListener('click', function () { randomizeHero('enemy'); });
@@ -1765,8 +1890,11 @@
         if (els.confirmHeroPickBtn) els.confirmHeroPickBtn.addEventListener('click', confirmHeroPick);
         if (els.playerHeroSelect) els.playerHeroSelect.addEventListener('change', function () { ensureDistinctHeroes('player'); });
         if (els.enemyHeroSelect) els.enemyHeroSelect.addEventListener('change', function () { ensureDistinctHeroes('enemy'); });
-        els.endTurnBtn.addEventListener('click', function () {
+        // v9 PR-E16: handDiscardBtn 替代 endTurnBtn — 结束回合进入弃牌阶段
+        // → 起牌阶段 (即对方回合).
+        if (els.handDiscardBtn) els.handDiscardBtn.addEventListener('click', function () {
           if (!game || game.turn !== 'player' || game.phase === 'gameover') return;
+          selectedHandCardId = null;
           selectedDiscardIds = [];
           hideTiesuoPanel();
           hideTargetZonePanel();
@@ -1784,10 +1912,23 @@
           render();
           maybeStartEnemyTurn();
         });
+        // v9 PR-E16: hand-confirm / hand-cancel — 选-后-确认 模式 +
+        // pending modal 的统一确认/取消 dispatch.
+        if (els.handConfirmBtn) els.handConfirmBtn.addEventListener('click', _handConfirm);
+        if (els.handCancelBtn) els.handCancelBtn.addEventListener('click', _handCancel);
         els.playerHand.addEventListener('click', function (event) {
           var card = event.target.closest('[data-card-id]');
           if (!card) return;
-          usePlayerCard(card.getAttribute('data-card-id'));
+          var cardId = card.getAttribute('data-card-id');
+          // v9 PR-E16: play 阶段无 pending / 无 skill-select / 非 discard 时,
+          // 点 hand-card 仅 set selectedHandCardId + 高亮. 用户必须按 #handConfirmBtn
+          // 才真正 usePlayerCard. 其余模式 (discard / skill / response) 走原 immediate 流程.
+          if (_shouldSelectFirst()) {
+            selectedHandCardId = (selectedHandCardId === cardId) ? null : cardId;
+            render();
+            return;
+          }
+          usePlayerCard(cardId);
         });
         // v6.1: 制衡 may include equipment-area cards; clicking them in
         // zhiheng select mode toggles selection just like a hand card.

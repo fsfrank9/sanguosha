@@ -114,22 +114,17 @@ test('v9 PR-E14: renderHero 据 roles[actor] === "反贼" 切换 rebelBadge.hidd
 
 // ───── 6. top-actions 移出 header + absolute 浮顶 ─────────────────────
 
-test('v9 PR-E14: index.html .top-actions 从 <header> 内移出 (header 之后, .game-frame 内)', () => {
-  // header 内不应再含 .top-actions
+test('v9 PR-E14: index.html .top-actions 从 <header> 内移出 (PR-E16 后整个删除)', () => {
+  // PR-E14 把 .top-actions 移出 header (header 之后 sibling). PR-E16 整个删除.
+  // header 内 / 整个 html 都不应再含 .top-actions.
   const headerBlock = html.match(/<header>[\s\S]*?<\/header>/);
   assert.ok(headerBlock);
   assert.doesNotMatch(headerBlock[0], /class="top-actions"/);
-  // 但 .game-frame 内仍含 .top-actions (作为 header 兄弟)
-  assert.match(html, /<\/header>\s*<!--[\s\S]*?-->\s*<nav class="top-actions">/);
+  assert.doesNotMatch(html, /<nav class="top-actions">/);
 });
 
-test('v9 PR-E14: controls.css .top-actions position: absolute (PR-E15 调整具体位置)', () => {
-  // PR-E14 把 .top-actions 改 absolute. PR-E15 进一步把位置从右上改到
-  // "角色卡上方" (top:auto + bottom:320), 这里只守护 absolute + 右侧锚.
-  const block = controlsCss.match(/\.top-actions\s*\{[\s\S]*?\n\s{4}\}/);
-  assert.ok(block);
-  assert.match(block[0], /position:\s*absolute/);
-  assert.match(block[0], /right:\s*\d+px/);
+test('v9 PR-E14: controls.css .top-actions 规则已删除 (PR-E16; PR-E14 absolute → PR-E15 浮顶 → PR-E16 真删)', () => {
+  assert.doesNotMatch(controlsCss, /\.top-actions\s*\{[\s\S]*?position:\s*absolute/);
 });
 
 test('v9 PR-E14: layout.css .game-frame position: relative (.top-actions absolute 锚)', () => {

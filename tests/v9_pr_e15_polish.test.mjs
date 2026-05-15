@@ -25,12 +25,10 @@ function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 1. top-actions 重定位到角色卡上方 ───────────────────────────────
 
-test('v9 PR-E15: controls.css .top-actions 改 bottom 定位 (top:auto, bottom 约 320px, right 28)', () => {
-  const block = controlsCss.match(/\.top-actions\s*\{[\s\S]*?\n\s{4}\}/);
-  assert.ok(block);
-  assert.match(block[0], /top:\s*auto/);
-  assert.match(block[0], /bottom:\s*320px/);
-  assert.match(block[0], /right:\s*28px/);
+test('v9 PR-E15: controls.css .top-actions 已删 (PR-E16 后)', () => {
+  // PR-E15 把 .top-actions 浮到 player-zone 上方 (bottom:320).
+  // PR-E16 用户反馈直接删. 现 .top-actions 整个 CSS 规则不存在.
+  assert.doesNotMatch(controlsCss, /\.top-actions\s*\{[\s\S]*?bottom:\s*320px/);
 });
 
 // ───── 2. stat-grid 隐藏 ──────────────────────────────────────────────
@@ -77,9 +75,8 @@ test('v9 PR-E15: .frame-corner-btn--menu / --share 位置 top:-8 + left/right:6 
 
 // ───── 回归 ────────────────────────────────────────────────────────────
 
-test('v9 PR-E15: loadAllStyles() 拼接含 .stat-grid display:none + .top-actions 新定位', () => {
+test('v9 PR-E15: loadAllStyles() 拼接含 .stat-grid display:none (PR-E16 后 .top-actions 已删)', () => {
   assert.match(css, /\.stat-grid\s*\{[\s\S]*?display:\s*none/);
-  assert.match(css, /\.top-actions\s*\{[\s\S]*?bottom:\s*320px/);
 });
 
 for (const [name, fn] of tests) {
