@@ -45,9 +45,10 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E15 | polish (top-actions 移角色卡上方 + stat-grid 隐藏 + deck info 移技能 panel + 删 time + 角落按钮往外) | 🟢 PR #83 已合并 |
 | PR-E16 | hand-actions (真删 top-actions + 删 pause-banner + 加确认/取消/弃牌 3 按钮 + select-then-confirm + pending modal 统一 dispatch) | 🟢 PR #84 已合并 |
 | PR-E17 | 真删 .phase-prompt 横幅 + .hand-dock overflow 修复 (containment) | 🟢 PR #85 已合并 |
-| PR-E18 | 删除二级 splash 屏 (纯文字介绍无功能) — 启动直接进 lobby | 🟡 PR 待合并 |
+| PR-E18 | 删除二级 splash 屏 (纯文字介绍无功能) — 启动直接进 lobby | 🟢 PR #86 已合并 |
+| PR-E19 | 角落菜单 game-only + 退出回大厅 / 重开回选将 逻辑修正 | 🟡 PR 待合并 |
 
-总预估: **~2700-3700 LOC 变更**, 跨 18 个 review cycle。
+总预估: **~2700-3700 LOC 变更**, 跨 19 个 review cycle。
 
 ## 设计目标 (从参考截图提炼)
 
@@ -67,6 +68,49 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E19 落地 — 角落菜单 game-only + 退出/重开 逻辑修正 ✅
+
+**用户反馈** (PR-E18 合并后):
+> 左上角那个菜单里面有退出和重开, 那个菜单应该是要进入到游戏里面才对外显示的,
+> 而不是在每一级页面都显示. 而且逻辑不一样, 重开是回到选将页面,
+> 退出应该是回到现在的一级页面 (大厅) 才对
+
+**问题**:
+1. `.frame-corner-btn` (左上菜单 + 右上分享) absolute 浮在 .app 上, lobby/setup/game 每一级都显示. 菜单含退出/重开, 在入口屏无意义
+2. 退出 (`exitConfirmYesBtn`) 当前 `showSetup()` — 回选将屏. 应回大厅 (lobby)
+3. 重开 (`drawerRestartBtn`) 当前 `showSetup()` — 回选将屏. ✅ 已正确, 保持
+
+**改动 (引擎零改动)**:
+
+- **HTML** `index.html`:
+  - `#frameMenuBtn` + `#frameShareBtn` 加 `hidden` 属性 (启动 lobby, 默认隐藏)
+  - 退出确认 modal 文案 "退出将返回选将界面" → "退出将返回大厅"
+- **CSS** `layout.css`: 加 `.frame-corner-btn[hidden] { display: none !important }` (因 `.frame-corner-btn { display: inline-flex }` 会覆盖 `[hidden]` 默认的 `display:none`)
+- **JS** `dom-adapter.js`:
+  - 新增 `_toggleCornerButtons(show)` — 切 frameMenuBtn + frameShareBtn 的 hidden
+  - `showLobby()` / `showSetup()` → `_toggleCornerButtons(false)`; `newGame()` → `_toggleCornerButtons(true)`
+  - `exitConfirmYesBtn` click handler: `showSetup()` → `showLobby()` (退出回大厅)
+  - `drawerRestartBtn` 保持 `showSetup()` (重开回选将, 已正确)
+
+注: 分享按钮与菜单一起 game-only (一对 frame 装饰 widget, 行为一致; 入口屏单留分享突兀).
+
+**新增测试** `tests/v9_pr_e19_menu_scope.test.mjs` (8 条守护):
+- 2 corner 按钮 hidden + CSS [hidden] 规则
+- 2 _toggleCornerButtons 函数 + 调用站点
+- 3 重开/退出 流向 + modal 文案
+- 1 loadAllStyles() 回归
+
+**同步更新旧测试**:
+- `v9_pr_e10_audit`: 退出 modal → showLobby (原 showSetup)
+- `v9_pr_e5_drawer_modal`: exitConfirmYesBtn → showLobby (原 showSetup)
+
+**Test status**: 780 → 788 ✓; `build:check` 通过.
+
+**Process 遵守**:
+- PR-E18 (#86) merge 状态已通过 `mcp__github__pull_request_read` 确认 (`merged: true, merged_at: 2026-05-15T09:16:30Z`) 后才从最新 main 拉新 branch `claude/v9-pr-e19-menu-scope`. 不在已 merge PR 上加 commit.
+
+---
 
 ### PR-E18 落地 — 删除二级 splash 屏 ✅
 
@@ -466,9 +510,9 @@ CSS `src/styles/zones.css`:
 
 ---
 
-## v9 方向 D 当前进度 (19 PR 已提交; 待用户验收)
+## v9 方向 D 当前进度 (20 PR 已提交; 待用户验收)
 
-PLAN + E0-E18 共 19 PR (1 PLAN + 18 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
+PLAN + E0-E19 共 20 PR (1 PLAN + 19 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
 
 | 子目标 | 提交 PR |
 |---|---|
@@ -490,11 +534,12 @@ PLAN + E0-E18 共 19 PR (1 PLAN + 18 实现) 已提交; 是否达成 v9-D 整体
 | 5 处 polish (按钮移位 / stat-grid / deck info / 删 time / 角落) | PR-E15 |
 | hand-actions 重构 (top-actions/pause-banner 真删 + 3 按钮 + 统一 dispatch) | PR-E16 |
 | 真删 .phase-prompt + .hand-dock overflow 修复 | PR-E17 |
-| **删除二级 splash 屏 (启动直接进 lobby)** | **PR-E18** |
+| 删除二级 splash 屏 (启动直接进 lobby) | PR-E18 |
+| **角落菜单 game-only + 退出回大厅 / 重开回选将** | **PR-E19** |
 
 数据点:
-- 18 实现 PR + 1 PLAN, ~3700 LOC (CSS + HTML + JS + tests)
-- 780 测试 ✓ 全套通过 (起点 529 → 780, 新增 ~251 条守护)
+- 19 实现 PR + 1 PLAN, ~3700 LOC (CSS + HTML + JS + tests)
+- 788 测试 ✓ 全套通过 (起点 529 → 788, 新增 ~259 条守护)
 - 引擎零改动 (`src/engine/*` 全程不动)
 - 无 PNG 素材 (纯 CSS / Unicode / inline SVG / polygon clip)
 

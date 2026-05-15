@@ -1727,6 +1727,7 @@
         if (els.setupScreen) els.setupScreen.hidden = false;
         if (els.duelTable) els.duelTable.hidden = true;
         _toggleHeader(true, 'setup');  // v9 PR-E10: setup 显示 header (含新开一局)
+        _toggleCornerButtons(false);   // v9 PR-E19: setup 入口屏不显示菜单/分享
         // v9 PR-E16: endTurnBtn / newGameBtn DOM 已删, 不再设置.
         populateHeroSelects();
         // v9 PR-E11: 入 setup 自动随机身份 (assignRandomRoles 内部已重置
@@ -1743,11 +1744,18 @@
         if (header) header.hidden = !show;
         if (els.titleCard) els.titleCard.hidden = !show || mode === 'game';
       }
+      // v9 PR-E19: 角落 widget (菜单 / 分享) 仅游戏内显示. 菜单含退出/重开,
+      // 在 lobby/setup 入口屏无意义. lobby/setup 隐藏, game 显示.
+      function _toggleCornerButtons(show) {
+        if (els.frameMenuBtn) els.frameMenuBtn.hidden = !show;
+        if (els.frameShareBtn) els.frameShareBtn.hidden = !show;
+      }
       function showLobby() {
         if (els.lobbyScreen) els.lobbyScreen.hidden = false;
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = true;
         _toggleHeader(false);
+        _toggleCornerButtons(false);
       }
 
       function newGame() {
@@ -1767,6 +1775,7 @@
         if (els.duelTable) els.duelTable.hidden = false;
         // v9 PR-E16: newGameBtn DOM 已删, 不再设置 textContent.
         _toggleHeader(true, 'game');  // v9 PR-E10: 游戏中也显示 header; v9 PR-E13: 但隐藏 .title-card 大标题描述
+        _toggleCornerButtons(true);   // v9 PR-E19: 游戏内才显示菜单/分享角落按钮
         render();
         maybeStartEnemyTurn();
       }
@@ -2153,6 +2162,7 @@
           closeSideDrawer();
           openExitConfirm();
         });
+        // v9 PR-E19: 重开 → 回选将屏 (setup, 重新选将).
         if (els.drawerRestartBtn) els.drawerRestartBtn.addEventListener('click', function () {
           closeSideDrawer();
           showSetup();
@@ -2165,9 +2175,10 @@
         });
         if (els.drawerCloseBtn) els.drawerCloseBtn.addEventListener('click', closeSideDrawer);
         // v9 PR-E5: 退出确认 modal handlers
+        // v9 PR-E19: 退出 → 回大厅 (lobby, 一级页面), 不再回选将屏.
         if (els.exitConfirmYesBtn) els.exitConfirmYesBtn.addEventListener('click', function () {
           closeExitConfirm();
-          showSetup();
+          showLobby();
         });
         if (els.exitConfirmNoBtn) els.exitConfirmNoBtn.addEventListener('click', closeExitConfirm);
         if (els.exitConfirmBackdrop) els.exitConfirmBackdrop.addEventListener('click', closeExitConfirm);
