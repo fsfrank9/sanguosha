@@ -43,9 +43,10 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E13 | 进入游戏后界面清理 v2 (隐藏 .title-card / .status-banner / .log-overlay / v9.0.0 重影 + 新增中下 phase-prompt 横幅 + zone-panel 半透明) | 🟢 PR #81 已合并 |
 | PR-E14 | arena 清理 + 反贼徽章对称 + 手牌截断修复 + top-actions 浮顶 + 恢复滚动日志 | 🟢 PR #82 已合并 |
 | PR-E15 | polish (top-actions 移角色卡上方 + stat-grid 隐藏 + deck info 移技能 panel + 删 time + 角落按钮往外) | 🟢 PR #83 已合并 |
-| PR-E16 | hand-actions (真删 top-actions + 删 pause-banner + 加确认/取消/弃牌 3 按钮 + select-then-confirm + pending modal 统一 dispatch) | 🟡 PR 待合并 |
+| PR-E16 | hand-actions (真删 top-actions + 删 pause-banner + 加确认/取消/弃牌 3 按钮 + select-then-confirm + pending modal 统一 dispatch) | 🟢 PR #84 已合并 |
+| PR-E17 | 真删 .phase-prompt 横幅 + .hand-dock overflow 修复 (containment) | 🟡 PR 待合并 |
 
-总预估: **~2700-3700 LOC 变更**, 跨 16 个 review cycle。
+总预估: **~2700-3700 LOC 变更**, 跨 17 个 review cycle。
 
 ## 设计目标 (从参考截图提炼)
 
@@ -65,6 +66,36 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E17 落地 — 真删 phase-prompt + hand-dock overflow 修复 ✅
+
+**用户反馈截图** (PR-E16 合并后浏览器实测, 2 条):
+> 这是怎么回事, 怎么牌一多就变成这个样子了
+> 还有那个你的回合能不能去掉, 那个位置太碍眼了
+
+**2 处改动**:
+
+1. **真删 `.phase-prompt`** — index.html `<div class="phase-prompt" id="phasePrompt">` 块删除. dom-adapter `'phasePrompt'`/`'phasePromptBrush'` 移出缓存, renderStatus 内的 phase 写入逻辑删除. layout.css `.phase-prompt` + `.phase-prompt__brush` 规则块删除. 当前回合方信息已由 `.hero-head` 内 `.turn-badge` "当前回合" 文字展示 (PR-E14)
+2. **.hand-dock overflow visible → hidden** — PR-E14 改为 visible 给卡牌底部 label 留位, 但导致 `.hand-actions` 行内容溢出影响其他区域. .duel-table 最后行 `minmax(180px, 1.2fr)` (PR-E14) 已给卡牌足够高度, overflow 改回 hidden 维持 containment. 加 `min-width: 0` 让 grid item 可缩小, `.hand` 子元素自有 `overflow-x: auto`, 多卡时横向滚动
+
+**新增测试** `tests/v9_pr_e17_hand_overflow.test.mjs` (6 条守护):
+- 1 phase-prompt HTML 真删
+- 2 phase-prompt JS (缓存 + renderStatus) 真删
+- 1 phase-prompt CSS 真删
+- 1 hand-dock overflow hidden + min-width 0
+- 1 loadAllStyles() 回归
+
+**同步更新旧测试** (PR-E17 真删):
+- `v9_pr_e13_ingame_cleanup_v2`: 5 条 phase-prompt 断言 (HTML / dom-adapter / CSS / loadAllStyles 全弱化或撤)
+- `v9_pr_e2_center_log`: 1 条 brush 风格断言撤 (.phase-prompt__brush 也删了)
+- `v9_pr_e14_arena_cleanup`: 1 条 .hand-dock overflow 断言 (visible → hidden)
+
+**Test status**: 772 → 774 ✓; `build:check` 通过.
+
+**Process 遵守**:
+- PR-E16 (#84) merge 状态已通过 `mcp__github__pull_request_read` 确认 (`merged: true, merged_at: 2026-05-15T01:51:47Z`) 后才从最新 main 拉新 branch `claude/v9-pr-e17-hand-overflow`. 不在已 merge PR 上加 commit.
+
+---
 
 ### PR-E16 落地 — hand-actions 重构 ✅
 
@@ -395,9 +426,9 @@ CSS `src/styles/zones.css`:
 
 ---
 
-## v9 方向 D 当前进度 (17 PR 已提交; 待用户验收)
+## v9 方向 D 当前进度 (18 PR 已提交; 待用户验收)
 
-PLAN + E0-E16 共 17 PR (1 PLAN + 16 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
+PLAN + E0-E17 共 18 PR (1 PLAN + 17 实现) 已提交; 是否达成 v9-D 整体目标由用户在浏览器实际验收后决定:
 
 | 子目标 | 提交 PR |
 |---|---|
@@ -417,11 +448,12 @@ PLAN + E0-E16 共 17 PR (1 PLAN + 16 实现) 已提交; 是否达成 v9-D 整体
 | 进入游戏后清理 v2 (title-card / status-banner / phase-prompt / 半透明) | PR-E13 |
 | arena 清理 + 反贼徽章 + 手牌修复 + top-actions 浮顶 + 恢复日志 | PR-E14 |
 | 5 处 polish (按钮移位 / stat-grid / deck info / 删 time / 角落) | PR-E15 |
-| **hand-actions 重构 (top-actions/pause-banner 真删 + 3 按钮 + 统一 dispatch)** | **PR-E16** |
+| hand-actions 重构 (top-actions/pause-banner 真删 + 3 按钮 + 统一 dispatch) | PR-E16 |
+| **真删 .phase-prompt + .hand-dock overflow 修复** | **PR-E17** |
 
 数据点:
-- 16 实现 PR + 1 PLAN, ~3700 LOC (CSS + HTML + JS + tests)
-- 772 测试 ✓ 全套通过 (起点 529 → 772, 新增 ~243 条守护)
+- 17 实现 PR + 1 PLAN, ~3700 LOC (CSS + HTML + JS + tests)
+- 774 测试 ✓ 全套通过 (起点 529 → 774, 新增 ~245 条守护)
 - 引擎零改动 (`src/engine/*` 全程不动)
 - 无 PNG 素材 (纯 CSS / Unicode / inline SVG / polygon clip)
 

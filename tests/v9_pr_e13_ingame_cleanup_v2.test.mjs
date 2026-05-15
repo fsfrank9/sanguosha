@@ -29,18 +29,12 @@ test('v9 PR-E13: index.html .title-card 加 id="titleCard"', () => {
   assert.match(html, /<section class="title-card" id="titleCard">/);
 });
 
-test('v9 PR-E13: index.html 在 .duel-table 内加 .phase-prompt + .phase-prompt__brush', () => {
-  assert.match(html, /<div class="phase-prompt" id="phasePrompt"[^>]*>/);
-  assert.match(html, /<span class="phase-prompt__brush" id="phasePromptBrush">/);
-});
+// PR-E17: .phase-prompt DOM 已删 (用户反馈 "你的回合那个位置太碍眼"). 守护已撤.
 
 // ───── dom-adapter: 缓存 + _toggleHeader + renderStatus ────────────────
 
-test('v9 PR-E13: dom-adapter 缓存 titleCard / phasePrompt / phasePromptBrush', () => {
-  ['titleCard', 'phasePrompt', 'phasePromptBrush'].forEach(function (id) {
-    const re = new RegExp("'" + id + "'");
-    assert.match(adapter, re, '应缓存 ' + id);
-  });
+test('v9 PR-E13: dom-adapter 缓存 titleCard (PR-E17 后 phasePrompt/phasePromptBrush 已删)', () => {
+  assert.match(adapter, /'titleCard'/);
 });
 
 test('v9 PR-E13: _toggleHeader 加 mode 参数 — game 模式隐藏 titleCard', () => {
@@ -55,14 +49,10 @@ test('v9 PR-E13: newGame 调 _toggleHeader(true, "game"); showSetup 调 _toggleH
   assert.match(adapter, /_toggleHeader\(true,\s*['"]setup['"]\)/);
 });
 
-test('v9 PR-E13: renderStatus 写入 phasePromptBrush textContent + hidden 控制 (pause 时隐藏)', () => {
-  const fn = adapter.match(/function renderStatus\(\)\s*\{[\s\S]*?\n\s{6}\}/);
-  assert.ok(fn);
-  assert.match(fn[0], /phasePromptBrush\.textContent\s*=\s*title/);
-  assert.match(fn[0], /phasePrompt\.hidden\s*=/);
-  // 检测 pause guard (pendingChoice / enemyThinking)
-  assert.match(fn[0], /getPendingChoice/);
-  assert.match(fn[0], /enemyThinking/);
+// PR-E17: renderStatus 内 phasePromptBrush.textContent 写入逻辑已删 (DOM 已 delete).
+// 此守护改为弱化版: renderStatus 仍存在并被调用即可.
+test('v9 PR-E13: renderStatus 函数存在 (PR-E17 后 phasePrompt 写入逻辑已删)', () => {
+  assert.match(adapter, /function renderStatus\(\)\s*\{/);
 });
 
 // ───── CSS: 5 处隐藏 / 新增 / 透明化 ──────────────────────────────────
@@ -73,18 +63,7 @@ test('v9 PR-E13: layout.css .status-banner display:none (整个块隐藏)', () =
   assert.match(block[0], /display:\s*none/);
 });
 
-test('v9 PR-E13: layout.css 新增 .phase-prompt + .phase-prompt__brush 黑底黄字 brush', () => {
-  const wrap = layoutCss.match(/\.phase-prompt\s*\{[\s\S]*?\n\s{4}\}/);
-  assert.ok(wrap, '.phase-prompt 规则存在');
-  assert.match(wrap[0], /position:\s*absolute/);
-  assert.match(wrap[0], /bottom:\s*22%/);
-  const brush = layoutCss.match(/\.phase-prompt__brush\s*\{[\s\S]*?\n\s{4}\}/);
-  assert.ok(brush);
-  assert.match(brush[0], /color:\s*#ffd900/);
-  assert.match(brush[0], /background:\s*rgba\(0,\s*0,\s*0,\s*0?\.78\)/);
-  // brush 多 box-shadow 笔触感
-  assert.match(brush[0], /box-shadow:[\s\S]*?,[\s\S]*?,/);
-});
+// PR-E17: .phase-prompt + .phase-prompt__brush CSS 已删除 (整个规则块).
 
 test('v9 PR-E13: layout.css .status-bar__version display:none (避免 v9.0.0 与手牌重影)', () => {
   // PR-E15 后, version/score/time 三选择器共享 display:none 规则.
@@ -106,10 +85,7 @@ test('v9 PR-E13: zones.css .zone-panel 背景半透明 (.32 / .42, 从原 .78/.8
 
 // ───── 回归 ────────────────────────────────────────────────────────────
 
-test('v9 PR-E13: loadAllStyles() 拼接含 .phase-prompt + .phase-prompt__brush 规则', () => {
-  assert.match(css, /\.phase-prompt\s*\{/);
-  assert.match(css, /\.phase-prompt__brush\s*\{/);
-});
+// PR-E17: loadAllStyles 不再含 .phase-prompt 规则 (DOM+CSS 已删).
 
 test('v9 PR-E13: loadAllStyles() 拼接含 .log-overlay display:none + .status-banner display:none', () => {
   assert.match(css, /\.log-overlay\s*\{[\s\S]*?display:\s*none/);

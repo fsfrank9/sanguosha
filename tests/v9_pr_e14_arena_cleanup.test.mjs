@@ -41,10 +41,13 @@ test('v9 PR-E14: layout.css .arena-phase-panel display:none', () => {
 
 // ───── 2. 手牌截断修复 ────────────────────────────────────────────────
 
-test('v9 PR-E14: .hand-dock overflow: hidden → visible (卡牌底部不再截断)', () => {
+test('v9 PR-E14: .hand-dock 卡牌不再截断 (.duel-table 最后行 minmax(180, 1.2fr) 已给空间; PR-E17 改回 overflow:hidden)', () => {
+  // PR-E14 originally overflow visible; PR-E17 changed back to hidden
+  // because visible let .hand-actions 行的内容溢出影响其他区域. row min
+  // 180 已给卡牌足够高度, 无需 visible.
   const block = layoutCss.match(/\.hand-dock\s*\{[\s\S]*?\n\s{4}\}/);
   assert.ok(block);
-  assert.match(block[0], /overflow:\s*visible/);
+  assert.match(block[0], /overflow:\s*hidden/);
 });
 
 test('v9 PR-E14: .duel-table grid 最后行 minmax(180px, 1.2fr) (留卡牌高度)', () => {

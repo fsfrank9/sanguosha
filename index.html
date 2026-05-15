@@ -184,15 +184,9 @@
            (pendingChoice 或 enemyThinking) 时显示; status-bar 显示版本 /
            占位分数 / 实时时钟. 都绝对定位在 .duel-table 上. -->
       <div class="log-overlay" id="logOverlay" aria-live="polite"></div>
-      <!-- v9 PR-E16: 删除 .pause-banner. 用户反馈 "别人回合或判定回合显示
-           游戏已暂停, 逻辑不对". 这两种场景应由 .phase-prompt 横幅 + 具体
-           modal 接管, 不显示模糊的"暂停"提示. -->
-      <!-- v9 PR-E13: 中下黄字黑笔触横幅 — 复用 .pause-banner brush 风格,
-           常驻显示当前 phase 提示 (e.g. "你的回合" / "弃牌阶段").
-           pause 时 (pendingChoice / enemyThinking) 由 .pause-banner 接管, 此横幅隐藏. -->
-      <div class="phase-prompt" id="phasePrompt" hidden>
-        <span class="phase-prompt__brush" id="phasePromptBrush"></span>
-      </div>
+      <!-- v9 PR-E16: 删除 .pause-banner. 用户反馈"别人回合显示游戏已暂停逻辑不对".
+           v9 PR-E17: 删除 .phase-prompt 横幅. 用户反馈"你的回合那个位置太碍眼".
+           当前回合方信息已由 .hero-head 内 .turn-badge "当前回合" 文字展示. -->
       <div class="status-bar" id="statusBar" aria-hidden="true">
         <span class="status-bar__version" id="statusBarVersion">v9.0.0</span>
         <span class="status-bar__score" id="statusBarScore">0</span>

@@ -92,7 +92,9 @@
           'heroPickPlayerValue', 'heroPickEnemyValue', 'heroPickGrid',
           'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn',
           // v9 PR-E13: 进入游戏后 UI 清理 v2 — 标题卡 hidden 控制 + 新中下 phase 横幅
-          'titleCard', 'phasePrompt', 'phasePromptBrush',
+          // v9 PR-E17: phasePrompt / phasePromptBrush 已从 HTML 删除 (用户反馈
+          // "你的回合那个位置太碍眼"). 缓存中也移出.
+          'titleCard',
           // v9 PR-E15: 牌堆/弃牌 数字从底部 .status-bar 移到玩家技能 panel-title 右侧
           'playerSkillDeckInfo',
           // v9 PR-E16: hand-dock 内 3 个新按钮 (确认 / 取消 / 结束回合).
@@ -452,15 +454,8 @@
         els.playerTurnBadge.hidden = !playerTurnActive;
         els.enemyTurnBadge.textContent = enemyTurnActive ? '当前回合' : '';
         els.enemyTurnBadge.hidden = !enemyTurnActive;
-        // v9 PR-E13: 中下 phase 横幅 (复用 .pause-banner brush 风格).
-        // 内容: title (e.g. "你的回合" / "弃牌阶段"). 仅在非 pause 时显示 —
-        // pendingChoice / enemyThinking 由 .pause-banner 接管, 避免双显.
-        if (els.phasePrompt && els.phasePromptBrush) {
-          var pending = Engine.getPendingChoice(game);
-          var hidePromptForPause = !!(pending || enemyThinking);
-          els.phasePromptBrush.textContent = title;
-          els.phasePrompt.hidden = hidePromptForPause || !title;
-        }
+        // v9 PR-E17: phase-prompt 横幅已删除 (用户反馈"你的回合那个位置太碍眼").
+        // 当前回合方信息由 hero-head 内 turn-badge "当前回合" 文字展示.
       }
 
       function zoneCards(cards, emptyText) {
