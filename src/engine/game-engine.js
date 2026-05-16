@@ -2216,9 +2216,48 @@
         return success('濒死结算完成。');
       }
 
-      function findResponseCard(state, type) {
+      // v9 PR-E26: 判定一张手牌能否当【闪】响应 — 真闪 / 龙胆(杀) / 倾国(黑牌).
+      // 返回 { via: null|'龙胆'|'倾国' } 或 null.
+      function shanOptionForCard(state, cardId) {
+        var hand = state.hand || [];
+        var card = null;
+        for (var i = 0; i < hand.length; i += 1) {
+          if (hand[i] && hand[i].id === cardId) { card = hand[i]; break; }
+        }
+        if (!card) return null;
+        if (card.type === 'shan') return { via: null };
+        if (hasSkill(state, 'longdan') && isShaCard(card)) return { via: '龙胆' };
+        if (hasSkill(state, 'qingguo') && card.color === 'black') return { via: '倾国' };
+        return null;
+      }
+
+      // v9 PR-E26: 枚举玩家所有可作【闪】响应的手牌 (真闪 + 转化候选), 供
+      // shan-response 面板列出让玩家选用哪张. 引擎返回数据, UI 负责格式化.
+      function listShanResponseOptions(state) {
+        var opts = [];
+        (state.hand || []).forEach(function (card) {
+          if (!card) return;
+          var opt = shanOptionForCard(state, card.id);
+          if (opt) {
+            opts.push({ cardId: card.id, via: opt.via, name: card.name, suit: card.suit, rank: card.rank });
+          }
+        });
+        return opts;
+      }
+
+      function findResponseCard(state, type, preferredCardId) {
         var card = null;
         if (type === 'shan') {
+          // v9 PR-E26: 玩家指定了用哪张牌当【闪】 → 直接消耗那张 (真闪 / 龙胆 / 倾国).
+          if (preferredCardId) {
+            var picked = shanOptionForCard(state, preferredCardId);
+            if (!picked) return null;
+            return {
+              card: removeOwnCardFromAnyZone(state, preferredCardId),
+              asName: '闪',
+              skillName: picked.via
+            };
+          }
           card = removeFirstCardOfType(state, 'shan');
           if (card) return { card: card, asName: '闪', skillName: null };
           var shanResponseContext = { mode: 'response', state: state, asType: 'shan' };
@@ -2268,8 +2307,8 @@
         return card ? { card: card, asName: card.name, skillName: null } : null;
       }
 
-      function consumeResponse(game, actor, type, reason) {
-        var response = findResponseCard(game[actor], type);
+      function consumeResponse(game, actor, type, reason, preferredCardId) {
+        var response = findResponseCard(game[actor], type, preferredCardId);
         if (!response) return false;
         if (type === 'sha' && actor === game.turn) game[actor].usedOrRespondedSha = true;
         if (response.extraCards && response.extraCards.length) {
@@ -2933,14 +2972,10 @@
         return continueShaAfterCixiong(game, actor, card, amount);
       }
 
-      // v9 PR-E25: 非消耗式探测 — 玩家是否有【闪】可作响应 (手牌闪 或 技能转化).
+      // v9 PR-E25/E26: 非消耗式探测 — 玩家是否有【闪】可作响应 (真闪 + 转化候选).
       function hasShanResponseAvailable(state) {
         if (!state) return false;
-        for (var i = 0; i < state.hand.length; i += 1) {
-          if (state.hand[i] && state.hand[i].type === 'shan') return true;
-        }
-        var ctx = { mode: 'response', state: state, asType: 'shan' };
-        return !!selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', ctx));
+        return listShanResponseOptions(state).length > 0;
       }
 
       function continueShaAfterCixiong(game, actor, card, amount) {
@@ -2983,7 +3018,9 @@
             kind: 'shan-response',
             actor: 'player',
             sourceActor: actor,
-            shaName: card.name
+            shaName: card.name,
+            // v9 PR-E26: 列出所有可作【闪】的牌 (真闪 + 龙胆/倾国 转化), 玩家自选.
+            options: listShanResponseOptions(target)
           };
           log(game, '等待' + actorName(game, 'player') + '决定是否打出【闪】。');
           return success('等待玩家响应【杀】。');
@@ -3039,7 +3076,10 @@
         return success(target.name + '受到攻击。');
       }
 
-      // v9 PR-E25: 玩家解决【闪】响应 pendingChoice — decision.use 决定出不出闪.
+      // v9 PR-E25/E26: 玩家解决【闪】响应 pendingChoice.
+      //   decision.cardId — 指定用哪张牌当【闪】 (真闪 / 龙胆 / 倾国转化)
+      //   decision.use    — true 时不指定 cardId, 引擎自动取第一张 (兼容旧调用)
+      //   都没有 → 不出【闪】.
       function resolveShanResponseChoice(game, pending, decision) {
         var saved = game.pauseState && game.pauseState.shaResponse;
         if (!saved) return fail('找不到【杀】响应的暂停状态。');
@@ -3048,8 +3088,12 @@
         var card = saved.card;
         var amount = saved.amount;
         var target = game.player;
+        var d = decision || {};
         var dodged = false;
-        if (decision && decision.use) {
+        if (d.cardId) {
+          dodged = consumeResponse(game, 'player', 'shan', '【杀】', d.cardId);
+          if (!dodged) log(game, actorName(game, 'player') + '指定的牌无法当【闪】。');
+        } else if (d.use) {
           dodged = consumeResponse(game, 'player', 'shan', '【杀】');
           if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
         } else {

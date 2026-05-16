@@ -79,8 +79,8 @@
           'wuguPickPanel', 'wuguPickHint', 'wuguPickChoices',
           // v8 hotfix-2: 洛神 (luoshen-continue) 面板 — 准备阶段连续判定决定
           'luoshenPromptPanel', 'luoshenPromptHint', 'luoshenContinueBtn', 'luoshenStopBtn',
-          // v9 PR-E25: 闪响应面板 — 被【杀】时玩家决定出不出闪
-          'shanResponsePanel', 'shanResponseHint', 'shanResponseUseBtn', 'shanResponseDeclineBtn',
+          // v9 PR-E25/E26: 闪响应面板 — 被【杀】时玩家选用哪张牌当闪
+          'shanResponsePanel', 'shanResponseHint', 'shanResponseChoices', 'shanResponseDeclineBtn',
           // v9 PR-E1: 装饰外框角落 widgets — 菜单 / 分享. placeholder 行为, 等
           // PR-E5 接入侧抽屉.
           'frameMenuBtn', 'frameShareBtn',
@@ -927,13 +927,26 @@
             els.luoshenPromptPanel.hidden = true;
           }
         }
-        // v9 PR-E25: 闪响应 — 被【杀】攻击时玩家决定出不出【闪】
+        // v9 PR-E25/E26: 闪响应 — 被【杀】攻击时玩家选用哪张牌当【闪】.
         if (els.shanResponsePanel) {
           if (kind === 'shan-response' && pending.actor === 'player') {
             els.shanResponsePanel.hidden = false;
             if (els.shanResponseHint) {
               els.shanResponseHint.textContent =
-                '对方对你使用【' + (pending.shaName || '杀') + '】，是否打出【闪】？';
+                '对方对你使用【' + (pending.shaName || '杀') + '】，选择用哪张牌当【闪】，或不出。';
+            }
+            if (els.shanResponseChoices) {
+              var shanOpts = pending.options || [];
+              els.shanResponseChoices.innerHTML = shanOpts.length
+                ? shanOpts.map(function (opt) {
+                    var suit = suitLabel(opt.suit);
+                    var rank = opt.rank ? String(opt.rank).toUpperCase() : '';
+                    var prefix = opt.via ? opt.via + '·' : '';
+                    return '<button class="mini-card shan-response-choice" data-shan-card-id="'
+                      + escapeHtml(opt.cardId) + '" title="用此牌当【闪】">'
+                      + escapeHtml(prefix + opt.name) + ' ' + suit + rank + '</button>';
+                  }).join('')
+                : '<span class="mini-card">无可用的【闪】</span>';
             }
           } else {
             els.shanResponsePanel.hidden = true;
@@ -1830,7 +1843,7 @@
       // 各 modal 显示时, hand-confirm 触发 .confirm 对应 button.click(),
       // hand-cancel 同理. 没注册的 modal 仍保留自己内部按钮 (兼容).
       var PENDING_MODAL_DISPATCH = [
-        { panelId: 'shanResponsePanel',     confirmBtnId: 'shanResponseUseBtn',     cancelBtnId: 'shanResponseDeclineBtn' },
+        { panelId: 'shanResponsePanel',     confirmBtnId: null,                     cancelBtnId: 'shanResponseDeclineBtn' },
         { panelId: 'luoshenPromptPanel',    confirmBtnId: 'luoshenContinueBtn',     cancelBtnId: 'luoshenStopBtn' },
         { panelId: 'guanxingModePanel',     confirmBtnId: 'guanxingConfirmBtn',     cancelBtnId: 'guanxingDeclineBtn' },
         { panelId: 'zhihengModePanel',      confirmBtnId: 'zhihengConfirmBtn',      cancelBtnId: 'zhihengCancelBtn' },
@@ -2254,11 +2267,18 @@
           if (!result.ok) renderLog();
           render();
         });
-        // v9 PR-E25: 闪响应 — 出闪 / 不出. resolvePendingChoice 后引擎完成【杀】
-        // 结算; 电脑回合的 enemyStep 轮询会自动接着推进 (见 enemyStep 内 guard).
-        if (els.shanResponseUseBtn) els.shanResponseUseBtn.addEventListener('click', function () {
-          var result = Engine.resolvePendingChoice(game, { use: true });
-          if (!result.ok) renderLog();
+        // v9 PR-E26: 闪响应 — 候选两步化. 点候选 (真闪/转化牌) 只 stage 高亮,
+        // #handConfirmBtn 才 resolvePendingChoice({cardId}); 不出 → {use:false}.
+        // resolvePendingChoice 后引擎完成【杀】结算, enemyStep 轮询自动续上.
+        if (els.shanResponseChoices) els.shanResponseChoices.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-shan-card-id]');
+          if (!btn) return;
+          var cardId = btn.getAttribute('data-shan-card-id');
+          stagedModalChoice = {
+            kind: 'pending',
+            payload: { cardId: cardId },
+            selector: '[data-shan-card-id="' + cardId + '"]'
+          };
           render();
         });
         if (els.shanResponseDeclineBtn) els.shanResponseDeclineBtn.addEventListener('click', function () {

@@ -17,11 +17,12 @@ function test(name, fn) { tests.push([name, fn]); }
 
 // ───── HTML: shanResponsePanel ───────────────────────────────────────
 
-test('v9 PR-E25: index.html 含 shanResponsePanel (pending-prompt-panel) + 出闪/不出 按钮', () => {
+test('v9 PR-E25/E26: index.html 含 shanResponsePanel — choices 容器 + 不出按钮', () => {
+  // v9 PR-E26: 改为候选列表 (shanResponseChoices) + 不出按钮 (出闪按钮已删).
   assert.match(html, /<div class="shan-response-panel pending-prompt-panel" id="shanResponsePanel" hidden>/);
   assert.match(html, /id="shanResponseHint"/);
-  assert.match(html, /id="shanResponseUseBtn"[^>]*>出【闪】</);
-  assert.match(html, /id="shanResponseDeclineBtn"[^>]*>不出</);
+  assert.match(html, /id="shanResponseChoices"/);
+  assert.match(html, /id="shanResponseDeclineBtn"[^>]*>不出/);
 });
 
 // ───── 引擎: shan-response 暂停机制 ──────────────────────────────────
@@ -45,32 +46,33 @@ test('v9 PR-E25: 引擎含 resolveShanResponseChoice + resolveShaAfterResponse +
   assert.match(engine, /function hasShanResponseAvailable\(state\)/);
 });
 
-test('v9 PR-E25: resolveShanResponseChoice — use 决定出不出闪', () => {
+test('v9 PR-E25/E26: resolveShanResponseChoice — cardId 指定 / use 自动 / 否则不出', () => {
   const fn = engine.match(/function resolveShanResponseChoice\([\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /decision\s*&&\s*decision\.use/);
+  assert.match(fn[0], /d\.cardId/);
   assert.match(fn[0], /consumeResponse\(game,\s*'player',\s*'shan'/);
   assert.match(fn[0], /resolveShaAfterResponse/);
 });
 
 // ───── dom-adapter 接入 ──────────────────────────────────────────────
 
-test('v9 PR-E25: dom-adapter 缓存 shanResponsePanel 4 个 id', () => {
-  ['shanResponsePanel', 'shanResponseHint', 'shanResponseUseBtn', 'shanResponseDeclineBtn'].forEach(function (id) {
+test('v9 PR-E25/E26: dom-adapter 缓存 shanResponsePanel 4 个 id', () => {
+  ['shanResponsePanel', 'shanResponseHint', 'shanResponseChoices', 'shanResponseDeclineBtn'].forEach(function (id) {
     assert.match(adapter, new RegExp("'" + id + "'"), '应缓存 ' + id);
   });
 });
 
-test('v9 PR-E25: PENDING_MODAL_DISPATCH 注册 shanResponsePanel', () => {
-  assert.match(adapter, /panelId:\s*'shanResponsePanel',\s*confirmBtnId:\s*'shanResponseUseBtn',\s*cancelBtnId:\s*'shanResponseDeclineBtn'/);
+test('v9 PR-E25/E26: PENDING_MODAL_DISPATCH 注册 shanResponsePanel (confirm=null, 候选两步化)', () => {
+  assert.match(adapter, /panelId:\s*'shanResponsePanel',\s*confirmBtnId:\s*null,\s*cancelBtnId:\s*'shanResponseDeclineBtn'/);
 });
 
 test('v9 PR-E25: renderPendingChoice 处理 shan-response kind', () => {
   assert.match(adapter, /kind\s*===\s*'shan-response'[\s\S]{0,160}shanResponsePanel\.hidden\s*=\s*false/);
 });
 
-test('v9 PR-E25: shanResponseUseBtn → resolvePendingChoice({use:true}); DeclineBtn → {use:false}', () => {
-  assert.match(adapter, /shanResponseUseBtn\.addEventListener[\s\S]{0,160}resolvePendingChoice\(game,\s*\{\s*use:\s*true\s*\}/);
+test('v9 PR-E25/E26: shanResponseChoices click → stage; DeclineBtn → resolvePendingChoice({use:false})', () => {
+  // v9 PR-E26: 候选两步化 — 点候选 stage, 不出按钮直接 decline.
+  assert.match(adapter, /shanResponseChoices\.addEventListener\([\s\S]{0,300}stagedModalChoice\s*=\s*\{[\s\S]{0,160}kind:\s*'pending'/);
   assert.match(adapter, /shanResponseDeclineBtn\.addEventListener[\s\S]{0,160}resolvePendingChoice\(game,\s*\{\s*use:\s*false\s*\}/);
 });
 

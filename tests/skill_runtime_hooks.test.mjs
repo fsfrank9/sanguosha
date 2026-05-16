@@ -281,7 +281,7 @@ test('game engine dispatches Wusheng, Longdan, and Qingguo card-as conversions t
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const responseMatch = source.match(/function findResponseCard\([^)]*\)/);
   const responseStart = responseMatch ? responseMatch.index : -1;
-  const responseEnd = source.indexOf('function consumeResponse(game, actor, type, reason)', responseStart);
+  const responseEnd = source.indexOf('function consumeResponse(game, actor, type, reason', responseStart);
   const canPlayStart = source.indexOf('function canPlayCardAs(game, actor, cardOrId, asType)');
   const canPlayEnd = source.indexOf('function playCardAs(game, actor, cardId, asType)', canPlayStart);
   assert.ok(responseStart >= 0 && responseEnd > responseStart, 'findResponseCard source should be extractable');
@@ -360,7 +360,7 @@ test('game engine dispatches Tiandu judgement-card gain through onJudgementAfter
 test('game engine dispatches Yiji per-damage-point draw through onDamageAfter hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
-  const damageEnd = source.indexOf('function findResponseCard(state, type)', damageStart);
+  const damageEnd = source.indexOf('function findResponseCard(state, type', damageStart);
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
   const damageSource = source.slice(damageStart, damageEnd);
 
@@ -378,7 +378,7 @@ test('game engine dispatches Luoyi through draw and damage-modifier hook seams',
   const drawHelperStart = source.indexOf('function triggerLuoyiDrawPhase(context)', drawStart);
   const drawEnd = drawHelperStart >= 0 ? drawHelperStart : source.indexOf('function isArmorIgnoredBySha(game, sourceActor, card)', drawStart);
   const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
-  const damageEnd = source.indexOf('function findResponseCard(state, type)', damageStart);
+  const damageEnd = source.indexOf('function findResponseCard(state, type', damageStart);
   assert.ok(drawStart >= 0 && drawEnd > drawStart, 'draw phase source should be extractable');
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
   const drawSource = source.slice(drawStart, drawEnd);
