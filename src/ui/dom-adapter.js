@@ -24,7 +24,11 @@
       var ganglieSelectedIds = [];
       var skillSelectMode = null;
       var selectedSkillCardIds = [];
-      var enemyActionDelay = 650;
+      // v9 PR-E22: 电脑回合节奏 — 用户反馈"自动出牌阶段过得太快, 来不及反应".
+      // 拆两档: 出牌阶段的实质动作 (出杀/锦囊等) 用 enemyActionDelay 慢一些
+      // 让玩家看清; 准备/判定/摸牌/弃牌/结束 等阶段切换用 enemyPhaseDelay.
+      var enemyActionDelay = 1300;
+      var enemyPhaseDelay = 700;
       var playerRole = '主公';
       var enemyRole = '反贼';
       var draftPicker = 'player';
@@ -1485,12 +1489,13 @@
           if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
           render();
           if (action.ok && action.action !== 'none' && game.turn === 'enemy' && game.phase === 'play') {
+            // v9 PR-E22: 出牌阶段实质动作 — 慢节奏让玩家看清
             window.setTimeout(enemyStep, enemyActionDelay);
             return;
           }
           Engine.finishPlayPhase(game);
           render();
-          window.setTimeout(enemyStep, enemyActionDelay);
+          window.setTimeout(enemyStep, enemyPhaseDelay);
           return;
         }
 
@@ -1501,7 +1506,7 @@
           }
           Engine.advancePhase(game);
           render();
-          window.setTimeout(enemyStep, enemyActionDelay);
+          window.setTimeout(enemyStep, enemyPhaseDelay);
           return;
         }
 
@@ -1514,14 +1519,14 @@
 
         Engine.advancePhase(game);
         render();
-        window.setTimeout(enemyStep, enemyActionDelay);
+        window.setTimeout(enemyStep, enemyPhaseDelay);
       }
 
       function maybeStartEnemyTurn() {
         if (game && game.turn === 'enemy' && game.phase !== 'gameover' && !enemyThinking) {
           enemyThinking = true;
           render();
-          window.setTimeout(enemyStep, enemyActionDelay);
+          window.setTimeout(enemyStep, enemyPhaseDelay);
         }
       }
 
