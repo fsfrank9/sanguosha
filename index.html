@@ -321,6 +321,13 @@
             <button class="btn small" id="handDiscardBtn" type="button">结束回合</button>
           </div>
         </div>
+        <div class="hand" id="playerHand"></div>
+      </section>
+
+      <!-- v9 PR-E21: pendingChoice / 技能 modal 块从 .hand-dock 内移出.
+           .hand-dock 有 backdrop-filter (建立 fixed 定位 containing block)
+           + overflow:hidden, 会让 position:fixed modal 错位并被裁剪. 移到
+           .duel-table 直属 (无 filter/transform), fixed modal 正确锚到视口. -->
         <div class="tiesuo-mode-panel" id="tiesuoModePanel" hidden>
           <span class="badge chain-status">铁索连环</span>
           <button class="btn small" id="tiesuoRecastBtn">重铸摸一张</button>
@@ -329,13 +336,17 @@
           <button class="btn small" id="tiesuoChainBothBtn">横置/重置两人</button>
           <button class="btn small" id="tiesuoCancelBtn">取消</button>
         </div>
-        <div class="target-zone-panel" id="targetZonePanel" hidden>
-          <span class="badge">选择目标区域</span>
-          <button class="btn small" id="targetHandBtn">手牌区</button>
-          <button class="btn small" id="targetEquipmentBtn">装备区</button>
-          <button class="btn small" id="targetJudgeBtn">延时锦囊区</button>
-          <button class="btn small" id="targetCancelBtn">取消</button>
-          <div class="target-card-choices" id="targetCardChoices" aria-live="polite">
+        <!-- v9 PR-E21: 升级为 pending-prompt-panel 卷轴风 (与 guicai/yiji 等
+             8 个新 modal 统一). 旧 inline 扁平风 → cream 纸身 + 居中 modal. -->
+        <div class="target-zone-panel pending-prompt-panel" id="targetZonePanel" hidden>
+          <span class="pending-prompt-panel__hint">选择目标区域</span>
+          <div class="pending-prompt-panel__actions">
+            <button class="btn small" id="targetHandBtn">手牌区</button>
+            <button class="btn small" id="targetEquipmentBtn">装备区</button>
+            <button class="btn small" id="targetJudgeBtn">延时锦囊区</button>
+            <button class="btn small" id="targetCancelBtn">取消</button>
+          </div>
+          <div class="target-card-choices pending-prompt-panel__choices" id="targetCardChoices" aria-live="polite">
             <span class="mini-card">先选择一个区域，再点具体目标牌</span>
           </div>
         </div>
@@ -347,11 +358,14 @@
             <span class="mini-card">同花色牌可用于造成火焰伤害</span>
           </div>
         </div>
-        <div class="conversion-mode-panel" id="conversionModePanel" hidden>
-          <span class="badge" id="conversionHint">这张牌可按原牌使用，也可当【杀】使用</span>
-          <button class="btn small" id="conversionNormalBtn">按原牌使用</button>
-          <button class="btn small" id="conversionShaBtn">当【杀】使用</button>
-          <button class="btn small" id="conversionCancelBtn">取消</button>
+        <!-- v9 PR-E21: 升级为 pending-prompt-panel 卷轴风. -->
+        <div class="conversion-mode-panel pending-prompt-panel" id="conversionModePanel" hidden>
+          <span class="pending-prompt-panel__hint" id="conversionHint">这张牌可按原牌使用，也可当【杀】使用</span>
+          <div class="pending-prompt-panel__actions">
+            <button class="btn small" id="conversionNormalBtn">按原牌使用</button>
+            <button class="btn small" id="conversionShaBtn">当【杀】使用</button>
+            <button class="btn small" id="conversionCancelBtn">取消</button>
+          </div>
         </div>
         <div class="guanxing-mode-panel" id="guanxingModePanel" hidden>
           <span class="badge" id="guanxingHint">观星：准备阶段开始时分配预览牌</span>
@@ -458,8 +472,6 @@
             <button class="btn small" id="luoshenStopBtn">结束</button>
           </div>
         </div>
-        <div class="hand" id="playerHand"></div>
-      </section>
     </section>
     </div><!-- /.game-frame -->
   </main>
