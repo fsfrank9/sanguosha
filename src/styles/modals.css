@@ -227,6 +227,17 @@
       border-color: rgba(255,255,255,.12);
     }
 
+    /* v9 PR-E23: 二级面板候选 stage 选中态 — 金色描边高亮.
+       点候选只 stage, 需再点 #handConfirmBtn 才生效. outline 在 cream / dark
+       两种面板底色上都清晰. */
+    .target-card-choice.is-staged,
+    .huogong-cost-choice.is-staged {
+      outline: 3px solid #ffd24a;
+      outline-offset: 1px;
+      box-shadow: 0 0 10px rgba(255, 210, 74, .8);
+      filter: brightness(1.12);
+    }
+
     /* v9 PR-E5: 卷轴风 modal — 米黄纸身 + 两端卷起 + 棕红装饰按钮.
        供退出确认 / 帮助等弹窗用 (后续 PR-E6 接 pendingChoice 也会复用). */
     .scroll-modal {
