@@ -77,9 +77,10 @@ test('v8 PR-A2: dying-rescue 渲染时 桃/酒 用 promptCardChoice + suffix 标
   assert.match(adapterSource, /'\s*·\s*桃'/);
 });
 
-test('v8 PR-A2: 事件绑定 — qilinPickChoices click → resolvePendingChoice({slot})', () => {
-  assert.match(adapterSource, /qilinPickChoices\.addEventListener\([\s\S]{0,200}data-qilin-slot/);
-  assert.match(adapterSource, /resolvePendingChoice\(game,\s*\{\s*slot:\s*slot\s*\}/);
+test('v8 PR-A2 / v9 PR-E24: qilinPickChoices click → stage (kind:pending, payload.slot)', () => {
+  // v9 PR-E24: 改两步化 — 点候选只 stage, #handConfirmBtn 才 resolvePendingChoice.
+  assert.match(adapterSource, /qilinPickChoices\.addEventListener\([\s\S]{0,300}data-qilin-slot/);
+  assert.match(adapterSource, /qilinPickChoices\.addEventListener\([\s\S]{0,400}stagedModalChoice\s*=\s*\{[\s\S]{0,160}slot:\s*slot/);
 });
 
 test('v8 PR-A2: 事件绑定 — qilinDeclineBtn click → resolvePendingChoice({decline:true})', () => {
@@ -87,9 +88,9 @@ test('v8 PR-A2: 事件绑定 — qilinDeclineBtn click → resolvePendingChoice(
   assert.match(adapterSource, /qilinDeclineBtn\.addEventListener[\s\S]{0,200}resolvePendingChoice\(game,\s*\{\s*decline:\s*true\s*\}/);
 });
 
-test('v8 PR-A2: 事件绑定 — dyingRescueChoices click → resolvePendingChoice({cardId})', () => {
-  assert.match(adapterSource, /dyingRescueChoices\.addEventListener\([\s\S]{0,200}data-dying-rescue-card-id/);
-  assert.match(adapterSource, /resolvePendingChoice\(game,\s*\{\s*cardId:\s*cardId\s*\}/);
+test('v8 PR-A2 / v9 PR-E24: dyingRescueChoices click → stage (kind:pending, payload.cardId)', () => {
+  assert.match(adapterSource, /dyingRescueChoices\.addEventListener\([\s\S]{0,300}data-dying-rescue-card-id/);
+  assert.match(adapterSource, /dyingRescueChoices\.addEventListener\([\s\S]{0,400}stagedModalChoice\s*=\s*\{[\s\S]{0,160}cardId:\s*cardId/);
 });
 
 test('v8 PR-A2: 事件绑定 — dyingRescueDeclineBtn click → resolvePendingChoice({decline:true})', () => {

@@ -48,10 +48,10 @@ test('v8 PR-A5: wugu-pick 渲染 pool 用 promptCardChoice + dataAttrs.wuguCardI
   assert.match(adapterSource, /wuguCardId:\s*card\.id/);
 });
 
-test('v8 PR-A5: 事件绑定 — wuguPickChoices click → resolvePendingChoice({cardId})', () => {
-  assert.match(adapterSource, /wuguPickChoices\.addEventListener\([\s\S]{0,200}data-wugu-card-id/);
-  // 文案应当传 cardId
-  assert.match(adapterSource, /resolvePendingChoice\(game,\s*\{\s*cardId:\s*cardId\s*\}/);
+test('v8 PR-A5 / v9 PR-E24: wuguPickChoices click → stage (kind:pending, payload.cardId)', () => {
+  // v9 PR-E24: 改两步化 — 点候选只 stage, #handConfirmBtn 才 resolvePendingChoice.
+  assert.match(adapterSource, /wuguPickChoices\.addEventListener\([\s\S]{0,300}data-wugu-card-id/);
+  assert.match(adapterSource, /wuguPickChoices\.addEventListener\([\s\S]{0,400}stagedModalChoice\s*=\s*\{[\s\S]{0,160}cardId:\s*cardId/);
 });
 
 test('v8 PR-A5: wugu 无 decline 按钮（spec：必须挑一张）', () => {

@@ -524,10 +524,25 @@
         renderPhaseTrack();
         renderZones();
         renderPendingChoice();
+        // v9 PR-E24: pendingChoice 已消失 (响应面板关闭) → 清掉 stale 的 staged.
+        if (stagedModalChoice && stagedModalChoice.kind === 'pending' &&
+            !(game && Engine.getPendingChoice(game))) {
+          stagedModalChoice = null;
+        }
+        // v9 PR-E24: renderPendingChoice 每次重建候选 DOM, 重新套用 staged 高亮.
+        _reapplyStagedHighlight();
         // v9 PR-E2: 暂停横幅 + 状态条
         renderPauseBanner();
         renderStatusBar();
         els.enemyHandBacks.innerHTML = miniBacks(game.enemy.hand.length);
+      }
+
+      // v9 PR-E24: render 重建 pending 面板候选后, 据 stagedModalChoice.selector
+      // 重新加 .is-staged 高亮 (target/huogong 面板不重建, 不需要此机制).
+      function _reapplyStagedHighlight() {
+        if (stagedModalChoice && stagedModalChoice.selector) {
+          _highlightStaged(document.querySelector(stagedModalChoice.selector));
+        }
       }
 
       function suitLabel(suit) {
@@ -1823,12 +1838,21 @@
         return true;
       }
 
-      // v9 PR-E23: 二级面板候选高亮 — 清掉容器内旧 .is-staged, 给当前加.
-      function _highlightStaged(container, chosenEl) {
-        if (!container) return;
-        var prev = container.querySelectorAll('.is-staged');
+      // v9 PR-E23/E24: 候选 stage 高亮 — 全局清掉旧 .is-staged, 给当前加.
+      // 单参数: 同一时刻只有一个 staged 候选, 全局清理即可 (跨多个面板/容器).
+      function _highlightStaged(chosenEl) {
+        var prev = document.querySelectorAll('.is-staged');
         for (var i = 0; i < prev.length; i += 1) prev[i].classList.remove('is-staged');
         if (chosenEl) chosenEl.classList.add('is-staged');
+      }
+
+      // v9 PR-E24: 是否有任意 modal / 面板可见 (含 PENDING_MODAL_DISPATCH 未注册的).
+      // 用于 playerHand 误点防护 — 任何面板开着时忽略手牌点击.
+      function _anyModalVisible() {
+        return !!document.querySelector(
+          '.pending-prompt-panel:not([hidden]), .tiesuo-mode-panel:not([hidden]),' +
+          '.huogong-mode-panel:not([hidden]), .guanxing-mode-panel:not([hidden]),' +
+          '.zhiheng-mode-panel:not([hidden]), .scroll-modal:not([hidden])');
       }
 
       // 何时点 hand-card 触发"选中-后-确认"模式 (而非直接 usePlayerCard).
@@ -1843,12 +1867,20 @@
       }
 
       function _handConfirm() {
-        // v9 PR-E23: 二级面板已 stage 候选 → 此时提交 resolve.
+        // v9 PR-E23/E24: 已 stage 面板候选 → 此时提交.
         if (stagedModalChoice) {
           var staged = stagedModalChoice;
           stagedModalChoice = null;
-          if (staged.kind === 'target') resolveTargetCard(staged.zone, staged.cardId);
-          else if (staged.kind === 'huogong') resolveHuogong(staged.costId, false);
+          if (staged.kind === 'target') {
+            resolveTargetCard(staged.zone, staged.cardId);
+          } else if (staged.kind === 'huogong') {
+            resolveHuogong(staged.costId, false);
+          } else if (staged.kind === 'pending') {
+            // v9 PR-E24: 响应/技能面板候选 — 统一走 Engine.resolvePendingChoice.
+            var pr = Engine.resolvePendingChoice(game, staged.payload);
+            if (!pr.ok) renderLog();
+            render();
+          }
           return;
         }
         // 1. 任何 visible pending modal → 触发对应 confirm
@@ -1872,11 +1904,10 @@
       }
 
       function _handCancel() {
-        // v9 PR-E23: 已 stage 二级面板候选 → 先撤销 stage (面板保持打开).
+        // v9 PR-E23/E24: 已 stage 面板候选 → 先撤销 stage (面板保持打开).
         if (stagedModalChoice) {
           stagedModalChoice = null;
-          _highlightStaged(els.targetCardChoices, null);
-          _highlightStaged(els.huogongCostChoices, null);
+          _highlightStaged(null);
           render();
           return;
         }
@@ -1941,9 +1972,10 @@
           var card = event.target.closest('[data-card-id]');
           if (!card) return;
           var cardId = card.getAttribute('data-card-id');
-          // v9 PR-E23: 有 modal 打开时, 点手牌应被忽略 (玩家该跟 modal 交互).
-          // 修旧 bug: modal 开着误点手牌 → 那张牌直接打出.
-          if (_firstVisibleDispatch()) return;
+          // v9 PR-E23/E24: 有任意 modal 打开时, 点手牌被忽略 (玩家该跟 modal 交互).
+          // 修旧 bug: modal 开着误点手牌 → 那张牌直接打出. 用 _anyModalVisible
+          // 覆盖全部面板 (含 PENDING_MODAL_DISPATCH 未注册的 fankui/fanjian 等).
+          if (_anyModalVisible()) return;
           // v9 PR-E16: play 阶段无 pending / 无 skill-select / 非 discard 时,
           // 点 hand-card 仅 set selectedHandCardId + 高亮. 用户必须按 #handConfirmBtn
           // 才真正 usePlayerCard. 其余模式 (discard / skill / response) 走原 immediate 流程.
@@ -1982,14 +2014,14 @@
             zone: target.getAttribute('data-target-zone'),
             cardId: target.getAttribute('data-target-card-id')
           };
-          _highlightStaged(els.targetCardChoices, target);
+          _highlightStaged(target);
           render();
         });
         if (els.huogongCostChoices) els.huogongCostChoices.addEventListener('click', function (event) {
           var cost = event.target.closest('[data-huogong-cost-id]');
           if (!cost || cost.disabled) return;
           stagedModalChoice = { kind: 'huogong', costId: cost.getAttribute('data-huogong-cost-id') };
-          _highlightStaged(els.huogongCostChoices, cost);
+          _highlightStaged(cost);
           render();
         });
         if (els.huogongDeclineBtn) els.huogongDeclineBtn.addEventListener('click', function () { resolveHuogong(null, true); });
@@ -2016,14 +2048,17 @@
         if (els.targetCancelBtn) els.targetCancelBtn.addEventListener('click', function () { hideTargetZonePanel(); render(); });
         if (els.zhihengConfirmBtn) els.zhihengConfirmBtn.addEventListener('click', confirmCardSkill);
         if (els.zhihengCancelBtn) els.zhihengCancelBtn.addEventListener('click', function () { exitSkillSelectMode(); render(); });
+        // v9 PR-E24: 响应/技能面板候选两步化 — 点候选只 stage (高亮),
+        // #handConfirmBtn 才 resolvePendingChoice. selector 供 render 重建后重套高亮.
         if (els.guicaiCandidates) els.guicaiCandidates.addEventListener('click', function (event) {
           var btn = event.target.closest('[data-guicai-card-id]');
           if (!btn) return;
           var cardId = btn.getAttribute('data-guicai-card-id');
-          var result = Engine.resolvePendingChoice(game, { cardId: cardId });
-          if (!result.ok) {
-            renderLog();
-          }
+          stagedModalChoice = {
+            kind: 'pending',
+            payload: { cardId: cardId },
+            selector: '[data-guicai-card-id="' + cardId + '"]'
+          };
           render();
         });
         if (els.guicaiDeclineBtn) els.guicaiDeclineBtn.addEventListener('click', function () {
@@ -2037,8 +2072,11 @@
           if (!el) return;
           el.addEventListener('click', function () {
             var suit = el.getAttribute('data-fanjian-suit');
-            var result = Engine.resolvePendingChoice(game, { suit: suit });
-            if (!result.ok) renderLog();
+            stagedModalChoice = {
+              kind: 'pending',
+              payload: { suit: suit },
+              selector: '[data-fanjian-suit="' + suit + '"]'
+            };
             render();
           });
         });
@@ -2047,8 +2085,13 @@
           if (!btn) return;
           var zone = btn.getAttribute('data-fankui-zone');
           var cardId = btn.getAttribute('data-fankui-card-id') || null;
-          var result = Engine.resolvePendingChoice(game, { zone: zone, cardId: cardId });
-          if (!result.ok) renderLog();
+          stagedModalChoice = {
+            kind: 'pending',
+            payload: { zone: zone, cardId: cardId },
+            selector: cardId
+              ? '[data-fankui-card-id="' + cardId + '"]'
+              : '[data-fankui-zone="' + zone + '"]'
+          };
           render();
         });
         // 刚烈 (v6.1): two prompts. ganglie-fire = yes/no for 夏侯惇 to
@@ -2093,8 +2136,11 @@
           var btn = event.target.closest('[data-qilin-slot]');
           if (!btn) return;
           var slot = btn.getAttribute('data-qilin-slot');
-          var result = Engine.resolvePendingChoice(game, { slot: slot });
-          if (!result.ok) renderLog();
+          stagedModalChoice = {
+            kind: 'pending',
+            payload: { slot: slot },
+            selector: '[data-qilin-slot="' + slot + '"]'
+          };
           render();
         });
         if (els.qilinDeclineBtn) els.qilinDeclineBtn.addEventListener('click', function () {
@@ -2118,8 +2164,11 @@
           var btn = event.target.closest('[data-cixiong-discard-card-id]');
           if (!btn) return;
           var cardId = btn.getAttribute('data-cixiong-discard-card-id');
-          var result = Engine.resolvePendingChoice(game, { option: 'discard', cardId: cardId });
-          if (!result.ok) renderLog();
+          stagedModalChoice = {
+            kind: 'pending',
+            payload: { option: 'discard', cardId: cardId },
+            selector: '[data-cixiong-discard-card-id="' + cardId + '"]'
+          };
           render();
         });
         if (els.cixiongChooseDrawBtn) els.cixiongChooseDrawBtn.addEventListener('click', function () {
@@ -2144,8 +2193,13 @@
           if (!btn) return;
           var zone = btn.getAttribute('data-guohe-zone');
           var cardId = btn.getAttribute('data-guohe-card-id');
-          var result = Engine.resolvePendingChoice(game, { zone: zone, cardId: cardId });
-          if (!result.ok) renderLog();
+          stagedModalChoice = {
+            kind: 'pending',
+            payload: { zone: zone, cardId: cardId },
+            selector: cardId
+              ? '[data-guohe-card-id="' + cardId + '"]'
+              : '[data-guohe-zone="' + zone + '"]'
+          };
           render();
         }
         if (els.guohePickEquipment) els.guohePickEquipment.addEventListener('click', handleGuohePickClick);
@@ -2155,8 +2209,11 @@
           var btn = event.target.closest('[data-wugu-card-id]');
           if (!btn) return;
           var cardId = btn.getAttribute('data-wugu-card-id');
-          var result = Engine.resolvePendingChoice(game, { cardId: cardId });
-          if (!result.ok) renderLog();
+          stagedModalChoice = {
+            kind: 'pending',
+            payload: { cardId: cardId },
+            selector: '[data-wugu-card-id="' + cardId + '"]'
+          };
           render();
         });
         // v8 hotfix-2: 洛神 continue / stop 按钮
@@ -2238,8 +2295,11 @@
           var btn = event.target.closest('[data-dying-rescue-card-id]');
           if (!btn) return;
           var cardId = btn.getAttribute('data-dying-rescue-card-id');
-          var result = Engine.resolvePendingChoice(game, { cardId: cardId });
-          if (!result.ok) renderLog();
+          stagedModalChoice = {
+            kind: 'pending',
+            payload: { cardId: cardId },
+            selector: '[data-dying-rescue-card-id="' + cardId + '"]'
+          };
           render();
         });
         if (els.dyingRescueDeclineBtn) els.dyingRescueDeclineBtn.addEventListener('click', function () {

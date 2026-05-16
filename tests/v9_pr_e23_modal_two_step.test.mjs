@@ -22,8 +22,8 @@ function test(name, fn) { tests.push([name, fn]); }
 test('v9 PR-E23: playerHand click — 有 visible modal 时直接 return (忽略手牌点击)', () => {
   const handler = adapter.match(/els\.playerHand\.addEventListener\('click',\s*function[\s\S]*?\n\s{8}\}\);/);
   assert.ok(handler);
-  // _firstVisibleDispatch() 真 → return
-  assert.match(handler[0], /if\s*\(_firstVisibleDispatch\(\)\)\s*return;/);
+  // v9 PR-E24: 守护从 _firstVisibleDispatch 改为 _anyModalVisible (覆盖全部面板).
+  assert.match(handler[0], /if\s*\(_anyModalVisible\(\)\)\s*return;/);
 });
 
 // ───── 2. stagedModalChoice 状态 ─────────────────────────────────────

@@ -88,9 +88,9 @@ test('v8 PR-A4: 共享 handleGuohePickClick 函数 + 两容器都绑', () => {
   assert.match(adapterSource, /guohePickHand\.addEventListener\('click',\s*handleGuohePickClick\)/);
 });
 
-test('v8 PR-A4: handleGuohePickClick payload 为 {zone, cardId}', () => {
-  // 函数体内的 resolvePendingChoice 调用
-  assert.match(adapterSource, /resolvePendingChoice\(game,\s*\{\s*zone:\s*zone,\s*cardId:\s*cardId\s*\}\)/);
+test('v8 PR-A4 / v9 PR-E24: handleGuohePickClick → stage (kind:pending, payload {zone, cardId})', () => {
+  // v9 PR-E24: 改两步化 — 点候选只 stage, #handConfirmBtn 才 resolvePendingChoice.
+  assert.match(adapterSource, /function handleGuohePickClick\(event\)\s*\{[\s\S]{0,400}stagedModalChoice\s*=\s*\{[\s\S]{0,200}zone:\s*zone,\s*cardId:\s*cardId/);
 });
 
 console.log('\nPending prompt panels A4 (jiedao + guohe-1v1) tests passed.');
