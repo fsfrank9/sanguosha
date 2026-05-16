@@ -74,9 +74,10 @@ test('v8 PR-A3: 事件绑定 — cixiongFireDeclineBtn → resolvePendingChoice(
   assert.match(adapterSource, /cixiongFireDeclineBtn\.addEventListener[\s\S]{0,200}resolvePendingChoice\(game,\s*\{\s*decline:\s*true\s*\}/);
 });
 
-test('v8 PR-A3: 事件绑定 — cixiongChooseChoices click → resolvePendingChoice({option:"discard", cardId})', () => {
+test('v8 PR-A3 / v9 PR-E24: cixiongChooseChoices click → stage (kind:pending, payload.option=discard)', () => {
+  // v9 PR-E24: 改两步化 — 点候选只 stage, #handConfirmBtn 才 resolvePendingChoice.
   assert.match(adapterSource, /cixiongChooseChoices\.addEventListener\([\s\S]{0,300}data-cixiong-discard-card-id/);
-  assert.match(adapterSource, /resolvePendingChoice\(game,\s*\{\s*option:\s*'discard',\s*cardId:\s*cardId\s*\}/);
+  assert.match(adapterSource, /cixiongChooseChoices\.addEventListener\([\s\S]{0,500}stagedModalChoice\s*=\s*\{[\s\S]{0,200}option:\s*'discard',\s*cardId:\s*cardId/);
 });
 
 test('v8 PR-A3: 事件绑定 — cixiongChooseDrawBtn → resolvePendingChoice({option:"draw"})', () => {
