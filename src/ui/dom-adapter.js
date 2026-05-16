@@ -79,6 +79,8 @@
           'wuguPickPanel', 'wuguPickHint', 'wuguPickChoices',
           // v8 hotfix-2: 洛神 (luoshen-continue) 面板 — 准备阶段连续判定决定
           'luoshenPromptPanel', 'luoshenPromptHint', 'luoshenContinueBtn', 'luoshenStopBtn',
+          // v9 PR-E25: 闪响应面板 — 被【杀】时玩家决定出不出闪
+          'shanResponsePanel', 'shanResponseHint', 'shanResponseUseBtn', 'shanResponseDeclineBtn',
           // v9 PR-E1: 装饰外框角落 widgets — 菜单 / 分享. placeholder 行为, 等
           // PR-E5 接入侧抽屉.
           'frameMenuBtn', 'frameShareBtn',
@@ -925,6 +927,18 @@
             els.luoshenPromptPanel.hidden = true;
           }
         }
+        // v9 PR-E25: 闪响应 — 被【杀】攻击时玩家决定出不出【闪】
+        if (els.shanResponsePanel) {
+          if (kind === 'shan-response' && pending.actor === 'player') {
+            els.shanResponsePanel.hidden = false;
+            if (els.shanResponseHint) {
+              els.shanResponseHint.textContent =
+                '对方对你使用【' + (pending.shaName || '杀') + '】，是否打出【闪】？';
+            }
+          } else {
+            els.shanResponsePanel.hidden = true;
+          }
+        }
         // v8 PR-A2: 濒死救援 — responder 用 桃/酒 救援（酒仅自救）
         if (els.dyingRescuePanel) {
           if (kind === 'dying-rescue' && pending.actor === 'player') {
@@ -1507,6 +1521,14 @@
           render();
           return;
         }
+        // v9 PR-E25: 电脑回合中出现待玩家决策的 pendingChoice (如被【杀】要不要
+        // 出【闪】) → 暂停 AI 推进, 轮询等玩家解决. 玩家 resolvePendingChoice 后
+        // 下一轮 poll 发现无 pendingChoice 即继续.
+        if (Engine.getPendingChoice(game)) {
+          render();
+          window.setTimeout(enemyStep, enemyPhaseDelay);
+          return;
+        }
         var playerHpBefore = game.player.hp;
         var enemyHpBefore = game.enemy.hp;
 
@@ -1792,6 +1814,10 @@
         var playerHero = els.playerHeroSelect ? els.playerHeroSelect.value : 'liubei';
         var enemyHero = els.enemyHeroSelect ? els.enemyHeroSelect.value : 'caocao';
         game = Engine.newGame({ seed: Date.now(), playerHero: playerHero, enemyHero: enemyHero, playerRole: playerRole, enemyRole: enemyRole, startWithFirstTurn: true });
+        // v9 PR-E25: 开启玩家手动【闪】响应 — 被【杀】攻击时由玩家决定出不出闪
+        // (引擎默认无此 pref → 自动响应; UI 对局显式开启).
+        game.player.skillPreferences = game.player.skillPreferences || {};
+        game.player.skillPreferences.shanResponse = 'ask';
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = false;
         // v9 PR-E16: newGameBtn DOM 已删. v9 PR-E20: 顶部 header 已删.
@@ -1804,6 +1830,7 @@
       // 各 modal 显示时, hand-confirm 触发 .confirm 对应 button.click(),
       // hand-cancel 同理. 没注册的 modal 仍保留自己内部按钮 (兼容).
       var PENDING_MODAL_DISPATCH = [
+        { panelId: 'shanResponsePanel',     confirmBtnId: 'shanResponseUseBtn',     cancelBtnId: 'shanResponseDeclineBtn' },
         { panelId: 'luoshenPromptPanel',    confirmBtnId: 'luoshenContinueBtn',     cancelBtnId: 'luoshenStopBtn' },
         { panelId: 'guanxingModePanel',     confirmBtnId: 'guanxingConfirmBtn',     cancelBtnId: 'guanxingDeclineBtn' },
         { panelId: 'zhihengModePanel',      confirmBtnId: 'zhihengConfirmBtn',      cancelBtnId: 'zhihengCancelBtn' },
@@ -2224,6 +2251,18 @@
         });
         if (els.luoshenStopBtn) els.luoshenStopBtn.addEventListener('click', function () {
           var result = Engine.resolvePendingChoice(game, { decline: true });
+          if (!result.ok) renderLog();
+          render();
+        });
+        // v9 PR-E25: 闪响应 — 出闪 / 不出. resolvePendingChoice 后引擎完成【杀】
+        // 结算; 电脑回合的 enemyStep 轮询会自动接着推进 (见 enemyStep 内 guard).
+        if (els.shanResponseUseBtn) els.shanResponseUseBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { use: true });
+          if (!result.ok) renderLog();
+          render();
+        });
+        if (els.shanResponseDeclineBtn) els.shanResponseDeclineBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { use: false });
           if (!result.ok) renderLog();
           render();
         });

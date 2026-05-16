@@ -472,6 +472,14 @@
             <button class="btn small" id="luoshenStopBtn">结束</button>
           </div>
         </div>
+        <!-- v9 PR-E25: 闪响应面板 — 被【杀】攻击时由玩家决定出不出【闪】. -->
+        <div class="shan-response-panel pending-prompt-panel" id="shanResponsePanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="shanResponseHint">对方对你使用【杀】，是否打出【闪】？</span>
+          <div class="shan-response-actions pending-prompt-panel__actions">
+            <button class="btn small" id="shanResponseUseBtn">出【闪】</button>
+            <button class="btn small" id="shanResponseDeclineBtn">不出</button>
+          </div>
+        </div>
     </section>
     </div><!-- /.game-frame -->
   </main>
