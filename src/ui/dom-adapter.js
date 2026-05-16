@@ -8,6 +8,10 @@
       // 高亮; #handConfirmBtn 触发后才真正 usePlayerCard. discard / skill /
       // pending response 等模式仍是即时行为 (sentinel 在 click handler 判断).
       var selectedHandCardId = null;
+      // v9 PR-E23: 二级面板 (目标选择 / 火攻弃牌) 也走"选中→确认"两步.
+      // 点候选只 stage (高亮), #handConfirmBtn 才真正 resolve.
+      // 形如 { kind: 'target', zone, cardId } 或 { kind: 'huogong', costId }.
+      var stagedModalChoice = null;
       var pendingTiesuoCardId = null;
       var pendingTargetCardId = null;
       var pendingTargetZone = null;
@@ -422,7 +426,11 @@
         var pendingDispatch = _firstVisibleDispatch();
         var canConfirm = false;
         var canCancel = false;
-        if (pendingDispatch) {
+        if (stagedModalChoice) {
+          // v9 PR-E23: 二级面板已 stage 一个候选 → 确认 提交, 取消 撤销.
+          canConfirm = true;
+          canCancel = true;
+        } else if (pendingDispatch) {
           canConfirm = !!(pendingDispatch.confirmBtnId && els[pendingDispatch.confirmBtnId] &&
                           !els[pendingDispatch.confirmBtnId].hidden && !els[pendingDispatch.confirmBtnId].disabled);
           canCancel = !!(pendingDispatch.cancelBtnId && els[pendingDispatch.cancelBtnId] &&
@@ -989,12 +997,14 @@
       function hideTargetZonePanel() {
         pendingTargetCardId = null;
         pendingTargetZone = null;
+        if (stagedModalChoice && stagedModalChoice.kind === 'target') stagedModalChoice = null;
         if (els.targetZonePanel) els.targetZonePanel.hidden = true;
         if (els.targetCardChoices) els.targetCardChoices.innerHTML = '<span class="mini-card">先选择一个区域，再点具体目标牌</span>';
       }
 
       function hideHuogongPanel() {
         pendingHuogongCardId = null;
+        if (stagedModalChoice && stagedModalChoice.kind === 'huogong') stagedModalChoice = null;
         if (els.huogongModePanel) els.huogongModePanel.hidden = true;
         if (els.huogongRevealText) els.huogongRevealText.textContent = '火攻：等待展示目标手牌';
         if (els.huogongCostChoices) els.huogongCostChoices.innerHTML = '<span class="mini-card">同花色牌可用于造成火焰伤害</span>';
@@ -1151,6 +1161,8 @@
 
       function showTargetCardChoices(zone) {
         if (!pendingTargetCardId || !game || !els.targetCardChoices) return;
+        // v9 PR-E23: 重选区域 → 旧 stage 失效
+        if (stagedModalChoice && stagedModalChoice.kind === 'target') stagedModalChoice = null;
         pendingTargetZone = zone;
         var choices = Engine.getTargetZoneCards(game, 'enemy', zone);
         var label = targetZoneLabel(zone);
@@ -1811,6 +1823,14 @@
         return true;
       }
 
+      // v9 PR-E23: 二级面板候选高亮 — 清掉容器内旧 .is-staged, 给当前加.
+      function _highlightStaged(container, chosenEl) {
+        if (!container) return;
+        var prev = container.querySelectorAll('.is-staged');
+        for (var i = 0; i < prev.length; i += 1) prev[i].classList.remove('is-staged');
+        if (chosenEl) chosenEl.classList.add('is-staged');
+      }
+
       // 何时点 hand-card 触发"选中-后-确认"模式 (而非直接 usePlayerCard).
       function _shouldSelectFirst() {
         if (!game || game.turn !== 'player' || enemyThinking) return false;
@@ -1823,6 +1843,14 @@
       }
 
       function _handConfirm() {
+        // v9 PR-E23: 二级面板已 stage 候选 → 此时提交 resolve.
+        if (stagedModalChoice) {
+          var staged = stagedModalChoice;
+          stagedModalChoice = null;
+          if (staged.kind === 'target') resolveTargetCard(staged.zone, staged.cardId);
+          else if (staged.kind === 'huogong') resolveHuogong(staged.costId, false);
+          return;
+        }
         // 1. 任何 visible pending modal → 触发对应 confirm
         var dispatch = _firstVisibleDispatch();
         if (dispatch && _clickIfEnabled(dispatch.confirmBtnId)) return;
@@ -1844,6 +1872,14 @@
       }
 
       function _handCancel() {
+        // v9 PR-E23: 已 stage 二级面板候选 → 先撤销 stage (面板保持打开).
+        if (stagedModalChoice) {
+          stagedModalChoice = null;
+          _highlightStaged(els.targetCardChoices, null);
+          _highlightStaged(els.huogongCostChoices, null);
+          render();
+          return;
+        }
         // 1. 任何 visible pending modal → 触发对应 cancel
         var dispatch = _firstVisibleDispatch();
         if (dispatch && _clickIfEnabled(dispatch.cancelBtnId)) return;
@@ -1905,6 +1941,9 @@
           var card = event.target.closest('[data-card-id]');
           if (!card) return;
           var cardId = card.getAttribute('data-card-id');
+          // v9 PR-E23: 有 modal 打开时, 点手牌应被忽略 (玩家该跟 modal 交互).
+          // 修旧 bug: modal 开着误点手牌 → 那张牌直接打出.
+          if (_firstVisibleDispatch()) return;
           // v9 PR-E16: play 阶段无 pending / 无 skill-select / 非 discard 时,
           // 点 hand-card 仅 set selectedHandCardId + 高亮. 用户必须按 #handConfirmBtn
           // 才真正 usePlayerCard. 其余模式 (discard / skill / response) 走原 immediate 流程.
@@ -1933,15 +1972,25 @@
         if (els.targetHandBtn) els.targetHandBtn.addEventListener('click', function () { resolveTargetZone('hand'); });
         if (els.targetEquipmentBtn) els.targetEquipmentBtn.addEventListener('click', function () { resolveTargetZone('equipment'); });
         if (els.targetJudgeBtn) els.targetJudgeBtn.addEventListener('click', function () { resolveTargetZone('judge'); });
+        // v9 PR-E23: 二级面板候选改"选中→确认"两步 — 点候选只 stage + 高亮,
+        // #handConfirmBtn 才 resolve.
         if (els.targetCardChoices) els.targetCardChoices.addEventListener('click', function (event) {
           var target = event.target.closest('[data-target-card-id]');
           if (!target) return;
-          resolveTargetCard(target.getAttribute('data-target-zone'), target.getAttribute('data-target-card-id'));
+          stagedModalChoice = {
+            kind: 'target',
+            zone: target.getAttribute('data-target-zone'),
+            cardId: target.getAttribute('data-target-card-id')
+          };
+          _highlightStaged(els.targetCardChoices, target);
+          render();
         });
         if (els.huogongCostChoices) els.huogongCostChoices.addEventListener('click', function (event) {
           var cost = event.target.closest('[data-huogong-cost-id]');
           if (!cost || cost.disabled) return;
-          resolveHuogong(cost.getAttribute('data-huogong-cost-id'), false);
+          stagedModalChoice = { kind: 'huogong', costId: cost.getAttribute('data-huogong-cost-id') };
+          _highlightStaged(els.huogongCostChoices, cost);
+          render();
         });
         if (els.huogongDeclineBtn) els.huogongDeclineBtn.addEventListener('click', function () { resolveHuogong(null, true); });
         if (els.huogongCancelBtn) els.huogongCancelBtn.addEventListener('click', function () { hideHuogongPanel(); render(); });
