@@ -47,9 +47,18 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | PR-E17 | 真删 .phase-prompt 横幅 + .hand-dock overflow 修复 (containment) | 🟢 PR #85 已合并 |
 | PR-E18 | 删除二级 splash 屏 (纯文字介绍无功能) — 启动直接进 lobby | 🟢 PR #86 已合并 |
 | PR-E19 | 角落菜单 game-only + 退出回大厅 / 重开回选将 逻辑修正 | 🟢 PR #87 已合并 |
-| PR-E20 | 删除顶部 header + title-card 标题栏 (各屏均不需要) | 🟡 PR 待合并 |
+| PR-E20 | 删除顶部 header + title-card 标题栏 (各屏均不需要) | 🟢 PR #88 已合并 |
+| PR-E21 | 技能/卡牌 modal 适配: modal 块移出 .hand-dock 修复 fixed 定位 + conversion/target 升级卷轴风 | 🟡 PR 待合并 |
 
-总预估: **~2700-3700 LOC 变更**, 跨 20 个 review cycle。
+总预估: **~2700-3800 LOC 变更**, 跨 21 个 review cycle。
+
+### 子阶段: 技能/卡牌 UI 适配 (PR-E21+)
+
+UI 重制 (E0-E20) 引擎零改动, 技能/卡牌**逻辑**未动. 收尾阶段把交互层适配到新 UI:
+- E21: modal 块移出 .hand-dock (修复 backdrop-filter + overflow 导致的 fixed 定位 bug) + conversion/target 升级
+- E22 (计划): guanxing / zhiheng modal 升级卷轴风
+- E23 (计划): huogong / tiesuo modal 升级卷轴风
+- E24 (计划): PENDING_MODAL_DISPATCH 注册表补全 + card-as 流程一致性
 
 ## 设计目标 (从参考截图提炼)
 
@@ -69,6 +78,40 @@ v8 主体完工后, 用户反馈"目前的整个 UI 我觉得不太行" + 给出
 | 侧抽屉 | 棕色木纹背景, 退出/重开/帮助/背景/变速 等图标列表 |
 
 ## 各 PR 详细范围
+
+### PR-E21 落地 — 技能/卡牌 modal 适配 (定位修复 + conversion/target 升级) ✅
+
+**起因**: 用户「把武将技能 + 卡牌逻辑适配到新 UI」需求. 调研发现一个结构性 bug:
+
+14 个 pendingChoice / 技能 modal 原都嵌在 `.hand-dock` 内. `.hand-dock` 有
+`backdrop-filter: blur(12px)` (CSS 规范: filter/backdrop-filter 会为 `position:fixed`
+后代建立 containing block) + `overflow: hidden` (PR-E17). 结果: 8 个
+`.pending-prompt-panel` (position:fixed) modal 被错误锚到 `.hand-dock` 而非视口,
+并被 hand-dock 的 overflow 裁剪. 6 个旧 modal (position:static) 则在 hand-dock 内
+inline-flow, 也偏离屏幕中心.
+
+**改动 (引擎零改动)**:
+
+1. **modal 块移出 `.hand-dock`** — index.html 把 14 个 modal `<div>` 块从
+   `.hand-dock` 内移到 `.duel-table` 直属 (hand-dock 之后, duel-table 之内).
+   `.duel-table` 无 transform/filter/backdrop-filter → `position:fixed` 正确锚到视口,
+   不被裁剪. (`.hand` 手牌容器仍留在 `.hand-dock` 内.)
+2. **conversion / target modal 升级卷轴风** — 加 `pending-prompt-panel` class +
+   `__hint` / `__actions` / `__choices` 结构包装, 与 8 个新风格 modal 视觉统一.
+3. **CSS modals.css** — conversion / target 从旧扁平 `*-mode-panel` 组移出;
+   旧组只剩 tiesuo/huogong/guanxing/zhiheng, 改 `position: fixed` 居中
+   (深色临时风格, 后续 E22/E23 升级为 cream pending-prompt-panel).
+
+**新增测试** `tests/v9_pr_e21_modal_relocate.test.mjs` (6 条守护).
+
+**Test status**: 789 → 795 ✓; `build:check` 通过.
+
+**Process 遵守**:
+- PR-E20 (#88) merge 状态已通过 `mcp__github__pull_request_read` 确认
+  (`merged_at: 2026-05-15T09:54:55Z`) 后才从最新 main 拉新 branch
+  `claude/v9-pr-e21-modal-conversion-target`.
+
+---
 
 ### PR-E20 落地 — 删除顶部 header + title-card 标题栏 ✅
 

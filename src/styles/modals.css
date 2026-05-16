@@ -148,28 +148,32 @@
     .zhiheng-mode-panel[hidden],
     .pending-prompt-panel[hidden] { display: none !important; }
 
-    .tiesuo-mode-panel {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 8px;
-    }
-
-    .target-zone-panel,
+    /* v9 PR-E21: modal 块从 .hand-dock 移出到 .duel-table 直属后, 旧 inline-flow
+       定位会在 grid 里错位. tiesuo/huogong/guanxing/zhiheng 暂未升级卷轴风,
+       先改 position:fixed 居中 (深色临时风格), 后续 PR 升级为 pending-prompt-panel.
+       conversion / target 本 PR 已升级 → 加 .pending-prompt-panel class, 从此组移出. */
+    .tiesuo-mode-panel,
     .huogong-mode-panel,
-    .conversion-mode-panel,
     .guanxing-mode-panel,
     .zhiheng-mode-panel {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 40;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 6px;
-      margin-bottom: 8px;
-      border: 1px solid rgba(255,214,138,.22);
-      border-radius: 14px;
-      padding: 6px;
-      background: rgba(0,0,0,.18);
+      justify-content: center;
+      gap: 8px;
+      width: min(520px, 84vw);
+      max-height: 76vh;
+      overflow-y: auto;
+      border: 1px solid rgba(255,214,138,.3);
+      border-radius: 12px;
+      padding: 18px 22px;
+      background: linear-gradient(180deg, rgba(48,28,18,.98), rgba(22,14,9,.99));
+      box-shadow: 0 14px 36px rgba(0,0,0,.6);
     }
 
     .target-card-choices,
