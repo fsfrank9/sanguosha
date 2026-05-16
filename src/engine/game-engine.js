@@ -2543,6 +2543,9 @@
         if (pending.kind === 'luoshen-continue') {
           return resolveLuoshenContinueChoice(game, pending, decision || {});
         }
+        if (pending.kind === 'shan-response') {
+          return resolveShanResponseChoice(game, pending, decision || {});
+        }
         return fail('未知的选择类型：' + pending.kind);
       }
 
@@ -2930,12 +2933,20 @@
         return continueShaAfterCixiong(game, actor, card, amount);
       }
 
+      // v9 PR-E25: 非消耗式探测 — 玩家是否有【闪】可作响应 (手牌闪 或 技能转化).
+      function hasShanResponseAvailable(state) {
+        if (!state) return false;
+        for (var i = 0; i < state.hand.length; i += 1) {
+          if (state.hand[i] && state.hand[i].type === 'shan') return true;
+        }
+        var ctx = { mode: 'response', state: state, asType: 'shan' };
+        return !!selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', ctx));
+      }
+
       function continueShaAfterCixiong(game, actor, card, amount) {
         var self = game[actor];
         var targetActor = opponent(actor);
         var target = game[targetActor];
-        var weapon = self.equipment && self.equipment.weapon;
-        var armor = target.equipment && target.equipment.armor;
         var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
 
         if (!ignoreArmor && card.color === 'black' && hasEquipmentEffect(target, 'blockBlackSha')) {
@@ -2944,7 +2955,6 @@
           return success('仁王盾抵消。');
         }
 
-        var dodged = false;
         var responseContext = {
           game: game,
           actor: actor,
@@ -2960,9 +2970,30 @@
             responseContext.responseLocked = true;
           }
         }
+
+        // v9 PR-E25: 玩家是【杀】目标 + skillPreferences.shanResponse==='ask' +
+        //   有【闪】可响应 → 暂停, 把"出不出闪"的决策交给玩家. 引擎默认 (无该
+        //   pref) 仍走自动响应, 保证旧测试同步行为不变.
+        if (targetActor === 'player' && !responseContext.responseLocked
+            && target.skillPreferences && target.skillPreferences.shanResponse === 'ask'
+            && hasShanResponseAvailable(target)) {
+          if (!game.pauseState) game.pauseState = {};
+          game.pauseState.shaResponse = { actor: actor, card: card, amount: amount };
+          game.pendingChoice = {
+            kind: 'shan-response',
+            actor: 'player',
+            sourceActor: actor,
+            shaName: card.name
+          };
+          log(game, '等待' + actorName(game, 'player') + '决定是否打出【闪】。');
+          return success('等待玩家响应【杀】。');
+        }
+
+        var dodged = false;
         if (!responseContext.responseLocked && consumeResponse(game, targetActor, 'shan', '【杀】')) {
           dodged = true;
-        } else if (!responseContext.responseLocked && armor && !ignoreArmor && armor.type === 'bagua') {
+        } else if (!responseContext.responseLocked && !ignoreArmor
+            && target.equipment && target.equipment.armor && target.equipment.armor.type === 'bagua') {
           var baguaJudge = judge(game, targetActor, '【八卦阵】');
           if (baguaJudge && baguaJudge.color === 'red') {
             log(game, actorName(game, targetActor) + '的【八卦阵】判定为红色，视为打出【闪】。');
@@ -2970,6 +3001,16 @@
           }
           resolveJudgementCard(game, targetActor, target, '【八卦阵】', baguaJudge);
         }
+        return resolveShaAfterResponse(game, actor, card, amount, dodged);
+      }
+
+      // v9 PR-E25: 【杀】响应窗口结束后的结算 (贯石/青龙/伤害). 从原
+      // continueShaAfterCixiong 拆出, 供同步路径 + shan-response 暂停恢复共用.
+      function resolveShaAfterResponse(game, actor, card, amount, dodged) {
+        var self = game[actor];
+        var targetActor = opponent(actor);
+        var target = game[targetActor];
+        var weapon = self.equipment && self.equipment.weapon;
 
         if (dodged) {
           if (weapon && weapon.type === 'guanshi' && self.hand.length >= 2) {
@@ -2996,6 +3037,35 @@
 
         if (damage(game, targetActor, amount, actor, '【' + card.name + '】', card)) applyWeaponHitEffects(game, actor, targetActor);
         return success(target.name + '受到攻击。');
+      }
+
+      // v9 PR-E25: 玩家解决【闪】响应 pendingChoice — decision.use 决定出不出闪.
+      function resolveShanResponseChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.shaResponse;
+        if (!saved) return fail('找不到【杀】响应的暂停状态。');
+        game.pauseState.shaResponse = null;
+        var actor = saved.actor;
+        var card = saved.card;
+        var amount = saved.amount;
+        var target = game.player;
+        var dodged = false;
+        if (decision && decision.use) {
+          dodged = consumeResponse(game, 'player', 'shan', '【杀】');
+          if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
+        } else {
+          log(game, actorName(game, 'player') + '选择不打出【闪】。');
+          var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
+          var armor = target.equipment && target.equipment.armor;
+          if (armor && !ignoreArmor && armor.type === 'bagua') {
+            var baguaJudge = judge(game, 'player', '【八卦阵】');
+            if (baguaJudge && baguaJudge.color === 'red') {
+              log(game, actorName(game, 'player') + '的【八卦阵】判定为红色，视为打出【闪】。');
+              dodged = true;
+            }
+            resolveJudgementCard(game, 'player', target, '【八卦阵】', baguaJudge);
+          }
+        }
+        return resolveShaAfterResponse(game, actor, card, amount, dodged);
       }
 
       function playDuel(game, actor, card) {
