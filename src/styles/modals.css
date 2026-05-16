@@ -35,7 +35,12 @@
       color: #3a2010;
     }
 
-    /* v9 PR-E6: ::before 充当全屏暗背景 (modal backdrop). */
+    /* v9 PR-E6: ::before 充当全屏暗背景 (modal backdrop).
+       v9 PR-E27: pointer-events 改 none — 此 backdrop (z-index 在 panel
+       stacking context 内, 整体 z-40) 会盖在 .hand-dock (z-5) 之上, 若
+       capture 点击则 hand-dock 内的 #handConfirmBtn / #handCancelBtn 点不到
+       (两步化 modal 的"确认/取消"全失效, 用户只能点面板内按钮). backdrop
+       改为纯视觉 (dim + blur), 不拦截点击. 手牌误点已由 _anyModalVisible 守护. */
     .pending-prompt-panel::before {
       content: '';
       position: fixed;
@@ -43,7 +48,7 @@
       background: rgba(0, 0, 0, .45);
       backdrop-filter: blur(2px);
       z-index: -1;
-      pointer-events: auto;
+      pointer-events: none;
     }
 
     .pending-prompt-panel__hint {

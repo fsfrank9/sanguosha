@@ -933,7 +933,7 @@
             els.shanResponsePanel.hidden = false;
             if (els.shanResponseHint) {
               els.shanResponseHint.textContent =
-                '对方对你使用【' + (pending.shaName || '杀') + '】，选择用哪张牌当【闪】，或不出。';
+                '对方对你使用【' + (pending.shaName || '杀') + '】，点选一张牌当【闪】后按下方【确认】，或点【不出【闪】】。';
             }
             if (els.shanResponseChoices) {
               var shanOpts = pending.options || [];
