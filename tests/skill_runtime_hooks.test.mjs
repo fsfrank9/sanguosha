@@ -90,8 +90,9 @@ test('game engine dispatches Jizhi through onCardUse hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const finishStart = source.indexOf('function finishTrickUse(game, actor, card, result, options)');
   const finishEnd = source.indexOf('function removeCardFromHand(state, cardId)', finishStart);
-  const wuxieStart = source.indexOf('function consumeWuxie(game, actor, reason)');
-  const wuxieEnd = source.indexOf('function judge(game, actor, reason, opts)', wuxieStart);
+  // v10 V5: consumeWuxie signature 加了 4th param preferredCardId. 用宽松前缀 match.
+  const wuxieStart = source.indexOf('function consumeWuxie(game, actor, reason');
+  const wuxieEnd = source.indexOf('// v10 V5: 无懈可击 链式响应 框架', wuxieStart);
   assert.ok(finishStart >= 0 && finishEnd > finishStart, 'finishTrickUse source should be extractable');
   assert.ok(wuxieStart >= 0 && wuxieEnd > wuxieStart, 'consumeWuxie source should be extractable');
   const finishTrickUseSource = source.slice(finishStart, finishEnd);

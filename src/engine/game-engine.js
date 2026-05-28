@@ -2387,8 +2387,19 @@
         return true;
       }
 
-      function consumeWuxie(game, actor, reason) {
-        var card = removeFirstCardOfType(game[actor], 'wuxie');
+      function consumeWuxie(game, actor, reason, preferredCardId) {
+        var card;
+        if (preferredCardId) {
+          // v10 V5: 玩家指定用哪张无懈 (面板候选选定)
+          var state = game[actor];
+          var idx = state.hand.findIndex(function (c) {
+            return c.id === preferredCardId && c.type === 'wuxie';
+          });
+          if (idx < 0) return false;
+          card = state.hand.splice(idx, 1)[0];
+        } else {
+          card = removeFirstCardOfType(game[actor], 'wuxie');
+        }
         if (!card) return false;
         discardCard(game, card);
         log(game, actorName(game, actor) + '打出【无懈可击】抵消' + reason + '。');
@@ -2405,6 +2416,130 @@
         }
         return true;
       }
+
+      // v10 V5: 无懈可击 链式响应 框架.
+      //   每张锦囊触发 wuxie 检查: 先问 target 是否无懈; 若是, 再问 source 是否反无懈;
+      //   依次交替, 直至某方放弃或无牌. 玩家方 (skillPreferences.wuxieResponse='ask')
+      //   暂停; AI 方默认 auto-use (有无懈则用).
+      //
+      //   pauseState.wuxieChain = {
+      //     trickName,         // 'juedou' / 'guohe' / 'shunshou' / 'huogong' / 'jiedao'
+      //     ctx,               // 继续逻辑的上下文 (actor, card, options...)
+      //     reason,            // 日志/文案用 (e.g. '【决斗】')
+      //     currentResponder,  // 'player' | 'enemy' — 当前轮到谁决定
+      //     wuxied             // bool — 当前 net 抵消态 (false=锦囊通过, true=已被抵消)
+      //   }
+      //
+      //   每用一次无懈即翻转 wuxied + 切换 currentResponder.
+      //   链结束时 settleWuxieChain 调 WUXIE_CONTINUATIONS[trickName] 完成结算.
+      var WUXIE_CONTINUATIONS = {};
+
+      function registerWuxieContinuation(trickName, fn) {
+        WUXIE_CONTINUATIONS[trickName] = fn;
+      }
+
+      function listWuxieOptions(state) {
+        if (!state || !state.hand) return [];
+        var opts = [];
+        state.hand.forEach(function (card) {
+          if (card && card.type === 'wuxie') {
+            opts.push({
+              cardId: card.id, via: null, name: card.name,
+              suit: card.suit, rank: card.rank
+            });
+          }
+        });
+        return opts;
+      }
+
+      function hasWuxieResponseAvailable(state) {
+        return listWuxieOptions(state).length > 0;
+      }
+
+      // 入口: trick 调用此 fn 触发无懈检查链. ctx 是 trick 的继续上下文.
+      function checkWuxieAndContinue(game, targetActor, reason, trickName, ctx) {
+        if (!game.pauseState) game.pauseState = {};
+        game.pauseState.wuxieChain = {
+          trickName: trickName,
+          ctx: ctx,
+          reason: reason,
+          currentResponder: targetActor,
+          wuxied: false
+        };
+        return advanceWuxieChain(game);
+      }
+
+      // 链推进: 据 chain.currentResponder 决定 暂停 (玩家 ask + 有无懈) /
+      // AI auto-use (有无懈则用) / 结算 (无无懈).
+      function advanceWuxieChain(game) {
+        var chain = game.pauseState && game.pauseState.wuxieChain;
+        if (!chain) return fail('无懈链状态丢失。');
+        var responder = chain.currentResponder;
+        var state = game[responder];
+        var hasWuxie = hasWuxieResponseAvailable(state);
+
+        // 玩家 ask 路径 — 暂停等待玩家
+        if (responder === 'player'
+            && state.skillPreferences && state.skillPreferences.wuxieResponse === 'ask'
+            && hasWuxie) {
+          return requestPlayerResponse(game, {
+            kind: 'wuxie-response',
+            actor: 'player',
+            pauseKey: 'wuxieChain',
+            source: chain,  // 即 pauseState.wuxieChain 自身 (链状态)
+            options: listWuxieOptions(state),
+            meta: {
+              reason: chain.reason,
+              chainWuxied: chain.wuxied,
+              trickName: chain.trickName
+            },
+            logMessage: '等待' + actorName(game, 'player') + '决定是否打出【无懈可击】响应' + chain.reason + '。',
+            statusMessage: '等待玩家无懈响应。'
+          });
+        }
+
+        // 非玩家 ask 路径: AI / 默认 auto — 有无懈则自动用
+        if (hasWuxie) {
+          consumeWuxie(game, responder, chain.reason);
+          chain.wuxied = !chain.wuxied;
+          chain.currentResponder = opponent(responder);
+          return advanceWuxieChain(game);
+        }
+
+        // 无无懈 → 结算
+        return settleWuxieChain(game);
+      }
+
+      function settleWuxieChain(game) {
+        var chain = game.pauseState && game.pauseState.wuxieChain;
+        if (!chain) return fail('无懈链状态丢失。');
+        game.pauseState.wuxieChain = null;
+        var cont = WUXIE_CONTINUATIONS[chain.trickName];
+        if (!cont) return fail('未注册的无懈延续: ' + chain.trickName);
+        return cont(game, chain.ctx, chain.wuxied);
+      }
+
+      // resolver — 玩家在 wuxie pendingChoice 上的决策.
+      function resolveWuxieResponseChoice(game, pending, decision) {
+        var chain = game.pauseState && game.pauseState.wuxieChain;
+        if (!chain) return fail('找不到无懈响应的暂停状态。');
+
+        if (decision.cardId || decision.use) {
+          var used = consumeWuxie(game, 'player', chain.reason, decision.cardId || null);
+          if (!used) {
+            log(game, actorName(game, 'player') + '没有可打出的【无懈可击】。');
+            return settleWuxieChain(game);
+          }
+          chain.wuxied = !chain.wuxied;
+          chain.currentResponder = opponent('player');
+          return advanceWuxieChain(game);
+        }
+        // 玩家放弃响应 → 结算
+        log(game, actorName(game, 'player') + '选择不打出【无懈可击】响应' + chain.reason + '。');
+        return settleWuxieChain(game);
+      }
+
+      registerResponseKind('wuxie-response', resolveWuxieResponseChoice);
 
       // v8 PR-B4: 银月枪 — gltjk SP 010：
       //   "每当你于回合外使用或打出黑色手牌时, 你可以令你攻击范围内的一名
@@ -3404,33 +3539,29 @@
         }
 
         if (card.type === 'juedou') {
-          if (consumeWuxie(game, opponent(actor), '【决斗】')) {
-            discardCard(game, card);
-            return finishTrickUse(game, actor, card, success('决斗被无懈可击。'), options);
-          }
-          return finishTrickUse(game, actor, card, playDuel(game, actor, card), options);
+          // v10 V5: 走无懈链框架. WUXIE_CONTINUATIONS['juedou'] 注册在 trick 区下方.
+          return checkWuxieAndContinue(game, opponent(actor), '【决斗】', 'juedou', {
+            actor: actor, card: card, options: options
+          });
         }
         if (card.type === 'nanman') return finishTrickUse(game, actor, card, playAOE(game, actor, card, 'sha', '南蛮入侵'), options);
         if (card.type === 'wanjian') return finishTrickUse(game, actor, card, playAOE(game, actor, card, 'shan', '万箭齐发'), options);
 
         if (card.type === 'guohe') {
           // v7 PR-9: 1V1 变体两选项 — 装备区一张 / 看手并弃一张。
+          // v10 V5: 走无懈链框架.
           discardCard(game, card);
-          if (consumeWuxie(game, opponent(actor), '【过河拆桥】')) {
-            return finishTrickUse(game, actor, card, success('过河拆桥被无懈可击。'), options);
-          }
-          return finishTrickUse(game, actor, card, resolveGuohe1v1(game, actor, opponent(actor), options), options);
+          return checkWuxieAndContinue(game, opponent(actor), '【过河拆桥】', 'guohe', {
+            actor: actor, card: card, options: options
+          });
         }
 
         if (card.type === 'shunshou') {
+          // v10 V5: 走无懈链框架.
           discardCard(game, card);
-          if (consumeWuxie(game, opponent(actor), '【顺手牵羊】')) return finishTrickUse(game, actor, card, success('顺手牵羊被无懈可击。'), options);
-          var stolenInfo = removeTargetZoneCard(game, opponent(actor), options.targetZone, options.targetCardId);
-          if (stolenInfo && stolenInfo.card) {
-            self.hand.push(stolenInfo.card);
-            log(game, actorName(game, actor) + '使用【顺手牵羊】，获得了' + actorName(game, opponent(actor)) + stolenInfo.zone + '的一张牌。');
-          }
-          return finishTrickUse(game, actor, card, success('获得对方一张牌。'), options);
+          return checkWuxieAndContinue(game, opponent(actor), '【顺手牵羊】', 'shunshou', {
+            actor: actor, card: card, options: options
+          });
         }
 
         if (card.type === 'taoyuan') {
@@ -3477,26 +3608,11 @@
         }
 
         if (card.type === 'huogong') {
-          var fireTarget = game[opponent(actor)];
+          // v10 V5: 走无懈链框架. 后续 huogong 流程移到 WUXIE_CONTINUATIONS['huogong'].
           discardCard(game, card);
-          if (consumeWuxie(game, opponent(actor), '【火攻】')) return finishTrickUse(game, actor, card, success('火攻被无懈可击。'), options);
-          if (!fireTarget.hand.length) return finishTrickUse(game, actor, card, success('目标没有手牌，火攻未造成伤害。'), options);
-          var revealed = fireTarget.hand[0];
-          log(game, actorName(game, opponent(actor)) + '展示【' + revealed.name + '】（' + revealed.suit + '）。');
-          if (options.declineHuogong) {
-            log(game, actorName(game, actor) + '选择不弃置同花色牌，【火攻】未造成伤害。');
-            return finishTrickUse(game, actor, card, success('火攻未追加弃牌。'), options);
-          }
-          var cost = options.huogongCostCardId ? removeCardFromHand(self, options.huogongCostCardId) : removeFirstMatchingCard(self, function (item) { return item.suit === revealed.suit; });
-          if (!cost) return finishTrickUse(game, actor, card, success('没有同花色牌可弃，火攻未造成伤害。'), options);
-          if (cost.suit !== revealed.suit) {
-            self.hand.push(cost);
-            return fail('请选择与展示牌同花色的手牌。');
-          }
-          discardCard(game, cost);
-          log(game, actorName(game, actor) + '弃置同花色【' + cost.name + '】发动【火攻】。');
-          damage(game, opponent(actor), 1, actor, '【火攻】', null, 'fire');
-          return finishTrickUse(game, actor, card, success('火攻结算完成。'), options);
+          return checkWuxieAndContinue(game, opponent(actor), '【火攻】', 'huogong', {
+            actor: actor, card: card, options: options
+          });
         }
 
         if (card.type === 'tiesuo') {
@@ -3518,22 +3634,95 @@
         }
 
         if (card.type === 'jiedao') {
-          // v7 PR-5: gltjk card__scroll.md 注 — 须做两次合法性检测。
-          // 第一次已在 canPlayCard 检过；这里做第二次（An 选择是否用杀时）。
-          var weaponOwner = game[opponent(actor)];
+          // v7 PR-5: gltjk card__scroll.md 注 — 须做两次合法性检测.
+          // 第一次已在 canPlayCard 检过; 这里做第二次 (在 jiedao 继续逻辑里).
+          // v10 V5: 走无懈链框架.
           discardCard(game, card);
-          if (consumeWuxie(game, opponent(actor), '【借刀杀人】')) {
-            return finishTrickUse(game, actor, card, success('借刀杀人被无懈可击。'), options);
-          }
-          if (!weaponOwner.equipment.weapon) {
-            return finishTrickUse(game, actor, card, success('目标没有武器，借刀杀人无效果。'), options);
-          }
-          return finishTrickUse(game, actor, card, resolveJiedaoDecision(game, actor, opponent(actor), card, options), options);
+          return checkWuxieAndContinue(game, opponent(actor), '【借刀杀人】', 'jiedao', {
+            actor: actor, card: card, options: options
+          });
         }
 
         discardCard(game, card);
         return success('卡牌已使用。');
       }
+
+      // v10 V5: 无懈链 settle 时调用. ctx = { actor, card, options }.
+      // wuxied: true → 锦囊被抵消; false → 锦囊照常结算.
+
+      registerWuxieContinuation('juedou', function (game, ctx, wuxied) {
+        if (wuxied) {
+          discardCard(game, ctx.card);
+          return finishTrickUse(game, ctx.actor, ctx.card, success('决斗被无懈可击。'), ctx.options);
+        }
+        return finishTrickUse(game, ctx.actor, ctx.card, playDuel(game, ctx.actor, ctx.card), ctx.options);
+      });
+
+      registerWuxieContinuation('guohe', function (game, ctx, wuxied) {
+        // 注意: guohe 在调 checkWuxieAndContinue 前已 discardCard. wuxied 仅影响后续动作.
+        if (wuxied) {
+          return finishTrickUse(game, ctx.actor, ctx.card, success('过河拆桥被无懈可击。'), ctx.options);
+        }
+        return finishTrickUse(game, ctx.actor, ctx.card,
+          resolveGuohe1v1(game, ctx.actor, opponent(ctx.actor), ctx.options), ctx.options);
+      });
+
+      registerWuxieContinuation('shunshou', function (game, ctx, wuxied) {
+        if (wuxied) {
+          return finishTrickUse(game, ctx.actor, ctx.card, success('顺手牵羊被无懈可击。'), ctx.options);
+        }
+        var self = game[ctx.actor];
+        var opt = ctx.options || {};
+        var stolenInfo = removeTargetZoneCard(game, opponent(ctx.actor), opt.targetZone, opt.targetCardId);
+        if (stolenInfo && stolenInfo.card) {
+          self.hand.push(stolenInfo.card);
+          log(game, actorName(game, ctx.actor) + '使用【顺手牵羊】，获得了'
+            + actorName(game, opponent(ctx.actor)) + stolenInfo.zone + '的一张牌。');
+        }
+        return finishTrickUse(game, ctx.actor, ctx.card, success('获得对方一张牌。'), ctx.options);
+      });
+
+      registerWuxieContinuation('huogong', function (game, ctx, wuxied) {
+        if (wuxied) {
+          return finishTrickUse(game, ctx.actor, ctx.card, success('火攻被无懈可击。'), ctx.options);
+        }
+        var self = game[ctx.actor];
+        var fireTarget = game[opponent(ctx.actor)];
+        var opt = ctx.options || {};
+        if (!fireTarget.hand.length) {
+          return finishTrickUse(game, ctx.actor, ctx.card, success('目标没有手牌，火攻未造成伤害。'), opt);
+        }
+        var revealed = fireTarget.hand[0];
+        log(game, actorName(game, opponent(ctx.actor)) + '展示【' + revealed.name + '】（' + revealed.suit + '）。');
+        if (opt.declineHuogong) {
+          log(game, actorName(game, ctx.actor) + '选择不弃置同花色牌，【火攻】未造成伤害。');
+          return finishTrickUse(game, ctx.actor, ctx.card, success('火攻未追加弃牌。'), opt);
+        }
+        var cost = opt.huogongCostCardId
+          ? removeCardFromHand(self, opt.huogongCostCardId)
+          : removeFirstMatchingCard(self, function (item) { return item.suit === revealed.suit; });
+        if (!cost) return finishTrickUse(game, ctx.actor, ctx.card, success('没有同花色牌可弃，火攻未造成伤害。'), opt);
+        if (cost.suit !== revealed.suit) {
+          self.hand.push(cost);
+          return fail('请选择与展示牌同花色的手牌。');
+        }
+        discardCard(game, cost);
+        log(game, actorName(game, ctx.actor) + '弃置同花色【' + cost.name + '】发动【火攻】。');
+        damage(game, opponent(ctx.actor), 1, ctx.actor, '【火攻】', null, 'fire');
+        return finishTrickUse(game, ctx.actor, ctx.card, success('火攻结算完成。'), opt);
+      });
+
+      registerWuxieContinuation('jiedao', function (game, ctx, wuxied) {
+        if (wuxied) {
+          return finishTrickUse(game, ctx.actor, ctx.card, success('借刀杀人被无懈可击。'), ctx.options);
+        }
+        var weaponOwner = game[opponent(ctx.actor)];
+        if (!weaponOwner.equipment.weapon) {
+          return finishTrickUse(game, ctx.actor, ctx.card, success('目标没有武器，借刀杀人无效果。'), ctx.options);
+        }
+        return finishTrickUse(game, ctx.actor, ctx.card,
+          resolveJiedaoDecision(game, ctx.actor, opponent(ctx.actor), ctx.card, ctx.options), ctx.options);
+      });
 
       function startTurn(game, actor) {
         if (game.phase === 'gameover') return fail('游戏已经结束。');
