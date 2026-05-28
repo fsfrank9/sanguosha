@@ -69,8 +69,10 @@ test('v9 PR-E25/E26: PENDING_MODAL_DISPATCH 注册 shanResponsePanel (confirm=nu
   assert.match(adapter, /panelId:\s*'shanResponsePanel',\s*confirmBtnId:\s*null,\s*cancelBtnId:\s*'shanResponseDeclineBtn'/);
 });
 
-test('v9 PR-E25: renderPendingChoice 处理 shan-response kind', () => {
-  assert.match(adapter, /kind\s*===\s*'shan-response'[\s\S]{0,160}shanResponsePanel\.hidden\s*=\s*false/);
+test('v9 PR-E25: renderPendingChoice 处理 shan-response kind (v10 V4: 走 SHAN_RESPONSE_KINDS 数组)', () => {
+  // V4: shan-response / wanjian-response / yinyue-response 共用 shanResponsePanel
+  assert.match(adapter, /SHAN_RESPONSE_KINDS\s*=\s*\[[\s\S]*?'shan-response'/);
+  assert.match(adapter, /SHAN_RESPONSE_KINDS\.indexOf\(kind\)\s*>=\s*0[\s\S]{0,200}shanResponsePanel\.hidden\s*=\s*false/);
 });
 
 test('v9 PR-E25/E26: shanResponseChoices click → stage; DeclineBtn → resolvePendingChoice({use:false})', () => {
