@@ -478,6 +478,15 @@
             <button class="btn small" id="wuxieResponseDeclineBtn">不无懈</button>
           </div>
         </div>
+        <!-- v10 V6: 决斗 响应面板 — 对方对你发起决斗时, 玩家手动出杀响应.
+             候选含真【杀】 + 龙胆(闪→杀) / 武圣(红→杀) 转化候选. -->
+        <div class="duel-response-panel pending-prompt-panel" id="duelResponsePanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="duelResponseHint">对方对你发起【决斗】，请选择一张牌当【杀】响应，或不出。</span>
+          <div class="duel-response-choices pending-prompt-panel__choices" id="duelResponseChoices" aria-live="polite"></div>
+          <div class="duel-response-actions pending-prompt-panel__actions">
+            <button class="btn small" id="duelResponseDeclineBtn">不出【杀】</button>
+          </div>
+        </div>
     </section>
     </div><!-- /.game-frame -->
   </main>

@@ -2297,6 +2297,57 @@
         return opts;
       }
 
+      // v10 V6: 判定一张牌能否当【杀】响应 — 真【杀】 / 龙胆(闪→杀) /
+      // 武圣(红→杀). 丈八(2 牌虚拟) 不在单牌 option 范围 (UI 选不到, fallback
+      // 走 consumeResponse 自动路径).
+      function shaOptionForCard(state, cardId) {
+        if (!state) return null;
+        var card = null;
+        var hand = state.hand || [];
+        for (var i = 0; i < hand.length; i += 1) {
+          if (hand[i] && hand[i].id === cardId) { card = hand[i]; break; }
+        }
+        if (!card && state.equipment) {
+          // 武圣 红装备 也可当杀响应
+          ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
+            if (!card && state.equipment[slot] && state.equipment[slot].id === cardId) {
+              card = state.equipment[slot];
+            }
+          });
+        }
+        if (!card) return null;
+        if (isShaCard(card)) return { via: null };
+        if (hasSkill(state, 'longdan') && card.type === 'shan') return { via: '龙胆' };
+        if (hasSkill(state, 'wusheng') && card.color === 'red') return { via: '武圣' };
+        return null;
+      }
+
+      // v10 V6: 枚举玩家所有可作【杀】响应的牌 (手牌 + 装备区 — 武圣需要装备区).
+      function listShaResponseOptions(state) {
+        var opts = [];
+        var seen = {};
+        function add(card) {
+          if (!card || seen[card.id]) return;
+          var opt = shaOptionForCard(state, card.id);
+          if (opt) {
+            seen[card.id] = true;
+            opts.push({ cardId: card.id, via: opt.via, name: card.name, suit: card.suit, rank: card.rank });
+          }
+        }
+        (state.hand || []).forEach(add);
+        if (state.equipment) {
+          ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
+            add(state.equipment[slot]);
+          });
+        }
+        return opts;
+      }
+
+      function hasShaResponseAvailable(state) {
+        if (!state) return false;
+        return listShaResponseOptions(state).length > 0;
+      }
+
       function findResponseCard(state, type, preferredCardId) {
         var card = null;
         if (type === 'shan') {
@@ -2321,6 +2372,16 @@
           return shanConversion ? { card: removeOwnCardFromAnyZone(state, shanConversion.card.id), asName: shanConversion.asName, skillName: shanConversion.skillName } : null;
         }
         if (type === 'sha') {
+          // v10 V6: 玩家指定用哪张牌当【杀】 → 直接消耗那张 (真杀 / 龙胆 / 武圣).
+          if (preferredCardId) {
+            var pickedSha = shaOptionForCard(state, preferredCardId);
+            if (!pickedSha) return null;
+            return {
+              card: removeOwnCardFromAnyZone(state, preferredCardId),
+              asName: '杀',
+              skillName: pickedSha.via
+            };
+          }
           card = removeFirstCardOfType(state, 'sha');
           if (card) return { card: card, asName: '杀', skillName: null };
           var responseContext = { mode: 'response', state: state, asType: 'sha' };
@@ -3352,20 +3413,91 @@
       // 决定 dodged, 再走 resolveShaAfterResponse 共享后续结算.
       registerResponseKind('shan-response', resolveShanResponseChoice);
 
+      // v10 V6: 决斗 链状态机 — playDuel 启动, advanceDuelChain 推进.
+      //   pauseState.duelChain = { starterActor, currentResponder, reason }
+      //   每轮: currentResponder 出杀; 出不出 → 切换; 出不了 → 受 1 伤, 链结束.
+      //   玩家 (skillPreferences.shaDuelResponse='ask' + 有杀响应选项) 暂停;
+      //   AI / 默认 走 consumeResponse 自动消耗 (有 sha / 转化即用).
       function playDuel(game, actor, card) {
-        var current = opponent(actor);
         discardCard(game, card);
         log(game, actorName(game, actor) + '发起【决斗】。');
-        while (game.phase !== 'gameover') {
-          if (consumeResponse(game, current, 'sha', '【决斗】')) {
-            current = opponent(current);
-          } else {
-            damage(game, current, 1, opponent(current), '【决斗】');
-            break;
-          }
+        if (!game.pauseState) game.pauseState = {};
+        game.pauseState.duelChain = {
+          starterActor: actor,
+          currentResponder: opponent(actor),
+          reason: '【决斗】'
+        };
+        return advanceDuelChain(game);
+      }
+
+      function advanceDuelChain(game) {
+        var chain = game.pauseState && game.pauseState.duelChain;
+        if (!chain) return fail('决斗链状态丢失。');
+        if (game.phase === 'gameover') {
+          game.pauseState.duelChain = null;
+          return success('决斗结算完成。');
         }
+        var responder = chain.currentResponder;
+        var state = game[responder];
+        var hasSha = hasShaResponseAvailable(state);
+
+        // 玩家 ask + 有杀响应 → 暂停
+        if (responder === 'player'
+            && state.skillPreferences && state.skillPreferences.shaDuelResponse === 'ask'
+            && hasSha) {
+          return requestPlayerResponse(game, {
+            kind: 'sha-duel-response',
+            actor: 'player',
+            pauseKey: 'duelChain',
+            source: chain,
+            options: listShaResponseOptions(state),
+            meta: {
+              reason: chain.reason,
+              starterActor: chain.starterActor
+            },
+            logMessage: '等待' + actorName(game, 'player') + '决定是否打出【杀】响应' + chain.reason + '。',
+            statusMessage: '等待玩家响应【决斗】。'
+          });
+        }
+
+        // 非玩家 ask 路径: AI / 默认 — 走原 consumeResponse 自动消耗
+        if (consumeResponse(game, responder, 'sha', chain.reason)) {
+          chain.currentResponder = opponent(responder);
+          return advanceDuelChain(game);
+        }
+        // 无杀 → 受 1 伤, 链结束
+        var loser = responder;
+        game.pauseState.duelChain = null;
+        damage(game, loser, 1, opponent(loser), chain.reason);
         return success('决斗结算完成。');
       }
+
+      // resolver — 玩家 sha-duel-response pendingChoice 决定.
+      function resolveDuelResponseChoice(game, pending, decision) {
+        var chain = game.pauseState && game.pauseState.duelChain;
+        if (!chain) return fail('找不到决斗响应的暂停状态。');
+
+        if (decision.cardId || decision.use) {
+          var consumed = consumeResponse(game, 'player', 'sha', chain.reason, decision.cardId || null);
+          if (!consumed) {
+            // 罕见: 指定的 cardId 无效或库中此牌已不可用 → 视为放弃
+            log(game, actorName(game, 'player') + '没有可打出的【杀】。');
+            var ploser = 'player';
+            game.pauseState.duelChain = null;
+            damage(game, ploser, 1, opponent(ploser), chain.reason);
+            return success('决斗结算完成。');
+          }
+          chain.currentResponder = opponent('player');
+          return advanceDuelChain(game);
+        }
+        // 玩家放弃出杀 → 受 1 伤
+        log(game, actorName(game, 'player') + '选择不打出【杀】响应' + chain.reason + '。');
+        game.pauseState.duelChain = null;
+        damage(game, 'player', 1, opponent('player'), chain.reason);
+        return success('决斗结算完成。');
+      }
+
+      registerResponseKind('sha-duel-response', resolveDuelResponseChoice);
 
       function playAOE(game, actor, card, responseType, title) {
         var targetActor = opponent(actor);
