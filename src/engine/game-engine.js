@@ -1891,6 +1891,58 @@
         return { ok: true, message: message };
       }
 
+      // v10 V3: 玩家响应窗口框架 — 统一暂停/恢复 API.
+      //
+      // 调用 (engine 侧): 触发暂停时, 不再手写 game.pauseState[xxx] +
+      //   game.pendingChoice = {...} + log + return; 改用 requestPlayerResponse
+      //   一行调用. 各 response kind 注册 continuation 到 RESPONSE_KIND_RESOLVERS.
+      //
+      // spec:
+      //   kind         — pendingChoice.kind ('shan-response' | 'wuxie-response' | ...)
+      //   actor        — 等待哪个 actor 响应 (UI 据此决定渲染哪边面板)
+      //   pauseKey     — 写入 game.pauseState[pauseKey] 的 key
+      //   source       — 暂停上下文 (resume 时用): { actor, card, amount, ... }
+      //   options      — UI 候选列表 (写入 pendingChoice.options)
+      //   meta         — 额外 UI 字段 (merge 进 pendingChoice, 如 shaName/sourceActor)
+      //   logMessage   — 可选 log 行
+      //   statusMessage— success() 的返回 message
+      //
+      // 恢复: 由 resolvePendingChoice / resolveResponseChoice 据 kind 查
+      // RESPONSE_KIND_RESOLVERS 分发到对应 resolver. resolver 签名
+      // (game, pending, decision), 自负责清 game.pauseState[pauseKey].
+      function requestPlayerResponse(game, spec) {
+        if (!game.pauseState) game.pauseState = {};
+        game.pauseState[spec.pauseKey] = spec.source;
+        var pending = { kind: spec.kind, actor: spec.actor };
+        if (spec.options !== undefined) pending.options = spec.options;
+        if (spec.meta) {
+          Object.keys(spec.meta).forEach(function (k) { pending[k] = spec.meta[k]; });
+        }
+        game.pendingChoice = pending;
+        if (spec.logMessage) log(game, spec.logMessage);
+        return success(spec.statusMessage || ('等待' + actorName(game, spec.actor) + '响应。'));
+      }
+
+      // v10 V3: response kind → resolver(game, pending, decision) 注册表.
+      // 各 resolveXxxResponseChoice 函数声明后调 registerResponseKind 入册.
+      var RESPONSE_KIND_RESOLVERS = {};
+
+      function registerResponseKind(kind, resolver) {
+        RESPONSE_KIND_RESOLVERS[kind] = resolver;
+      }
+
+      // v10 V3: response 专用 dispatcher (public 入口). 与 resolvePendingChoice
+      // 区别: 此函数仅处理已注册的 response kind, 未注册 → fail.
+      // V3 只迁移 shan-response; V4-V6 会陆续注册 wuxie / sha-duel 等.
+      function resolveResponseChoice(game, decision) {
+        var pending = game && game.pendingChoice;
+        if (!pending) return fail('没有待处理的响应。');
+        var resolver = RESPONSE_KIND_RESOLVERS[pending.kind];
+        if (!resolver) return fail('未注册的响应类型：' + pending.kind);
+        game.pendingChoice = null;
+        return resolver(game, pending, decision || {});
+      }
+
       function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature) {
         if (game.phase === 'gameover') return false;
         var target = game[targetActor];
@@ -2536,6 +2588,13 @@
       function resolvePendingChoice(game, decision) {
         var pending = game && game.pendingChoice;
         if (!pending) return fail('没有待处理的选择。');
+        // v10 V3: 框架注册的 response kinds 优先走 registry 分发.
+        // 已注册: shan-response. V4-V6 会陆续加 wuxie / sha-duel 等.
+        var registered = RESPONSE_KIND_RESOLVERS[pending.kind];
+        if (registered) {
+          game.pendingChoice = null;
+          return registered(game, pending, decision || {});
+        }
         game.pendingChoice = null;
         if (pending.kind === 'guicai-replace') {
           return resolveGuicaiReplaceChoice(game, pending, decision || {});
@@ -2582,9 +2641,7 @@
         if (pending.kind === 'luoshen-continue') {
           return resolveLuoshenContinueChoice(game, pending, decision || {});
         }
-        if (pending.kind === 'shan-response') {
-          return resolveShanResponseChoice(game, pending, decision || {});
-        }
+        // v10 V3: shan-response 已移到框架注册表 (上方 RESPONSE_KIND_RESOLVERS).
         return fail('未知的选择类型：' + pending.kind);
       }
 
@@ -3009,21 +3066,22 @@
         // v9 PR-E25: 玩家是【杀】目标 + skillPreferences.shanResponse==='ask' +
         //   有【闪】可响应 → 暂停, 把"出不出闪"的决策交给玩家. 引擎默认 (无该
         //   pref) 仍走自动响应, 保证旧测试同步行为不变.
+        // v10 V3: 走 requestPlayerResponse 框架 — pauseState.shaResponse + pendingChoice
+        // 的设置统一. resolve 在 RESPONSE_KIND_RESOLVERS['shan-response'] 注册.
         if (targetActor === 'player' && !responseContext.responseLocked
             && target.skillPreferences && target.skillPreferences.shanResponse === 'ask'
             && hasShanResponseAvailable(target)) {
-          if (!game.pauseState) game.pauseState = {};
-          game.pauseState.shaResponse = { actor: actor, card: card, amount: amount };
-          game.pendingChoice = {
+          return requestPlayerResponse(game, {
             kind: 'shan-response',
             actor: 'player',
-            sourceActor: actor,
-            shaName: card.name,
+            pauseKey: 'shaResponse',
+            source: { actor: actor, card: card, amount: amount },
             // v9 PR-E26: 列出所有可作【闪】的牌 (真闪 + 龙胆/倾国 转化), 玩家自选.
-            options: listShanResponseOptions(target)
-          };
-          log(game, '等待' + actorName(game, 'player') + '决定是否打出【闪】。');
-          return success('等待玩家响应【杀】。');
+            options: listShanResponseOptions(target),
+            meta: { sourceActor: actor, shaName: card.name },
+            logMessage: '等待' + actorName(game, 'player') + '决定是否打出【闪】。',
+            statusMessage: '等待玩家响应【杀】。'
+          });
         }
 
         var dodged = false;
@@ -3111,6 +3169,11 @@
         }
         return resolveShaAfterResponse(game, actor, card, amount, dodged);
       }
+
+      // v10 V3: 注册到 response framework. UI 通过 resolvePendingChoice 或
+      // resolveResponseChoice 调过来时, 此 fn 拿 pauseState.shaResponse + decision
+      // 决定 dodged, 再走 resolveShaAfterResponse 共享后续结算.
+      registerResponseKind('shan-response', resolveShanResponseChoice);
 
       function playDuel(game, actor, card) {
         var current = opponent(actor);
@@ -4293,6 +4356,11 @@
         getSkillPreference: getSkillPreference,
         getPendingChoice: getPendingChoice,
         resolvePendingChoice: resolvePendingChoice,
+        // v10 V3: 响应窗口框架 — 引擎暂停/恢复统一 API.
+        // V3 已迁移 shan-response; V4-V6 计划迁移 万箭/银月/无懈/决斗 杀.
+        requestPlayerResponse: requestPlayerResponse,
+        resolveResponseChoice: resolveResponseChoice,
+        registerResponseKind: registerResponseKind,
         drawCards: drawCards,
         aiChooseCard: aiChooseCard,
         aiChooseSkillAction: aiChooseSkillAction,
