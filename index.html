@@ -459,6 +459,7 @@
           </div>
         </div>
         <!-- v9 PR-E25/E26: 闪响应面板 — 被【杀】攻击时玩家选用哪张牌当【闪】.
+             v10 V4: 万箭齐发/银月枪 玩家闪响应也复用此面板.
              choices 容器由 renderPendingChoice 据 pending.options 动态填充
              (真闪 + 龙胆/倾国 转化候选); 选一张 stage 后 #handConfirmBtn 确认. -->
         <div class="shan-response-panel pending-prompt-panel" id="shanResponsePanel" hidden>
@@ -466,6 +467,15 @@
           <div class="shan-response-choices pending-prompt-panel__choices" id="shanResponseChoices" aria-live="polite"></div>
           <div class="shan-response-actions pending-prompt-panel__actions">
             <button class="btn small" id="shanResponseDeclineBtn">不出【闪】</button>
+          </div>
+        </div>
+        <!-- v10 V5: 无懈可击 响应面板 — 锦囊 targeting 玩家时弹此面板.
+             chainWuxied 决定文案: false="是否打出?", true="对方反无懈, 是否再无懈?". -->
+        <div class="wuxie-response-panel pending-prompt-panel" id="wuxieResponsePanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="wuxieResponseHint">是否打出【无懈可击】？</span>
+          <div class="wuxie-response-choices pending-prompt-panel__choices" id="wuxieResponseChoices" aria-live="polite"></div>
+          <div class="wuxie-response-actions pending-prompt-panel__actions">
+            <button class="btn small" id="wuxieResponseDeclineBtn">不无懈</button>
           </div>
         </div>
     </section>

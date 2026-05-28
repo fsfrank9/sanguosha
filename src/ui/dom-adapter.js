@@ -76,8 +76,10 @@
           'wuguPickPanel', 'wuguPickHint', 'wuguPickChoices',
           // v8 hotfix-2: 洛神 (luoshen-continue) 面板 — 准备阶段连续判定决定
           'luoshenPromptPanel', 'luoshenPromptHint', 'luoshenContinueBtn', 'luoshenStopBtn',
-          // v9 PR-E25/E26: 闪响应面板 — 被【杀】时玩家选用哪张牌当闪
+          // v9 PR-E25/E26: 闪响应面板 — 被【杀】时玩家选用哪张牌当闪 (V4: 万箭/银月复用)
           'shanResponsePanel', 'shanResponseHint', 'shanResponseChoices', 'shanResponseDeclineBtn',
+          // v10 V5: 无懈可击 响应面板 — 锦囊 targeting 玩家时弹
+          'wuxieResponsePanel', 'wuxieResponseHint', 'wuxieResponseChoices', 'wuxieResponseDeclineBtn',
           // v9 PR-E1: 装饰外框角落 widgets — 菜单 / 分享. placeholder 行为, 等
           // PR-E5 接入侧抽屉.
           'frameMenuBtn', 'frameShareBtn',
@@ -886,6 +888,34 @@
             }
           } else {
             els.luoshenPromptPanel.hidden = true;
+          }
+        }
+        // v10 V5: 无懈可击 响应 — 锦囊 targeting 玩家时弹. 文案据 chainWuxied 区分:
+        //   false="对方使用【X】，是否打出【无懈】？"
+        //   true="对方对【X】打出【无懈】，是否再【无懈】？"
+        if (els.wuxieResponsePanel) {
+          if (kind === 'wuxie-response' && pending.actor === 'player') {
+            els.wuxieResponsePanel.hidden = false;
+            if (els.wuxieResponseHint) {
+              var wxReason = pending.reason || '锦囊';
+              els.wuxieResponseHint.textContent = pending.chainWuxied
+                ? '对方对' + wxReason + '打出【无懈可击】，是否再【无懈】反制？'
+                : '对方使用' + wxReason + '，是否打出【无懈可击】抵消？';
+            }
+            if (els.wuxieResponseChoices) {
+              var wuxieOpts = pending.options || [];
+              els.wuxieResponseChoices.innerHTML = wuxieOpts.length
+                ? wuxieOpts.map(function (opt) {
+                    var suit = suitLabel(opt.suit);
+                    var rank = opt.rank ? String(opt.rank).toUpperCase() : '';
+                    return '<button class="mini-card wuxie-response-choice" data-wuxie-card-id="'
+                      + escapeHtml(opt.cardId) + '" title="用此【无懈】响应">'
+                      + escapeHtml(opt.name) + ' ' + suit + rank + '</button>';
+                  }).join('')
+                : '<span class="mini-card">无可用的【无懈可击】</span>';
+            }
+          } else {
+            els.wuxieResponsePanel.hidden = true;
           }
         }
         // v9 PR-E25/E26: 闪响应 — 被【杀】攻击时玩家选用哪张牌当【闪】.
@@ -1754,10 +1784,12 @@
         var playerHero = els.playerHeroSelect ? els.playerHeroSelect.value : 'liubei';
         var enemyHero = els.enemyHeroSelect ? els.enemyHeroSelect.value : 'caocao';
         game = Engine.newGame({ seed: Date.now(), playerHero: playerHero, enemyHero: enemyHero, playerRole: playerRole, enemyRole: enemyRole, startWithFirstTurn: true });
-        // v9 PR-E25: 开启玩家手动【闪】响应 — 被【杀】攻击时由玩家决定出不出闪
-        // (引擎默认无此 pref → 自动响应; UI 对局显式开启).
+        // v9 PR-E25: 开启玩家手动【闪】响应 — 被【杀】/万箭/银月时由玩家决定出不出闪
+        // v10 V5: 同时开启玩家手动【无懈可击】响应 — 锦囊 targeting 玩家时弹.
+        // (引擎默认无 pref → 自动响应; UI 对局显式开启 ask 模式.)
         game.player.skillPreferences = game.player.skillPreferences || {};
         game.player.skillPreferences.shanResponse = 'ask';
+        game.player.skillPreferences.wuxieResponse = 'ask';
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = false;
         _toggleCornerButtons(true);   // v9 PR-E19: 游戏内才显示菜单/分享角落按钮
@@ -1770,6 +1802,7 @@
       // hand-cancel 同理. 没注册的 modal 仍保留自己内部按钮 (兼容).
       var PENDING_MODAL_DISPATCH = [
         { panelId: 'shanResponsePanel',     confirmBtnId: null,                     cancelBtnId: 'shanResponseDeclineBtn' },
+        { panelId: 'wuxieResponsePanel',    confirmBtnId: null,                     cancelBtnId: 'wuxieResponseDeclineBtn' },
         { panelId: 'luoshenPromptPanel',    confirmBtnId: 'luoshenContinueBtn',     cancelBtnId: 'luoshenStopBtn' },
         { panelId: 'guanxingModePanel',     confirmBtnId: 'guanxingConfirmBtn',     cancelBtnId: 'guanxingDeclineBtn' },
         { panelId: 'zhihengModePanel',      confirmBtnId: 'zhihengConfirmBtn',      cancelBtnId: 'zhihengCancelBtn' },
@@ -2199,6 +2232,23 @@
           render();
         });
         if (els.shanResponseDeclineBtn) els.shanResponseDeclineBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { use: false });
+          if (!result.ok) renderLog();
+          render();
+        });
+        // v10 V5: 无懈可击 响应 — 候选两步化, decline 直接 resolve.
+        if (els.wuxieResponseChoices) els.wuxieResponseChoices.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-wuxie-card-id]');
+          if (!btn) return;
+          var cardId = btn.getAttribute('data-wuxie-card-id');
+          stagedModalChoice = {
+            kind: 'pending',
+            payload: { cardId: cardId },
+            selector: '[data-wuxie-card-id="' + cardId + '"]'
+          };
+          render();
+        });
+        if (els.wuxieResponseDeclineBtn) els.wuxieResponseDeclineBtn.addEventListener('click', function () {
           var result = Engine.resolvePendingChoice(game, { use: false });
           if (!result.ok) renderLog();
           render();
