@@ -1,9 +1,7 @@
 /* layout.css — Top-level containers and game arena grid.
-   v9 PR-E10: 删除死代码 .layout / .side / .battlefield (HTML 未使用).
    Includes: .app, header, .panel, .duel-table, opponent/player/arena zones,
    .side-log-panel, .hand-dock, .status-banner, .game-frame, .frame-corner-btn,
-   .side-drawer, .pause-banner, .status-bar, 共享 panel-base look,
-   响应式 @media. */
+   .side-drawer, 共享 panel-base look, 响应式 @media. */
 
     .app {
       position: relative;        /* v9 PR-E1: 角落 widget 绝对定位锚 */
@@ -26,8 +24,6 @@
       display: flex;
       flex-direction: column;
       padding: 12px;
-      /* v9 PR-E14: 为 .top-actions absolute 提供锚 (其余 .pause-banner /
-         .phase-prompt / .status-bar 等都锚到 .duel-table). */
       position: relative;
       border: var(--frame-stripe-width) solid transparent;
       border-radius: calc(var(--frame-inner-radius) + 8px);
@@ -214,9 +210,7 @@
     }
 
     /* v9 PR-E13: 旧版本 .status-banner (大棕色 "你的回合" + 长解释文字)
-       占地大 + 与新 .phase-prompt 横幅信息重复. 整个块隐藏, deckInfo
-       数据仍在 #deckInfo 内 (脚本仍写, 仅视觉隐藏 — score 已由
-       .status-bar__score 在底部显示, 等价信息). */
+       占地大, 整块视觉隐藏. deckInfo 数据仍在 #deckInfo 内 (脚本仍写). */
     .status-banner {
       display: none;
     }
@@ -258,58 +252,6 @@
       height: calc(100vh - 36px);
       min-height: 0;
       overflow: hidden;
-    }
-
-    /* v9 PR-E2: 暂停 brush 横幅 (.pause-banner / __brush).
-       v9 PR-E16: 用户反馈 "别人回合或判定回合显示游戏已暂停, 逻辑不对".
-       这两种场景应由 .phase-prompt + 具体 modal 接管, 整个 .pause-banner
-       DOM + CSS 删除. .phase-prompt 仍保留 (PR-E13 加, 常驻 phase 提示). */
-
-    /* v9 PR-E13: 中下 phase 横幅 — 黄字黑笔触, 常驻 phase 提示.
-       v9 PR-E17: 用户反馈"那个位置太碍眼", 整个 .phase-prompt + __brush
-       CSS + HTML 删除. 当前回合方信息已由 .hero-head 内 turn-badge
-       "当前回合" 文字展示. */
-
-    /* v9 PR-E2: 底部状态条 — 版本 / 占位分数 / 实时时钟. 半透明小字. */
-    .status-bar {
-      position: absolute;
-      left: 14px;
-      right: 14px;
-      bottom: 2px;
-      z-index: 6;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      color: rgba(255, 244, 220, 0.55);
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: .08em;
-      pointer-events: none;
-      user-select: none;
-    }
-
-    .status-bar__version,
-    .status-bar__score,
-    .status-bar__time {
-      text-shadow: 0 1px 4px rgba(0, 0, 0, .7);
-    }
-
-    /* v9 PR-E13: 旧 v9.0.0 版本号 absolute bottom: 2px 在 .duel-table 上,
-       与 .hand-dock 卡牌底部重叠成水印重影. 版本号在底部状态条上意义不大.
-       v9 PR-E15: score (牌堆/弃牌数) 也移到玩家技能 panel-title 右侧
-       (#playerSkillDeckInfo, 用户反馈位置应在 "武将技能卡最右边往上一点");
-       time 用户反馈 "没必要直接删了". .status-bar 三个子元素全 hide. */
-    .status-bar__version,
-    .status-bar__score,
-    .status-bar__time {
-      display: none;
-    }
-
-    .status-bar__score {
-      flex: 1 0 auto;
-      text-align: center;
-      color: rgba(255, 213, 138, 0.8);
     }
 
     .opponent-zone,

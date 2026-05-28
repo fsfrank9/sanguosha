@@ -35,7 +35,6 @@
       var enemyPhaseDelay = 700;
       var playerRole = '主公';
       var enemyRole = '反贼';
-      var draftPicker = 'player';
       var els = {};
 
       function $(id) {
@@ -44,8 +43,6 @@
 
       function initElements() {
         [
-          // v9 PR-E16: newGameBtn / endTurnBtn 已删 (top-actions 真删).
-          // 重开局走 drawerRestartBtn (PR-E5); 结束回合走 handDiscardBtn.
           'startGameBtn', 'randomPlayerHeroBtn', 'randomEnemyHeroBtn',
           'setupScreen', 'duelTable', 'enemyHero', 'playerHero', 'enemyName', 'playerName',
           'enemyCamp', 'playerCamp', 'enemyQuote', 'playerQuote', 'enemyHp', 'playerHp',
@@ -84,9 +81,8 @@
           // v9 PR-E1: 装饰外框角落 widgets — 菜单 / 分享. placeholder 行为, 等
           // PR-E5 接入侧抽屉.
           'frameMenuBtn', 'frameShareBtn',
-          // v9 PR-E2: 中央日志 overlay + 暂停 brush 横幅 + 底部状态条
-          // v9 PR-E16: pauseBanner 已删 (HTML). renderPauseBanner 仍存在但 no-op.
-          'logOverlay', 'statusBar', 'statusBarVersion', 'statusBarScore', 'statusBarTime',
+          // v9 PR-E2: 中央日志 overlay (.duel-table 上, 最近 4-6 条 game.log).
+          'logOverlay',
           // v9 PR-E4: 主公徽章 — 右上角红圆 "主". 由 renderHero 据
           // game.roles[actor] 切换 hidden.
           // v9 PR-E14: 反贼徽章 — 同位置绿圆 "反". 与 lord-badge 互斥显示.
@@ -94,16 +90,15 @@
           // v9 PR-E5: 侧抽屉菜单 + 退出确认 modal
           'sideDrawer', 'drawerExitBtn', 'drawerRestartBtn', 'drawerHelpBtn', 'drawerCloseBtn',
           'exitConfirmModal', 'exitConfirmBackdrop', 'exitConfirmYesBtn', 'exitConfirmNoBtn',
-          // v9 PR-E8: 一级 lobby (v9 PR-E18: 二级 splash 已删除).
+          // v9 PR-E8: 一级 lobby
           'lobbyScreen', 'lobbyKofBtn', 'lobby1v1Btn', 'lobbyHellBtn',
           // v9 PR-E9: 选将网格 — 替代旧 <select> 下拉
           'heroPick', 'heroPickPrompt', 'heroPickPlayerTab', 'heroPickEnemyTab',
           'heroPickPlayerValue', 'heroPickEnemyValue', 'heroPickGrid',
-          'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge', 'firstPickBadge', 'confirmHeroPickBtn',
-          // v9 PR-E20: titleCard 已从 HTML 删除 (含整个顶部 header), 缓存移出.
-          // v9 PR-E15: 牌堆/弃牌 数字从底部 .status-bar 移到玩家技能 panel-title 右侧
+          'randomRolesBtn', 'playerRoleBadge', 'enemyRoleBadge',
+          // v9 PR-E15: 牌堆/弃牌 数字显示在玩家技能 panel-title 右侧
           'playerSkillDeckInfo',
-          // v9 PR-E16: hand-dock 内 3 个新按钮 (确认 / 取消 / 结束回合).
+          // v9 PR-E16: hand-dock 内 3 个按钮 (确认 / 取消 / 结束回合).
           'handConfirmBtn', 'handCancelBtn', 'handDiscardBtn'
         ].forEach(function (id) { els[id] = $(id); });
         els.log = els.battleLog;
@@ -347,31 +342,6 @@
         }).join('');
       }
 
-      // v9 PR-E2: 暂停 brush 横幅 — 等待玩家选择 / 电脑思考时显示.
-      // v9 PR-E16: 用户反馈 "别人回合或判定回合显示游戏已暂停, 逻辑不对".
-      // .pause-banner DOM 已删, 该函数保留为 no-op (避免删除调用站点风险).
-      function renderPauseBanner() {
-        return;
-      }
-
-      // v9 PR-E2: 底部状态条 — 版本 (硬编码 v9) / 分数占位 (用牌堆张数作
-      // 视觉占位, 无经济系统) / 实时时钟. 时钟在 bindEvents 里通过
-      // setInterval 每秒刷新, 此 fn 只渲染版本+score 部分。
-      function renderStatusBar() {
-        if (!els.statusBarScore || !game) return;
-        // 分数占位: 显示牌堆 + 弃牌 总数 (visual filler, 无实际意义)
-        var total = (game.deck ? game.deck.length : 0) + (game.discard ? game.discard.length : 0);
-        els.statusBarScore.textContent = String(total);
-      }
-
-      function tickStatusBarTime() {
-        if (!els.statusBarTime) return;
-        var now = new Date();
-        var hh = String(now.getHours()).padStart(2, '0');
-        var mm = String(now.getMinutes()).padStart(2, '0');
-        els.statusBarTime.textContent = hh + ':' + mm;
-      }
-
       // v9 PR-E5: 侧抽屉 + 退出确认 modal 显隐工具.
       function openSideDrawer() { if (els.sideDrawer) els.sideDrawer.hidden = false; }
       function closeSideDrawer() { if (els.sideDrawer) els.sideDrawer.hidden = true; }
@@ -412,12 +382,8 @@
         els.statusText.textContent = text;
         var deckText = '牌堆 ' + game.deck.length + ' · 弃牌 ' + game.discard.length;
         els.deckInfo.textContent = deckText;
-        // v9 PR-E15: 玩家技能 panel-title 右侧同步显示 (替代底部 .status-bar__score
-        // 数字, 用户反馈数字应在 "武将技能卡最右边往上一点").
+        // v9 PR-E15: 用户反馈数字应在 "武将技能卡最右边往上一点".
         if (els.playerSkillDeckInfo) els.playerSkillDeckInfo.textContent = deckText;
-        // v9 PR-E16: endTurnBtn 删除, 替代 #handDiscardBtn — 同语义 (结束回合 →
-        // 弃牌阶段 → 起牌阶段). discard 阶段需先弃牌, 此时仍允许点击 (但 _handDiscard
-        // 会 short-circuit 回 render). text 在 play 阶段 "结束出牌", 其余 "结束回合".
         if (els.handDiscardBtn) {
           els.handDiscardBtn.disabled = !isPlayerTurn || isGameOver || enemyThinking;
           els.handDiscardBtn.textContent = game.phase === 'play' ? '结束出牌' : '结束回合';
@@ -464,8 +430,6 @@
         els.playerTurnBadge.hidden = !playerTurnActive;
         els.enemyTurnBadge.textContent = enemyTurnActive ? '当前回合' : '';
         els.enemyTurnBadge.hidden = !enemyTurnActive;
-        // v9 PR-E17: phase-prompt 横幅已删除 (用户反馈"你的回合那个位置太碍眼").
-        // 当前回合方信息由 hero-head 内 turn-badge "当前回合" 文字展示.
       }
 
       function zoneCards(cards, emptyText) {
@@ -533,9 +497,6 @@
         }
         // v9 PR-E24: renderPendingChoice 每次重建候选 DOM, 重新套用 staged 高亮.
         _reapplyStagedHighlight();
-        // v9 PR-E2: 暂停横幅 + 状态条
-        renderPauseBanner();
-        renderStatusBar();
         els.enemyHandBacks.innerHTML = miniBacks(game.enemy.hand.length);
       }
 
@@ -1275,11 +1236,6 @@
         return true;
       }
 
-      function enterZhihengMode() {
-        skillSelectMode = 'zhiheng';
-        return enterCardSkillMode(skillSelectMode);
-      }
-
       function exitSkillSelectMode() {
         skillSelectMode = null;
         selectedSkillCardIds = [];
@@ -1312,19 +1268,6 @@
         exitSkillSelectMode();
         if (!result.ok) game.log.push(result.message);
         if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
-        render();
-      }
-
-      function confirmZhiheng() {
-        if (!game || skillSelectMode !== 'zhiheng') return;
-        if (!selectedSkillCardIds.length) {
-          game.log.push('请选择至少一张牌发动【制衡】。');
-          render();
-          return;
-        }
-        var result = Engine.useSkill(game, 'player', 'zhiheng', selectedSkillCardIds);
-        exitSkillSelectMode();
-        if (!result.ok) game.log.push(result.message);
         render();
       }
 
@@ -1709,12 +1652,6 @@
         renderHeroPickGrid();
       }
 
-      function handleHeroPickTabClick(side) {
-        // v9 PR-E11: 顺序选将锁定 tab 切换 — 点击非当前 side 的 tab 无操作.
-        // (其实非当前 tab 已 hidden, 通常无法点; 这里是 defensive.)
-        if (side !== currentPickSide) return;
-      }
-
       function optionValues(select) {
         return Array.from(select.options).map(function (option) { return option.value; });
       }
@@ -1756,26 +1693,16 @@
       function updateDraftUI() {
         if (els.playerRoleBadge) els.playerRoleBadge.textContent = '我方：' + playerRole;
         if (els.enemyRoleBadge) els.enemyRoleBadge.textContent = '敌方：' + enemyRole;
-        if (els.firstPickBadge) els.firstPickBadge.textContent = '主公先选 · 当前：' + (draftPicker === 'player' ? '我方' : draftPicker === 'enemy' ? '敌方' : '双方已确认');
       }
 
       function assignRandomRoles() {
         var playerIsLord = Math.random() >= 0.5;
         playerRole = playerIsLord ? '主公' : '反贼';
         enemyRole = playerIsLord ? '反贼' : '主公';
-        draftPicker = playerIsLord ? 'player' : 'enemy';
         updateDraftUI();
         // v9 PR-E11: 重抽身份 → 重置选将状态 (pickStep + selects 清空)
         resetPickSequence();
         renderHeroPickGrid();
-      }
-
-      function confirmHeroPick() {
-        // v9 PR-E11: 旧 "确认当前选择" 按钮已 hidden (顺序选将自动确认).
-        // 保留 fn 以兼容旧绑定; 仅推进 draftPicker 标签.
-        if (draftPicker === 'player') draftPicker = 'enemy';
-        else if (draftPicker === 'enemy') draftPicker = 'done';
-        updateDraftUI();
       }
 
       function showSetup() {
@@ -1786,23 +1713,18 @@
         hideConversionPanel();
         hideGuanxingPanel();
         exitSkillSelectMode();
-        // v9 PR-E8: 切到 setup 时, 隐藏 lobby (v9 PR-E18: splash 已删).
         if (els.lobbyScreen) els.lobbyScreen.hidden = true;
         if (els.setupScreen) els.setupScreen.hidden = false;
         if (els.duelTable) els.duelTable.hidden = true;
         _toggleCornerButtons(false);   // v9 PR-E19: setup 入口屏不显示菜单/分享
-        // v9 PR-E16: endTurnBtn / newGameBtn DOM 已删, 不再设置.
-        // v9 PR-E20: 顶部 header + 标题栏已删, 屏切换不再切 header.
         populateHeroSelects();
         // v9 PR-E11: 入 setup 自动随机身份 (assignRandomRoles 内部已重置
         // 选将状态 + renderHeroPickGrid). 用户可点 "随机主公/反贼" 重抽.
         assignRandomRoles();
       }
 
-      // v9 PR-E8: 入口屏切换 — lobby → setup → game (v9 PR-E18: splash 已删).
-      // v9 PR-E19: 角落 widget (菜单 / 分享) 仅游戏内显示. 菜单含退出/重开,
-      // 在 lobby/setup 入口屏无意义. lobby/setup 隐藏, game 显示.
-      // v9 PR-E20: 顶部 header + 标题栏已删, 屏切换不再切 header.
+      // v9 PR-E19: 角落 widget (菜单 / 分享) 仅游戏内显示 —
+      // 菜单含退出/重开, 在 lobby/setup 入口屏无意义.
       function _toggleCornerButtons(show) {
         if (els.frameMenuBtn) els.frameMenuBtn.hidden = !show;
         if (els.frameShareBtn) els.frameShareBtn.hidden = !show;
@@ -1833,7 +1755,6 @@
         game.player.skillPreferences.shanResponse = 'ask';
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = false;
-        // v9 PR-E16: newGameBtn DOM 已删. v9 PR-E20: 顶部 header 已删.
         _toggleCornerButtons(true);   // v9 PR-E19: 游戏内才显示菜单/分享角落按钮
         render();
         maybeStartEnemyTurn();
@@ -1968,22 +1889,13 @@
       }
 
       function bindEvents() {
-        // v9 PR-E2: 实时时钟 — 启动 + 每分钟刷新一次 (秒级精度对玩家无意义).
-        if (els.statusBarTime) {
-          tickStatusBarTime();
-          window.setInterval(tickStatusBarTime, 60 * 1000);
-        }
-        // v9 PR-E16: 删除 newGameBtn / endTurnBtn 监听 (DOM 已真删). 重开局
-        // 走 drawerRestartBtn (PR-E5 已绑定); 结束回合走 handDiscardBtn.
         if (els.startGameBtn) els.startGameBtn.addEventListener('click', newGame);
         if (els.randomPlayerHeroBtn) els.randomPlayerHeroBtn.addEventListener('click', function () { randomizeHero('player'); });
         if (els.randomEnemyHeroBtn) els.randomEnemyHeroBtn.addEventListener('click', function () { randomizeHero('enemy'); });
         if (els.randomRolesBtn) els.randomRolesBtn.addEventListener('click', assignRandomRoles);
-        if (els.confirmHeroPickBtn) els.confirmHeroPickBtn.addEventListener('click', confirmHeroPick);
         if (els.playerHeroSelect) els.playerHeroSelect.addEventListener('change', function () { ensureDistinctHeroes('player'); });
         if (els.enemyHeroSelect) els.enemyHeroSelect.addEventListener('change', function () { ensureDistinctHeroes('enemy'); });
-        // v9 PR-E16: handDiscardBtn 替代 endTurnBtn — 结束回合进入弃牌阶段
-        // → 起牌阶段 (即对方回合).
+        // v9 PR-E16: handDiscardBtn — 结束回合 → 弃牌 → 起牌 (对方回合)
         if (els.handDiscardBtn) els.handDiscardBtn.addEventListener('click', function () {
           if (!game || game.turn !== 'player' || game.phase === 'gameover') return;
           selectedHandCardId = null;
@@ -2286,21 +2198,14 @@
           if (!result.ok) renderLog();
           render();
         });
-        // v9 PR-E9: 选将网格 — card click → 设当前 pick side 的 hero;
-        // tab click → 切换 pick side.
+        // v9 PR-E9: 选将网格 — card click → 设当前 pick side 的 hero.
+        // (tab 在非当前 side 时 hidden, 不可点; 不再绑 click.)
         if (els.heroPickGrid) els.heroPickGrid.addEventListener('click', function (event) {
           var btn = event.target.closest('[data-hero-id]');
           if (!btn) return;
           handleHeroPickCardClick(btn.getAttribute('data-hero-id'));
         });
-        if (els.heroPickPlayerTab) els.heroPickPlayerTab.addEventListener('click', function () {
-          handleHeroPickTabClick('player');
-        });
-        if (els.heroPickEnemyTab) els.heroPickEnemyTab.addEventListener('click', function () {
-          handleHeroPickTabClick('enemy');
-        });
         // v9 PR-E8: lobby 1V1 → setup; KOF/炼狱 placeholder.
-        // v9 PR-E18: splash 屏已删, 启动直接进 lobby.
         if (els.lobby1v1Btn) els.lobby1v1Btn.addEventListener('click', showSetup);
         if (els.lobbyKofBtn) els.lobbyKofBtn.addEventListener('click', function () {
           if (window.alert) window.alert('KOF 模式 — 待开发 (v10+ 计划)');
@@ -2405,5 +2310,4 @@
       initElements();
       populateHeroSelects();
       bindEvents();
-      // v9 PR-E18: 启动直接进 lobby (二级 splash 已删), 选 1V1 进 setup
       showLobby();

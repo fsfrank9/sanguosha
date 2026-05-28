@@ -122,10 +122,10 @@ test('v9 PR-E9: dom-adapter 缓存 7 个新 ids (heroPick + 6 子)', () => {
   });
 });
 
-test('v9 PR-E9: dom-adapter 暴露 renderHeroPickGrid / handleHeroPickCardClick / handleHeroPickTabClick', () => {
+test('v9 PR-E9: dom-adapter 暴露 renderHeroPickGrid / handleHeroPickCardClick (v10 V2: tab click no-op fn 已删)', () => {
   assert.match(adapter, /function renderHeroPickGrid\(\)/);
   assert.match(adapter, /function handleHeroPickCardClick\(/);
-  assert.match(adapter, /function handleHeroPickTabClick\(/);
+  assert.doesNotMatch(adapter, /function handleHeroPickTabClick\(/);
 });
 
 test('v9 PR-E9: 维护 currentPickSide 状态 (player/enemy 切换)', () => {
@@ -162,10 +162,10 @@ test('v9 PR-E9/E11: randomizeHero 走 handleHeroPickCardClick 统一流程 (含 
   assert.match(fn[0], /handleHeroPickCardClick/);
 });
 
-test('v9 PR-E9: bindEvents 接入 heroPickGrid click + 两 tab click', () => {
+test('v9 PR-E9: bindEvents 接入 heroPickGrid click (v10 V2: tab click 绑定已删, tab 用 hidden 锁)', () => {
   assert.match(adapter, /els\.heroPickGrid\.addEventListener\('click'/);
-  assert.match(adapter, /els\.heroPickPlayerTab\.addEventListener\('click'/);
-  assert.match(adapter, /els\.heroPickEnemyTab\.addEventListener\('click'/);
+  assert.doesNotMatch(adapter, /els\.heroPickPlayerTab\.addEventListener\('click'/);
+  assert.doesNotMatch(adapter, /els\.heroPickEnemyTab\.addEventListener\('click'/);
 });
 
 // ───── 全套回归 ──────────────────────────────────────────────────────

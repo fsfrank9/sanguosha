@@ -56,9 +56,10 @@ test('v9 PR-E15: dom-adapter 缓存 playerSkillDeckInfo + renderStatus 写入', 
 
 // ───── 4. time 删除 ───────────────────────────────────────────────────
 
-test('v9 PR-E15: layout.css .status-bar__time display:none (与 version/score 一同隐藏)', () => {
-  // 现在 3 个 selector 共享同一规则 (display: none)
-  assert.match(layoutCss, /\.status-bar__version,\s*\n\s*\.status-bar__score,\s*\n\s*\.status-bar__time\s*\{[\s\S]{0,80}display:\s*none/);
+test('v10 V2: layout.css 不再含 .status-bar__time (E15 后已无 JS 用途, V2 整块删)', () => {
+  assert.doesNotMatch(layoutCss, /\.status-bar__time/);
+  assert.doesNotMatch(layoutCss, /\.status-bar__version/);
+  assert.doesNotMatch(layoutCss, /\.status-bar__score/);
 });
 
 // ───── 5. frame-corner-btn 再往外 ─────────────────────────────────────

@@ -113,10 +113,10 @@ test('v9 PR-E11: renderHeroPickGrid 给被对方选走的 card 加 disabled + .i
   assert.match(fn[0], /locked\s*\?\s*['"]\s*disabled['"]/);
 });
 
-test('v9 PR-E11: handleHeroPickTabClick 顺序选将下锁定 tab 切换 (side !== currentPickSide 早 return)', () => {
-  const fn = adapter.match(/function handleHeroPickTabClick\([\s\S]*?\n\s{6}\}/);
-  assert.ok(fn);
-  assert.match(fn[0], /side\s*!==?\s*currentPickSide/);
+test('v9 PR-E11: 非当前 pick side 的 tab hidden=true (锁定切换, v10 V2 后无 click handler)', () => {
+  // v10 V2: handleHeroPickTabClick no-op fn 已删, 直接由 hidden 属性锁定.
+  assert.match(adapter, /els\.heroPickPlayerTab\.hidden\s*=\s*\(currentPickSide\s*!==?\s*'player'\)/);
+  assert.match(adapter, /els\.heroPickEnemyTab\.hidden\s*=\s*\(currentPickSide\s*!==?\s*'enemy'\)/);
 });
 
 // ───── CSS ───────────────────────────────────────────────────────────
@@ -145,9 +145,9 @@ test('v9 PR-E11: setup.css 含 .hero-pick__random-row .btn.small[hidden] display
 
 // ───── HTML ──────────────────────────────────────────────────────────
 
-test('v9 PR-E11: startGameBtn / confirmHeroPickBtn 加 hidden (auto-flow 替代)', () => {
+test('v9 PR-E11: startGameBtn hidden (auto-flow 替代; v10 V2 confirmHeroPickBtn 已彻底删)', () => {
   assert.match(html, /id="startGameBtn"[^>]*hidden/);
-  assert.match(html, /id="confirmHeroPickBtn"[^>]*hidden/);
+  assert.doesNotMatch(html, /id="confirmHeroPickBtn"/);
 });
 
 // ───── 回归 ──────────────────────────────────────────────────────────
