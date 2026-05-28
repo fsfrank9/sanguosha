@@ -83,12 +83,10 @@ test('v9 PR-E16: index.html 不再含 .pause-banner DOM', () => {
   assert.doesNotMatch(html, /id="pauseBanner"/);
 });
 
-test('v9 PR-E16: dom-adapter 不再缓存 pauseBanner (renderPauseBanner 改为 no-op)', () => {
+test('v10 V2: dom-adapter 不再缓存 pauseBanner; renderPauseBanner no-op 整体删除', () => {
   assert.doesNotMatch(adapter, /'pauseBanner'/);
-  // renderPauseBanner 仍存在但 body 为 no-op (return)
-  const fn = adapter.match(/function renderPauseBanner\(\)\s*\{[\s\S]*?\n\s{6}\}/);
-  assert.ok(fn);
-  assert.match(fn[0], /^\s*function renderPauseBanner\(\)\s*\{\s*\n[\s\S]*?return;\s*\n\s*\}$/);
+  // V2: no-op fn 整块删 (E16 暂留 fn 为 "safety"; V2 清债).
+  assert.doesNotMatch(adapter, /function renderPauseBanner\(/);
 });
 
 test('v9 PR-E16: layout.css .pause-banner 规则块已删 (仅注释保留)', () => {

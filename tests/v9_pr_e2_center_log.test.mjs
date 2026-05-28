@@ -16,22 +16,13 @@ function test(name, fn) { tests.push([name, fn]); }
 
 // ───── HTML 结构 ─────────────────────────────────────────────────────
 
-test('v9 PR-E2: index.html 在 .duel-table 内含 logOverlay / statusBar (pauseBanner 由 PR-E16 删除)', () => {
+test('v9 PR-E2: index.html 在 .duel-table 内含 logOverlay (pauseBanner / statusBar 已删)', () => {
   assert.match(html, /id="logOverlay"/);
-  assert.match(html, /id="statusBar"/);
   // 必须在 .duel-table 内 (绝对定位锚).
   assert.match(html, /<section class="duel-table"[\s\S]{0,1200}id="logOverlay"/);
-  assert.match(html, /<section class="duel-table"[\s\S]{0,1200}id="statusBar"/);
 });
 
-// PR-E16: pauseBanner DOM 已删除, 跳过此守护.
-// test('v9 PR-E2: pauseBanner 默认 hidden + 含 brush 文本') — 已删除.
-
-test('v9 PR-E2: statusBar 含 3 子元素 (version / score / time)', () => {
-  assert.match(html, /id="statusBarVersion"/);
-  assert.match(html, /id="statusBarScore"/);
-  assert.match(html, /id="statusBarTime"/);
-});
+// PR-E16: pauseBanner DOM 已删除. v10 V2: statusBar 三件套也整块删除.
 
 // ───── CSS 样式 ──────────────────────────────────────────────────────
 
@@ -56,42 +47,23 @@ test('v9 PR-E2: zones.css 含 .log-overlay + __entry + __entry--phase + 进入�
 });
 
 // PR-E16: .pause-banner CSS 已删除. PR-E17: .phase-prompt CSS 也已删除.
-// 笔触风格 (黑底黄字 + 多 box-shadow) 已不再有可用 selector 守护; 跳过.
-
-test('v9 PR-E2: layout.css 含 .status-bar + 3 子样式 (version/score/time)', () => {
-  const layout = fs.readFileSync(path.join(stylesDir, 'layout.css'), 'utf8');
-  assert.match(layout, /\.status-bar\s*\{/);
-  // 绝对定位在底部
-  assert.match(layout, /\.status-bar\s*\{[\s\S]{0,300}position:\s*absolute/);
-  assert.match(layout, /\.status-bar\s*\{[\s\S]{0,300}bottom:/);
-  // 子选择器
-  assert.match(layout, /\.status-bar__version/);
-  assert.match(layout, /\.status-bar__score/);
-  assert.match(layout, /\.status-bar__time/);
-});
+// v10 V2: .status-bar CSS / DOM / JS 三件套整块删 (display:none 后无 JS 用途).
 
 // ───── dom-adapter 接入 ──────────────────────────────────────────────
 
-test('v9 PR-E2: dom-adapter 缓存 5 个新 ids (PR-E16 后 pauseBanner 删除)', () => {
-  ['logOverlay', 'statusBar', 'statusBarVersion', 'statusBarScore', 'statusBarTime'].forEach(function (id) {
+test('v9 PR-E2: dom-adapter 缓存 logOverlay (v10 V2: statusBar 三件套已删)', () => {
+  assert.match(adapter, /'logOverlay'/);
+  ['statusBar', 'statusBarVersion', 'statusBarScore', 'statusBarTime'].forEach(function (id) {
     const re = new RegExp("'" + id + "'");
-    assert.match(adapter, re, '应缓存 ' + id);
+    assert.doesNotMatch(adapter, re, id + ' 缓存应已清除');
   });
 });
 
-test('v9 PR-E2: dom-adapter 暴露 renderLogOverlay / renderPauseBanner / renderStatusBar / tickStatusBarTime', () => {
+test('v9 PR-E2: dom-adapter 暴露 renderLogOverlay (v10 V2: renderPauseBanner/renderStatusBar/tickStatusBarTime 已删)', () => {
   assert.match(adapter, /function renderLogOverlay\(\)/);
-  assert.match(adapter, /function renderPauseBanner\(\)/);
-  assert.match(adapter, /function renderStatusBar\(\)/);
-  assert.match(adapter, /function tickStatusBarTime\(\)/);
-});
-
-test('v9 PR-E2: render() 调用新增的 renderPauseBanner + renderStatusBar', () => {
-  // 抓 render 函数体
-  const renderFn = adapter.match(/function render\(\)\s*\{[\s\S]*?\n\s{6}\}/);
-  assert.ok(renderFn);
-  assert.match(renderFn[0], /renderPauseBanner\(\)/);
-  assert.match(renderFn[0], /renderStatusBar\(\)/);
+  assert.doesNotMatch(adapter, /function renderPauseBanner\(/);
+  assert.doesNotMatch(adapter, /function renderStatusBar\(/);
+  assert.doesNotMatch(adapter, /function tickStatusBarTime\(/);
 });
 
 test('v9 PR-E2: renderLog 触发 overlay 渲染 (renderLog 内含 renderLogOverlay)', () => {
@@ -100,16 +72,15 @@ test('v9 PR-E2: renderLog 触发 overlay 渲染 (renderLog 内含 renderLogOverl
   assert.match(renderLog[0], /renderLogOverlay\(\)/);
 });
 
-test('v9 PR-E2: tickStatusBarTime 用 setInterval (60s) 启动', () => {
-  // bindEvents 内含 setInterval(tickStatusBarTime, ...)
-  assert.match(adapter, /setInterval\(tickStatusBarTime/);
+test('v10 V2: bindEvents 不再含 setInterval(tickStatusBarTime) (status-bar 三件套全删)', () => {
+  assert.doesNotMatch(adapter, /setInterval\(tickStatusBarTime/);
 });
 
 // ───── 全套回归 ──────────────────────────────────────────────────────
 
-test('v9 PR-E2: loadAllStyles() 拼接结果含 overlay/status-bar 规则 (PR-E16 后 .pause-banner 删除)', () => {
+test('v9 PR-E2: loadAllStyles() 拼接结果含 .log-overlay 规则 (v10 V2: .status-bar 整块删除)', () => {
   assert.match(css, /\.log-overlay\s*\{/);
-  assert.match(css, /\.status-bar\s*\{/);
+  assert.doesNotMatch(css, /\.status-bar\s*\{/);
 });
 
 for (const [name, fn] of tests) {

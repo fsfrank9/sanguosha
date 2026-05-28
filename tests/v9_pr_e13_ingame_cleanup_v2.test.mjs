@@ -44,9 +44,12 @@ test('v9 PR-E13: layout.css .status-banner display:none (整个块隐藏)', () =
 
 // PR-E17: .phase-prompt + .phase-prompt__brush CSS 已删除 (整个规则块).
 
-test('v9 PR-E13: layout.css .status-bar__version display:none (避免 v9.0.0 与手牌重影)', () => {
-  // PR-E15 后, version/score/time 三选择器共享 display:none 规则.
-  assert.match(layoutCss, /\.status-bar__version[,\s]*[\s\S]{0,80}display:\s*none/);
+test('v10 V2: .status-bar 三件套 (version/score/time) 整块删除 (display:none 后无 JS 用途)', () => {
+  // PR-E13 隐藏 v9.0.0 与手牌重影; PR-E15 score/time 也移走; v10 V2 整块清.
+  assert.doesNotMatch(layoutCss, /\.status-bar\s*\{/);
+  assert.doesNotMatch(layoutCss, /\.status-bar__version/);
+  assert.doesNotMatch(layoutCss, /\.status-bar__score/);
+  assert.doesNotMatch(layoutCss, /\.status-bar__time/);
 });
 
 test('v9 PR-E13: zones.css .log-overlay display:none (整个隐藏, 数据仍在 game.log)', () => {

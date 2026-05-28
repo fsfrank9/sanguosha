@@ -127,10 +127,7 @@
           <span class="badge">身份判定</span>
           <span class="badge" id="playerRoleBadge">我方：待定</span>
           <span class="badge" id="enemyRoleBadge">敌方：待定</span>
-          <span class="badge" id="firstPickBadge">主公先选</span>
           <button class="btn small" id="randomRolesBtn">随机主公/反贼</button>
-          <!-- v9 PR-E11: 顺序选将自动确认, "确认当前选择" 不再需要 (hidden) -->
-          <button class="btn small" id="confirmHeroPickBtn" hidden>确认当前选择</button>
         </div>
         <!-- v9 PR-E9: 选将网格 — 替代旧 <select> 下拉. 顶部 tabs 切换
              我方/敌方, 中部 4 列武将网格 (含势力 tag), 右下角 preview.
@@ -168,19 +165,8 @@
     </section>
 
     <section class="duel-table" id="duelTable" hidden>
-      <!-- v9 PR-E2: 中央日志 overlay + 暂停 brush 横幅 + 底部状态条.
-           overlay 显示最近 4-6 条 game.log; pause-banner 在等待玩家选择
-           (pendingChoice 或 enemyThinking) 时显示; status-bar 显示版本 /
-           占位分数 / 实时时钟. 都绝对定位在 .duel-table 上. -->
+      <!-- 中央日志 overlay — 最近 4-6 条 game.log. 绝对定位在 .duel-table 上. -->
       <div class="log-overlay" id="logOverlay" aria-live="polite"></div>
-      <!-- v9 PR-E16: 删除 .pause-banner. 用户反馈"别人回合显示游戏已暂停逻辑不对".
-           v9 PR-E17: 删除 .phase-prompt 横幅. 用户反馈"你的回合那个位置太碍眼".
-           当前回合方信息已由 .hero-head 内 .turn-badge "当前回合" 文字展示. -->
-      <div class="status-bar" id="statusBar" aria-hidden="true">
-        <span class="status-bar__version" id="statusBarVersion">v9.0.0</span>
-        <span class="status-bar__score" id="statusBarScore">0</span>
-        <span class="status-bar__time" id="statusBarTime">--:--</span>
-      </div>
 
       <section class="opponent-zone" id="enemyBoard">
         <div class="zone-panel">
