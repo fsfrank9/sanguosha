@@ -80,6 +80,8 @@
           'shanResponsePanel', 'shanResponseHint', 'shanResponseChoices', 'shanResponseDeclineBtn',
           // v10 V5: 无懈可击 响应面板 — 锦囊 targeting 玩家时弹
           'wuxieResponsePanel', 'wuxieResponseHint', 'wuxieResponseChoices', 'wuxieResponseDeclineBtn',
+          // v10 V6: 决斗 响应面板 — 玩家被发起决斗, 手动选用哪张牌当杀
+          'duelResponsePanel', 'duelResponseHint', 'duelResponseChoices', 'duelResponseDeclineBtn',
           // v9 PR-E1: 装饰外框角落 widgets — 菜单 / 分享. placeholder 行为, 等
           // PR-E5 接入侧抽屉.
           'frameMenuBtn', 'frameShareBtn',
@@ -916,6 +918,33 @@
             }
           } else {
             els.wuxieResponsePanel.hidden = true;
+          }
+        }
+        // v10 V6: 决斗 响应 — 对方发起【决斗】, 玩家选用哪张牌当【杀】响应.
+        // 候选含真【杀】 + 龙胆 / 武圣 转化. 不出 → 自己受 1 伤.
+        if (els.duelResponsePanel) {
+          if (kind === 'sha-duel-response' && pending.actor === 'player') {
+            els.duelResponsePanel.hidden = false;
+            if (els.duelResponseHint) {
+              els.duelResponseHint.textContent =
+                '对方对你发起' + (pending.reason || '【决斗】')
+                + '，请选择一张牌当【杀】响应，或不出（受 1 点伤害）。';
+            }
+            if (els.duelResponseChoices) {
+              var duelOpts = pending.options || [];
+              els.duelResponseChoices.innerHTML = duelOpts.length
+                ? duelOpts.map(function (opt) {
+                    var suit = suitLabel(opt.suit);
+                    var rank = opt.rank ? String(opt.rank).toUpperCase() : '';
+                    var prefix = opt.via ? opt.via + '·' : '';
+                    return '<button class="mini-card duel-response-choice" data-duel-card-id="'
+                      + escapeHtml(opt.cardId) + '" title="用此牌当【杀】">'
+                      + escapeHtml(prefix + opt.name) + ' ' + suit + rank + '</button>';
+                  }).join('')
+                : '<span class="mini-card">无可用的【杀】</span>';
+            }
+          } else {
+            els.duelResponsePanel.hidden = true;
           }
         }
         // v9 PR-E25/E26: 闪响应 — 被【杀】攻击时玩家选用哪张牌当【闪】.
@@ -1790,6 +1819,8 @@
         game.player.skillPreferences = game.player.skillPreferences || {};
         game.player.skillPreferences.shanResponse = 'ask';
         game.player.skillPreferences.wuxieResponse = 'ask';
+        // v10 V6: 决斗 玩家手动出杀响应.
+        game.player.skillPreferences.shaDuelResponse = 'ask';
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = false;
         _toggleCornerButtons(true);   // v9 PR-E19: 游戏内才显示菜单/分享角落按钮
@@ -1803,6 +1834,7 @@
       var PENDING_MODAL_DISPATCH = [
         { panelId: 'shanResponsePanel',     confirmBtnId: null,                     cancelBtnId: 'shanResponseDeclineBtn' },
         { panelId: 'wuxieResponsePanel',    confirmBtnId: null,                     cancelBtnId: 'wuxieResponseDeclineBtn' },
+        { panelId: 'duelResponsePanel',     confirmBtnId: null,                     cancelBtnId: 'duelResponseDeclineBtn' },
         { panelId: 'luoshenPromptPanel',    confirmBtnId: 'luoshenContinueBtn',     cancelBtnId: 'luoshenStopBtn' },
         { panelId: 'guanxingModePanel',     confirmBtnId: 'guanxingConfirmBtn',     cancelBtnId: 'guanxingDeclineBtn' },
         { panelId: 'zhihengModePanel',      confirmBtnId: 'zhihengConfirmBtn',      cancelBtnId: 'zhihengCancelBtn' },
@@ -2249,6 +2281,23 @@
           render();
         });
         if (els.wuxieResponseDeclineBtn) els.wuxieResponseDeclineBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { use: false });
+          if (!result.ok) renderLog();
+          render();
+        });
+        // v10 V6: 决斗 响应 — 候选两步化, decline 直接 resolve {use:false}.
+        if (els.duelResponseChoices) els.duelResponseChoices.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-duel-card-id]');
+          if (!btn) return;
+          var cardId = btn.getAttribute('data-duel-card-id');
+          stagedModalChoice = {
+            kind: 'pending',
+            payload: { cardId: cardId },
+            selector: '[data-duel-card-id="' + cardId + '"]'
+          };
+          render();
+        });
+        if (els.duelResponseDeclineBtn) els.duelResponseDeclineBtn.addEventListener('click', function () {
           var result = Engine.resolvePendingChoice(game, { use: false });
           if (!result.ok) renderLog();
           render();
