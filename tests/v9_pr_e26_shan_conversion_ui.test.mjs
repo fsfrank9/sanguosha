@@ -29,8 +29,8 @@ test('v9 PR-E26: findResponseCard 支持 preferredCardId (指定牌当闪)', () 
   assert.match(engine, /if\s*\(preferredCardId\)/);
 });
 
-test('v9 PR-E26: shan-response pendingChoice 带 options (listShanResponseOptions)', () => {
-  assert.match(engine, /kind:\s*'shan-response'[\s\S]{0,200}options:\s*listShanResponseOptions/);
+test('v9 PR-E26: shan-response 请求带 options (listShanResponseOptions; v10 V3 后从 requestPlayerResponse 调用传入)', () => {
+  assert.match(engine, /kind:\s*'shan-response'[\s\S]{0,300}options:\s*listShanResponseOptions/);
 });
 
 test('v9 PR-E26: renderPendingChoice 渲染 shanResponseChoices 候选 (data-shan-card-id)', () => {

@@ -27,17 +27,20 @@ test('v9 PR-E25/E26: index.html 含 shanResponsePanel — choices 容器 + 不�
 
 // ───── 引擎: shan-response 暂停机制 ──────────────────────────────────
 
-test('v9 PR-E25: 引擎 resolvePendingChoice 注册 shan-response kind', () => {
-  assert.match(engine, /pending\.kind\s*===\s*'shan-response'[\s\S]{0,80}resolveShanResponseChoice/);
+test('v9 PR-E25: 引擎注册 shan-response kind (v10 V3 后走 RESPONSE_KIND_RESOLVERS 注册表)', () => {
+  // V3 前: pending.kind === 'shan-response' 直接调 resolveShanResponseChoice;
+  // V3 后: 经 registerResponseKind('shan-response', resolveShanResponseChoice) 注册.
+  assert.match(engine, /registerResponseKind\(\s*'shan-response'\s*,\s*resolveShanResponseChoice\s*\)/);
 });
 
-test('v9 PR-E25: 引擎 continueShaAfterCixiong — 玩家是杀目标 + shanResponse=ask 时暂停', () => {
+test('v9 PR-E25: 引擎 continueShaAfterCixiong — 玩家是杀目标 + shanResponse=ask 时暂停 (v10 V3 后走 requestPlayerResponse)', () => {
   const fn = engine.match(/function continueShaAfterCixiong\(game, actor, card, amount\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /targetActor\s*===\s*'player'/);
   assert.match(fn[0], /skillPreferences\.shanResponse\s*===\s*'ask'/);
+  assert.match(fn[0], /requestPlayerResponse\(game,\s*\{/);
   assert.match(fn[0], /kind:\s*'shan-response'/);
-  assert.match(fn[0], /pauseState\.shaResponse/);
+  assert.match(fn[0], /pauseKey:\s*'shaResponse'/);
 });
 
 test('v9 PR-E25: 引擎含 resolveShanResponseChoice + resolveShaAfterResponse + hasShanResponseAvailable', () => {
