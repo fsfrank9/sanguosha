@@ -105,7 +105,8 @@ test('双方英雄池一致且 UI 有去重逻辑，禁止同英雄对战', () =
 test('主游戏界面应按一屏布局约束页面滚动，并提供铁索选择控件和状态样式', () => {
   assert.match(html, /body[\s\S]*overflow:\s*hidden/, 'page-level scrolling should be disabled for one-screen gameplay');
   assert.match(html, /\.duel-table[\s\S]*height:\s*calc\(100vh/, 'duel table should be constrained to viewport height');
-  assert.match(html, /\.tiesuo-mode-panel\[hidden\]/, 'hidden Tiesuo chooser must really disappear before selecting a Tiesuo card');
+  // v10 V7: tiesuoModePanel 升级走 pending-prompt-panel, hidden 由 framework cascade 覆盖.
+  assert.match(html, /\.pending-prompt-panel\[hidden\]/, 'hidden Tiesuo chooser (via pending-prompt-panel framework) must really disappear');
   assert.match(html, /id="tiesuoModePanel"/, 'UI should expose Tiesuo action choices');
   assert.match(html, /id="tiesuoRecastBtn"/, 'Tiesuo recast button should exist');
   assert.match(html, /id="tiesuoChainBothBtn"/, 'Tiesuo chain-both button should exist');

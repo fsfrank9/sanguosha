@@ -314,13 +314,16 @@
            .hand-dock 有 backdrop-filter (建立 fixed 定位 containing block)
            + overflow:hidden, 会让 position:fixed modal 错位并被裁剪. 移到
            .duel-table 直属 (无 filter/transform), fixed modal 正确锚到视口. -->
-        <div class="tiesuo-mode-panel" id="tiesuoModePanel" hidden>
-          <span class="badge chain-status">铁索连环</span>
-          <button class="btn small" id="tiesuoRecastBtn">重铸摸一张</button>
-          <button class="btn small" id="tiesuoChainEnemyBtn">横置/重置对方</button>
-          <button class="btn small" id="tiesuoChainSelfBtn">横置/重置自己</button>
-          <button class="btn small" id="tiesuoChainBothBtn">横置/重置两人</button>
-          <button class="btn small" id="tiesuoCancelBtn">取消</button>
+        <!-- v10 V7: 升级为 pending-prompt-panel 卷轴风, 与 conversion/target 等一致. -->
+        <div class="tiesuo-mode-panel pending-prompt-panel" id="tiesuoModePanel" hidden>
+          <span class="pending-prompt-panel__hint">铁索连环</span>
+          <div class="pending-prompt-panel__actions">
+            <button class="btn small" id="tiesuoRecastBtn">重铸摸一张</button>
+            <button class="btn small" id="tiesuoChainEnemyBtn">横置/重置对方</button>
+            <button class="btn small" id="tiesuoChainSelfBtn">横置/重置自己</button>
+            <button class="btn small" id="tiesuoChainBothBtn">横置/重置两人</button>
+            <button class="btn small" id="tiesuoCancelBtn">取消</button>
+          </div>
         </div>
         <!-- v9 PR-E21: 升级为 pending-prompt-panel 卷轴风 (与 guicai/yiji 等
              8 个新 modal 统一). 旧 inline 扁平风 → cream 纸身 + 居中 modal. -->
@@ -336,11 +339,14 @@
             <span class="mini-card">先选择一个区域，再点具体目标牌</span>
           </div>
         </div>
-        <div class="huogong-mode-panel" id="huogongModePanel" hidden>
-          <span class="badge huogong-reveal" id="huogongRevealText">火攻：等待展示目标手牌</span>
-          <button class="btn small" id="huogongDeclineBtn">不弃牌结算</button>
-          <button class="btn small" id="huogongCancelBtn">取消</button>
-          <div class="huogong-cost-choices" id="huogongCostChoices" aria-live="polite">
+        <!-- v10 V7: 升级为 pending-prompt-panel 卷轴风. -->
+        <div class="huogong-mode-panel pending-prompt-panel" id="huogongModePanel" hidden>
+          <span class="pending-prompt-panel__hint huogong-reveal" id="huogongRevealText">火攻：等待展示目标手牌</span>
+          <div class="pending-prompt-panel__actions">
+            <button class="btn small" id="huogongDeclineBtn">不弃牌结算</button>
+            <button class="btn small" id="huogongCancelBtn">取消</button>
+          </div>
+          <div class="huogong-cost-choices pending-prompt-panel__choices" id="huogongCostChoices" aria-live="polite">
             <span class="mini-card">同花色牌可用于造成火焰伤害</span>
           </div>
         </div>
@@ -353,8 +359,9 @@
             <button class="btn small" id="conversionCancelBtn">取消</button>
           </div>
         </div>
-        <div class="guanxing-mode-panel" id="guanxingModePanel" hidden>
-          <span class="badge" id="guanxingHint">观星：准备阶段开始时分配预览牌</span>
+        <!-- v10 V7: 升级为 pending-prompt-panel 卷轴风. 复杂三 zone 结构保留. -->
+        <div class="guanxing-mode-panel pending-prompt-panel" id="guanxingModePanel" hidden>
+          <span class="pending-prompt-panel__hint" id="guanxingHint">观星：准备阶段开始时分配预览牌</span>
           <div class="guanxing-zone" id="guanxingUnassigned" aria-live="polite">
             <span class="mini-card">待分配的牌（点选）</span>
           </div>
@@ -371,15 +378,18 @@
           <div class="guanxing-zone" id="guanxingBottomZone" aria-live="polite">
             <span class="mini-card">尚无</span>
           </div>
-          <div class="guanxing-zone-row">
+          <div class="pending-prompt-panel__actions">
             <button class="btn small" id="guanxingConfirmBtn">确认观星</button>
             <button class="btn small" id="guanxingDeclineBtn">不发动</button>
           </div>
         </div>
-        <div class="zhiheng-mode-panel" id="zhihengModePanel" hidden>
-          <span class="badge" id="zhihengHint">制衡：点选任意张手牌</span>
-          <button class="btn small" id="zhihengConfirmBtn">确认制衡</button>
-          <button class="btn small" id="zhihengCancelBtn">取消</button>
+        <!-- v10 V7: 升级为 pending-prompt-panel 卷轴风. -->
+        <div class="zhiheng-mode-panel pending-prompt-panel" id="zhihengModePanel" hidden>
+          <span class="pending-prompt-panel__hint" id="zhihengHint">制衡：点选任意张手牌</span>
+          <div class="pending-prompt-panel__actions">
+            <button class="btn small" id="zhihengConfirmBtn">确认制衡</button>
+            <button class="btn small" id="zhihengCancelBtn">取消</button>
+          </div>
         </div>
         <div class="guicai-prompt-panel pending-prompt-panel" id="guicaiPromptPanel" hidden>
           <span class="badge pending-prompt-panel__hint" id="guicaiPromptHint">鬼才：选择手牌替换判定，或跳过</span>

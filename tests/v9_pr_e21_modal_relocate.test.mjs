@@ -34,8 +34,8 @@ test('v9 PR-E21: modal 块不再在 .hand-dock 内 (hand-dock 只剩 hand-title 
 });
 
 test('v9 PR-E21: modal 块现为 .duel-table 直属 (hand-dock 之后, duel-table 之内)', () => {
-  // 顺序: </section> (hand-dock 收尾) → 注释 → tiesuo-mode-panel → ... → </section> (duel-table 收尾)
-  assert.match(html, /id="playerHand"><\/div>\s*<\/section>[\s\S]{0,400}<div class="tiesuo-mode-panel"/);
+  // v10 V7: tiesuo-mode-panel 升级为复合 class "tiesuo-mode-panel pending-prompt-panel"
+  assert.match(html, /id="playerHand"><\/div>\s*<\/section>[\s\S]{0,600}<div class="tiesuo-mode-panel pending-prompt-panel"/);
   // luoshen (modal 块末) 之后紧跟 duel-table 收尾
   assert.match(html, /id="luoshenPromptPanel"[\s\S]*?<\/div>\s*<\/section>\s*<\/div><!-- \/\.game-frame -->/);
 });
@@ -56,17 +56,19 @@ test('v9 PR-E21: targetZonePanel 加 pending-prompt-panel class + __hint / __act
   assert.match(html, /class="target-card-choices pending-prompt-panel__choices" id="targetCardChoices"/);
 });
 
-// ───── 3. CSS: conversion/target 移出旧扁平组, 4 旧 modal 改 fixed ────
+// ───── 3. CSS: v10 V7 后 4 旧 modal 升级为 pending-prompt-panel ────────
 
-test('v9 PR-E21: modals.css 旧组只剩 tiesuo/huogong/guanxing/zhiheng, 改 position:fixed 居中', () => {
-  // conversion / target 不再在旧 *-mode-panel 扁平组里
-  const oldGroup = modalsCss.match(/\.tiesuo-mode-panel,\s*\n\s*\.huogong-mode-panel,\s*\n\s*\.guanxing-mode-panel,\s*\n\s*\.zhiheng-mode-panel\s*\{[\s\S]*?\n\s{4}\}/);
-  assert.ok(oldGroup, '4-modal 旧组规则存在');
-  assert.match(oldGroup[0], /position:\s*fixed/);
-  assert.match(oldGroup[0], /transform:\s*translate\(-50%,\s*-50%\)/);
-  // conversion / target 不在该组
-  assert.doesNotMatch(oldGroup[0], /conversion-mode-panel/);
-  assert.doesNotMatch(oldGroup[0], /target-zone-panel/);
+test('v10 V7: 4 旧 modal (tiesuo/huogong/guanxing/zhiheng) 旧 dark 组规则已删', () => {
+  // v9 PR-E21 时 4 旧 modal 留在 dark fixed 临时组里 (与 cream framework 区分).
+  // v10 V7 升级后该组整块删除, 4 modal 全走 .pending-prompt-panel cascade.
+  assert.doesNotMatch(modalsCss, /\.tiesuo-mode-panel,\s*\n\s*\.huogong-mode-panel,\s*\n\s*\.guanxing-mode-panel,\s*\n\s*\.zhiheng-mode-panel\s*\{/);
+});
+
+test('v10 V7: 4 旧 modal HTML 含 pending-prompt-panel class (cream cascade 接管)', () => {
+  ['tiesuo-mode-panel', 'huogong-mode-panel', 'guanxing-mode-panel', 'zhiheng-mode-panel'].forEach(function (cls) {
+    const re = new RegExp('class="' + cls + ' pending-prompt-panel"');
+    assert.match(html, re, cls + ' 应加 pending-prompt-panel');
+  });
 });
 
 // ───── 回归 ────────────────────────────────────────────────────────────
