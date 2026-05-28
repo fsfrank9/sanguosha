@@ -2426,10 +2426,52 @@
           return;
         }
         log(game, actorName(game, holderActor) + '发动【银月枪】，令' + actorName(game, targetActor) + '出闪或受 1 点伤害。');
+        // v10 V4: 银月枪 触发 + 玩家为目标 + shanResponse=ask + 有闪 → 暂停.
+        if (targetActor === 'player') {
+          var yinyueTarget = game.player;
+          if (yinyueTarget.skillPreferences && yinyueTarget.skillPreferences.shanResponse === 'ask'
+              && hasShanResponseAvailable(yinyueTarget)) {
+            requestPlayerResponse(game, {
+              kind: 'yinyue-response',
+              actor: 'player',
+              pauseKey: 'yinyueResponse',
+              source: { holderActor: holderActor },
+              options: listShanResponseOptions(yinyueTarget),
+              meta: { sourceActor: holderActor, sourceName: '银月枪' },
+              logMessage: '等待' + actorName(game, 'player') + '决定是否打出【闪】响应【银月枪】。',
+              statusMessage: '等待玩家响应【银月枪】。'
+            });
+            return;
+          }
+        }
         if (!consumeResponse(game, targetActor, 'shan', '【银月枪】')) {
           damage(game, targetActor, 1, holderActor, '【银月枪】');
         }
       }
+
+      // v10 V4: 银月枪 闪响应 — 玩家 decision 决定 化解 / damage(1).
+      function resolveYinyueResponseChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.yinyueResponse;
+        if (!saved) return fail('找不到【银月枪】响应的暂停状态。');
+        game.pauseState.yinyueResponse = null;
+        var holderActor = saved.holderActor;
+        var dodged = false;
+        if (decision.cardId) {
+          dodged = consumeResponse(game, 'player', 'shan', '【银月枪】', decision.cardId);
+          if (!dodged) log(game, actorName(game, 'player') + '指定的牌无法当【闪】。');
+        } else if (decision.use) {
+          dodged = consumeResponse(game, 'player', 'shan', '【银月枪】');
+          if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
+        } else {
+          log(game, actorName(game, 'player') + '选择不打出【闪】响应【银月枪】。');
+        }
+        if (!dodged) {
+          damage(game, 'player', 1, holderActor, '【银月枪】');
+        }
+        return success('银月枪响应完成。');
+      }
+
+      registerResponseKind('yinyue-response', resolveYinyueResponseChoice);
 
       function judge(game, actor, reason, opts) {
         reshuffleIfNeeded(game);
@@ -3194,6 +3236,24 @@
         var targetActor = opponent(actor);
         discardCard(game, card);
         log(game, actorName(game, actor) + '使用【' + title + '】。');
+        // v10 V4: 万箭齐发 (responseType='shan') + 玩家为目标 + shanResponse=ask +
+        // 有闪可响应 → 暂停, 让玩家自选闪 / 不出. 引擎默认仍走自动响应.
+        if (responseType === 'shan' && targetActor === 'player') {
+          var aoeTarget = game.player;
+          if (aoeTarget.skillPreferences && aoeTarget.skillPreferences.shanResponse === 'ask'
+              && hasShanResponseAvailable(aoeTarget)) {
+            return requestPlayerResponse(game, {
+              kind: 'wanjian-response',
+              actor: 'player',
+              pauseKey: 'wanjianResponse',
+              source: { sourceActor: actor, title: title },
+              options: listShanResponseOptions(aoeTarget),
+              meta: { sourceActor: actor, sourceName: title },
+              logMessage: '等待' + actorName(game, 'player') + '决定是否打出【闪】响应【' + title + '】。',
+              statusMessage: '等待玩家响应【' + title + '】。'
+            });
+          }
+        }
         if (consumeResponse(game, targetActor, responseType, '【' + title + '】')) {
           log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
         } else {
@@ -3201,6 +3261,34 @@
         }
         return success(title + '结算完成。');
       }
+
+      // v10 V4: 万箭齐发 闪响应 — 玩家 decision 决定 化解 / damage(1).
+      // saved.sourceActor 是万箭来源, saved.title 是显示文案.
+      function resolveWanjianResponseChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.wanjianResponse;
+        if (!saved) return fail('找不到【万箭齐发】响应的暂停状态。');
+        game.pauseState.wanjianResponse = null;
+        var sourceActor = saved.sourceActor;
+        var title = saved.title || '万箭齐发';
+        var dodged = false;
+        if (decision.cardId) {
+          dodged = consumeResponse(game, 'player', 'shan', '【' + title + '】', decision.cardId);
+          if (!dodged) log(game, actorName(game, 'player') + '指定的牌无法当【闪】。');
+        } else if (decision.use) {
+          dodged = consumeResponse(game, 'player', 'shan', '【' + title + '】');
+          if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
+        } else {
+          log(game, actorName(game, 'player') + '选择不打出【闪】响应【' + title + '】。');
+        }
+        if (dodged) {
+          log(game, actorName(game, 'player') + '成功化解【' + title + '】。');
+        } else {
+          damage(game, 'player', 1, sourceActor, '【' + title + '】');
+        }
+        return success(title + '响应完成。');
+      }
+
+      registerResponseKind('wanjian-response', resolveWanjianResponseChoice);
 
       function getHuogongChoice(game, actor) {
         var self = game && game[actor];

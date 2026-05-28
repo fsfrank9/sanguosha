@@ -889,12 +889,17 @@
           }
         }
         // v9 PR-E25/E26: 闪响应 — 被【杀】攻击时玩家选用哪张牌当【闪】.
+        // v10 V4: 万箭齐发 (wanjian-response) + 银月枪 (yinyue-response) 复用此面板.
+        // 各 kind 通过 pending.sourceName / shaName 决定文案 (V3 用 shaName, V4 用 sourceName).
+        var SHAN_RESPONSE_KINDS = ['shan-response', 'wanjian-response', 'yinyue-response'];
         if (els.shanResponsePanel) {
-          if (kind === 'shan-response' && pending.actor === 'player') {
+          if (SHAN_RESPONSE_KINDS.indexOf(kind) >= 0 && pending.actor === 'player') {
             els.shanResponsePanel.hidden = false;
             if (els.shanResponseHint) {
+              var srcLabel = pending.sourceName || pending.shaName || '杀';
+              var verb = kind === 'yinyue-response' ? '发动' : '使用';
               els.shanResponseHint.textContent =
-                '对方对你使用【' + (pending.shaName || '杀') + '】，点选一张牌当【闪】后按下方【确认】，或点【不出【闪】】。';
+                '对方' + verb + '【' + srcLabel + '】，点选一张牌当【闪】后按下方【确认】，或点【不出【闪】】。';
             }
             if (els.shanResponseChoices) {
               var shanOpts = pending.options || [];
