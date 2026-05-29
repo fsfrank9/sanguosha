@@ -1087,6 +1087,8 @@
 
       function hideConversionPanel() {
         pendingConversionCardId = null;
+        // v10 V8: 与 hideTargetZonePanel / hideHuogongPanel 对称, 清掉 staged.
+        if (stagedModalChoice && stagedModalChoice.kind === 'conversion') stagedModalChoice = null;
         if (els.conversionModePanel) els.conversionModePanel.hidden = true;
         if (els.conversionHint) els.conversionHint.textContent = '这张牌可按原牌使用，也可当【杀】使用';
       }
@@ -1831,6 +1833,9 @@
       // v9 PR-E16: pending modal 与 hand-confirm/cancel 的统一 dispatch 注册表.
       // 各 modal 显示时, hand-confirm 触发 .confirm 对应 button.click(),
       // hand-cancel 同理. 没注册的 modal 仍保留自己内部按钮 (兼容).
+      // v10 V8: 6 个旧缺口面板 (fanjian/fankui/wugu/guohe/cixiongChoose 必选; dyingRescue 有 decline)
+      // 全部入册. 必选面板无 cancel 语义, 此处仍登记为 confirmBtnId=null/cancelBtnId=null
+      // 仅用于 _firstVisibleDispatch 命中 — handConfirm/Cancel 不再 fall-through 到手牌.
       var PENDING_MODAL_DISPATCH = [
         { panelId: 'shanResponsePanel',     confirmBtnId: null,                     cancelBtnId: 'shanResponseDeclineBtn' },
         { panelId: 'wuxieResponsePanel',    confirmBtnId: null,                     cancelBtnId: 'wuxieResponseDeclineBtn' },
@@ -1849,7 +1854,15 @@
         { panelId: 'tiesuoModePanel',       confirmBtnId: null,                     cancelBtnId: 'tiesuoCancelBtn' },
         { panelId: 'conversionModePanel',   confirmBtnId: null,                     cancelBtnId: 'conversionCancelBtn' },
         { panelId: 'targetZonePanel',       confirmBtnId: null,                     cancelBtnId: 'targetCancelBtn' },
-        { panelId: 'exitConfirmModal',      confirmBtnId: 'exitConfirmYesBtn',      cancelBtnId: 'exitConfirmNoBtn' }
+        { panelId: 'exitConfirmModal',      confirmBtnId: 'exitConfirmYesBtn',      cancelBtnId: 'exitConfirmNoBtn' },
+        // v10 V8 补齐: 以下 6 面板 visible 时, _firstVisibleDispatch 会命中此条,
+        // _handConfirm/Cancel 不再 fall-through 误触手牌; 必选面板 (无 cancel 语义) 用 null.
+        { panelId: 'dyingRescuePanel',      confirmBtnId: null,                     cancelBtnId: 'dyingRescueDeclineBtn' },
+        { panelId: 'fanjianPromptPanel',    confirmBtnId: null,                     cancelBtnId: null },
+        { panelId: 'fankuiPromptPanel',     confirmBtnId: null,                     cancelBtnId: null },
+        { panelId: 'wuguPickPanel',         confirmBtnId: null,                     cancelBtnId: null },
+        { panelId: 'guohePickPanel',        confirmBtnId: null,                     cancelBtnId: null },
+        { panelId: 'cixiongChoosePanel',    confirmBtnId: null,                     cancelBtnId: 'cixiongChooseDrawBtn' }
       ];
 
       function _firstVisibleDispatch() {
@@ -1905,6 +1918,9 @@
             resolveTargetCard(staged.zone, staged.cardId);
           } else if (staged.kind === 'huogong') {
             resolveHuogong(staged.costId, false);
+          } else if (staged.kind === 'conversion') {
+            // v10 V8: card-as 一致性 — 转化面板 stage 提交.
+            resolveConversion(staged.asSha);
           } else if (staged.kind === 'pending') {
             // v9 PR-E24: 响应/技能面板候选 — 统一走 Engine.resolvePendingChoice.
             var pr = Engine.resolvePendingChoice(game, staged.payload);
@@ -1915,7 +1931,12 @@
         }
         // 1. 任何 visible pending modal → 触发对应 confirm
         var dispatch = _firstVisibleDispatch();
-        if (dispatch && _clickIfEnabled(dispatch.confirmBtnId)) return;
+        if (dispatch) {
+          // v10 V8: dispatch 命中 (即使 confirmBtnId 为 null) → 必须 return,
+          // 不能 fall-through 到弃牌/手牌 (modal 还开着, 误触会跨上下文).
+          _clickIfEnabled(dispatch.confirmBtnId);
+          return;
+        }
         // 2. 弃牌阶段 → 提交弃牌
         if (game && game.turn === 'player' && game.phase === 'discard' &&
             Engine.needsDiscard(game, 'player')) {
@@ -1943,7 +1964,11 @@
         }
         // 1. 任何 visible pending modal → 触发对应 cancel
         var dispatch = _firstVisibleDispatch();
-        if (dispatch && _clickIfEnabled(dispatch.cancelBtnId)) return;
+        if (dispatch) {
+          // v10 V8: dispatch 命中 → 必须 return, 不能 fall-through 到手牌清.
+          _clickIfEnabled(dispatch.cancelBtnId);
+          return;
+        }
         // 2. 清 hand-card 选中
         if (selectedHandCardId) {
           selectedHandCardId = null;
@@ -2047,8 +2072,19 @@
         });
         if (els.huogongDeclineBtn) els.huogongDeclineBtn.addEventListener('click', function () { resolveHuogong(null, true); });
         if (els.huogongCancelBtn) els.huogongCancelBtn.addEventListener('click', function () { hideHuogongPanel(); render(); });
-        if (els.conversionNormalBtn) els.conversionNormalBtn.addEventListener('click', function () { resolveConversion(false); });
-        if (els.conversionShaBtn) els.conversionShaBtn.addEventListener('click', function () { resolveConversion(true); });
+        // v10 V8: card-as 一致性 — 转化面板也走 stage-then-confirm. 点 "按原牌使用"
+        // 或 "当杀使用" 只 stage 高亮; 必须再按 #handConfirmBtn 才真正 resolve.
+        // 与 target/huogong/响应面板 统一交互节奏.
+        if (els.conversionNormalBtn) els.conversionNormalBtn.addEventListener('click', function () {
+          stagedModalChoice = { kind: 'conversion', asSha: false };
+          _highlightStaged(els.conversionNormalBtn);
+          render();
+        });
+        if (els.conversionShaBtn) els.conversionShaBtn.addEventListener('click', function () {
+          stagedModalChoice = { kind: 'conversion', asSha: true };
+          _highlightStaged(els.conversionShaBtn);
+          render();
+        });
         if (els.conversionCancelBtn) els.conversionCancelBtn.addEventListener('click', function () { hideConversionPanel(); render(); });
         if (els.guanxingTopBtn) els.guanxingTopBtn.addEventListener('click', function () { guanxingMoveSelectedTo('top'); });
         if (els.guanxingBottomBtn) els.guanxingBottomBtn.addEventListener('click', function () { guanxingMoveSelectedTo('bottom'); });
