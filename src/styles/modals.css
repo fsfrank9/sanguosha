@@ -1,8 +1,8 @@
 /* modals.css — Overlay panels and pendingChoice popups.
    Includes: .pending-prompt-panel framework (v8 PR-A1) + .prompt-card-choice,
-   six *-mode-panel containers (tiesuo/target/huogong/conversion/guanxing/zhiheng),
-   .target-card-choices, .guanxing-card-choices, .target-card-choice,
-   .huogong-reveal/-cost-choices/-cost-choice + .unusable,
+   6 *-mode-panel containers (tiesuo/target/huogong/conversion/guanxing/zhiheng,
+   v10 V7 起全部走 pending-prompt-panel cream 卷轴风),
+   .huogong-reveal / .guanxing-zone* / candidates,
    the [hidden] override block (v8 hotfix #60). */
 
     /* v8 PR-A1 → v9 PR-E6: 通用 pendingChoice 面板框架升级为卷轴风
@@ -139,102 +139,105 @@
       color: #3a2010;
     }
 
-    /* [hidden] override for both legacy mode-panels and the pending-prompt
-       framework. The .pending-prompt-panel[hidden] entry is v8 HOTFIX #60
-       — the framework's display:flex was overriding the HTML hidden
-       attribute, causing every prompt panel to be permanently visible. */
+    /* [hidden] override for pending-prompt-panel framework — v8 HOTFIX #60
+       (framework's display:flex was overriding the HTML hidden attribute).
+       v10 V7: 4 个旧 mode-panel 升级走 pending-prompt-panel, 选择器统一. */
     .duel-table[hidden],
     .setup-screen[hidden],
-    .tiesuo-mode-panel[hidden],
-    .target-zone-panel[hidden],
-    .huogong-mode-panel[hidden],
-    .conversion-mode-panel[hidden],
-    .guanxing-mode-panel[hidden],
-    .zhiheng-mode-panel[hidden],
     .pending-prompt-panel[hidden] { display: none !important; }
 
-    /* v9 PR-E21: modal 块从 .hand-dock 移出到 .duel-table 直属后, 旧 inline-flow
-       定位会在 grid 里错位. tiesuo/huogong/guanxing/zhiheng 暂未升级卷轴风,
-       先改 position:fixed 居中 (深色临时风格), 后续 PR 升级为 pending-prompt-panel.
-       conversion / target 本 PR 已升级 → 加 .pending-prompt-panel class, 从此组移出. */
-    .tiesuo-mode-panel,
-    .huogong-mode-panel,
-    .guanxing-mode-panel,
-    .zhiheng-mode-panel {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 40;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      width: min(520px, 84vw);
-      max-height: 76vh;
-      overflow-y: auto;
-      border: 1px solid rgba(255,214,138,.3);
-      border-radius: 12px;
-      padding: 18px 22px;
-      background: linear-gradient(180deg, rgba(48,28,18,.98), rgba(22,14,9,.99));
-      box-shadow: 0 14px 36px rgba(0,0,0,.6);
-    }
-
-    .target-card-choices,
-    .guanxing-card-choices {
-      flex: 1 0 100%;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      align-items: center;
-      padding-top: 4px;
-      border-top: 1px dashed rgba(255,214,138,.18);
-    }
-
-    .target-card-choice {
-      cursor: pointer;
-      color: #fff4d0;
-      border-color: rgba(255,214,138,.42);
-      background: rgba(88, 43, 22, .42);
-    }
-
-    .target-card-choice:hover {
-      transform: translateY(-1px);
-      border-color: rgba(255,214,138,.75);
-    }
+    /* v10 V7: tiesuo / huogong / guanxing / zhiheng 4 panels 升级为
+       pending-prompt-panel cream 卷轴风, 与 conversion/target/13 个 pending
+       面板视觉统一. 旧 dark fixed 块已删. */
 
     .huogong-reveal {
-      color: #ffd68a;
-      border-color: rgba(255,120,80,.46);
-      background: rgba(120, 42, 20, .26);
+      color: #5b2f15;
+      border-color: rgba(178, 90, 30, .55);
+      background: rgba(255, 180, 110, .35);
     }
 
-    .huogong-cost-choices {
-      flex: 1 0 100%;
+    /* v10 V7: 观星 3-zone 内部布局 — 卷轴风兼容. */
+    .pending-prompt-panel .guanxing-zone {
+      flex: 1 1 100%;
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
       align-items: center;
-      padding-top: 4px;
-      border-top: 1px dashed rgba(255,214,138,.18);
+      min-height: 40px;
+      padding: 6px 8px;
+      border: 1px dashed rgba(178, 118, 50, .42);
+      border-radius: 6px;
+      background: rgba(255, 240, 200, .35);
     }
-
-    .huogong-cost-choice {
+    .pending-prompt-panel .guanxing-zone-row {
+      flex: 1 1 100%;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    .pending-prompt-panel .guanxing-zone-label {
+      flex: 1 1 100%;
+      font-size: 12px;
+      font-weight: 700;
+      color: #7a3a14;
+      letter-spacing: .06em;
+    }
+    .pending-prompt-panel .guanxing-card {
       cursor: pointer;
-      border-color: rgba(255,214,138,.42);
+      border: 1px solid #8e5824;
+      background: linear-gradient(180deg, #fff5d4, #f0c878);
+      color: #3a2010;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      transition: background .15s, transform .05s, border-color .15s;
+    }
+    .pending-prompt-panel .guanxing-card:hover {
+      background: linear-gradient(180deg, #fff5d4, #ffb96e);
+      border-color: #5b2f15;
+      transform: translateY(-1px);
+    }
+    .pending-prompt-panel .guanxing-card.selected {
+      background: linear-gradient(180deg, #ffd68a, #d88427);
+      color: #fff4d0;
+      border-color: #5b2f15;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, .3);
+    }
+    .pending-prompt-panel .guanxing-position-tag {
+      color: #7a3a14;
+      background: rgba(255, 240, 200, .55);
+      border-color: rgba(178, 118, 50, .42);
     }
 
-    .huogong-cost-choice.unusable {
+    /* v10 V7: 火攻 / 目标区 候选按钮 cream 改写 (旧 dark 风已随 mode-panel 一起删).
+       buttons 走 mini-card base + 覆写 cream; mini-card cascade 已在 .pending-prompt-panel
+       .mini-card 处理 (line ~136). 此处只补 hover / disabled / unusable. */
+    .pending-prompt-panel .huogong-cost-choice {
+      cursor: pointer;
+    }
+    .pending-prompt-panel .huogong-cost-choice:hover:not(:disabled) {
+      border-color: #5b2f15;
+      transform: translateY(-1px);
+    }
+    .pending-prompt-panel .huogong-cost-choice.unusable {
       opacity: .45;
       cursor: not-allowed;
       filter: grayscale(.45);
-      border-color: rgba(255,255,255,.12);
+    }
+    .pending-prompt-panel .target-card-choice {
+      cursor: pointer;
+    }
+    .pending-prompt-panel .target-card-choice:hover {
+      border-color: #5b2f15;
+      transform: translateY(-1px);
     }
 
+    /* v10 V7: 旧 .huogong-cost-choices / .huogong-cost-choice / .unusable
+       规则块已删 (由上方 .pending-prompt-panel .huogong-cost-choice* 接管). */
+
     /* v9 PR-E23: 二级面板候选 stage 选中态 — 金色描边高亮.
-       点候选只 stage, 需再点 #handConfirmBtn 才生效. outline 在 cream / dark
-       两种面板底色上都清晰. */
+       点候选只 stage, 需再点 #handConfirmBtn 才生效. */
     .target-card-choice.is-staged,
     .huogong-cost-choice.is-staged {
       outline: 3px solid #ffd24a;

@@ -1879,11 +1879,10 @@
 
       // v9 PR-E24: 是否有任意 modal / 面板可见 (含 PENDING_MODAL_DISPATCH 未注册的).
       // 用于 playerHand 误点防护 — 任何面板开着时忽略手牌点击.
+      // v10 V7: 4 个旧 mode-panel 升级走 pending-prompt-panel 后, 选择器简化.
       function _anyModalVisible() {
         return !!document.querySelector(
-          '.pending-prompt-panel:not([hidden]), .tiesuo-mode-panel:not([hidden]),' +
-          '.huogong-mode-panel:not([hidden]), .guanxing-mode-panel:not([hidden]),' +
-          '.zhiheng-mode-panel:not([hidden]), .scroll-modal:not([hidden])');
+          '.pending-prompt-panel:not([hidden]), .scroll-modal:not([hidden])');
       }
 
       // 何时点 hand-card 触发"选中-后-确认"模式 (而非直接 usePlayerCard).

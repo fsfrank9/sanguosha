@@ -63,12 +63,13 @@ test('v9 PR-E24: _handConfirm pending kind → Engine.resolvePendingChoice(stage
 
 // ───── _anyModalVisible 完整面板检测 ─────────────────────────────────
 
-test('v9 PR-E24: _anyModalVisible 覆盖 pending-prompt-panel + 旧 mode-panel + scroll-modal', () => {
+test('v9 PR-E24: _anyModalVisible 覆盖 pending-prompt-panel + scroll-modal (v10 V7 后简化)', () => {
+  // v10 V7: 4 旧 mode-panel 升级走 pending-prompt-panel cascade, 选择器简化.
   const fn = adapter.match(/function _anyModalVisible\(\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /pending-prompt-panel:not\(\[hidden\]\)/);
-  assert.match(fn[0], /tiesuo-mode-panel:not\(\[hidden\]\)/);
   assert.match(fn[0], /scroll-modal:not\(\[hidden\]\)/);
+  assert.doesNotMatch(fn[0], /tiesuo-mode-panel:not/, 'V7 后不再分列旧 mode-panel');
 });
 
 // ───── render 重套 staged 高亮 ───────────────────────────────────────
