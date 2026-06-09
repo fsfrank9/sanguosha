@@ -3705,22 +3705,18 @@
 
         if (card.type === 'taoyuan') {
           discardCard(game, card);
-          // v7 PR-2: gltjk card__scroll.md 注："对未受伤的角色无效"。
-          // 多角色结算顺序：从当前回合角色开始按逆时针方向（rule__principle.md
-          // 多角色结算顺序原则 a.），即发动者先结算、对手后结算。
+          // v7 PR-2 + H1b: gltjk card__scroll.md "对未受伤的角色无效"; 多角色
+          // 结算顺序从发动者起逆时针 = [actor, opponent]。H1b: 每名受伤目标各
+          // 自独立开无懈窗口 (无懈只抵消「对一个目标」的效果, 双方都受伤时各
+          // 自可被无懈)。未受伤角色不是目标, 不开窗。
           log(game, actorName(game, actor) + '使用【桃园结义】。');
-          var taoyuanOrder = [actor, opponent(actor)];
-          taoyuanOrder.forEach(function (side) {
-            var taoyuanState = game[side];
-            if (!taoyuanState) return;
-            if (taoyuanState.hp >= taoyuanState.maxHp) {
-              log(game, '【桃园结义】对' + actorName(game, side) + '无效（未受伤）。');
-              return;
-            }
-            taoyuanState.hp = Math.min(taoyuanState.maxHp, taoyuanState.hp + 1);
-            log(game, actorName(game, side) + '因【桃园结义】回复 1 点体力。');
+          var taoyuanTargets = [actor, opponent(actor)].filter(function (side) {
+            var s = game[side];
+            return s && s.hp < s.maxHp;
           });
-          return finishTrickUse(game, actor, card, success('桃园结义结算完成。'), options);
+          return advanceTaoyuanTargets(game, {
+            actor: actor, card: card, options: options, targets: taoyuanTargets, idx: 0
+          });
         }
 
         if (card.type === 'wugu') {
@@ -3908,6 +3904,37 @@
           log(game, actorName(game, ctx.actor) + '将【' + ctx.card.name + '】置入' + actorName(game, side) + '的判定区。');
         }
         return success('延时锦囊生效。');
+      });
+
+      // H1b: 桃园结义 逐目标无懈驱动。targets = 受伤角色 (按 [actor, opponent]
+      // 顺序)。每名目标独立开无懈窗口, responder = opponent(目标) (即另一方可
+      // 抵消该目标的回复)。全部目标结算后 finishTrickUse 触发集智等 onCardUse。
+      function advanceTaoyuanTargets(game, ctx) {
+        while (ctx.idx < ctx.targets.length) {
+          var target = ctx.targets[ctx.idx];
+          if (!game[target] || game[target].hp >= game[target].maxHp) {
+            ctx.idx += 1; // 期间已被治满 (理论不出现) → 跳过
+            continue;
+          }
+          return checkWuxieAndContinue(
+            game, opponent(target),
+            '【桃园结义】（' + actorName(game, target) + '）',
+            'taoyuan-target', ctx
+          );
+        }
+        return finishTrickUse(game, ctx.actor, ctx.card, success('桃园结义结算完成。'), ctx.options);
+      }
+
+      registerWuxieContinuation('taoyuan-target', function (game, ctx, wuxied) {
+        var target = ctx.targets[ctx.idx];
+        if (wuxied) {
+          log(game, '【桃园结义】对' + actorName(game, target) + '的回复被【无懈可击】抵消。');
+        } else if (game[target] && game[target].hp < game[target].maxHp) {
+          game[target].hp = Math.min(game[target].maxHp, game[target].hp + 1);
+          log(game, actorName(game, target) + '因【桃园结义】回复 1 点体力。');
+        }
+        ctx.idx += 1;
+        return advanceTaoyuanTargets(game, ctx);
       });
 
       function startTurn(game, actor) {
