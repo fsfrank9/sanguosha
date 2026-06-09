@@ -2000,7 +2000,7 @@
         return finishPendingChoiceResolution(game, resolver(game, pending, decision || {}));
       }
 
-      function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature) {
+      function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts) {
         if (game.phase === 'gameover') return false;
         var target = game[targetActor];
         if (!target) return false;
@@ -2075,6 +2075,17 @@
         // 0, 否则深度致命伤被一张【桃】抹平, 严重削弱【闪电】/【酒】+【杀】等。
         target.hp = target.hp - amount;
         log(game, actorName(game, targetActor) + '因' + reason + '受到 ' + amount + ' 点伤害。');
+        // H4 (审计二轮): 铁索连环传导 — gltjk card__scroll.md: 处于连环状态的
+        // 角色受到属性 (火/雷) 伤害时解除连环状态; 若此伤害不是传导伤害, 该
+        // 角色伤害结算完毕后, 对其他处于连环状态的角色依次造成等量同属性的
+        // 传导伤害 (传导伤害不再引发新的传导)。此前 chained 只是 UI 布尔,
+        // damage() 无任何连环逻辑, 横置等于无效果。
+        var chainTransmit = false;
+        if (damageNature !== 'normal' && target.chained) {
+          target.chained = false;
+          log(game, actorName(game, targetActor) + '受到属性伤害，解除连环状态。');
+          if (!(opts && opts.chainTransmit)) chainTransmit = true;
+        }
         var damageContext = {
           game: game,
           targetActor: targetActor,
@@ -2082,7 +2093,8 @@
           reason: reason,
           sourceCard: sourceCard,
           amount: amount,
-          nature: damageNature
+          nature: damageNature,
+          chainTransmit: chainTransmit
         };
         // M1 (审计二轮): gltjk flow__decreaselife.md / flow__damage.md — 濒死
         // 结算嵌套在「扣减体力」内, "受到伤害后" 时机 (奸雄/反馈/刚烈/遗计)
@@ -2122,6 +2134,25 @@
         if (damageContext.sourceCard && !sourceCardClaimed) {
           discardCard(game, damageContext.sourceCard);
         }
+        // H4: 该角色的伤害结算 (含嵌套濒死 — deferred 路径在 flush 时才到这)
+        // 完毕后, 向其他横置角色传导属性伤害。
+        if (damageContext.chainTransmit) {
+          transmitChainDamage(game, damageContext);
+        }
+      }
+
+      // H4: 铁索连环传导执行 — 1v1 中"其他处于连环状态的角色"只有对手。
+      // 传导伤害: 等量、同属性、同来源, 无实体来源牌 (原牌已结算完毕),
+      // 标记 chainTransmit 防止递归再传导。
+      function transmitChainDamage(game, damageContext) {
+        if (game.phase === 'gameover') return;
+        var nextActor = opponent(damageContext.targetActor);
+        var nextState = game[nextActor];
+        if (!nextState || !nextState.chained) return;
+        var natureName = damageContext.nature === 'fire' ? '火焰' : '雷电';
+        log(game, '【铁索连环】传导：' + actorName(game, nextActor) + '受到等量' + natureName + '伤害。');
+        damage(game, nextActor, damageContext.amount, damageContext.sourceActor,
+          damageContext.reason + '（铁索连环传导）', null, damageContext.nature, { chainTransmit: true });
       }
 
       function flushDeferredDamageAfter(game) {

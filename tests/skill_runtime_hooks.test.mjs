@@ -222,7 +222,7 @@ test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
 
 test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
+  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
   const damageEnd = source.indexOf('function findResponseCard(', damageStart);
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
   const damageSource = source.slice(damageStart, damageEnd);
@@ -238,7 +238,7 @@ test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
 
 test('game engine dispatches Ganglie through onDamageAfter and finalizes its judgment card', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
+  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
   const damageEnd = source.indexOf('function findResponseCard(', damageStart);
   const ganglieStart = source.indexOf('function triggerGanglieDamageAfter(context)');
   const ganglieEnd = source.indexOf('function triggerTianduJudgementAfterResolve(context)', ganglieStart);
@@ -259,7 +259,7 @@ test('game engine dispatches Ganglie through onDamageAfter and finalizes its jud
 
 test('game engine dispatches Fankui through onDamageAfter and gains a source-area card', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
+  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
   const damageEnd = source.indexOf('function findResponseCard(', damageStart);
   const fankuiStart = source.indexOf('function triggerFankuiDamageAfter(context)');
   const fankuiEnd = source.indexOf('function triggerGanglieDamageAfter(context)', fankuiStart);
@@ -360,7 +360,7 @@ test('game engine dispatches Tiandu judgement-card gain through onJudgementAfter
 
 test('game engine dispatches Yiji per-damage-point draw through onDamageAfter hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
+  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
   const damageEnd = source.indexOf('function findResponseCard(state, type', damageStart);
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
   const damageSource = source.slice(damageStart, damageEnd);
@@ -378,7 +378,7 @@ test('game engine dispatches Luoyi through draw and damage-modifier hook seams',
   const drawStart = source.indexOf('function performDrawPhase(game, actor)');
   const drawHelperStart = source.indexOf('function triggerLuoyiDrawPhase(context)', drawStart);
   const drawEnd = drawHelperStart >= 0 ? drawHelperStart : source.indexOf('function isArmorIgnoredBySha(game, sourceActor, card)', drawStart);
-  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature)');
+  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
   const damageEnd = source.indexOf('function findResponseCard(state, type', damageStart);
   assert.ok(drawStart >= 0 && drawEnd > drawStart, 'draw phase source should be extractable');
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
