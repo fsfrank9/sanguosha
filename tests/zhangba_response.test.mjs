@@ -24,8 +24,11 @@ test('v7 PR-14: 丈八蛇矛 使用 path 已实现 (Engine.playZhangbaSha 旧路
   const result = Engine.playZhangbaSha(game, 'player', ['h1', 'h2']);
   assert.equal(result.ok, true);
   assert.equal(game.enemy.hp, hpBefore - 1, '丈八虚拟杀命中（enemy 无闪）');
-  assert.ok(game.discard.some((c) => c.id === 'h1'));
-  assert.ok(game.discard.some((c) => c.id === 'h2'));
+  // H1 修复后: seed 91 的 enemy 是曹操, 【奸雄】获得造成伤害的两张组成实体牌
+  // (此前两张牌留在弃牌堆且虚拟杀凭空进弃牌堆)。
+  assert.ok(game.enemy.hand.some((c) => c.id === 'h1'), '奸雄获得组成牌 h1');
+  assert.ok(game.enemy.hand.some((c) => c.id === 'h2'), '奸雄获得组成牌 h2');
+  assert.ok(!game.discard.some((c) => String(c.id).startsWith('zhangba-')), '虚拟丈八杀不进弃牌堆');
 });
 
 test('v7 PR-14: 决斗响应 — 拥有 丈八 + 无杀 + 2 张手牌 → 自动当杀响应', () => {
