@@ -68,6 +68,9 @@
           'gangliePromptPanel', 'gangliePromptHint', 'ganglieFireBtn', 'ganglieDeclineBtn',
           'ganglieSourcePanel', 'ganglieSourceHint', 'ganglieSourceCandidates', 'ganglieSourceConfirmBtn', 'ganglieSourceTakeDamageBtn',
           'qilinPickPanel', 'qilinPickHint', 'qilinPickChoices', 'qilinDeclineBtn',
+          // 审计二轮 PR-8: 贯石斧自选两张 + 火攻展示牌自选 面板
+          'guanshiDiscardPanel', 'guanshiDiscardHint', 'guanshiDiscardChoices', 'guanshiConfirmBtn', 'guanshiDeclineBtn',
+          'huogongShowPanel', 'huogongShowHint', 'huogongShowChoices',
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
           'cixiongFirePanel', 'cixiongFireHint', 'cixiongFireBtn', 'cixiongFireDeclineBtn',
           'cixiongChoosePanel', 'cixiongChooseHint', 'cixiongChooseChoices', 'cixiongChooseDrawBtn',
@@ -577,6 +580,8 @@
       }
 
       var yijiGiveSelection = [];
+      // 审计二轮 PR-8: 贯石斧成本多选 (恰好 2 张, 手牌/装备混选)
+      var guanshiDiscardSelection = [];
 
       function renderPendingChoice() {
         var pending = game && Engine.getPendingChoice(game);
@@ -762,6 +767,72 @@
             }
           } else {
             els.qilinPickPanel.hidden = true;
+          }
+        }
+        // 审计二轮 PR-8: 贯石斧 — 杀被闪后, 玩家自选两张牌 (手牌/装备) 弃置
+        // 令【杀】强制命中, 或不发动。
+        if (els.guanshiDiscardPanel) {
+          if (kind === 'guanshi-discard' && pending.actor === 'player') {
+            els.guanshiDiscardPanel.hidden = false;
+            var gsAllowedIds = (pending.handIds || []).concat((pending.equipment || []).map(function (e) { return e.cardId; }));
+            guanshiDiscardSelection = guanshiDiscardSelection.filter(function (id) {
+              return gsAllowedIds.indexOf(id) >= 0;
+            });
+            if (els.guanshiDiscardHint) {
+              els.guanshiDiscardHint.textContent =
+                '贯石斧：选 2 张牌弃置令【杀】强制命中（已选 ' + guanshiDiscardSelection.length + '/2），或不发动。';
+            }
+            if (els.guanshiDiscardChoices) {
+              var gsHandHtml = (pending.handIds || []).map(function (cardId) {
+                var card = (game.player.hand || []).find(function (c) { return c.id === cardId; });
+                if (!card) return '';
+                return promptCardChoice(card, {
+                  dataAttrs: { guanshiCardId: cardId },
+                  title: '切换选中：这张手牌作为贯石斧成本',
+                  selected: guanshiDiscardSelection.indexOf(cardId) >= 0,
+                  extraClass: 'guanshi-discard-choice'
+                });
+              }).join('');
+              var gsEquipHtml = (pending.equipment || []).map(function (entry) {
+                return promptCardChoice({ name: entry.name }, {
+                  dataAttrs: { guanshiCardId: entry.cardId },
+                  title: '切换选中：这件装备作为贯石斧成本',
+                  selected: guanshiDiscardSelection.indexOf(entry.cardId) >= 0,
+                  prefix: '装备 ',
+                  extraClass: 'guanshi-discard-choice'
+                });
+              }).join('');
+              els.guanshiDiscardChoices.innerHTML = (gsHandHtml + gsEquipHtml)
+                || '<span class="mini-card">没有可弃置的牌</span>';
+            }
+            if (els.guanshiConfirmBtn) els.guanshiConfirmBtn.disabled = guanshiDiscardSelection.length !== 2;
+          } else {
+            els.guanshiDiscardPanel.hidden = true;
+            guanshiDiscardSelection = [];
+          }
+        }
+        // 审计二轮 PR-8: 火攻 — 玩家为目标时自选展示哪张手牌 (官方: 展示是
+        // 目标的选择)。必选面板: 点牌 stage 后经 hand-confirm 提交。
+        if (els.huogongShowPanel) {
+          if (kind === 'huogong-show' && pending.actor === 'player') {
+            els.huogongShowPanel.hidden = false;
+            if (els.huogongShowHint) {
+              els.huogongShowHint.textContent =
+                '火攻：选择展示一张手牌（对方弃同花色手牌才能造成 1 点火焰伤害）。';
+            }
+            if (els.huogongShowChoices) {
+              els.huogongShowChoices.innerHTML = (pending.cardIds || []).map(function (cardId) {
+                var card = (game.player.hand || []).find(function (c) { return c.id === cardId; });
+                if (!card) return '';
+                return promptCardChoice(card, {
+                  dataAttrs: { huogongShowCardId: cardId },
+                  title: '展示这张手牌',
+                  extraClass: 'huogong-show-choice'
+                });
+              }).join('') || '<span class="mini-card">没有手牌可展示</span>';
+            }
+          } else {
+            els.huogongShowPanel.hidden = true;
           }
         }
         // v8 PR-A3: 雌雄双股剑 fire — source 决定是否对异性发动
@@ -1823,6 +1894,10 @@
         game.player.skillPreferences.wuxieResponse = 'ask';
         // v10 V6: 决斗 玩家手动出杀响应.
         game.player.skillPreferences.shaDuelResponse = 'ask';
+        // 审计二轮 PR-8: 贯石斧自选两张成本 + 火攻展示牌自选 (引擎默认 auto
+        // 保持测试/AI 行为不变, UI 对局显式开启 ask).
+        game.player.skillPreferences.guanshi = 'ask';
+        game.player.skillPreferences.huogongShow = 'ask';
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = false;
         _toggleCornerButtons(true);   // v9 PR-E19: 游戏内才显示菜单/分享角落按钮
@@ -1862,7 +1937,10 @@
         { panelId: 'fankuiPromptPanel',     confirmBtnId: null,                     cancelBtnId: null },
         { panelId: 'wuguPickPanel',         confirmBtnId: null,                     cancelBtnId: null },
         { panelId: 'guohePickPanel',        confirmBtnId: null,                     cancelBtnId: null },
-        { panelId: 'cixiongChoosePanel',    confirmBtnId: null,                     cancelBtnId: 'cixiongChooseDrawBtn' }
+        { panelId: 'cixiongChoosePanel',    confirmBtnId: null,                     cancelBtnId: 'cixiongChooseDrawBtn' },
+        // 审计二轮 PR-8: 贯石斧 (可弃可不发动) + 火攻展示 (必选, stage 提交)
+        { panelId: 'guanshiDiscardPanel',   confirmBtnId: 'guanshiConfirmBtn',      cancelBtnId: 'guanshiDeclineBtn' },
+        { panelId: 'huogongShowPanel',      confirmBtnId: null,                     cancelBtnId: null }
       ];
 
       function _firstVisibleDispatch() {
@@ -2203,6 +2281,40 @@
         if (els.qilinDeclineBtn) els.qilinDeclineBtn.addEventListener('click', function () {
           var result = Engine.resolvePendingChoice(game, { decline: true });
           if (!result.ok) renderLog();
+          render();
+        });
+        // 审计二轮 PR-8: 贯石斧 自选两张面板 — 点击切换选中, 凑满 2 张后确认
+        if (els.guanshiDiscardChoices) els.guanshiDiscardChoices.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-guanshi-card-id]');
+          if (!btn) return;
+          var id = btn.getAttribute('data-guanshi-card-id');
+          var idx = guanshiDiscardSelection.indexOf(id);
+          if (idx >= 0) guanshiDiscardSelection.splice(idx, 1);
+          else if (guanshiDiscardSelection.length < 2) guanshiDiscardSelection.push(id);
+          render();
+        });
+        if (els.guanshiConfirmBtn) els.guanshiConfirmBtn.addEventListener('click', function () {
+          var result = Engine.resolvePendingChoice(game, { cardIds: guanshiDiscardSelection.slice() });
+          guanshiDiscardSelection = [];
+          if (!result.ok) renderLog();
+          render();
+        });
+        if (els.guanshiDeclineBtn) els.guanshiDeclineBtn.addEventListener('click', function () {
+          guanshiDiscardSelection = [];
+          var result = Engine.resolvePendingChoice(game, { decline: true });
+          if (!result.ok) renderLog();
+          render();
+        });
+        // 审计二轮 PR-8: 火攻 展示牌面板 — stage 后经 hand-confirm 提交
+        if (els.huogongShowChoices) els.huogongShowChoices.addEventListener('click', function (event) {
+          var btn = event.target.closest('[data-huogong-show-card-id]');
+          if (!btn) return;
+          var cardId = btn.getAttribute('data-huogong-show-card-id');
+          stagedModalChoice = {
+            kind: 'pending',
+            payload: { cardId: cardId },
+            selector: '[data-huogong-show-card-id="' + cardId + '"]'
+          };
           render();
         });
         // v8 PR-A3: 雌雄 fire 面板
