@@ -170,7 +170,7 @@ test('曹操【奸雄】 gains the card that caused damage', () => {
   assert.ok(ids(game.enemy.hand).includes('jianxiong-sha'), 'Cao Cao should gain the damaging Sha');
 });
 
-test('曹操【奸雄】 only claims physical damaging cards from the damage-after flow', () => {
+test('曹操【奸雄】 claims trick damaging cards too (L2: 火攻牌从弃牌堆取回)', () => {
   const noSkill = skillGame('sunquan', 'lvmeng');
   noSkill.player.hand = [c('sha', { id: 'non-jianxiong-sha' })];
 
@@ -181,19 +181,22 @@ test('曹操【奸雄】 only claims physical damaging cards from the damage-aft
   assert.deepEqual(ids(noSkill.enemy.hand), [], 'non-Jianxiong targets should not gain the damaging card');
   assert.ok(ids(noSkill.discard).includes('non-jianxiong-sha'), 'non-Jianxiong damaging cards should still be discarded');
 
-  const noPhysicalSource = skillGame('sunquan', 'caocao');
-  noPhysicalSource.player.hand = [
+  // L2 (审计二轮): 官方 — 奸雄获得"造成伤害的牌", 火攻/决斗/南蛮/万箭的实体
+  // 锦囊牌同样符合 (此前这些 damage 调用传 null, 奸雄只对杀类生效)。
+  const trickSource = skillGame('sunquan', 'caocao');
+  trickSource.player.hand = [
     c('huogong', { id: 'jianxiong-huogong', suit: 'heart', color: 'red' }),
     c('shan', { id: 'huogong-cost', suit: 'spade', color: 'black' })
   ];
-  noPhysicalSource.enemy.hand = [c('sha', { id: 'revealed-spade', suit: 'spade', color: 'black' })];
+  trickSource.enemy.hand = [c('sha', { id: 'revealed-spade', suit: 'spade', color: 'black' })];
 
-  const noPhysicalResult = Engine.playCard(noPhysicalSource, 'player', 'jianxiong-huogong', { huogongCostCardId: 'huogong-cost' });
+  const trickResult = Engine.playCard(trickSource, 'player', 'jianxiong-huogong', { huogongCostCardId: 'huogong-cost' });
 
-  assert.equal(noPhysicalResult.ok, true, noPhysicalResult.message);
-  assert.equal(noPhysicalSource.enemy.hp, noPhysicalSource.enemy.maxHp - 1);
-  assert.deepEqual(ids(noPhysicalSource.enemy.hand), ['revealed-spade'], 'Jianxiong should not gain cards when the damage event has no physical source card');
-  assert.ok(ids(noPhysicalSource.discard).includes('jianxiong-huogong'), 'the Huogong card itself should remain discarded');
+  assert.equal(trickResult.ok, true, trickResult.message);
+  assert.equal(trickSource.enemy.hp, trickSource.enemy.maxHp - 1);
+  assert.ok(ids(trickSource.enemy.hand).includes('jianxiong-huogong'), 'L2: 奸雄获得造成伤害的火攻牌');
+  assert.ok(!ids(trickSource.discard).includes('jianxiong-huogong'), '被奸雄获得的火攻牌已离开弃牌堆 (不重复)');
+  assert.ok(ids(trickSource.discard).includes('huogong-cost'), '火攻成本牌正常进弃牌堆');
 });
 
 test('司马懿【反馈】 gains a remaining hand card from the damage source', () => {

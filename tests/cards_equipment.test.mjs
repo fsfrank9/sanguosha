@@ -136,7 +136,8 @@ test('core trick cards resolve: Taoyuan, Wugu, Huogong, Tiesuo and Jiedao', () =
   ];
   game.enemy.hand = [c('shan', { id: 'revealed-heart', suit: 'heart', color: 'red' })];
   game.enemy.equipment.weapon = c('zhuge', { id: 'borrowed-zhuge' });
-  game.deck = [c('tao', { id: 'wugu-enemy' }), c('tao', { id: 'wugu-player' })];
+  // L1: 火攻展示牌改为目标随机选择 — 让 enemy 两张手牌同为红桃, 展示花色确定
+  game.deck = [c('tao', { id: 'wugu-enemy', suit: 'heart', color: 'red' }), c('tao', { id: 'wugu-player', suit: 'heart', color: 'red' })];
 
   assert.equal(Engine.playCard(game, 'player', 'taoyuan').ok, true);
   assert.equal(game.player.hp, 3);

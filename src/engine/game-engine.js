@@ -508,6 +508,10 @@
         if (!physicalSourceCard) return null;
         // M5: 被朱雀临时转化的【杀】进入奸雄手牌前还原物理身份, 与 discardCard 一致。
         restoreZhuqueIdentity(sourceCard);
+        // L2: 决斗/南蛮/万箭/火攻 在使用时已进弃牌堆 — 奸雄获得时从弃牌堆取回,
+        // 保持牌守恒 (杀类牌仍在结算中, 不在弃牌堆, indexOf 命中不了)。
+        var discardIdx = game.discard.indexOf(physicalSourceCard);
+        if (discardIdx !== -1) game.discard.splice(discardIdx, 1);
         target.hand.push(physicalSourceCard);
         log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + physicalSourceCard.name + '】。');
         return { claimedSourceCard: true };
@@ -2000,6 +2004,15 @@
         return finishPendingChoiceResolution(game, resolver(game, pending, decision || {}));
       }
 
+      // L2: 决斗/南蛮/万箭/火攻 等锦囊在使用时已进入弃牌堆, 伤害结算收尾时
+      // 不可重复弃置 (否则弃牌堆出现双份); 仍在结算中的牌 (如【杀】) 正常弃置。
+      function discardSourceCardIfPending(game, card) {
+        if (!card) return;
+        var physical = physicalCardOf(card);
+        if (physical && game.discard.indexOf(physical) !== -1) return;
+        discardCard(game, card);
+      }
+
       function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts) {
         if (game.phase === 'gameover') return false;
         var target = game[targetActor];
@@ -2031,7 +2044,7 @@
             log(game, actorName(game, targetActor) + '的【藤甲】令火焰伤害 +1。');
           } else if ((sourceCard && sourceCard.type === 'sha') || /南蛮入侵|万箭齐发/.test(reason || '')) {
             log(game, actorName(game, targetActor) + '的【藤甲】防止了这次伤害。');
-            if (sourceCard) discardCard(game, sourceCard);
+            if (sourceCard) discardSourceCardIfPending(game, sourceCard);
             return false;
           }
         }
@@ -2061,13 +2074,13 @@
         if (amount > 0 && sourceActor && sourceCard && isShaCard(sourceCard)) {
           var hbResult = applyHanbingPrevent(game, sourceActor, targetActor);
           if (hbResult && hbResult.prevented) {
-            if (sourceCard) discardCard(game, sourceCard);
+            if (sourceCard) discardSourceCardIfPending(game, sourceCard);
             return false;
           }
         }
 
         if (amount <= 0) {
-          if (sourceCard) discardCard(game, sourceCard);
+          if (sourceCard) discardSourceCardIfPending(game, sourceCard);
           return false;
         }
         // C1: 体力值可降至负数 (gltjk flow__neardeath.md — 1 体力的法正受
@@ -2132,7 +2145,7 @@
           }
         }
         if (damageContext.sourceCard && !sourceCardClaimed) {
-          discardCard(game, damageContext.sourceCard);
+          discardSourceCardIfPending(game, damageContext.sourceCard);
         }
         // H4: 该角色的伤害结算 (含嵌套濒死 — deferred 路径在 flush 时才到这)
         // 完毕后, 向其他横置角色传导属性伤害。
@@ -3469,6 +3482,94 @@
         return dodged;
       }
 
+      // M7 (审计二轮): 贯石斧 — spec "你可以弃置两张牌, 令此【杀】依然生效":
+      //   (a) "可以" → skillPreferences.guanshi 提供 decline / ask 开关
+      //       (此前无条件强制发动, 可能弃掉玩家的桃/无懈);
+      //   (b) "两张牌" 含装备区牌 (此前只取手牌最旧两张);
+      //   (c) ask 档 (默认 auto, 避免 UI 无对应面板时卡死) 经 pendingChoice
+      //       'guanshi-discard' 让玩家自选两张或放弃。
+      // 返回 result 表示贯石流程接管 (强制命中或暂停); null 表示不发动,
+      // 回到正常闪避收尾。
+      function applyGuanshiForcedHit(game, actor, targetActor, card, amount) {
+        var self = game[actor];
+        var handIds = (self.hand || []).map(function (c) { return c.id; });
+        var equipEntries = equipmentList(self);
+        if (handIds.length + equipEntries.length < 2) return null;
+        var pref = (self.skillPreferences && self.skillPreferences.guanshi) || 'auto';
+        if (pref === 'decline') {
+          log(game, actorName(game, actor) + '选择不发动【贯石斧】。');
+          return null;
+        }
+        if (pref === 'ask') {
+          if (!game.pauseState) game.pauseState = {};
+          game.pauseState.guanshi = { actor: actor, targetActor: targetActor, card: card, amount: amount };
+          setPendingChoice(game, {
+            kind: 'guanshi-discard',
+            actor: actor,
+            handIds: handIds,
+            equipment: equipEntries.map(function (e) {
+              return { slot: e.slot, cardId: e.card.id, name: e.card.name };
+            })
+          });
+          return success('等待' + actorName(game, actor) + '决定是否发动【贯石斧】。');
+        }
+        // auto: 弃 AI 评分最低的两张手牌; 手牌不足两张时用装备补足
+        // (坐骑 > 防具 > 武器, 尽量保留战力)。
+        var scoredHand = (self.hand || []).slice()
+          .map(function (c) { return { card: c, score: scoreCardForAI(game, actor, c) }; })
+          .sort(function (a, b) { return a.score - b.score; });
+        var costIds = scoredHand.slice(0, 2).map(function (e) { return e.card.id; });
+        if (costIds.length < 2) {
+          var slotOrder = { horsePlus: 1, horseMinus: 2, armor: 3, weapon: 4 };
+          var sortedEquips = equipEntries.slice().sort(function (a, b) {
+            return (slotOrder[a.slot] || 9) - (slotOrder[b.slot] || 9);
+          });
+          for (var si = 0; si < sortedEquips.length && costIds.length < 2; si += 1) {
+            costIds.push(sortedEquips[si].card.id);
+          }
+        }
+        return executeGuanshiForcedHit(game, actor, targetActor, card, amount, costIds);
+      }
+
+      function executeGuanshiForcedHit(game, actor, targetActor, card, amount, costIds) {
+        var self = game[actor];
+        var discardedNames = [];
+        for (var i = 0; i < costIds.length; i += 1) {
+          var costCard = removeOwnCardFromAnyZone(self, costIds[i], game);
+          if (costCard) {
+            discardCard(game, costCard);
+            discardedNames.push(costCard.name);
+          }
+        }
+        log(game, actorName(game, actor) + '发动【贯石斧】，弃置【' + discardedNames.join('】、【') + '】令【杀】强制命中。');
+        if (damage(game, targetActor, amount, actor, '【' + card.name + '】', card)) applyWeaponHitEffects(game, actor, targetActor);
+        return success('贯石斧强制命中。');
+      }
+
+      function resolveGuanshiDiscardChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.guanshi;
+        if (!saved) return fail('找不到【贯石斧】的暂停状态。');
+        var actor = pending.actor;
+        if (decision && decision.decline) {
+          game.pauseState.guanshi = null;
+          log(game, actorName(game, actor) + '选择不发动【贯石斧】。');
+          log(game, actorName(game, saved.targetActor) + '闪避成功，没有受到伤害。');
+          discardCard(game, saved.card);
+          return success('目标闪避。');
+        }
+        var ids = (decision && decision.cardIds) || [];
+        var allowed = pending.handIds.concat(pending.equipment.map(function (e) { return e.cardId; }));
+        var unique = ids.filter(function (id, idx) { return ids.indexOf(id) === idx && allowed.indexOf(id) >= 0; });
+        if (unique.length !== 2) {
+          setPendingChoice(game, pending);
+          return fail('请选择两张要弃置的牌（手牌或装备），或 decline 放弃。');
+        }
+        game.pauseState.guanshi = null;
+        return executeGuanshiForcedHit(game, actor, saved.targetActor, saved.card, saved.amount, unique);
+      }
+
+      registerResponseKind('guanshi-discard', resolveGuanshiDiscardChoice);
+
       // v9 PR-E25: 【杀】响应窗口结束后的结算 (贯石/青龙/伤害). 从原
       // continueShaAfterCixiong 拆出, 供同步路径 + shan-response 暂停恢复共用.
       function resolveShaAfterResponse(game, actor, card, amount, dodged) {
@@ -3478,14 +3579,9 @@
         var weapon = self.equipment && self.equipment.weapon;
 
         if (dodged) {
-          if (weapon && weapon.type === 'guanshi' && self.hand.length >= 2) {
-            var costA = self.hand.shift();
-            var costB = self.hand.shift();
-            discardCard(game, costA);
-            discardCard(game, costB);
-            log(game, actorName(game, actor) + '发动【贯石斧】，弃置两张牌令【杀】强制命中。');
-            if (damage(game, targetActor, amount, actor, '【' + card.name + '】', card)) applyWeaponHitEffects(game, actor, targetActor);
-            return success('贯石斧强制命中。');
+          if (weapon && weapon.type === 'guanshi') {
+            var guanshiResult = applyGuanshiForcedHit(game, actor, targetActor, card, amount);
+            if (guanshiResult) return guanshiResult;
           }
           if (weapon && weapon.type === 'qinglong') {
             var follow = removeFirstCardOfType(self, 'sha');
@@ -3548,7 +3644,9 @@
         game.pauseState.duelChain = {
           starterActor: actor,
           currentResponder: opponent(actor),
-          reason: '【决斗】'
+          reason: '【决斗】',
+          // L2: 保留决斗牌引用 — 奸雄可获得"造成伤害的牌" (决斗/南蛮/万箭/火攻)
+          card: card
         };
         return advanceDuelChain(game);
       }
@@ -3591,7 +3689,7 @@
         // 无杀 → 受 1 伤, 链结束
         var loser = responder;
         game.pauseState.duelChain = null;
-        damage(game, loser, 1, opponent(loser), chain.reason);
+        damage(game, loser, 1, opponent(loser), chain.reason, chain.card);
         return success('决斗结算完成。');
       }
 
@@ -3607,7 +3705,7 @@
             log(game, actorName(game, 'player') + '没有可打出的【杀】。');
             var ploser = 'player';
             game.pauseState.duelChain = null;
-            damage(game, ploser, 1, opponent(ploser), chain.reason);
+            damage(game, ploser, 1, opponent(ploser), chain.reason, chain.card);
             return success('决斗结算完成。');
           }
           chain.currentResponder = opponent('player');
@@ -3616,7 +3714,7 @@
         // 玩家放弃出杀 → 受 1 伤
         log(game, actorName(game, 'player') + '选择不打出【杀】响应' + chain.reason + '。');
         game.pauseState.duelChain = null;
-        damage(game, 'player', 1, opponent('player'), chain.reason);
+        damage(game, 'player', 1, opponent('player'), chain.reason, chain.card);
         return success('决斗结算完成。');
       }
 
@@ -3636,7 +3734,7 @@
               kind: 'wanjian-response',
               actor: 'player',
               pauseKey: 'wanjianResponse',
-              source: { sourceActor: actor, title: title },
+              source: { sourceActor: actor, title: title, card: card },
               options: listShanResponseOptions(aoeTarget),
               meta: { sourceActor: actor, sourceName: title },
               logMessage: '等待' + actorName(game, 'player') + '决定是否打出【闪】响应【' + title + '】。',
@@ -3651,7 +3749,8 @@
           //      (【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦)
           log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
         } else {
-          damage(game, targetActor, 1, actor, '【' + title + '】');
+          // L2: 传 card — 奸雄可获得造成伤害的南蛮/万箭实体牌
+          damage(game, targetActor, 1, actor, '【' + title + '】', card);
         }
         return success(title + '结算完成。');
       }
@@ -3681,12 +3780,34 @@
         if (dodged) {
           log(game, actorName(game, 'player') + '成功化解【' + title + '】。');
         } else {
-          damage(game, 'player', 1, sourceActor, '【' + title + '】');
+          damage(game, 'player', 1, sourceActor, '【' + title + '】', saved.card);
         }
         return success(title + '响应完成。');
       }
 
       registerResponseKind('wanjian-response', resolveWanjianResponseChoice);
+
+      // L1 (审计二轮): 火攻 "目标展示一张手牌" 是目标的选择, 此前恒取
+      // hand[0] (确定性泄露 + 目标无选择权)。现在: AI / 'auto' (默认) 目标用
+      // 游戏 RNG 随机挑一张并缓存 (pauseState.huogongReveal), 同一次结算内
+      // getHuogongChoice 预览 / playCard 校验 / 结算三处一致; 玩家目标可设
+      // skillPreferences.huogongShow='ask' 经 pendingChoice 'huogong-show'
+      // 自选 (默认 auto, 避免 UI 无对应面板时卡死)。
+      function peekHuogongReveal(game, targetActor) {
+        var targetState = game[targetActor];
+        if (!targetState || !targetState.hand || !targetState.hand.length) return null;
+        if (!game.pauseState) game.pauseState = {};
+        var cached = game.pauseState.huogongReveal;
+        if (cached && cached.targetActor === targetActor) {
+          var cachedCard = targetState.hand.find(function (c) { return c.id === cached.cardId; });
+          if (cachedCard) return cachedCard;
+        }
+        var pref = (targetState.skillPreferences && targetState.skillPreferences.huogongShow) || 'auto';
+        if (targetActor === 'player' && pref === 'ask') return null;
+        var picked = targetState.hand[randomHandIndex(game, targetState)];
+        game.pauseState.huogongReveal = { targetActor: targetActor, cardId: picked.id };
+        return picked;
+      }
 
       function getHuogongChoice(game, actor) {
         var self = game && game[actor];
@@ -3694,7 +3815,10 @@
         if (!self || !target || !target.hand || !target.hand.length) {
           return { ok: false, revealedCard: null, usableCostIds: [], unusableCostIds: [], usableCards: [], unusableCards: [], message: '目标没有手牌。' };
         }
-        var revealed = target.hand[0];
+        var revealed = peekHuogongReveal(game, opponent(actor));
+        if (!revealed) {
+          return { ok: false, pendingTargetChoice: true, revealedCard: null, usableCostIds: [], unusableCostIds: [], usableCards: [], unusableCards: [], message: '等待目标选择展示牌。' };
+        }
         var usableCards = [];
         var unusableCards = [];
         self.hand.forEach(function (card) {
@@ -3862,18 +3986,25 @@
           //   "作用效果：目标角色获得这些牌中（剩余）的一张牌。"
           //   "若你未将执行动作完整执行完毕，终止此牌的使用结算。"
           //   "使用结算结束后，将这些牌中剩余的牌置入弃牌堆。"
-          discardCard(game, card);
           var wuguTargetCount = StateRuntime.aliveActorCount(game);
-          // 多次重洗以尽可能凑齐 X 张
-          for (var rs = 0; rs < 3 && game.deck.length < wuguTargetCount; rs++) {
+          // M4 (审计二轮): 逐张亮出, 每张前按需洗牌 (与 drawCards 同构)。此前
+          // reshuffleIfNeeded 只在 deck===0 时触发, deck=1 + discard=130 时
+          // 循环空转, 错误地以"牌堆不足"终止结算。五谷自身在亮牌后才进弃牌堆
+          // (结算中的牌不可被洗回亮出)。
+          var wuguPool = [];
+          for (var wi = 0; wi < wuguTargetCount; wi++) {
             reshuffleIfNeeded(game);
+            if (game.deck.length === 0) break;
+            wuguPool.push(game.deck.pop());
           }
-          if (game.deck.length < wuguTargetCount) {
+          discardCard(game, card);
+          if (wuguPool.length < wuguTargetCount) {
+            // 牌堆 + 弃牌堆合计不足 X 张 → 官方: 执行动作未完整执行, 终止结算,
+            // 已亮出的牌置入弃牌堆 (保持牌守恒)。
+            wuguPool.forEach(function (revealedCard) { discardCard(game, revealedCard); });
             log(game, '【五谷丰登】牌堆不足以亮出 ' + wuguTargetCount + ' 张牌，结算终止。');
             return finishTrickUse(game, actor, card, success('五谷丰登终止（牌堆不足）。'), options);
           }
-          var wuguPool = [];
-          for (var wi = 0; wi < wuguTargetCount; wi++) wuguPool.push(game.deck.pop());
           log(game, actorName(game, actor) + '使用【五谷丰登】，亮出 ' + wuguPool.map(function (c) { return '【' + c.name + '】'; }).join(' / ') + '。');
           // 多角色结算顺序原则：从当前回合角色起按逆时针 → 1v1 即 [actor, opponent(actor)]
           return finishTrickUse(game, actor, card, processWuguPick(game, actor, card, wuguPool, [actor, opponent(actor)], 0, options), options);
@@ -3958,13 +4089,28 @@
         if (wuxied) {
           return finishTrickUse(game, ctx.actor, ctx.card, success('火攻被无懈可击。'), ctx.options);
         }
-        var self = game[ctx.actor];
         var fireTarget = game[opponent(ctx.actor)];
-        var opt = ctx.options || {};
         if (!fireTarget.hand.length) {
-          return finishTrickUse(game, ctx.actor, ctx.card, success('目标没有手牌，火攻未造成伤害。'), opt);
+          return finishTrickUse(game, ctx.actor, ctx.card, success('目标没有手牌，火攻未造成伤害。'), ctx.options || {});
         }
-        var revealed = fireTarget.hand[0];
+        // L1: 目标选展示牌 — AI/auto 随机 (缓存保证与预览一致); 玩家 ask → 暂停。
+        var revealed = peekHuogongReveal(game, opponent(ctx.actor));
+        if (!revealed) {
+          game.pauseState.huogong = ctx;
+          setPendingChoice(game, {
+            kind: 'huogong-show',
+            actor: opponent(ctx.actor),
+            cardIds: fireTarget.hand.map(function (c) { return c.id; })
+          });
+          return success('等待目标选择【火攻】展示牌。');
+        }
+        return runHuogongResolution(game, ctx, revealed);
+      });
+
+      function runHuogongResolution(game, ctx, revealed) {
+        var self = game[ctx.actor];
+        var opt = ctx.options || {};
+        game.pauseState.huogongReveal = null; // 本次结算已消费缓存
         log(game, actorName(game, opponent(ctx.actor)) + '展示【' + revealed.name + '】（' + revealed.suit + '）。');
         if (opt.declineHuogong) {
           log(game, actorName(game, ctx.actor) + '选择不弃置同花色牌，【火攻】未造成伤害。');
@@ -3980,9 +4126,27 @@
         }
         discardCard(game, cost);
         log(game, actorName(game, ctx.actor) + '弃置同花色【' + cost.name + '】发动【火攻】。');
-        damage(game, opponent(ctx.actor), 1, ctx.actor, '【火攻】', null, 'fire');
+        damage(game, opponent(ctx.actor), 1, ctx.actor, '【火攻】', ctx.card, 'fire');
         return finishTrickUse(game, ctx.actor, ctx.card, success('火攻结算完成。'), opt);
-      });
+      }
+
+      // L1: 玩家目标 (huogongShow='ask') 自选展示牌的 resolver。
+      function resolveHuogongShowChoice(game, pending, decision) {
+        var ctx = game.pauseState && game.pauseState.huogong;
+        if (!ctx) return fail('找不到【火攻】的暂停状态。');
+        var targetState = game[pending.actor];
+        var cardId = decision && decision.cardId;
+        var chosen = targetState && targetState.hand.find(function (c) { return c.id === cardId; });
+        if (!chosen) {
+          setPendingChoice(game, pending);
+          return fail('请选择一张手牌展示。');
+        }
+        game.pauseState.huogong = null;
+        game.pauseState.huogongReveal = { targetActor: pending.actor, cardId: cardId };
+        return runHuogongResolution(game, ctx, chosen);
+      }
+
+      registerResponseKind('huogong-show', resolveHuogongShowChoice);
 
       registerWuxieContinuation('jiedao', function (game, ctx, wuxied) {
         if (wuxied) {
@@ -4344,16 +4508,24 @@
         cardIds = cardIds || [];
         var excess = Math.max(0, state.hand.length - handLimit(game, actor));
         if (excess === 0) return success('无需弃牌。');
-        if (cardIds.length < excess) return fail('需要弃置 ' + excess + ' 张牌。');
+        // L4 (审计二轮): 先完整校验再变更状态 — 此前传入重复/无效 cardId 时
+        // 先弃掉能弃的再返回 fail, 状态已被部分修改 (非事务性)。
+        var unique = [];
+        cardIds.forEach(function (id) {
+          if (unique.indexOf(id) < 0) unique.push(id);
+        });
+        var valid = unique.filter(function (id) {
+          return state.hand.some(function (card) { return card.id === id; });
+        });
+        if (valid.length < excess) return fail('需要弃置 ' + excess + ' 张有效手牌。');
         var discarded = [];
-        for (var i = 0; i < cardIds.length && discarded.length < excess; i += 1) {
-          var card = removeCardFromHand(state, cardIds[i]);
+        for (var i = 0; i < valid.length && discarded.length < excess; i += 1) {
+          var card = removeCardFromHand(state, valid[i]);
           if (card) {
             discarded.push(card);
             discardCard(game, card);
           }
         }
-        if (state.hand.length > handLimit(game, actor)) return fail('弃牌数量不足。');
         log(game, actorName(game, actor) + '弃置 ' + discarded.length + ' 张牌，满足手牌上限。');
         return success('弃牌完成。');
       }
@@ -4556,11 +4728,12 @@
         removeOwnCardFromAnyZone(self, cardId, game);
         log(game, actorName(game, actor) + playable.message);
         if (asType === 'lebusishu') {
-          // v8 PR-C1: 国色 把方片当乐 — 直接放对手判定区, 复用 delayed-trick 流程
+          // v8 PR-C1: 国色 把方片当乐。L3 (审计二轮): 与普通乐不思蜀一致走
+          // delayed-place 无懈链 — 此前直接 push 判定区, 转化版乐无法被无懈。
           var virtualLebu = virtualLebusishuFromCard(original);
-          game[opponent(actor)].judgeArea.push(virtualLebu);
-          log(game, actorName(game, actor) + '将【乐不思蜀】置入' + actorName(game, opponent(actor)) + '的判定区。');
-          return success('国色 乐不思蜀 置入完成。');
+          return checkWuxieAndContinue(game, opponent(actor), '【乐不思蜀】', 'delayed-place', {
+            actor: actor, card: virtualLebu, options: {}, delayedSide: opponent(actor)
+          });
         }
         return playSha(game, actor, virtualShaFromCard(original));
       }
@@ -5005,7 +5178,14 @@
           if (card.type === 'tiesuo') cardOptions = { mode: 'chain', targets: [opponent(actor)] };
           if (card.type === 'huogong') {
             var fireChoice = getHuogongChoice(game, actor);
-            cardOptions = fireChoice.ok && fireChoice.usableCostIds.length ? { huogongCostCardId: fireChoice.usableCostIds[0] } : { declineHuogong: true };
+            if (fireChoice.ok && fireChoice.usableCostIds.length) {
+              cardOptions = { huogongCostCardId: fireChoice.usableCostIds[0] };
+            } else if (fireChoice.pendingTargetChoice) {
+              // L1: 目标 (玩家, ask) 展示牌未定 — 展示后引擎自动弃同花色
+              cardOptions = {};
+            } else {
+              cardOptions = { declineHuogong: true };
+            }
           }
           cardResult = playCard(game, actor, card.id, cardOptions);
         }
