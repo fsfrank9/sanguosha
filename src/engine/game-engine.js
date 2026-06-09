@@ -564,12 +564,12 @@
           return null;  // nothing to gain
         }
         if (pref === 'ask') {
-          game.pendingChoice = {
+          setPendingChoice(game, {
             kind: 'fankui-pick',
             actor: targetActor,
             sourceActor: sourceActor,
             zones: zones
-          };
+          });
           return { suspendedForFankui: true };
         }
         // Auto path: legacy default zone (hand if any → equipment → judge).
@@ -587,7 +587,7 @@
         if (!holderState) return fail('未知角色。');
         var zone = decision && decision.zone;
         if (['hand', 'equipment', 'judge'].indexOf(zone) < 0) {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('请选择有效的区域（hand / equipment / judge）。');
         }
         // For hand zone we deliberately ignore decision.cardId — engine
@@ -596,7 +596,7 @@
         // and judge zones use the specific cardId the player clicked.
         var gained = removeTargetZoneCard(game, sourceActor, zone, zone === 'hand' ? null : decision.cardId);
         if (!gained || !gained.card) {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('找不到目标牌，请重新选择。');
         }
         holderState.hand.push(gained.card);
@@ -664,14 +664,14 @@
           var c = target.hand.find(function (item) { return item.id === id; });
           return c ? { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank } : null;
         }).filter(Boolean);
-        game.pendingChoice = {
+        setPendingChoice(game, {
           kind: 'yiji-distribute',
           actor: targetActor,
           drawnIds: drawnIds,
           cards: cards,
           currentPoint: currentPoint,
           totalPoints: saved.totalPoints
-        };
+        });
         return { suspendedForYiji: true };
       }
 
@@ -715,12 +715,12 @@
           return { declinedGanglie: true };
         }
         if (pref === 'ask') {
-          game.pendingChoice = {
+          setPendingChoice(game, {
             kind: 'ganglie-fire',
             actor: targetActor,
             sourceActor: sourceActor,
             sourceName: actorName(game, sourceActor)
-          };
+          });
           return { suspendedForGanglieFire: true };
         }
         return runGanglieJudgement(game, targetActor, sourceActor);
@@ -753,12 +753,12 @@
         var sourcePref = (source.skillPreferences && source.skillPreferences.ganglieSource)
           || (sourceActor === 'player' ? 'ask' : 'auto');
         if (sourcePref === 'ask') {
-          game.pendingChoice = {
+          setPendingChoice(game, {
             kind: 'ganglie-source-choice',
             actor: sourceActor,
             targetActor: targetActor,
             candidates: candidates
-          };
+          });
           return { suspendedForGanglieSource: true };
         }
         return runGanglieSourceAutoChoice(game, targetActor, sourceActor);
@@ -858,7 +858,7 @@
         if (decision.mode === 'discard') {
           var cardIds = Array.isArray(decision.cardIds) ? decision.cardIds : [];
           if (cardIds.length !== 2) {
-            game.pendingChoice = pending;
+            setPendingChoice(game, pending);
             return fail('请选择两张牌弃置（或选择受 1 点伤害）。');
           }
           // Validate each id is in pending.candidates (i.e. source's
@@ -866,24 +866,24 @@
           var validIds = pending.candidates.map(function (e) { return e.id; });
           for (var i = 0; i < cardIds.length; i += 1) {
             if (validIds.indexOf(cardIds[i]) < 0) {
-              game.pendingChoice = pending;
+              setPendingChoice(game, pending);
               return fail('选择的牌不在可弃置列表中。');
             }
           }
           if (cardIds[0] === cardIds[1]) {
-            game.pendingChoice = pending;
+            setPendingChoice(game, pending);
             return fail('需要两张不同的牌。');
           }
           var disc = applyGanglieDiscardCards(game, sourceActor, cardIds);
           if (disc.length !== 2) {
             // Shouldn't happen because we validated, but guard anyway.
-            game.pendingChoice = pending;
+            setPendingChoice(game, pending);
             return fail('弃置失败，请重新选择。');
           }
           log(game, actorName(game, sourceActor) + '因【刚烈】弃置两张牌：' + disc.map(function (c) { return '【' + c.name + '】'; }).join('、') + '。');
           return success('刚烈完成（弃 2 牌）。');
         }
-        game.pendingChoice = pending;
+        setPendingChoice(game, pending);
         return fail('请选择：弃两张牌 或 受 1 点伤害。');
       }
 
@@ -944,7 +944,7 @@
           // Set pendingChoice; processJudgeArea will detect this and snapshot
           // its iteration state. resolveGuicaiReplaceChoice takes the
           // replacement from holder.hand and resumes from the saved trick.
-          game.pendingChoice = {
+          setPendingChoice(game, {
             kind: 'guicai-replace',
             actor: holder,
             judgementActor: judgementActor,
@@ -957,7 +957,7 @@
             candidates: holderState.hand.map(function (c) {
               return { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank };
             })
-          };
+          });
           return { suspendedForGuicai: true };
         }
         // Auto path (pref === 'auto', AI default, or non-pausable judgement):
@@ -1228,13 +1228,13 @@
         if (targetActor === 'player') {
           // Set pendingChoice; the player UI shows the card NAME but not
           // suit, then 4 suit buttons.
-          game.pendingChoice = {
+          setPendingChoice(game, {
             kind: 'fanjian-guess',
             actor: targetActor,
             sourceActor: actor,
             cardId: fanjianCard.id,
             cardName: fanjianCard.name
-          };
+          });
           return { suspendedForFanjian: true };
         }
         // AI target: blind random guess from {spade, heart, club, diamond}.
@@ -1270,7 +1270,7 @@
         var guess = decision && decision.suit;
         if (['spade', 'heart', 'club', 'diamond'].indexOf(guess) < 0) {
           // Restore pending so UI can keep prompting on invalid input.
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('请选择有效的花色（spade/heart/club/diamond）。');
         }
         return applyFanjianGuess(game, sourceActor, targetActor, fanjianCard, guess);
@@ -1425,12 +1425,12 @@
         }
         // slots.length === 2
         if (pref === 'ask') {
-          game.pendingChoice = {
+          setPendingChoice(game, {
             kind: 'qilin-pick',
             actor: sourceActor,
             target: targetActor,
             horseSlots: slots.slice()
-          };
+          });
           return;
         }
         // 'auto': default heuristic — kill +1 马 first（多数情况对目标更具威胁）。
@@ -1450,12 +1450,12 @@
         }
         var slot = decision && decision.slot;
         if (['horseMinus', 'horsePlus'].indexOf(slot) < 0) {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('请选择要弃置的坐骑（horseMinus / horsePlus）。');
         }
         if (pending.horseSlots.indexOf(slot) < 0
           || !targetState.equipment || !targetState.equipment[slot]) {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('该坐骑已不在装备区。');
         }
         loseEquipment(game, targetActor, slot);
@@ -1550,11 +1550,11 @@
           return null;
         }
         if (sourcePref === 'ask') {
-          game.pendingChoice = {
+          setPendingChoice(game, {
             kind: 'cixiong-fire',
             actor: sourceActor,
             target: targetActor
-          };
+          });
           return { paused: true };
         }
         // 'auto' → fire immediately, proceed to target's choice.
@@ -1588,12 +1588,12 @@
           return null;
         }
         // 'ask' → pendingChoice for target.
-        game.pendingChoice = {
+        setPendingChoice(game, {
           kind: 'cixiong-choose',
           actor: targetActor,
           sourceActor: sourceActor,
           handIds: target.hand.map(function (c) { return c.id; })
-        };
+        });
         return { paused: true };
       }
 
@@ -1634,7 +1634,7 @@
             log(game, actorName(game, targetActor) + '弃置【' + dropped.name + '】响应【雌雄双股剑】。');
           }
         } else {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('请选择 discard 或 draw。');
         }
         return resumePlayShaAfterCixiong(game);
@@ -1667,7 +1667,7 @@
           return success('过河拆桥已取消。');
         }
         if (pref === 'ask') {
-          game.pendingChoice = {
+          setPendingChoice(game, {
             kind: 'guohe-1v1-pick',
             actor: sourceActor,
             target: targetActor,
@@ -1677,7 +1677,7 @@
             hand: target.hand.map(function (c) {
               return { cardId: c.id, name: c.name, suit: c.suit, color: c.color, rank: c.rank };
             })
-          };
+          });
           return success('【过河拆桥】等待发动者选择…');
         }
         // v8 PR-D2: 'auto' → 装备优先, 按 slot 影响排 (weapon > armor >
@@ -1714,16 +1714,16 @@
         var zone = decision && decision.zone;
         var cardId = decision && decision.cardId;
         if (zone !== 'equipment' && zone !== 'hand') {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('请选择 equipment 或 hand。');
         }
         if (!cardId) {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('请通过 cardId 指定具体牌。');
         }
         var result = executeGuohe1v1Pick(game, sourceActor, targetActor, zone, cardId);
         if (!result.ok) {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return result;
         }
         return result;
@@ -1753,13 +1753,13 @@
         var picker = pending.actor;
         var cardId = decision && decision.cardId;
         if (!cardId) {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('请从亮出的牌中选择一张（用 cardId 指定）。');
         }
         var pool = saved.pool;
         var poolIdx = pool.findIndex(function (c) { return c.id === cardId; });
         if (poolIdx < 0) {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('该牌不在【五谷丰登】的亮出池中。');
         }
         var picked = pool.splice(poolIdx, 1)[0];
@@ -1807,11 +1807,11 @@
           || (opponentActor === 'player' ? 'ask' : 'auto');
         if (pref === 'comply') pref = 'auto'; // synonym
         if (pref === 'ask') {
-          game.pendingChoice = {
+          setPendingChoice(game, {
             kind: 'jiedao-decision',
             actor: opponentActor,
             sourceActor: sourceActor
-          };
+          });
           return success('【借刀杀人】等待目标决定…');
         }
         // 'auto' → fire sha.
@@ -1909,7 +1909,7 @@
         if (spec.meta) {
           Object.keys(spec.meta).forEach(function (k) { pending[k] = spec.meta[k]; });
         }
-        game.pendingChoice = pending;
+        setPendingChoice(game, pending);
         if (spec.logMessage) log(game, spec.logMessage);
         return success(spec.statusMessage || ('等待' + actorName(game, spec.actor) + '响应。'));
       }
@@ -1922,6 +1922,61 @@
         RESPONSE_KIND_RESOLVERS[kind] = resolver;
       }
 
+      // H3 (审计二轮): pendingChoice 是单槽位, 此前并发触发的选择 (如【杀】致
+      // 濒死的 dying-rescue 紧接着武器特效 qilin-pick) 会互相覆盖, 先到的选择
+      // 连同其 pauseState 永久泄漏 → 软死锁。统一入口: 槽位空 → 设为当前;
+      // 已占用 → 进入 FIFO 队列, 由 dispatcher 在前一个选择解决后依次弹出。
+      function setPendingChoice(game, pending) {
+        if (!game || !pending) return pending;
+        if (game.pendingChoice && game.pendingChoice !== pending) {
+          if (!game.pendingChoiceQueue) game.pendingChoiceQueue = [];
+          game.pendingChoiceQueue.push(pending);
+        } else {
+          game.pendingChoice = pending;
+        }
+        return pending;
+      }
+
+      function shiftPendingChoiceQueue(game) {
+        if (!game || game.pendingChoice) return;
+        var queue = game.pendingChoiceQueue;
+        if (queue && queue.length) game.pendingChoice = queue.shift();
+      }
+
+      // H2 (审计二轮): 判定阶段的延时锦囊结算 (如【闪电】命中) 把角色打入濒死
+      // 并暂停等待救援时, processJudgeArea 会在 applyJudgeAreaOutcome 后挂起
+      // (snapshot 带 outcomeApplied 标记)。该挂起没有专属 resolver (dying-rescue
+      // / yiji-distribute 等各管各的), 统一由 dispatcher 在所有 pendingChoice
+      // 排空后调用本函数续跑判定区剩余结算 + 摸牌/出牌阶段。
+      function resumeSuspendedTurnFlowIfReady(game) {
+        if (!game || game.pendingChoice || game.phase === 'gameover') return null;
+        var savedJudge = game.pauseState && game.pauseState.judgeArea;
+        if (!savedJudge || !savedJudge.outcomeApplied) return null;
+        var actor = savedJudge.actor;
+        var resumeResult = processJudgeArea(game, actor);
+        if (resumeResult && resumeResult.suspended) return success('回合暂停，等待玩家选择。');
+        if (game.phase === 'gameover') return success('游戏结束。');
+        return continueTurnAfterJudgeArea(game, actor);
+      }
+
+      // dispatcher 公共收尾: resolver 返回后弹出队列中的下一个选择; 若全部
+      // 排空且存在被 H2 挂起的回合流程, 续跑之。
+      function finishPendingChoiceResolution(game, result) {
+        shiftPendingChoiceQueue(game);
+        resumeSuspendedTurnFlowIfReady(game);
+        return result;
+      }
+
+      // M6 (审计二轮): 全局挂起冻结守卫 — 任何 pendingChoice 未解决时, 拒绝
+      // 一切推进游戏的公开入口 (出牌/技能/阶段推进/结束回合/弃牌)。此前可在
+      // guohe-1v1-pick 等挂起时 endTurn, 甚至在对方回合 resolvePendingChoice。
+      function pendingChoiceGuard(game) {
+        if (game && game.pendingChoice) {
+          return fail('有待处理的选择（' + game.pendingChoice.kind + '），请先调用 resolvePendingChoice。');
+        }
+        return null;
+      }
+
       // v10 V3: response 专用 dispatcher (public 入口). 与 resolvePendingChoice
       // 区别: 此函数仅处理已注册的 response kind, 未注册 → fail.
       // V3 只迁移 shan-response; V4-V6 会陆续注册 wuxie / sha-duel 等.
@@ -1931,7 +1986,7 @@
         var resolver = RESPONSE_KIND_RESOLVERS[pending.kind];
         if (!resolver) return fail('未注册的响应类型：' + pending.kind);
         game.pendingChoice = null;
-        return resolver(game, pending, decision || {});
+        return finishPendingChoiceResolution(game, resolver(game, pending, decision || {}));
       }
 
       function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature) {
@@ -2142,14 +2197,14 @@
           return { skipped: true };
         }
         if (pref === 'ask') {
-          game.pendingChoice = {
+          setPendingChoice(game, {
             kind: 'dying-rescue',
             actor: responder,
             dyingActor: dyingActor,
             taoIds: taoCards.map(function (c) { return c.id; }),
             jiuIds: jiuCards.map(function (c) { return c.id; }),
             jijiuIds: jijiuCards.map(function (c) { return c.id; })
-          };
+          });
           return { paused: true };
         }
         // 'auto':
@@ -2233,12 +2288,12 @@
         }
         var cardId = decision && decision.cardId;
         if (!cardId) {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('请通过 cardId 指定要使用的【桃】/【酒】。');
         }
         var allowed = (pending.taoIds || []).concat(pending.jiuIds || []).concat(pending.jijiuIds || []);
         if (allowed.indexOf(cardId) < 0) {
-          game.pendingChoice = pending;
+          setPendingChoice(game, pending);
           return fail('该牌不在救援可用列表中。');
         }
         // v8 PR-C3: 三段 kind 判定 — 桃 / 酒 / 急救 (jijiu 红色当桃)
@@ -2747,6 +2802,23 @@
             return { suspended: true };
           }
           applyJudgeAreaOutcome(game, actor, state, trick, reason, judgementCard);
+          if (game.phase === 'gameover') {
+            if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
+            return { ok: true };
+          }
+          if (game.pendingChoice) {
+            // H2: outcome 结算本身产生了待玩家选择 (如【闪电】命中致濒死求桃 /
+            // 遗计逐点分配)。此前这里不检查, 濒死角色会带着挂起的 pendingChoice
+            // 照常摸牌进入出牌阶段。挂起并标记 outcomeApplied (idx 已前进),
+            // 由 finishPendingChoiceResolution 在所有选择排空后续跑回合。
+            game.pauseState.judgeArea = {
+              actor: actor,
+              pending: pending,
+              idx: i + 1,
+              outcomeApplied: true
+            };
+            return { suspended: true };
+          }
         }
         // Clear the snapshot if we exited cleanly.
         if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
@@ -2822,7 +2894,7 @@
         var resolver = RESPONSE_KIND_RESOLVERS[pending.kind];
         if (!resolver) return fail('未知的选择类型：' + pending.kind);
         game.pendingChoice = null;
-        return resolver(game, pending, decision || {});
+        return finishPendingChoiceResolution(game, resolver(game, pending, decision || {}));
       }
 
       // 注册表迁移收官: 把原 resolvePendingChoice 内的 15 个手写 if 分支统一
@@ -2859,7 +2931,7 @@
           });
           if (!result.ok) {
             // Restore so the UI can re-render the panel.
-            game.pendingChoice = pending;
+            setPendingChoice(game, pending);
             return result;
           }
         }
@@ -2963,6 +3035,7 @@
           log: [],
           turnHistory: [],
           pendingChoice: null,
+          pendingChoiceQueue: [],
           pauseState: {},
           roles: roles,
           firstActor: firstActor,
@@ -3562,6 +3635,8 @@
       }
 
       function playCard(game, actor, cardId, options) {
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
         var self = game[actor];
         options = options || {};
         if (!self) return fail('未知角色。');
@@ -3987,14 +4062,14 @@
           idx: ctx.idx,
           options: ctx.options
         };
-        game.pendingChoice = {
+        setPendingChoice(game, {
           kind: 'wugu-pick',
           actor: picker,
           sourceActor: ctx.sourceActor,
           cards: pool.map(function (c) {
             return { id: c.id, name: c.name, suit: c.suit, color: c.color, rank: c.rank };
           })
-        };
+        });
         return success('【五谷丰登】等待 ' + actorName(game, picker) + ' 选牌…');
       }
 
@@ -4011,6 +4086,8 @@
       }
 
       function startTurn(game, actor) {
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         if (!game[actor]) return fail('未知角色。');
         game.turn = actor;
@@ -4050,13 +4127,13 @@
               state.flags.guanxingUsed = true;
               return null;
             }
-            game.pendingChoice = {
+            setPendingChoice(game, {
               kind: 'guanxing-reorder',
               actor: actor,
               cards: preview.cards.map(function (c) {
                 return { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank };
               })
-            };
+            });
             return { suspended: true };
           }
           // AI: auto-fire with default ordering (no reorder).
@@ -4094,7 +4171,7 @@
         if (pref === 'ask' && actor === 'player') {
           if (!game.pauseState) game.pauseState = {};
           game.pauseState.luoshen = { actor: actor };
-          game.pendingChoice = { kind: 'luoshen-continue', actor: actor };
+          setPendingChoice(game, { kind: 'luoshen-continue', actor: actor });
           return { suspended: true };
         }
         return runLuoshenJudge(game, actor, pref);
@@ -4168,6 +4245,8 @@
       }
 
       function finishPlayPhase(game) {
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         var actor = game.turn;
         var hookContext = { game: game, actor: actor, handled: false, result: null };
@@ -4179,6 +4258,8 @@
       }
 
       function discardExcess(game, actor, cardIds) {
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
         var state = game[actor];
         if (!state) return fail('未知角色。');
         cardIds = cardIds || [];
@@ -4209,6 +4290,8 @@
       }
 
       function discardSelected(game, actor, cardIds) {
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
         var state = game[actor];
         if (!state) return fail('未知角色。');
         cardIds = Array.from(cardIds || []);
@@ -4238,6 +4321,8 @@
       }
 
       function advancePhase(game) {
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         var actor = game.turn;
         if (game.phase === 'prepare') {
@@ -4291,12 +4376,16 @@
       }
 
       function endTurn(game) {
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         var ending = game.turn;
         return completeTurn(game, ending);
       }
 
       function playZhangbaSha(game, actor, cardIds) {
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
         var self = game[actor];
         cardIds = cardIds || [];
         if (!self) return fail('未知角色。');
@@ -4374,6 +4463,8 @@
       }
 
       function playCardAs(game, actor, cardId, asType) {
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
         var self = game[actor];
         if (!self) return fail('未知角色。');
         var hit = findOwnCardById(self, cardId);
@@ -4425,6 +4516,8 @@
       }
 
       function useSkill(game, actor, skillId, cardIds, options) {
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
         var self = game[actor];
         cardIds = cardIds || [];
         options = options || {};
@@ -4800,6 +4893,13 @@
           blocked.action = 'none';
           return blocked;
         }
+        // M6: 有挂起的玩家选择 (如 AI 出杀等玩家决定是否出闪) → AI 暂停而非
+        // 继续行动; UI 轮询在 pendingChoice 解决后会再次调用。
+        if (game.pendingChoice) {
+          var pausedAction = success('等待玩家处理选择。');
+          pausedAction.action = 'paused';
+          return pausedAction;
+        }
 
         var skillAction = aiChooseSkillAction(game, actor);
         if (skillAction) {
@@ -4861,10 +4961,12 @@
           for (var i = 0; i < maxActions; i += 1) {
             var action = aiTakeAction(game, actor);
             if (!action.ok) return action;
+            if (action.action === 'paused' || game.pendingChoice) return aiTurnPaused();
             if (action.action === 'none' || game.phase === 'gameover') break;
           }
           if (game.phase === 'play') finishPlayPhase(game);
         }
+        if (game.pendingChoice) return aiTurnPaused();
 
         if (game.phase === 'discard' && needsDiscard(game, actor)) {
           var discarded = discardSelected(game, actor, aiDiscardCandidates(game, actor));
@@ -4875,6 +4977,7 @@
           var advanced = advancePhase(game);
           if (!advanced.ok) return advanced;
         }
+        if (game.pendingChoice) return aiTurnPaused();
 
         if (game.phase === 'finish') {
           var ended = endTurn(game);
@@ -4884,6 +4987,14 @@
         var done = success('AI 回合完成。');
         done.action = 'turn';
         return done;
+      }
+
+      // M6: AI 回合因等待玩家 pendingChoice 暂停。调用方 (UI 轮询 / 测试) 在
+      // resolvePendingChoice 后重新调用 runAITurn 续跑。
+      function aiTurnPaused() {
+        var paused = success('AI 回合暂停，等待玩家处理选择。');
+        paused.action = 'paused';
+        return paused;
       }
 
       export const SanguoshaEngine = {
