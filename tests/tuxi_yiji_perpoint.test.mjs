@@ -113,41 +113,38 @@ test('遗计 amount=3: prompts player THREE times, one per damage point', () => 
     c('sha', { id: 'sd-judge', suit: 'spade', color: 'black', rank: '5' })
   ];
   game.player.judgeArea = [c('shandian', { id: 'sd', suit: 'spade', color: 'black' })];
+  // M1 (审计二轮): 闪电 3 dmg 把 3 血郭嘉打入濒死, 官方时序是先濒死结算后
+  // "受到伤害后" — 给郭嘉一张桃自救, 救回后遗计才逐点派发。
+  game.player.hand = [c('tao', { id: 'self-tao' })];
 
-  // Start turn → judge phase → shandian fires → 3 damage to guojia.
-  // The damage hook runs onDamageAfter (yiji) with amount=3.
-  // pref='ask' → fireNextYijiPoint sets pendingChoice for point 1.
+  // Start turn → judge phase → shandian fires → 3 damage to guojia → 濒死。
   Engine.startTurn(game, 'player');
 
-  // Point 1 of 3
+  // 濒死求桃在前 (M1: 扣减体力含濒死结算, 先于 "受到伤害后")
   let pending = Engine.getPendingChoice(game);
-  assert.ok(pending, 'expect pendingChoice for point 1');
-  assert.equal(pending.currentPoint, 1);
-  assert.equal(pending.totalPoints, 3);
-  assert.deepEqual(pending.drawnIds, ['p1-a', 'p1-b'], 'first 2 draws assigned to point 1');
+  assert.ok(pending, 'expect dying-rescue first');
+  assert.equal(pending.kind, 'dying-rescue', 'M1: 濒死结算先于遗计');
+  Engine.resolvePendingChoice(game, { cardId: 'self-tao' });
+  assert.equal(game.player.hp, 1, '桃自救回到 1 (hp 0 → 1)');
 
-  // Resolve point 1 (keep all)
-  Engine.resolvePendingChoice(game, { giveIds: [] });
-
-  // Point 2 of 3
-  pending = Engine.getPendingChoice(game);
-  assert.ok(pending, 'expect pendingChoice for point 2');
-  assert.equal(pending.currentPoint, 2);
-  assert.deepEqual(pending.drawnIds, ['p2-a', 'p2-b']);
-  Engine.resolvePendingChoice(game, { giveIds: [] });
-
-  // Point 3 of 3
-  pending = Engine.getPendingChoice(game);
-  assert.ok(pending);
-  assert.equal(pending.currentPoint, 3);
-  assert.deepEqual(pending.drawnIds, ['p3-a', 'p3-b']);
-  Engine.resolvePendingChoice(game, { giveIds: [] });
+  // 濒死结束后 deferred onDamageAfter 派发遗计, 3 点伤害 = 3 个独立 prompt。
+  // 注: 不断言每点抽到的具体 cardId — 摸牌阶段与遗计的相对顺序取决于
+  // 判定阶段濒死是否冻结回合 (H2, 另一 PR 修复), 两种顺序下逐点机制一致。
+  for (let point = 1; point <= 3; point += 1) {
+    pending = Engine.getPendingChoice(game);
+    assert.ok(pending, `expect pendingChoice for point ${point}`);
+    assert.equal(pending.kind, 'yiji-distribute');
+    assert.equal(pending.currentPoint, point);
+    assert.equal(pending.totalPoints, 3);
+    assert.equal(pending.drawnIds.length, 2, `point ${point} draws 2 cards`);
+    Engine.resolvePendingChoice(game, { giveIds: [] });
+  }
 
   // All 3 points resolved; pendingChoice cleared.
   assert.equal(Engine.getPendingChoice(game), null);
-  // Guojia got all 6 drawn cards in hand.
-  ['p1-a', 'p1-b', 'p2-a', 'p2-b', 'p3-a', 'p3-b'].forEach(id => {
-    assert.ok(game.player.hand.some(c => c.id === id), `point card ${id} in hand`);
+  // 6 张遗计牌 + 2 张摸牌阶段牌全部进入郭嘉手牌 (keep all)。
+  ['p1-a', 'p1-b', 'p2-a', 'p2-b', 'p3-a', 'p3-b', 'pad-1', 'pad-2'].forEach(id => {
+    assert.ok(game.player.hand.some(c => c.id === id), `card ${id} in hand`);
   });
 });
 
@@ -190,10 +187,14 @@ test('AI 遗计 / pref=auto: batched single draw, no per-point prompts', () => {
     c('sha', { id: 'sd-judge', suit: 'spade', color: 'black', rank: '5' })
   ];
   game.enemy.judgeArea = [c('shandian', { id: 'sd', suit: 'spade', color: 'black' })];
+  // M1: 闪电 3 dmg 致濒死先结算 — 给 AI 郭嘉一张桃自动自救, 救回后遗计才触发
+  // (无救援牌时官方时序下郭嘉直接死亡, 遗计不再发动)。
+  game.enemy.hand = [c('tao', { id: 'ai-self-tao' })];
 
   Engine.startTurn(game, 'enemy');
 
   assert.equal(Engine.getPendingChoice(game), null, 'AI never sets pendingChoice for yiji');
+  assert.equal(game.enemy.hp, 1, 'AI 桃自救回到 1');
   // AI 郭嘉 kept all 6 cards from the 3-damage hit (after which the
   // draw phase also fires; some cards land in hand from either source).
   // Verify the 6 yiji draws are in 郭嘉's hand.

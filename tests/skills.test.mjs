@@ -348,7 +348,10 @@ test('夏侯惇【刚烈】 non-heart judgment damages source when < 2 cards ava
   assert.ok(game.log.some((entry) => /刚烈/.test(entry) && /受到 1 点伤害/.test(entry)), 'Ganglie damage choice should be logged');
 });
 
-test('夏侯惇【刚烈】 lethal retaliation wins once and is not overwritten by the original damage', () => {
+test('夏侯惇【刚烈】 M1: 致命伤先濒死结算 — 夏侯惇死亡后刚烈不再触发', () => {
+  // M1 (审计二轮): 官方 flow__damage.md — "受到伤害后" 时机在扣减体力 (含
+  // 嵌套濒死结算) 之后。夏侯惇被打死 → 角色已阵亡, 刚烈不触发, 来源不受罚。
+  // (此前 hooks 先跑: 刚烈反伤把来源打死, 与官方时序相反。)
   const game = skillGame('sunquan', 'xiahoudun');
   game.player.hp = 1;
   game.enemy.hp = 1;
@@ -359,11 +362,32 @@ test('夏侯惇【刚烈】 lethal retaliation wins once and is not overwritten 
 
   assert.equal(result.ok, true, result.message);
   assert.equal(game.phase, 'gameover');
-  assert.equal(game.winner, 'enemy', 'nested Ganglie lethal damage should not be overwritten by the outer damage winner check');
-  assert.equal(game.player.hp, 0);
+  assert.equal(game.winner, 'player', '夏侯惇先死亡, 刚烈不触发, 出杀方获胜');
+  assert.equal(game.player.hp, 1, '来源未受刚烈反伤');
   assert.equal(game.enemy.hp, 0);
+  assert.ok(!game.log.some((entry) => /刚烈/.test(entry)), '死亡后刚烈不触发');
   const victoryLogs = game.log.filter((entry) => /获胜/.test(entry));
-  assert.deepEqual(victoryLogs, ['夏侯惇获胜！'], 'Ganglie mutual lethal flow should log a single consistent winner');
+  assert.equal(victoryLogs.length, 1, '只产生一条获胜日志');
+});
+
+test('夏侯惇【刚烈】 nested lethal: 夏侯惇存活时刚烈反伤致死来源, 胜负不被覆盖', () => {
+  // 保留原测试意图 (嵌套致命伤的胜负判定唯一性): 夏侯惇 hp 2 受伤存活 →
+  // 刚烈触发 → 来源无 2 张手牌可弃 → 受 1 点伤害 → 来源 (hp 1) 死亡。
+  const game = skillGame('sunquan', 'xiahoudun');
+  game.player.hp = 1;
+  game.enemy.hp = 2;
+  game.player.hand = [c('sha', { id: 'ganglie-nested-sha' })];
+  game.deck = [c('shan', { id: 'ganglie-nested-judge', suit: 'spade', color: 'black' })];
+
+  const result = Engine.playCard(game, 'player', 'ganglie-nested-sha');
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.phase, 'gameover');
+  assert.equal(game.winner, 'enemy', '刚烈反伤致死来源, 夏侯惇获胜');
+  assert.equal(game.player.hp, 0);
+  assert.equal(game.enemy.hp, 1, '夏侯惇受 1 伤存活');
+  const victoryLogs = game.log.filter((entry) => /获胜/.test(entry));
+  assert.deepEqual(victoryLogs, ['夏侯惇获胜！'], '嵌套致命伤只产生一条一致的获胜日志');
 });
 
 test('夏侯惇【刚烈】 heart judgment does not punish the damage source', () => {
