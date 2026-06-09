@@ -460,6 +460,14 @@
       }
 
       function discardCard(game, card) {
+        // M1: 还原【朱雀羽扇】本次使用临时转化的【杀】, 使其以原始身份 (普通
+        // 【杀】或被当作杀的红牌) 进入弃牌堆, 避免洗回牌堆后变成永久【火杀】。
+        if (card && card.zhuqueOriginalType !== undefined) {
+          card.type = card.zhuqueOriginalType;
+          card.name = card.zhuqueOriginalName;
+          delete card.zhuqueOriginalType;
+          delete card.zhuqueOriginalName;
+        }
         var physicalCard = physicalCardOf(card);
         if (physicalCard) game.discard.push(physicalCard);
       }
@@ -3222,6 +3230,12 @@
         var zhuqueWeapon = self.equipment && self.equipment.weapon;
         if (zhuqueWeapon && zhuqueWeapon.type === 'zhuque' && card.type === 'sha'
             && (!self.skillPreferences || self.skillPreferences.zhuque !== 'decline')) {
+          // M1: 朱雀转火杀是「本次使用」的视为效果, 不应永久改写物理牌身份。
+          // 记录转化前 type/name, 由 discardCard 在该牌离场时还原; 否则该【杀】
+          // 弃置 → 洗回牌堆后会变成永久【火杀】, 污染牌堆。虚拟杀 (武圣/龙胆/
+          // 丈八 的 wrapper) 走 physicalCard, wrapper 被丢弃, 不受影响。
+          card.zhuqueOriginalType = card.type;
+          card.zhuqueOriginalName = card.name;
           card.type = 'fire_sha';
           card.name = '火杀';
           log(game, actorName(game, actor) + '发动【朱雀羽扇】，将【杀】转化为【火杀】。');
