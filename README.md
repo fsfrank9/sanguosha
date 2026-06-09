@@ -1,251 +1,96 @@
 # 三国杀 · 1v1 规则合规版
 
-纯 HTML/CSS/JavaScript 实现的三国杀 1v1。架构上从 v4 的「单文件 + IIFE 全局」演进到 v5 的「原生 ES 模块 + GitHub Pages 静态托管」；规则上 v6.0 完成"数据驱动技能 / 牌 / 装备"基础设施，v6.1 用 7 个 PR 把 26 个已实现技能与官方 spec 逐字段对齐。`src/` 是浏览器加载的源码本身，根 `index.html` 是手写的模块入口，没有打包步骤、没有 npm 运行时依赖。
+纯 HTML/CSS/JavaScript 实现的三国杀 1v1。原生 ES 模块 + GitHub Pages 静态托管:`src/` 就是浏览器加载的源码本身,根 `index.html` 是手写的模块入口——没有打包步骤、没有 npm 运行时依赖。
+
+**当前版本 `v10.2`**:31 个已实现技能(7 个主动)100% 对照官方 spec,39 张牌规则数据驱动,统一的暂停/恢复玩家选择框架(FIFO 队列 + 全局挂起冻结)与响应(无懈/闪/杀)派发,经两轮独立代码审计修复后引擎规则层无已知胜负级偏差。
 
 ## 运行
 
-### 线上（GitHub Pages）
+### 线上(GitHub Pages)
 
 ```
 https://fsfrank9.github.io/sanguosha/
 ```
 
-仓库根目录在 `main` 分支每次更新后由 `.github/workflows/pages.yml` 自动发布。**首次使用需要仓库 owner 在 GitHub 仓库的 Settings → Pages 把 Source 切换成 "GitHub Actions"**，之后无需手动操作。
+`main` 分支每次更新后由 `.github/workflows/pages.yml` 自动发布(部署产物只含 `index.html` + `src/`)。首次使用需要仓库 owner 在 Settings → Pages 把 Source 切换成 "GitHub Actions"。
 
 ### 本地开发
 
-`index.html` 是手写的 ES 模块入口（`<script type="module" src="./src/main.js">`），原生模块在 `file://` 下被浏览器 CORS 拦截，所以**不再支持双击 `index.html` 直开**。在仓库根目录起一个本地 HTTP 服务器即可：
+原生 ES 模块在 `file://` 下被浏览器 CORS 拦截,不支持双击直开。在仓库根目录起一个本地 HTTP 服务器即可:
 
 ```bash
 python3 -m http.server 8000
-# 然后浏览器访问 http://127.0.0.1:8000/
+# 浏览器访问 http://127.0.0.1:8000/
 ```
 
-不需要 npm install、不需要打包、不需要联网。
-
-检查仓库结构是否完整（必备源文件存在、入口 HTML 用模块标签、不再有 `dist/` / 模板残留）：
-
-```bash
-node tools/build.mjs --check
-# 或
-npm run build:check
-```
-
-`npm run build` 在 v5 不再产出文件——所有源码本身就是浏览器要加载的资产。
-
-## 当前版本
-
-`v10 + 两轮审计规则合规修复`：31 个已实现技能（7 个主动）100% 对照官方 spec，39 张牌规则数据驱动，统一的暂停/恢复玩家选择框架（带 FIFO 队列与全局挂起冻结）与响应（无懈/闪/杀）派发。
-
-架构沿用 v5 的「原生 ES 模块 + GitHub Pages 托管」（详见 `docs/plans/2026-05-13-sanguosha-v5-architecture.md`），工作重心在规则层。
-
-### v7–v10 进展概览
-
-- **v7** 牌规则合规（16 个 PR #27..#42）：杀/闪响应窗口、桃/酒限制、距离与范围、即时/延时锦囊交互、装备特效（青釭/诸葛连弩/方天/麒麟/古锭/雌雄/寒冰/朱雀）、濒死流程。
-- **v8** UI 集成 + 标准包技能扩充：补齐 大乔【国色】【流离】、华佗【急救】【青囊】、甄姬【洛神】（已实现技能 26 → 31）；AI 评估 1-ply lookahead + 威胁感知。
-- **v9** UI 全面改版：布局重构、cream 卷轴风、modal/响应两步式、CSS 拆分为 10 个文件。
-- **v10** 稳定化与扩展：响应窗口框架（无懈/万箭/银月/决斗杀 统一暂停/恢复）、dispatch 注册表、card-as 一致性。
-
-### 审计规则合规修复（post-v10，对照官方 spec 的胜负级偏差）
-
-逐条对照官方规则缓存（`official-skill-cache/gltjk-sanguosha-rules`）的全方位审计后修复：
-
-- **濒死流程 (#105)**：体力值可降至负数（不再 clamp 到 0）；同一响应者可连续出多张【桃】/【酒】，直到回复至 1 点（此前每人仅一次救援，深度致命伤被一张桃抹平）。
-- **无懈可击覆盖 (#106)**：无中生有 / 南蛮入侵 / 万箭齐发 / 延时锦囊放置（乐不思蜀/兵粮寸断/闪电）补齐无懈窗口（此前仅 5 张锦囊可被无懈）。
-- **八卦阵对万箭 (#107)**：万箭齐发的【闪】响应补八卦红判定兜底；顺带统一【杀】与【万箭】两处八卦逻辑。
-- **朱雀羽扇 (#108)**：转火杀改为「本次使用」的临时视为，弃置时还原物理牌身份（此前永久 mutate `card.type`，洗回牌堆变永久火杀）。
-
-### 二轮审计修复（PR #115–#121）
-
-第二轮独立代码审计后的修复，按批次拆 PR：
-
-- **丈八蛇矛牌守恒 (#115)**：主动使用的虚拟【杀】不再凭空进入弃牌堆；奸雄改为获得组成虚拟杀的两张实体牌；朱雀临时火杀进入奸雄手牌前还原物理身份。
-- **暂停/恢复架构闭环 (#116)**：pendingChoice 队列化（并发选择不再互相覆盖导致软死锁）；判定阶段濒死冻结回合流程；挂起时冻结全部公开入口（不可挂着选择跨回合操作）。
-- **伤害后时机 (#117)**：奸雄/反馈/刚烈/遗计移到濒死结算之后（官方顺序）；角色死亡后技能不再触发。
-- **铁索连环传导 (#118)**：横置角色受属性伤害解除连环并向其他横置角色传导等量同属性伤害。
-- **白银狮子 + 判定区归属 (#119)**：任何失去白银狮子的路径都回复 1 点体力；寒冰剑/反馈不再把判定区牌当作角色的牌。
-- **牌规则杂项 (#120)**：五谷丰登逐张亮出按需洗牌；贯石斧可选发动且成本可含装备；火攻展示牌由目标选择；奸雄可获得决斗/南蛮/万箭/火攻实体牌；国色转化乐走无懈链；discardExcess 事务化。
-- **文档与工程卫生 (#121)**：本节所在的 README 数字修正、index.html 版本标记、Node 版本下限声明、CI 双跑修复、Pages 产物瘦身。
-
-### v6.0 基础（数据驱动 + 暂停/恢复机制）
-
-- **结构化技能元数据** (`src/data/heroes.js` 的 `SKILL_METADATA`)：每个已实现技能（v6.0 时为 26 个，当前 31 个）各有 `{ trigger, frequency, optional, mandatory, cost, hooks }` 六字段，跨武将共享的同名技能（mashu / wusheng / longdan / biyue / paoxiao）自动保持一致。UI tooltip 从结构化字段派生分行提示。
-- **结构化牌规则** (`src/data/cards.js` 的 `CARD_RULES`)：所有牌（v6.0 时 35 张，当前 39 张；基本 / 即时锦囊 / 延时锦囊 / 装备）各有 `{ summary, timing, targets, effect, frequency, responseWindow, engineHooks }`，自动 merge 到 `CARD_CATALOG[id].rule`。
-- **官方规格 cache + audit harness**：`official-skill-cache/sanguosha-standard/official_standard_skill_cache.json` 保存所有已实现技能的官方规格副本（带 sourceTextSha256）。`tests/v6_skill_audit.test.mjs` + `tests/skill_schema.test.mjs` + `tests/card_rules.test.mjs` 持续校验「cache ↔ specs fixture ↔ heroes.js ↔ cards.js」四方一致。
-- **装备被动效果注册表** (`src/engine/state.js` 的 `EQUIPMENT_EFFECTS`)：诸葛连弩 / 青釭剑 / 仁王盾 的布尔被动通过 `hasEquipmentEffect(state, name)` 查询，与 `SkillRuntime.hasPassiveEffect` 同形。
-- **玩家选择暂停 / 恢复机制**：`game.pendingChoice` + `game.pauseState` + 公开 API `Engine.setSkillPreference` / `getSkillPreference` / `getPendingChoice` / `resolvePendingChoice`。
-- **AI 主动技能感知**：AI 从只识【苦肉】【制衡】扩到全部 5 个主动技（+ 仁德 / 反间 / 观星）+ 2 个出牌期转化（武圣 / 龙胆 把红牌或闪当杀），其余 19 个被动 / 触发 / 锁定技通过引擎 hooks 自动生效。
-
-### v6.1 mismatch 修复链（7 个 PR 把所有偏差修到与官方 spec 完全一致）
-
-v6.0 收尾后做了一次"逐字对照"per-skill spec audit，发现 12 处真实 mismatch（包括第一次 audit 漏掉的隐藏问题）。v6.1 用 7 个独立 PR 全部修完：
-
-- **【观星】#17**：预览张数 = min(存活角色数, 5, deck)；触发时机搬到准备阶段；新 API `{ topIds, bottomIds }` 支持任意排序 + 顶/底独立分配
-- **【鬼才】#18**：跨 actor 触发 —— 任何判定都能干预（不只是 司马懿 自己的）；非 pausable 判定（八卦/铁骑/刚烈 内部判定）回退 auto-fire
-- **【反间】#19**：目标方真·猜花色（不是出招方传 options）；player UI 弹 4 花色选择；AI 盲随机
-- **【反馈】#20**：玩家挑区域 + 具体牌（hand 随机不可窥探 / 装备 / 判定区按 cardId）
-- **【刚烈】#21**：4 子问题（夏侯惇 可选触发 / 来源选弃 2 vs 受 1 / 来源选哪两张 / 含装备可弃）
-- **【武圣】+【制衡】+【苦肉】#22**：装备区可作牌源（关羽 卸下红色武器当杀响应决斗）；制衡 可弃装备；苦肉 hp=1 允许
-- **【突袭】+【遗计】#23**：突袭 可决/不发动 toggle；遗计 "按伤害点数逐点处理"（闪电 3 点 → 3 个独立 prompt）
-
-v6.1 累计基础设施：
-- **7 个 pendingChoice kinds**: `guicai-replace` / `yiji-distribute` / `guanxing-reorder` / `fanjian-guess` / `fankui-pick` / `ganglie-fire` / `ganglie-source-choice`
-- **6 个 skillPreferences** toggles: `luoyi` / `tieqi` / `guicai` / `yiji` / `tuxi` / `ganglie`
-- **3 个"自己的牌 = hand + equipment" helpers**: `findOwnCardById` / `removeOwnCardFromAnyZone` / `firstMatchingOwnCard`
-- **判定 pausable flag**: `judge(game, actor, reason, { pausable })`
-- **多点伤害逐点处理**: `pauseState.yiji.{ remainingPoints, totalPoints }` + `fireNextYijiPoint`
-- **60 条新 behavior 测试** 覆盖每个修复点
-
-### 1v1 玩法
-
-- 1v1 选将、主公/反贼身份与主公先手流程，标准包/风林火山/SP 武将池 catalog，标准+军争核心牌组。
-- 阶段、装备区、判定区、延时锦囊、部分武将技能和 AI 行动。
-- 火攻、铁索连环、顺手牵羊、过河拆桥等交互选择流程。
-- 技能实现状态可见：已实现技能可用；仅展示/待实现技能会明确标记为"未实现"，避免看起来有技能但实际无法触发。
-
-### 后续方向
-
-详见 plan 文档「下一步方向」节，主要候选：装备复杂副作用 handler 体系（八卦/藤甲/青龙等）、牌效果对照官方修复、新技能批量接入（17 个 cache-ready 技能）、AI 进阶、多人模式。
-
-## 架构路线
-
-> **[已冻结 · v5.0 起不再维护]** 以下条目记录 v4 各 Phase 迁移历史，仅供参考。v5.0（Phase 5A–5E）已完成「单文件 IIFE + window globals → 原生 ES 模块 + GitHub Pages」全量迁移，后续新技能开发直接在 v5 基础上进行。详见 `docs/plans/2026-05-13-sanguosha-v5-architecture.md`。
-
-v4.0 不是重写，而是分批”安全拆源”：
-
-1. 保留根目录 `index.html` 作为可直接打开的稳定产物。
-2. 已将 CSS、数据模块、引擎、UI 适配层抽到 `src/`。
-3. 用 `tools/build.mjs` 生成 `index.html` 和 `dist/index.html`。
-4. 用 `tests/architecture_build.test.mjs`、`tests/data_modules.test.mjs` 和 `tests/engine_modules.test.mjs` 防止源码与产物漂移。
-5. 已开始拆 `src/engine/*` runtime seam；`runtime`、`skill-runtime`、`card-runtime`、`state`、`phases`、`judgement` 已落地，其中 `skill-runtime` 正在 Phase 4 逐个迁移已实现技能的触发入口与被动效果入口。
-6. Phase 4A 已把【闭月】作为第一条证明链路迁入 `onTurnEnd` hook：`completeTurn` 统一派发 hook，具体技能效果仍复用原 `triggerBiyue`，避免行为漂移。
-7. Phase 4B 已把吕蒙【克己】迁入 `onBeforeDiscardPhase` hook：`finishPlayPhase` 先派发进入弃牌前 hook，原有跳过弃牌行为与日志/返回值保持不变。
-8. Phase 4C 已把黄月英【集智】迁入 `onCardUse` hook：普通锦囊成功使用与响应【无懈可击】统一通过 `SkillRuntime.runHook` 派发，非普通锦囊、非法使用与【铁索连环】重铸仍不触发。
-9. Phase 4D 已把周瑜【英姿】迁入 `onDrawPhase` hook：摸牌阶段统一派发 draw-phase hook，默认摸 2、【英姿】额外摸 1 的既有行为保持不变。
-10. Phase 4E 已把张辽【突袭】迁入同一个 `onDrawPhase` hook seam：对手有手牌时从对方获得 1 张手牌，并把本次摸牌数减少 1；`performDrawPhase` 不再直接持有 `tuxi` 技能判断。
-11. Phase 4F 已把张飞【咆哮】与马超/庞德/SP 庞德【马术】接入 `SkillRuntime` 被动效果 seam：`StateRuntime` 通过 `hasPassiveEffect` / `sumPassiveEffect` 查询无限【杀】与出距 -1，不再直接硬编码 `paoxiao` / `mashu` 判断。
-12. Phase 4G 已把诸葛亮【空城】接入 `SkillRuntime.onCardTarget` target-validity seam：`canPlayCard` 与 `playSha` 通过统一目标保护 helper 派发 `onCardTarget`，不再直接持有 `kongcheng` 目标保护判断。
-13. Phase 4H 已把马超【铁骑】迁入 `SkillRuntime.onNeedResponse` response-window seam：`playSha` 只派发【闪】响应窗口，红色判定锁定响应的逻辑由【铁骑】hook 处理。
-14. Phase 4I 已把曹操【奸雄】迁入 `SkillRuntime.onDamageAfter` damage-after seam：`damage` 只负责伤害结算与统一派发，获得造成伤害实体牌的逻辑由【奸雄】hook 处理。
-15. Phase 4J 已把关羽/SP 关羽【武圣】与赵云/SP 赵云【龙胆】迁入 `SkillRuntime.onCardAs` card-as/conversion seam：响应窗口与主动“当【杀】使用”入口统一派发转化 hook，原有红牌/【闪】/【杀】转化行为保持不变。
-16. Phase 4K 已把孙权【制衡】、黄盖【苦肉】、刘备【仁德】、周瑜【反间】和诸葛亮【观星】迁入 `SkillRuntime.onActiveSkill` 主动技 dispatcher seam；【观星】预览额外走 `onSkillPreview`。
-17. Phase 4L 已把甄姬【倾国】接入 `SkillRuntime.onCardAs` 响应转化 seam：无真实【闪】时可将黑色手牌当【闪】响应。
-18. Phase 4M 已把黄月英【奇才】接入被动效果 seam：距离受限锦囊（当前【顺手牵羊】/【兵粮寸断】）会正常校验距离，拥有【奇才】时忽略该距离限制。
-19. Phase 4N 已把陆逊【谦逊】接入 `SkillRuntime.onCardTarget` target-validity seam：陆逊不能成为【顺手牵羊】或【乐不思蜀】目标。
-20. Phase 4O 已把郭嘉【天妒】接入 `SkillRuntime.onJudgementAfterResolve` judgement-after-resolve seam：郭嘉自己的判定牌结算后、进入弃牌堆前会获得该判定牌。
-21. Phase 4P 已把夏侯惇【刚烈】接入 `SkillRuntime.onDamageAfter` + judgement finalizer seam：夏侯惇受到伤害后进行判定，非红桃时伤害来源自动弃置两张手牌，否则受到 1 点伤害；判定牌统一走 `resolveJudgementCard`。
-22. Phase 4Q 已把司马懿【反馈】接入 `SkillRuntime.onDamageAfter` source-card gain seam：司马懿受到伤害后从伤害来源的手牌/装备/判定区获得一张可获得牌，不会错误获得已经打出的伤害来源牌。
-23. Phase 4R 已把郭嘉【遗计】接入 `SkillRuntime.onDamageAfter` per-damage-point draw seam：郭嘉受到伤害后按伤害点数逐点摸两张牌，当前 1v1 最小实现默认分配给郭嘉自己。
-24. Phase 4S 已把许褚【裸衣】接入 `SkillRuntime.onDrawPhase` + `onDamageModify` seam：摸牌阶段少摸一张并设置本回合标记，本回合许褚造成的【杀】/【决斗】伤害 +1。
-25. Phase 4T 已把司马懿【鬼才】接入 `SkillRuntime.onJudgementBeforeResolve` judgement replacement seam：判定牌翻出后、生效前可用一张手牌替换，原判定牌进入弃牌堆，后续判定结果按替换牌结算。
-26. v4 继续保证根目录 `index.html` 与 `dist/index.html` 可直接 `file://` 打开且字节级一致；v5 方向则是 GitHub 托管访问、模块化加载，不再维护 all-in-one 单 HTML 作为架构目标。（**v5.0 已完成，此条已过时。**）
-
-v4 详细迁移历史见：
-
-```text
-docs/plans/2026-04-29-sanguosha-v4-architecture.md  [已冻结]
-```
-
-v5.0 迁移计划与完成状态见：
-
-```text
-docs/plans/2026-05-13-sanguosha-v5-architecture.md  [已完成]
-```
-
-游戏逻辑正确性与重构计划见 plan 文档（按主题分文件）：
-
-```text
-docs/plans/
-  2026-05-13-sanguosha-v6-logic-correctness.md      [v6.0 + v6.1 已完成]
-  2026-05-14-sanguosha-v7-card-rule-compliance.md   [v7  16/16 已完成 #27..#42]
-  2026-05-14-sanguosha-v8-ui-integration.md         [v8  已完成 — 标准包技能扩充 + AI lookahead]
-  2026-05-14-sanguosha-v9-ui-overhaul.md            [v9  已完成 — UI 全面改版 + CSS 拆分]
-  2026-05-28-sanguosha-v10-stabilize-and-expand.md  [v10 已完成 — 响应框架 + dispatch 注册表]
-```
-
-## 武将技能实现状态
-
-当前 catalog 统计：
-
-- 武将：68 名。
-- 技能条目：123 条。
-- 唯一技能 ID：118 个。
-- 已接入引擎逻辑的技能：31 个。
-- 有主动按钮/交互入口的技能：7 个。
-- 未实现/仅展示技能会在 UI 中标记为不可用或未实现。
-
-已实现技能：
-
-- 主动/交互技能（7 个）：孙权【制衡】、黄盖【苦肉】、刘备【仁德】、周瑜【反间】、诸葛亮【观星】、华佗【青囊】、甄姬【洛神】。
-- 转化/被动/自动技能：张飞【咆哮】、关羽/SP 关羽【武圣】、赵云/SP 赵云【龙胆】、甄姬【倾国】、曹操【奸雄】、夏侯惇【刚烈】、司马懿【反馈】、司马懿【鬼才】、郭嘉【天妒】、郭嘉【遗计】、许褚【裸衣】、马超/庞德/SP 庞德【马术】、马超【铁骑】、张辽【突袭】、周瑜【英姿】、诸葛亮【空城】、陆逊【谦逊】、貂蝉/SP 貂蝉【闭月】、吕蒙【克己】、黄月英【集智】、黄月英【奇才】、大乔【国色】、大乔【流离】、华佗【急救】。
-
-近期补齐技能说明：
-
-- 【闭月】：貂蝉结束阶段摸 1 张牌；`endTurn` 和阶段推进到结束阶段的路径都会触发。
-- 【克己】：吕蒙本回合未使用/打出/响应过【杀】时，跳过弃牌阶段；主动使用【杀】与响应【杀】都会阻止触发。
-- 【集智】：黄月英成功使用普通锦囊后摸 1 张牌；响应使用【无懈可击】成功抵消锦囊时也会触发；非法使用、非普通锦囊或【铁索连环】重铸不触发。该触发入口已迁到 Phase 4C 的 `onCardUse` hook seam，实际摸牌效果仍复用原有行为 helper 以降低迁移风险。
-- 【英姿】：周瑜摸牌阶段额外摸 1 张牌。该触发入口已迁到 Phase 4D 的 `onDrawPhase` hook seam，`performDrawPhase` 只负责派发 draw-phase hook 与执行摸牌。
-- 【突袭】：张辽摸牌阶段在对手有手牌时获得对手 1 张手牌，并少摸 1 张。该触发入口已迁到 Phase 4E 的 `onDrawPhase` hook seam，行为测试继续覆盖偷牌与少摸牌的回归。
-- 【咆哮】/【马术】：张飞【咆哮】提供无限使用【杀】效果，马超/庞德/SP 庞德【马术】提供出距 -1；Phase 4F 将这类锁定被动效果迁到 `SkillRuntime.hasPassiveEffect` / `sumPassiveEffect` seam，`StateRuntime` 继续负责距离与次数查询但不再直接硬编码对应技能 ID。
-- 【空城】：诸葛亮无手牌时不能成为【杀】或【决斗】目标；Phase 4G 将该目标合法性保护迁到 `SkillRuntime.onCardTarget` seam，`canPlayCard` 和 `playSha` 统一通过 target protection helper 派发，行为测试继续覆盖失败后手牌不被移除与目标不受伤。
-- 【铁骑】：马超使用【杀】指定目标后进行判定，红色判定令目标不能打出【闪】且保留原有伤害结算；Phase 4H 将该响应锁定逻辑迁到 `SkillRuntime.onNeedResponse` seam，`playSha` 不再直接持有 `tieqi` 判断或 `tieqiLocked` 状态。
-- 【奸雄】：曹操受到有实体来源牌造成的伤害后获得该牌；Phase 4I 将该伤害后触发迁到 `SkillRuntime.onDamageAfter` seam，`damage` 不再直接持有 `jianxiong` 判断，且无实体来源牌的伤害不会错误获得牌。
-- 【武圣】/【龙胆】：关羽/SP 关羽可将红色牌当【杀】使用/响应，赵云/SP 赵云可在【杀】/【闪】间互相转化；Phase 4J 将这些 card-as/conversion 入口迁到 `SkillRuntime.onCardAs` seam，`findResponseCard` 与 `canPlayCardAs` 不再直接持有 `wusheng` / `longdan` 判断，同时保留响应窗口、主动 UI affordance 与实体牌来源追踪。
-- 【制衡】/【苦肉】/【仁德】/【反间】/【观星】：Phase 4K 将这些主动技能统一迁入 `SkillRuntime.onActiveSkill` dispatcher seam；【观星】的非消耗预览迁入 `onSkillPreview`。
-- 【倾国】：甄姬无真实【闪】时可将黑色手牌当【闪】响应；Phase 4L 将该响应转化迁入 `SkillRuntime.onCardAs` seam，并保持真实【闪】优先。
-- 【奇才】：黄月英使用距离受限锦囊时忽略距离限制；Phase 4M 将该锁定被动迁入 `SkillRuntime.hasPassiveEffect(..., 'ignoreTrickDistance')`，同时为普通角色补上【顺手牵羊】/【兵粮寸断】距离校验。
-- 【谦逊】：陆逊不能成为【顺手牵羊】或【乐不思蜀】目标；Phase 4N 将该目标保护迁入 `SkillRuntime.onCardTarget` seam，失败时不会消耗来源牌，也不会移动目标手牌/判定区。
-- 【天妒】：郭嘉自己的判定牌结算后、进入弃牌堆前获得该判定牌；Phase 4O 将判定牌结算后入口迁入 `SkillRuntime.onJudgementAfterResolve` seam，未被技能获得的判定牌仍会正常进入弃牌堆。
-- 【刚烈】：夏侯惇受到伤害后进行【刚烈】判定，非红桃时伤害来源若有至少两张手牌则自动弃置两张，否则受到 1 点伤害；Phase 4P 复用 `SkillRuntime.onDamageAfter` 并把【刚烈】判定牌接入共享 `resolveJudgementCard` finalizer。
-- 【反馈】：司马懿受到有来源且非自伤的伤害后，从伤害来源当前手牌/装备/判定区获得一张可获得牌；Phase 4Q 复用 `SkillRuntime.onDamageAfter`，并避免从无来源伤害或已经打出的伤害来源牌中错误获得牌。
-- 【遗计】：郭嘉每受到 1 点伤害后摸两张牌；Phase 4R 复用 `SkillRuntime.onDamageAfter`，当前 1v1 最小实现按伤害点数逐点结算并默认把摸到的牌分配给郭嘉自己。
-- 【裸衣】：许褚摸牌阶段自动少摸一张牌并获得本回合伤害加成；Phase 4S 接入 `SkillRuntime.onDrawPhase` 与 `onDamageModify`，只增强本回合许褚造成的【杀】或【决斗】伤害，火攻等其他伤害不受影响，回合结束会清除标记。
-- 【鬼才】：司马懿自己的判定牌翻出后、生效前，可自动用一张手牌替换判定牌；Phase 4T 接入 `SkillRuntime.onJudgementBeforeResolve`，原判定牌立即进入弃牌堆，替换牌作为最终判定牌继续走判定结果与 `resolveJudgementCard` finalizer。
-
-## 官方资料对照与缓存
-
-本仓库把官网资料分成两层，避免后续补技能时每次都重新拉官网，也避免在公开仓库提交大段官网原文：
-
-- `tests/fixtures/official_standard_skills.json`：官网标准包武将/技能名的紧凑 fixture，用于校验本地 catalog 中当前批次技能名是否与官方资料源一致。
-- `tests/fixtures/official_standard_skill_specs.json`：可提交的结构化实现规格 fixture。它包含来源 URL、`sourceTextRef` 摘要引用、技能触发时机/条件/成本/效果/频率/引擎 hook 等转述后的实现要点，不包含 `officialText` 原文字段。
-- `.cache/sanguosha-official/official_standard_skill_texts.json`：本地原文缓存，只用于开发参考和重新生成结构化规格；该目录已加入 `.gitignore`，不提交到仓库。
-
-后续继续实现技能时优先按 cache-first 流程工作：先读本地 `.cache/sanguosha-official/` 原文缓存与已提交的结构化 specs；只有缓存缺失、过期或需要刷新官方资料时，才重新请求 `https://www.sanguosha.com/hero` 与对应详情页。
+不需要 npm install、不需要打包、不需要联网。需要 Node ≥ 20.11(仅用于跑测试)。
 
 ## 测试
 
-使用 Node 直接执行测试文件，例如：
-
 ```bash
-node tests/architecture_build.test.mjs
-node tests/data_modules.test.mjs
-node tests/engine_modules.test.mjs
-node tests/card_runtime.test.mjs
-node tests/state_runtime.test.mjs
-node tests/phase_runtime.test.mjs
-node tests/skill_runtime_hooks.test.mjs
-node tests/game_engine.test.mjs
-node tests/skills.test.mjs
-node tests/official_source.test.mjs
+npm test              # 全量回归(逐文件执行 tests/*.mjs, 失败即停)
+npm run build:check   # 仓库结构完整性检查
+npm run verify        # build:check + 全量测试(CI 门禁同款)
 ```
 
-全量回归：
+测试无框架、无依赖:每个文件用 `node:assert/strict` 直跑。引擎层是行为测试(含全场牌数守恒回归),UI 层用 `tests/helpers/fake-dom.mjs` 零依赖 DOM 垫片做全链路行为测试。
 
-```bash
-npm test
+## 仓库结构
+
+```text
+index.html            手写模块入口(无内联逻辑)
+src/
+  main.js             两行 side-effect import
+  engine/             游戏引擎(game-engine.js 主体 + runtime seam 模块)
+  ui/dom-adapter.js   DOM 适配层(面板渲染/事件绑定)
+  data/               武将/技能/牌的结构化 catalog 与元数据
+  styles/             CSS(main.css 为 @import 入口)
+tests/                行为测试 + 架构守护测试(零依赖直跑)
+tools/build.mjs       结构完整性检查(--check)
+official-skill-cache/ 官方规格副本(audit harness 数据源)
+docs/
+  history.md          版本演进史(v4 → 两轮审计的浓缩档案)
+  plans/              各版本计划与执行记录
+  audit/              代码审计纪要
 ```
 
-等价于：
+## 内容现状
 
-```bash
-for f in tests/*.mjs; do
-  printf '\n===== %s\n' "$f"
-  node "$f" || exit 1
-done
-```
+- 武将 68 名 / 技能条目 123 条 / 唯一技能 ID 118 个。
+- 已接入引擎逻辑的技能 31 个(主动/交互 7 个:制衡、苦肉、仁德、反间、观星、青囊、洛神);未实现技能在 UI 中明确标记,不会"看起来有但触发不了"。
+- 标准 + 军争核心牌组 39 张牌全部数据驱动;濒死/判定/响应窗口/无懈链/铁索传导等结算对照 `official-skill-cache/gltjk-sanguosha-rules` 官方规则集。
+- 技能逐项的引擎接入说明见 [`docs/history.md`](docs/history.md)。
 
-完整验证（构建一致性 + 全量测试）：
+## 版本演进
 
-```bash
-npm run verify
-```
+详细历史见 [`docs/history.md`](docs/history.md),各版本计划见 `docs/plans/`:
+
+| 版本 | 主题 | 计划文档 |
+|------|------|----------|
+| v4 | 安全拆源 + SkillRuntime hook seam(Phase 4A–4T) | `2026-04-29-sanguosha-v4-architecture.md` |
+| v5 | 原生 ES 模块 + GitHub Pages 迁移 | `2026-05-13-sanguosha-v5-architecture.md` |
+| v6 | 数据驱动基础设施 + per-skill spec audit | `2026-05-13-sanguosha-v6-logic-correctness.md` |
+| v7 | 牌规则合规(16 PR) | `2026-05-14-sanguosha-v7-card-rule-compliance.md` |
+| v8 | 标准包技能扩充 + AI lookahead | `2026-05-14-sanguosha-v8-ui-integration.md` |
+| v9 | UI 全面改版(cream 卷轴风) | `2026-05-14-sanguosha-v9-ui-overhaul.md` |
+| v10 | 响应框架 + dispatch 注册表 | `2026-05-28-sanguosha-v10-stabilize-and-expand.md` |
+| 审计×2 | 两轮规则合规审计修复(#105–#113, #115–#123) | `docs/audit/` + `docs/history.md` |
+
+## 下一阶段(v11)
+
+路线图见 [`docs/plans/2026-06-09-sanguosha-v11-roadmap.md`](docs/plans/2026-06-09-sanguosha-v11-roadmap.md),按优先级:
+
+1. **守恒与回归硬化**:全局牌守恒断言、`moveCard` 原语、UI 面板行为测试补全。
+2. **单体拆分**:`game-engine.js`(~5100 行)按域拆模块,`dom-adapter.js` 面板拆分。
+3. **新技能批量接入**:17 个 cache-ready 技能,引擎+UI+测试三件套齐备地分批落地。
+4. **AI 进阶 / 玩法扩展**:响应决策评估、装备 handler 收口、多人模式(远期)。
+
+## 官方资料对照与缓存
+
+官网资料分两层,避免重复拉取、也避免在公开仓库提交大段官网原文:
+
+- `tests/fixtures/official_standard_skills.json`:官网标准包武将/技能名紧凑 fixture(校验 catalog 一致性)。
+- `tests/fixtures/official_standard_skill_specs.json`:可提交的结构化实现规格(来源 URL + `sourceTextRef` 摘要,不含原文)。
+- `.cache/sanguosha-official/`:本地原文缓存,已 gitignore 不入库。
+
+继续实现技能时按 cache-first 流程:先读本地缓存与已提交 specs,缓存缺失/过期才重新请求官网。
