@@ -3324,16 +3324,28 @@
         var dodged = false;
         if (!responseContext.responseLocked && consumeResponse(game, targetActor, 'shan', '【杀】')) {
           dodged = true;
-        } else if (!responseContext.responseLocked && !ignoreArmor
-            && target.equipment && target.equipment.armor && target.equipment.armor.type === 'bagua') {
-          var baguaJudge = judge(game, targetActor, '【八卦阵】');
-          if (baguaJudge && baguaJudge.color === 'red') {
-            log(game, actorName(game, targetActor) + '的【八卦阵】判定为红色，视为打出【闪】。');
-            dodged = true;
-          }
-          resolveJudgementCard(game, targetActor, target, '【八卦阵】', baguaJudge);
+        } else if (!responseContext.responseLocked) {
+          dodged = tryBaguaDodge(game, targetActor, ignoreArmor);
         }
         return resolveShaAfterResponse(game, actor, card, amount, dodged);
+      }
+
+      // H2: 八卦阵 — 需要打出【闪】时 (响应【杀】或【万箭齐发】) 若目标装备
+      // 八卦且未被无视, 进行判定; 红色视为打出【闪】。返回是否因此闪避; 无
+      // 八卦 / 被无视 → 返回 false 且无副作用。统一【杀】与【万箭齐发】两类
+      // 需闪场景, 此前【万箭齐发】缺失此兜底 (有八卦无闪的目标必中)。
+      function tryBaguaDodge(game, targetActor, ignoreArmor) {
+        var target = game[targetActor];
+        var armor = target && target.equipment && target.equipment.armor;
+        if (!armor || armor.type !== 'bagua' || ignoreArmor) return false;
+        var baguaJudge = judge(game, targetActor, '【八卦阵】');
+        var dodged = false;
+        if (baguaJudge && baguaJudge.color === 'red') {
+          log(game, actorName(game, targetActor) + '的【八卦阵】判定为红色，视为打出【闪】。');
+          dodged = true;
+        }
+        resolveJudgementCard(game, targetActor, target, '【八卦阵】', baguaJudge);
+        return dodged;
       }
 
       // v9 PR-E25: 【杀】响应窗口结束后的结算 (贯石/青龙/伤害). 从原
@@ -3393,16 +3405,7 @@
           if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
         } else {
           log(game, actorName(game, 'player') + '选择不打出【闪】。');
-          var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
-          var armor = target.equipment && target.equipment.armor;
-          if (armor && !ignoreArmor && armor.type === 'bagua') {
-            var baguaJudge = judge(game, 'player', '【八卦阵】');
-            if (baguaJudge && baguaJudge.color === 'red') {
-              log(game, actorName(game, 'player') + '的【八卦阵】判定为红色，视为打出【闪】。');
-              dodged = true;
-            }
-            resolveJudgementCard(game, 'player', target, '【八卦阵】', baguaJudge);
-          }
+          dodged = tryBaguaDodge(game, 'player', isArmorIgnoredBySha(game, actor, card));
         }
         return resolveShaAfterResponse(game, actor, card, amount, dodged);
       }
@@ -3522,6 +3525,10 @@
         }
         if (consumeResponse(game, targetActor, responseType, '【' + title + '】')) {
           log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
+        } else if (responseType === 'shan' && tryBaguaDodge(game, targetActor, false)) {
+          // H2: 【万箭齐发】需打出【闪】, 八卦阵 红判定可化解。
+          //      (【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦)
+          log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
         } else {
           damage(game, targetActor, 1, actor, '【' + title + '】');
         }
@@ -3545,6 +3552,10 @@
           if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
         } else {
           log(game, actorName(game, 'player') + '选择不打出【闪】响应【' + title + '】。');
+        }
+        // H2: 玩家未以【闪】化解 (放弃 / 无闪 / 指定牌无效) → 八卦阵 红判定可化解。
+        if (!dodged && tryBaguaDodge(game, 'player', false)) {
+          dodged = true;
         }
         if (dodged) {
           log(game, actorName(game, 'player') + '成功化解【' + title + '】。');
