@@ -2562,3 +2562,12 @@
       populateHeroSelects();
       bindEvents();
       showLobby();
+
+      // 审计二轮 PR-9: UI 行为测试钩子 — fake-DOM 测试需要访问模块私有的
+      // game 引用与手动触发 render (浏览器对局不依赖此对象)。
+      if (typeof window !== 'undefined') {
+        window.SanguoshaUI = {
+          getGame: function () { return game; },
+          render: function () { render(); }
+        };
+      }
