@@ -25,7 +25,7 @@ test('v9 PR-E26: shanOptionForCard 识别 真闪 / 龙胆 / 倾国', () => {
 });
 
 test('v9 PR-E26: findResponseCard 支持 preferredCardId (指定牌当闪)', () => {
-  assert.match(engine, /function findResponseCard\(state, type, preferredCardId\)/);
+  assert.match(engine, /function findResponseCard\(state, type, preferredCardId, game\)/);
   assert.match(engine, /if\s*\(preferredCardId\)/);
 });
 

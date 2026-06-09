@@ -68,7 +68,9 @@ test('v8 PR-B1: 寒冰剑 装备1张 + 手牌1张 → 弃装备1张 + 手牌1张
   assert.equal(game.enemy.hand.length, 0);
 });
 
-test('v8 PR-B1: 寒冰剑 + 目标判定区有牌 (无装备) → 弃判定 1 + 手牌 1', () => {
+test('M3: 寒冰剑不可弃判定区牌 — 判定区乐不思蜀原地不动, 只弃手牌', () => {
+  // gltjk glossary__zone.md 明文反例: "执行【寒冰剑】的效果不可以弃置目标
+  // 角色判定区里的牌"。此前判定区被计入并弃置, 弃掉对方的乐反而帮了对方。
   const game = makeGame();
   game.player.equipment.weapon = { id: 'hb-w4', type: 'hanbing', name: '寒冰剑', family: 'equipment', slot: 'weapon', range: 2 };
   game.enemy.judgeArea.push({ id: 'foe-lebu', type: 'lebusishu', name: '乐不思蜀', family: 'delayed', suit: 'spade', color: 'black' });
@@ -76,9 +78,20 @@ test('v8 PR-B1: 寒冰剑 + 目标判定区有牌 (无装备) → 弃判定 1 + 
   dealSha(game.player, 'hb-sha4');
   const enemyHpBefore = game.enemy.hp;
   Engine.playCard(game, 'player', 'hb-sha4');
-  assert.equal(game.enemy.hp, enemyHpBefore);
-  assert.equal(game.enemy.judgeArea.length, 0, '判定区被弃');
-  assert.equal(game.enemy.hand.length, 0, '手牌也被弃');
+  assert.equal(game.enemy.hp, enemyHpBefore, '寒冰触发 (手牌可弃) → 伤害防止');
+  assert.equal(game.enemy.judgeArea.length, 1, 'M3: 判定区牌不可被寒冰弃置');
+  assert.equal(game.enemy.hand.length, 0, '手牌被弃 (只有 1 张可弃)');
+});
+
+test('M3: 寒冰剑 + 目标只有判定区牌 → 不触发 (判定区牌不是其牌), 伤害正常', () => {
+  const game = makeGame();
+  game.player.equipment.weapon = { id: 'hb-w6', type: 'hanbing', name: '寒冰剑', family: 'equipment', slot: 'weapon', range: 2 };
+  game.enemy.judgeArea.push({ id: 'foe-lebu-only', type: 'lebusishu', name: '乐不思蜀', family: 'delayed', suit: 'spade', color: 'black' });
+  dealSha(game.player, 'hb-sha6');
+  const enemyHpBefore = game.enemy.hp;
+  Engine.playCard(game, 'player', 'hb-sha6');
+  assert.equal(game.enemy.hp, enemyHpBefore - 1, '目标无手牌/装备 → 寒冰不触发');
+  assert.equal(game.enemy.judgeArea.length, 1, '判定区原地不动');
 });
 
 test('v8 PR-B1: 寒冰剑 + 目标完全无牌 → 不触发, 伤害正常', () => {
