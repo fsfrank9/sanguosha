@@ -2833,62 +2833,34 @@
       function resolvePendingChoice(game, decision) {
         var pending = game && game.pendingChoice;
         if (!pending) return fail('没有待处理的选择。');
-        // v10 V3: 框架注册的 response kinds 优先走 registry 分发.
-        // 已注册: shan-response. V4-V6 会陆续加 wuxie / sha-duel 等.
-        var registered = RESPONSE_KIND_RESOLVERS[pending.kind];
-        if (registered) {
-          game.pendingChoice = null;
-          return registered(game, pending, decision || {});
-        }
+        // 注册表迁移收官: 所有 pendingChoice / response kind 统一经
+        // RESPONSE_KIND_RESOLVERS 分发 (此前仅 V3-V6 的 shan/wuxie/sha-duel/
+        // wanjian/yinyue 走注册表, 其余 15 个 kind 是手写 if 链)。
+        var resolver = RESPONSE_KIND_RESOLVERS[pending.kind];
+        if (!resolver) return fail('未知的选择类型：' + pending.kind);
         game.pendingChoice = null;
-        if (pending.kind === 'guicai-replace') {
-          return resolveGuicaiReplaceChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'yiji-distribute') {
-          return resolveYijiDistributeChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'guanxing-reorder') {
-          return resolveGuanxingChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'fanjian-guess') {
-          return resolveFanjianGuessChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'fankui-pick') {
-          return resolveFankuiPickChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'ganglie-fire') {
-          return resolveGanglieFireChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'ganglie-source-choice') {
-          return resolveGanglieSourceChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'qilin-pick') {
-          return resolveQilinPickChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'cixiong-fire') {
-          return resolveCixiongFireChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'cixiong-choose') {
-          return resolveCixiongChoose(game, pending, decision || {});
-        }
-        if (pending.kind === 'jiedao-decision') {
-          return resolveJiedaoDecisionChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'wugu-pick') {
-          return resolveWuguPickChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'guohe-1v1-pick') {
-          return resolveGuohe1v1PickChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'dying-rescue') {
-          return resolveDyingRescueChoice(game, pending, decision || {});
-        }
-        if (pending.kind === 'luoshen-continue') {
-          return resolveLuoshenContinueChoice(game, pending, decision || {});
-        }
-        // v10 V3: shan-response 已移到框架注册表 (上方 RESPONSE_KIND_RESOLVERS).
-        return fail('未知的选择类型：' + pending.kind);
+        return resolver(game, pending, decision || {});
       }
+
+      // 注册表迁移收官: 把原 resolvePendingChoice 内的 15 个手写 if 分支统一
+      // 注册到 RESPONSE_KIND_RESOLVERS, 与 V3-V6 已迁移的 response kind 同走
+      // 一套 dispatcher。resolver 签名 (game, pending, decision), 各自负责清理
+      // 对应 pauseState (失败时可重设 game.pendingChoice 以重试)。
+      registerResponseKind('guicai-replace', resolveGuicaiReplaceChoice);
+      registerResponseKind('yiji-distribute', resolveYijiDistributeChoice);
+      registerResponseKind('guanxing-reorder', resolveGuanxingChoice);
+      registerResponseKind('fanjian-guess', resolveFanjianGuessChoice);
+      registerResponseKind('fankui-pick', resolveFankuiPickChoice);
+      registerResponseKind('ganglie-fire', resolveGanglieFireChoice);
+      registerResponseKind('ganglie-source-choice', resolveGanglieSourceChoice);
+      registerResponseKind('qilin-pick', resolveQilinPickChoice);
+      registerResponseKind('cixiong-fire', resolveCixiongFireChoice);
+      registerResponseKind('cixiong-choose', resolveCixiongChoose);
+      registerResponseKind('jiedao-decision', resolveJiedaoDecisionChoice);
+      registerResponseKind('wugu-pick', resolveWuguPickChoice);
+      registerResponseKind('guohe-1v1-pick', resolveGuohe1v1PickChoice);
+      registerResponseKind('dying-rescue', resolveDyingRescueChoice);
+      registerResponseKind('luoshen-continue', resolveLuoshenContinueChoice);
 
       function resolveGuanxingChoice(game, pending, decision) {
         var actor = pending.actor;
