@@ -1,0 +1,28 @@
+name: CI
+
+# 审计 T2: pages.yml 只在 push 到 main 时跑测试 (合并后), PR 本身不被测试。
+# 本 workflow 在 PR (及非 main 分支 push) 上运行 build:check + 全量测试,
+# 成为合并前的门禁。不含 Pages 部署 (部署仍由 pages.yml 在 main 上负责)。
+'on':
+  pull_request:
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify (build:check + 全量测试)
+        run: npm run verify
