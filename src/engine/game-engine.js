@@ -459,23 +459,49 @@
         return null;
       }
 
-      function discardCard(game, card) {
-        // M1: 还原【朱雀羽扇】本次使用临时转化的【杀】, 使其以原始身份 (普通
-        // 【杀】或被当作杀的红牌) 进入弃牌堆, 避免洗回牌堆后变成永久【火杀】。
+      // M1: 还原【朱雀羽扇】本次使用临时转化的【杀】, 使其以原始身份 (普通
+      // 【杀】或被当作杀的红牌) 离开结算, 避免洗回牌堆 / 进入手牌后变成永久【火杀】。
+      function restoreZhuqueIdentity(card) {
         if (card && card.zhuqueOriginalType !== undefined) {
           card.type = card.zhuqueOriginalType;
           card.name = card.zhuqueOriginalName;
           delete card.zhuqueOriginalType;
           delete card.zhuqueOriginalName;
         }
+      }
+
+      function discardCard(game, card) {
+        restoreZhuqueIdentity(card);
+        // H1: 虚拟合成牌 (丈八蛇矛的两手牌当【杀】等) 没有对应实体——组成它
+        // 的实体牌已在转化时弃置, 再推入弃牌堆会凭空多出一张牌污染牌堆。
+        if (card && card.virtual) return;
         var physicalCard = physicalCardOf(card);
         if (physicalCard) game.discard.push(physicalCard);
       }
 
       function triggerJianxiongDamageAfter(game, targetActor, sourceCard) {
         var target = game[targetActor];
+        if (!sourceCard || !target || !hasSkill(target, 'jianxiong')) return null;
+        // H1: 虚拟合成牌 (丈八蛇矛) 造成伤害时, 奸雄获得组成它的实体牌
+        // (转化时已进入弃牌堆), 而不是把无实体的虚拟牌收进手牌。
+        if (sourceCard.virtual) {
+          var components = sourceCard.physicalCards || [];
+          var gainedNames = [];
+          components.forEach(function (component) {
+            var discardIndex = game.discard.indexOf(component);
+            if (discardIndex === -1) return;
+            game.discard.splice(discardIndex, 1);
+            target.hand.push(component);
+            gainedNames.push(component.name);
+          });
+          if (!gainedNames.length) return null;
+          log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + gainedNames.join('】、【') + '】。');
+          return { claimedSourceCard: true };
+        }
         var physicalSourceCard = physicalCardOf(sourceCard);
-        if (!sourceCard || !physicalSourceCard || !target || !hasSkill(target, 'jianxiong')) return null;
+        if (!physicalSourceCard) return null;
+        // M5: 被朱雀临时转化的【杀】进入奸雄手牌前还原物理身份, 与 discardCard 一致。
+        restoreZhuqueIdentity(sourceCard);
         target.hand.push(physicalSourceCard);
         log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + physicalSourceCard.name + '】。');
         return { claimedSourceCard: true };
@@ -4286,12 +4312,16 @@
         }
         discardCard(game, first);
         discardCard(game, second);
+        // H1: virtual + physicalCards 标记 — 虚拟杀本身不进弃牌堆 (discardCard
+        // 会跳过), 奸雄等"获得造成伤害的牌"改为获得这两张组成实体牌。
         var virtualSha = makeTestCard('sha', {
           id: 'zhangba-' + first.id + '-' + second.id,
           suit: first.suit,
           rank: first.rank,
           color: first.color,
-          name: '丈八蛇矛杀'
+          name: '丈八蛇矛杀',
+          virtual: true,
+          physicalCards: [first, second]
         });
         log(game, actorName(game, actor) + '发动【丈八蛇矛】，将两张手牌当【杀】使用。');
         return playSha(game, actor, virtualSha);
