@@ -45,11 +45,12 @@ test('v10 V3: resolveResponseChoice 仅处理注册的 kind, 未注册 → fail'
   assert.match(fn[0], /未注册的响应类型/);
 });
 
-test('v10 V3: resolvePendingChoice 优先走 RESPONSE_KIND_RESOLVERS, 未注册 fall through 旧分支', () => {
+test('注册表迁移收官: resolvePendingChoice 统一经 RESPONSE_KIND_RESOLVERS 分发 (无旧分支)', () => {
   const fn = engineSrc.match(/function resolvePendingChoice\(game, decision\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /var registered\s*=\s*RESPONSE_KIND_RESOLVERS\[pending\.kind\]/);
-  assert.match(fn[0], /if\s*\(registered\)/);
+  assert.match(fn[0], /var resolver\s*=\s*RESPONSE_KIND_RESOLVERS\[pending\.kind\]/);
+  assert.match(fn[0], /if\s*\(!resolver\)\s*return fail/);
+  assert.match(fn[0], /return resolver\(game, pending, decision \|\| \{\}\)/);
 });
 
 // ───── shan-response 迁移到框架 (reference impl) ──────────────────────
@@ -114,20 +115,27 @@ test('v10 V3: resolveResponseChoice 与 resolvePendingChoice 行为等价 (shan-
 });
 
 test('v10 V3: resolveResponseChoice 未注册 kind → fail (不破坏 pendingChoice)', () => {
+  // 注: 注册表迁移收官后 ganglie-fire 等已注册, 这里改用一个根本不存在的
+  // kind 来验证未注册 → fail 且保留 pendingChoice 的分支。
   const game = Engine.newGame({ seed: 91003, playerHero: 'liubei', enemyHero: 'caocao' });
-  game.pendingChoice = { kind: 'ganglie-fire', actor: 'player' };
+  game.pendingChoice = { kind: 'definitely-not-a-registered-kind', actor: 'player' };
   const res = Engine.resolveResponseChoice(game, {});
   assert.equal(res.ok, false);
   assert.match(res.message, /未注册的响应类型/);
+  assert.ok(game.pendingChoice, '未注册 → 不清空 pendingChoice');
 });
 
-test('v10 V3: 旧未注册 kinds (guanxing/yiji/fanjian) 仍由 resolvePendingChoice 走原有分支', () => {
-  // 直接形态检查 — 旧分支链仍在 (registry fall through 后).
+test('注册表迁移收官: 旧 pendingChoice kinds 已注册到 RESPONSE_KIND_RESOLVERS, resolvePendingChoice 不再有 if 链', () => {
+  // 迁移前这些 kind 是 resolvePendingChoice 内的手写 if 分支; 现统一注册并由
+  // dispatcher 分发。形态校验: registerResponseKind 注册存在, 且函数体内不再有
+  // pending.kind === ... 分支。
+  assert.match(engineSrc, /registerResponseKind\(\s*'guanxing-reorder'\s*,\s*resolveGuanxingChoice\s*\)/);
+  assert.match(engineSrc, /registerResponseKind\(\s*'yiji-distribute'\s*,\s*resolveYijiDistributeChoice\s*\)/);
+  assert.match(engineSrc, /registerResponseKind\(\s*'fanjian-guess'\s*,\s*resolveFanjianGuessChoice\s*\)/);
+  assert.match(engineSrc, /registerResponseKind\(\s*'dying-rescue'\s*,\s*resolveDyingRescueChoice\s*\)/);
   const fn = engineSrc.match(/function resolvePendingChoice\(game, decision\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /pending\.kind\s*===\s*'guanxing-reorder'/);
-  assert.match(fn[0], /pending\.kind\s*===\s*'yiji-distribute'/);
-  assert.match(fn[0], /pending\.kind\s*===\s*'fanjian-guess'/);
+  assert.doesNotMatch(fn[0], /pending\.kind\s*===/);
 });
 
 // ───── helpers ────────────────────────────────────────────────────────
