@@ -19,16 +19,40 @@ function dealSha(state, id, opts) {
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
 
-test('v8 PR-B3: 朱雀装备 + 普通杀 → 转化为火杀 (card.type → fire_sha, name → 火杀)', () => {
+// M1 (审计): 朱雀转火杀是「本次使用」的视为效果, 弃置后物理牌还原为普通
+// 【杀】。此前 mutate card.type='fire_sha' 永久污染物理牌 (洗回牌堆变永久火杀)。
+test('M1: 朱雀 + 普通杀 → 使用时为火杀, 弃置后还原为普通【杀】(不污染牌堆)', () => {
   const game = makeGame();
   game.player.equipment.weapon = { id: 'zq-w', type: 'zhuque', name: '朱雀羽扇', family: 'equipment', slot: 'weapon', range: 4 };
   const sha = dealSha(game.player, 'normal-sha');
   Engine.playCard(game, 'player', 'normal-sha');
-  // 卡牌已用 → 弃牌堆里 type 已被改成 fire_sha
+  // M1 修复: 弃牌堆里的物理牌还原为普通【杀】(火属性仅在本次使用时生效)。
   const discardedSha = game.discard.find((c) => c.id === 'normal-sha');
   assert.ok(discardedSha, 'sha 已使用进入弃牌堆');
-  assert.equal(discardedSha.type, 'fire_sha', 'card.type 被 mutate 为 fire_sha');
-  assert.equal(discardedSha.name, '火杀', 'name 被 mutate 为 火杀');
+  assert.equal(discardedSha.type, 'sha', '弃置后 type 还原为 sha (不再永久 fire_sha)');
+  assert.equal(discardedSha.name, '杀', '弃置后 name 还原为 杀');
+  assert.equal(discardedSha.zhuqueOriginalType, undefined, '临时标记已清除');
+  assert.equal(discardedSha.zhuqueOriginalName, undefined, '临时标记已清除');
+});
+
+test('M1: 被朱雀转化过的【杀】卸下朱雀后再用 → 仍是普通【杀】(被藤甲防止, 无火杀残留)', () => {
+  const game = makeGame();
+  game.player.equipment.weapon = { id: 'zq-reuse', type: 'zhuque', name: '朱雀羽扇', family: 'equipment', slot: 'weapon', range: 4 };
+  game.enemy.equipment.armor = { id: 'tj-reuse', type: 'tengjia', name: '藤甲', family: 'equipment', slot: 'armor' };
+  dealSha(game.player, 'reuse-sha');
+  const hp0 = game.enemy.hp;
+  Engine.playCard(game, 'player', 'reuse-sha');
+  assert.equal(game.enemy.hp, hp0 - 2, '首次: 朱雀火杀 + 藤甲 +1 = 2 dmg (火属性本次生效)');
+  const reused = game.discard.find((c) => c.id === 'reuse-sha');
+  assert.equal(reused.type, 'sha', '弃置后还原为普通杀');
+  // 取回该物理牌, 卸下朱雀, 复位出杀计数, 回满血, 再用一次
+  game.discard = game.discard.filter((c) => c.id !== 'reuse-sha');
+  game.player.hand = [reused];
+  game.player.equipment.weapon = null;
+  game.player.usedSha = false;
+  game.enemy.hp = game.enemy.maxHp;
+  Engine.playCard(game, 'player', 'reuse-sha');
+  assert.equal(game.enemy.hp, game.enemy.maxHp, '再次使用为普通杀 → 藤甲防止 → 不掉血 (确认无火杀残留)');
 });
 
 test('v8 PR-B3: 朱雀 + 普通杀 + 目标藤甲 → 不再"防止伤害", 改为火焰 +1 = 2 dmg', () => {
