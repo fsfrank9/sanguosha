@@ -145,6 +145,84 @@ test('v7 PR-13: AI 对手不救玩家 (responder !== dyingActor + auto → skip)
   assert.ok(game.enemy.hand.some((c) => c.id === 'foe-tao'), 'enemy 不会自动救 player → 桃 保留');
 });
 
+// --- C1 + C2: 体力值可降至负数 + 同一响应者可连续出多张【桃】 ---
+// gltjk flow__neardeath.md：1 体力角色受【闪电】3 点伤害后为 -2，需 3 张【桃】
+// 才能回到 +1；同一响应者可连续出【桃】「直到将体力值首次回复至1点或以上」。
+
+test('C1+C2: 【酒】+【杀】对 1 体力玩家造成 2 点伤害 → hp 降至 -1 (不再 clamp 到 0)', () => {
+  const game = buildGame();
+  game.player.hp = 1;
+  game.player.hand = [tao('c1-tao-a'), tao('c1-tao-b')]; // 无【闪】, 无法闪避
+  // player default = ask → 命中后暂停等救援, 可观察到负血
+  game.enemy.hand = [jiu('c1-jiu'), sha('c1-sha')];
+  game.turn = 'enemy';
+  Engine.playCard(game, 'enemy', 'c1-jiu'); // 本回合下一张【杀】+1 伤害
+  Engine.playCard(game, 'enemy', 'c1-sha'); // 2 点伤害命中
+  assert.equal(game.player.hp, -1, 'hp 应为 -1 (1 - 2), 不再 clamp 到 0');
+  assert.ok(game.pendingChoice, '应暂停等待玩家救援');
+  assert.equal(game.pendingChoice.kind, 'dying-rescue');
+  assert.deepEqual(game.pendingChoice.taoIds.sort(), ['c1-tao-a', 'c1-tao-b']);
+});
+
+test('C2: ask 路径 — 第一张【桃】只回到 0 → 再次询问同一响应者出第二张【桃】 → 存活', () => {
+  const game = buildGame();
+  game.player.hp = 1;
+  game.player.hand = [tao('c2-tao-a'), tao('c2-tao-b')];
+  game.enemy.hand = [jiu('c2-jiu'), sha('c2-sha')];
+  game.turn = 'enemy';
+  Engine.playCard(game, 'enemy', 'c2-jiu');
+  Engine.playCard(game, 'enemy', 'c2-sha');
+  assert.equal(game.player.hp, -1);
+
+  // 第一张【桃】: -1 → 0, 仍未回到 1 → 应重新询问同一响应者 (再次 pendingChoice)
+  const r1 = Engine.resolvePendingChoice(game, { cardId: 'c2-tao-a' });
+  assert.equal(r1.ok, true);
+  assert.equal(game.player.hp, 0, '第一张桃后 hp = 0, 仍濒死');
+  assert.ok(game.pendingChoice, 'C2: 同一响应者被再次询问 (而非直接死亡)');
+  assert.equal(game.pendingChoice.kind, 'dying-rescue');
+  assert.deepEqual(game.pendingChoice.taoIds, ['c2-tao-b'], '剩余可用【桃】更新为第二张');
+  assert.equal(game.phase, 'play', '尚未 game-over');
+
+  // 第二张【桃】: 0 → 1 → 存活
+  const r2 = Engine.resolvePendingChoice(game, { cardId: 'c2-tao-b' });
+  assert.equal(r2.ok, true);
+  assert.equal(game.player.hp, 1, '第二张桃后 hp = 1, 脱离濒死');
+  assert.equal(game.phase, 'play');
+  assert.ok(!game.pendingChoice, '濒死结算完成');
+  assert.ok(game.discard.some((c) => c.id === 'c2-tao-a'), '第一张桃已消耗');
+  assert.ok(game.discard.some((c) => c.id === 'c2-tao-b'), '第二张桃已消耗');
+});
+
+test('C2: auto 路径 — 深度致命伤自动连出 2 张【桃】救回', () => {
+  const game = buildGame();
+  game.player.hp = 1;
+  game.player.hand = [tao('c2a-tao-a'), tao('c2a-tao-b')];
+  game.player.skillPreferences.dying = 'auto';
+  game.enemy.hand = [jiu('c2a-jiu'), sha('c2a-sha')];
+  game.turn = 'enemy';
+  Engine.playCard(game, 'enemy', 'c2a-jiu');
+  Engine.playCard(game, 'enemy', 'c2a-sha');
+  assert.equal(game.phase, 'play', 'auto 连续自救后存活');
+  assert.equal(game.player.hp, 1, 'hp -1 → 0 → 1');
+  assert.ok(game.discard.some((c) => c.id === 'c2a-tao-a'), '第一张桃已消耗');
+  assert.ok(game.discard.some((c) => c.id === 'c2a-tao-b'), '第二张桃已消耗');
+});
+
+test('C1: 桃数量不足以抵消深度致命伤 → 死亡 (旧 clamp-to-0 下会错误存活)', () => {
+  const game = buildGame();
+  game.player.hp = 1;
+  game.player.hand = [tao('c1d-tao')]; // 只有 1 张桃, 不足以从 -1 回到 1
+  game.player.skillPreferences.dying = 'auto';
+  game.enemy.hand = [jiu('c1d-jiu'), sha('c1d-sha')];
+  game.turn = 'enemy';
+  Engine.playCard(game, 'enemy', 'c1d-jiu');
+  Engine.playCard(game, 'enemy', 'c1d-sha');
+  // -1 → 用唯一的桃 → 0 → 无更多救援牌 → 死亡
+  assert.equal(game.phase, 'gameover', '1 张桃无法抵消 2 点致命伤 (-1) → 死');
+  assert.equal(game.winner, 'enemy');
+  assert.ok(game.discard.some((c) => c.id === 'c1d-tao'), '唯一的桃仍被尝试使用');
+});
+
 for (const [name, fn] of tests) {
   try { fn(); console.log(`✓ ${name}`); }
   catch (error) { console.error(`✗ ${name}`); throw error; }

@@ -2013,7 +2013,10 @@
           if (sourceCard) discardCard(game, sourceCard);
           return false;
         }
-        target.hp = Math.max(0, target.hp - amount);
+        // C1: 体力值可降至负数 (gltjk flow__neardeath.md — 1 体力的法正受
+        // 【闪电】3 点伤害后为 -2, 需 3 张【桃】方能回到 +1)。不再 clamp 到
+        // 0, 否则深度致命伤被一张【桃】抹平, 严重削弱【闪电】/【酒】+【杀】等。
+        target.hp = target.hp - amount;
         log(game, actorName(game, targetActor) + '因' + reason + '受到 ' + amount + ' 点伤害。');
         var damageContext = {
           game: game,
@@ -2067,8 +2070,7 @@
           actor: dyingActor,
           source: sourceActor,
           responders: responderQueue,
-          idx: 0,
-          actedOnce: {}
+          idx: 0
         };
         processDyingNext(game);
       }
@@ -2085,15 +2087,13 @@
           game.pauseState.dying = null;
           return { saved: true };
         }
-        // 全部响应完毕 → 死亡
+        // 全部响应完毕 → 死亡。从当前回合角色起按逆时针依次响应；C2: 同一
+        // 名响应者可连续出多张【桃】/【酒】, 直到体力值首次回复至 1 点 (gltjk
+        // flow__neardeath.md「直到A将体力值首次回复至1点或1点以上为止」)。仅当
+        // 该响应者放弃 / 已无可用救援牌时才前进到下一名 (idx += 1)。
         while (saved.idx < saved.responders.length) {
           var responder = saved.responders[saved.idx];
           if (!game[responder]) {
-            saved.idx += 1;
-            continue;
-          }
-          // 跳过同一名响应者重复 (spec 简化: 1v1 中每个 responder 仅一次机会)
-          if (saved.actedOnce[responder]) {
             saved.idx += 1;
             continue;
           }
@@ -2102,17 +2102,15 @@
             return { paused: true };
           }
           if (attemptResult && attemptResult.healed) {
-            saved.actedOnce[responder] = true;
-            // 重新检查存活
+            // 回复后再次检查存活；未满 1 点则继续询问同一响应者 (不前进 idx)。
             if (dyingState.hp >= 1) {
               log(game, actorName(game, dyingActor) + '脱离濒死状态。');
               game.pauseState.dying = null;
               return { saved: true };
             }
-            // hp 仍 0 (在我们的引擎里不会发生，因为 hp 被 clamp 到 0；这里
-            // 保留为未来扩展) → 同一名响应者结束，进入下一名
+            continue;
           }
-          saved.actedOnce[responder] = true;
+          // skipped (无【桃】/【酒】或放弃) → 进入下一名响应者
           saved.idx += 1;
         }
         // All responders exhausted, no save → die. 1v1 中胜者恒为对手。
@@ -2238,8 +2236,7 @@
         var dyingActor = pending.dyingActor;
         if (decision && (decision.decline || decision.skip)) {
           log(game, actorName(game, responder) + '选择不救援。');
-          saved.actedOnce[responder] = true;
-          saved.idx += 1;
+          saved.idx += 1; // C2: 放弃 → 进入下一名响应者
           var nextOutcome = processDyingNext(game);
           return (nextOutcome && (nextOutcome.saved || nextOutcome.died)) ? success('濒死结算完成。') : success('继续濒死结算。');
         }
@@ -2259,10 +2256,12 @@
         else if ((pending.jiuIds || []).indexOf(cardId) >= 0) kind = 'jiu';
         else kind = 'jijiu';
         var executeResult = executeDyingRescue(game, responder, dyingActor, kind, cardId);
-        saved.actedOnce[responder] = true;
         if (!executeResult.healed) {
+          // 使用失败 (理论上不出现) → 跳过该响应者
           saved.idx += 1;
         }
+        // C2: 救援成功后不前进 idx — 若仍未回复至 1 点, processDyingNext 会再次
+        // 询问同一响应者 (再出一张【桃】); 已回复至 1 点则直接判存活。
         var outcome = processDyingNext(game);
         if (outcome && outcome.paused) return success('继续等待救援。');
         return success('濒死结算完成。');
