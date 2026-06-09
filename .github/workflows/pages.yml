@@ -35,10 +35,19 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      # 审计二轮: 此前 path:. 把整个仓库 (tests/ docs/ official-skill-cache/
+      # 等约 2.5MB 非运行时内容) 发布到公网站点。游戏运行只需要 index.html
+      # 与 src/, 组装最小产物再上传。
+      - name: Assemble static site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp -r src _site/src
+
       - name: Upload static site artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
 
   deploy:
     needs: build
