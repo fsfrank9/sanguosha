@@ -400,7 +400,7 @@
         return null;
       }
 
-      function removeOwnCardFromAnyZone(state, cardId) {
+      function removeOwnCardFromAnyZone(state, cardId, game) {
         var hit = findOwnCardById(state, cardId);
         if (!hit) return null;
         if (hit.zone === 'hand') {
@@ -408,6 +408,12 @@
         }
         // equipment
         state.equipment[hit.slot] = null;
+        // M2: 制衡/苦肉/武圣转化等把装备区牌当成本, 同样是"失去装备" —
+        // 传入 game 的调用方会触发失去时机 (白银狮子回血)。
+        if (game) {
+          var ownerActor = game.player === state ? 'player' : 'enemy';
+          triggerEquipmentLoss(game, ownerActor, hit.card);
+        }
         return hit.card;
       }
 
@@ -541,6 +547,9 @@
           return { declinedFankui: true };
         }
         // Build a zone catalog of every gainable card.
+        // M3 (审计二轮): gltjk glossary__zone.md — "其判定区里的牌既不是该角色
+        // 的牌, 也不为任何角色所拥有"。反馈获得"来源的一张牌"仅限手牌/装备区,
+        // 此前错误把判定区列为可获得 zone。
         var zones = [];
         if (source.hand && source.hand.length > 0) {
           zones.push({ zone: 'hand', count: source.hand.length });
@@ -552,14 +561,6 @@
             name: card.name, suit: card.suit, rank: card.rank
           });
         });
-        if (source.judgeArea) {
-          source.judgeArea.forEach(function (card) {
-            zones.push({
-              zone: 'judge', cardId: card.id,
-              name: card.name, suit: card.suit, rank: card.rank
-            });
-          });
-        }
         if (zones.length === 0) {
           return null;  // nothing to gain
         }
@@ -572,8 +573,9 @@
           });
           return { suspendedForFankui: true };
         }
-        // Auto path: legacy default zone (hand if any → equipment → judge).
-        var gained = removeTargetZoneCard(game, sourceActor);
+        // Auto path: hand if any → equipment (M3: 判定区牌不可获得)。
+        var autoZone = (source.hand && source.hand.length) ? 'hand' : 'equipment';
+        var gained = removeTargetZoneCard(game, sourceActor, autoZone);
         if (!gained || !gained.card) return null;
         target.hand.push(gained.card);
         log(game, actorName(game, targetActor) + '发动【反馈】，获得' + actorName(game, sourceActor) + '的一张' + gained.zone + '牌。');
@@ -586,14 +588,15 @@
         var holderState = game[holder];
         if (!holderState) return fail('未知角色。');
         var zone = decision && decision.zone;
-        if (['hand', 'equipment', 'judge'].indexOf(zone) < 0) {
+        // M3: 判定区牌不为任何角色所拥有, 反馈不可获得 (glossary__zone.md)。
+        if (['hand', 'equipment'].indexOf(zone) < 0) {
           setPendingChoice(game, pending);
-          return fail('请选择有效的区域（hand / equipment / judge）。');
+          return fail('请选择有效的区域（hand / equipment）。');
         }
         // For hand zone we deliberately ignore decision.cardId — engine
         // picks a random hand card, preserving the "opponent's hand
         // contents are hidden when 反馈 is choosing" semantic. equipment
-        // and judge zones use the specific cardId the player clicked.
+        // zone uses the specific cardId the player clicked.
         var gained = removeTargetZoneCard(game, sourceActor, zone, zone === 'hand' ? null : decision.cardId);
         if (!gained || !gained.card) {
           setPendingChoice(game, pending);
@@ -799,6 +802,7 @@
             var ecard = source.equipment[slotKey];
             source.equipment[slotKey] = null;
             discardCard(game, ecard);
+            triggerEquipmentLoss(game, sourceActor, ecard);
             discarded.push(ecard);
           }
         }
@@ -1086,7 +1090,7 @@
         // cleared when a card is taken from them.
         var discarded = [];
         for (var i = 0; i < cardIds.length; i += 1) {
-          var card = removeOwnCardFromAnyZone(self, cardIds[i]);
+          var card = removeOwnCardFromAnyZone(self, cardIds[i], game);
           if (card) {
             discarded.push(card);
             discardCard(game, card);
@@ -1363,6 +1367,20 @@
         return guanxingResult;
       }
 
+      // M2 (审计二轮): "当你失去装备区里的【白银狮子】时, 你回复1点体力" —
+      // 任何失去方式 (弃置/被拆/被顺/替换/作为技能或转化成本) 都应触发。
+      // 此前回血只在 loseEquipment 一条路径生效, equipCard 替换 / 过河拆桥 /
+      // 制衡弃装备 / 刚烈弃置 等全部绕过。所有装备离开装备区的路径统一调本函数。
+      function triggerEquipmentLoss(game, actor, card) {
+        if (!card || !game) return;
+        var self = game[actor];
+        if (!self) return;
+        if (card.type === 'baiyin' && self.hp < self.maxHp && game.phase !== 'gameover') {
+          self.hp += 1;
+          log(game, actorName(game, actor) + '因失去【白银狮子】回复 1 点体力。');
+        }
+      }
+
       function equipCard(game, actor, card) {
         var self = game[actor];
         if (!self) return fail('未知角色。');
@@ -1371,8 +1389,11 @@
         if (!slot) return fail('装备槽位未知。');
         removeCardFromHand(self, card.id);
         if (self.equipment[slot]) {
-          discardCard(game, self.equipment[slot]);
-          log(game, actorName(game, actor) + '替换并弃置了原有装备【' + self.equipment[slot].name + '】。');
+          var replaced = self.equipment[slot];
+          self.equipment[slot] = null;
+          discardCard(game, replaced);
+          log(game, actorName(game, actor) + '替换并弃置了原有装备【' + replaced.name + '】。');
+          triggerEquipmentLoss(game, actor, replaced);
         }
         self.equipment[slot] = card;
         log(game, actorName(game, actor) + '装备了【' + card.name + '】。');
@@ -1387,10 +1408,7 @@
         self.equipment[slot] = null;
         discardCard(game, card);
         log(game, actorName(game, actor) + '失去了【' + card.name + '】。');
-        if (card.type === 'baiyin' && self.hp > 0 && self.hp < self.maxHp) {
-          self.hp = Math.min(self.maxHp, self.hp + 1);
-          log(game, actorName(game, actor) + '因失去【白银狮子】回复 1 点体力。');
-        }
+        triggerEquipmentLoss(game, actor, card);
         return success('失去装备。');
       }
 
@@ -1475,31 +1493,24 @@
         if (!source || !target) return null;
         var weapon = source.equipment && source.equipment.weapon;
         if (!weapon || weapon.type !== 'hanbing') return null;
-        // 数有效牌总数 (手牌 + 装备 + 判定区)
+        // M3 (审计二轮): gltjk glossary__zone.md 明文反例 — "执行【寒冰剑】的
+        // 效果不可以弃置目标角色判定区里的牌" (判定区牌不是该角色的牌)。
+        // 此前把判定区计入并弃置, 弃掉对方的【乐不思蜀】反而帮了对方。
+        // 数有效牌总数 (手牌 + 装备)
         var equipsCount = equipmentList(target).length;
         var handCount = (target.hand || []).length;
-        var judgeCount = (target.judgeArea || []).length;
-        if (equipsCount + handCount + judgeCount === 0) return null;
+        if (equipsCount + handCount === 0) return null;
         var pref = (source.skillPreferences && source.skillPreferences.hanbing) || 'auto';
         if (pref === 'decline') {
           log(game, actorName(game, sourceActor) + '选择不发动【寒冰剑】。');
           return null;
         }
-        // auto / 其它: 按 装备 > 判定 > 手牌 顺序弃 2 张
+        // auto / 其它: 按 装备 > 手牌 顺序弃 2 张
         var discarded = 0;
         var equips = equipmentList(target).slice();
         for (var ei = 0; ei < equips.length && discarded < 2; ei += 1) {
           loseEquipment(game, targetActor, equips[ei].slot);
           discarded += 1;
-        }
-        var judges = (target.judgeArea || []).slice();
-        for (var ji = 0; ji < judges.length && discarded < 2; ji += 1) {
-          var jcard = target.judgeArea.shift();
-          if (jcard) {
-            discardCard(game, jcard);
-            log(game, '【寒冰剑】依次弃置' + actorName(game, targetActor) + '判定区【' + jcard.name + '】。');
-            discarded += 1;
-          }
         }
         while (discarded < 2 && (target.hand || []).length > 0) {
           var hcard = target.hand.shift();
@@ -2428,7 +2439,7 @@
         return listShaResponseOptions(state).length > 0;
       }
 
-      function findResponseCard(state, type, preferredCardId) {
+      function findResponseCard(state, type, preferredCardId, game) {
         var card = null;
         if (type === 'shan') {
           // v9 PR-E26: 玩家指定了用哪张牌当【闪】 → 直接消耗那张 (真闪 / 龙胆 / 倾国).
@@ -2436,7 +2447,7 @@
             var picked = shanOptionForCard(state, preferredCardId);
             if (!picked) return null;
             return {
-              card: removeOwnCardFromAnyZone(state, preferredCardId),
+              card: removeOwnCardFromAnyZone(state, preferredCardId, game),
               asName: '闪',
               skillName: picked.via
             };
@@ -2449,7 +2460,7 @@
           // weapon (cardAs may return an equipment card). Skills that only
           // operate on hand (倾国 / 龙胆) won't return equipment cards in
           // the first place, so this is a strict superset.
-          return shanConversion ? { card: removeOwnCardFromAnyZone(state, shanConversion.card.id), asName: shanConversion.asName, skillName: shanConversion.skillName } : null;
+          return shanConversion ? { card: removeOwnCardFromAnyZone(state, shanConversion.card.id, game), asName: shanConversion.asName, skillName: shanConversion.skillName } : null;
         }
         if (type === 'sha') {
           // v10 V6: 玩家指定用哪张牌当【杀】 → 直接消耗那张 (真杀 / 龙胆 / 武圣).
@@ -2457,7 +2468,7 @@
             var pickedSha = shaOptionForCard(state, preferredCardId);
             if (!pickedSha) return null;
             return {
-              card: removeOwnCardFromAnyZone(state, preferredCardId),
+              card: removeOwnCardFromAnyZone(state, preferredCardId, game),
               asName: '杀',
               skillName: pickedSha.via
             };
@@ -2467,7 +2478,7 @@
           var responseContext = { mode: 'response', state: state, asType: 'sha' };
           var conversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', responseContext));
           // Same: support equipment-zone sources for 武圣 's response path.
-          if (conversion) return { card: removeOwnCardFromAnyZone(state, conversion.card.id), asName: conversion.asName, skillName: conversion.skillName };
+          if (conversion) return { card: removeOwnCardFromAnyZone(state, conversion.card.id, game), asName: conversion.asName, skillName: conversion.skillName };
           // v7 PR-14: 丈八蛇矛 — "你可以将两张手牌当【杀】使用或打出"
           //   响应路径：装备 丈八 且手牌 >= 2 时，consume 2 张手牌当 杀 响应。
           //   spec 是 optional，但响应窗口缺省"自动出杀"——保留旧行为。
@@ -2501,7 +2512,7 @@
       }
 
       function consumeResponse(game, actor, type, reason, preferredCardId) {
-        var response = findResponseCard(game[actor], type, preferredCardId);
+        var response = findResponseCard(game[actor], type, preferredCardId, game);
         if (!response) return false;
         if (type === 'sha' && actor === game.turn) game[actor].usedOrRespondedSha = true;
         if (response.extraCards && response.extraCards.length) {
@@ -3153,6 +3164,8 @@
         }
         if (zone === 'equipment') {
           target.equipment[picked.slot] = null;
+          // M2: 被拆/被顺/被反馈拿走装备同样是"失去装备区里的牌"
+          triggerEquipmentLoss(game, targetActor, picked.card);
           return { card: picked.card, zone: '装备区' };
         }
         if (zone === 'judge') {
@@ -4509,7 +4522,7 @@
         if (!playable.ok) return playable;
         // Remove from whichever zone the source card lived in. The slot is
         // cleared if it came from equipment (relevant for 关羽 卸下武器当杀).
-        removeOwnCardFromAnyZone(self, cardId);
+        removeOwnCardFromAnyZone(self, cardId, game);
         log(game, actorName(game, actor) + playable.message);
         if (asType === 'lebusishu') {
           // v8 PR-C1: 国色 把方片当乐 — 直接放对手判定区, 复用 delayed-trick 流程

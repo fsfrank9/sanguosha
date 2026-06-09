@@ -29,7 +29,7 @@ function buildGame(playerHero, enemyHero, seed) {
 
 // ─── Player 司马懿 gets a pendingChoice with the zone catalog ────────
 
-test('Player 司马懿 takes damage → pendingChoice lists source zones (hand count + face-up equip + judge)', () => {
+test('Player 司马懿 takes damage → pendingChoice lists source zones (hand count + face-up equip, 不含判定区)', () => {
   const game = buildGame('simayi', 'caocao');
   // Source (caocao) has hand cards (private), 1 equipment, 1 judge-area card.
   game.enemy.hand = [
@@ -59,8 +59,9 @@ test('Player 司马懿 takes damage → pendingChoice lists source zones (hand c
   assert.ok(equipZone, 'equipment zone should expose the weapon as a specific entry');
   assert.equal(equipZone.name, '诸葛连弩');
 
-  const judgeZone = pending.zones.find(z => z.zone === 'judge' && z.cardId === 'lebu-on-opp');
-  assert.ok(judgeZone, 'judge zone should expose the delayed trick card');
+  // M3 (审计二轮): glossary__zone.md — 判定区牌不为任何角色所拥有, 反馈不可获得。
+  const judgeZone = pending.zones.find(z => z.zone === 'judge');
+  assert.equal(judgeZone, undefined, 'M3: 判定区牌不再列入可获得 zones');
 });
 
 test('Player resolves zone=hand → random hand card transferred (engine ignores cardId)', () => {
@@ -93,16 +94,17 @@ test('Player resolves zone=equipment with cardId → exact equipment moved', () 
     'specific equipment card moved to player hand');
 });
 
-test('Player resolves zone=judge with cardId → exact judge card moved', () => {
+test('M3: 来源只有判定区牌 → 反馈无可获得牌, 不设 pendingChoice', () => {
+  // 判定区牌不是来源"的牌" — 来源手牌/装备皆空时反馈完全不触发。
   const game = buildGame('simayi', 'caocao');
   game.enemy.judgeArea = [c('lebusishu', { id: 'lebu-1', suit: 'club', color: 'black' })];
   game.enemy.hand = [c('sha', { id: 'damage-sha', suit: 'spade', color: 'black' })];
 
   Engine.playCard(game, 'enemy', 'damage-sha');
-  Engine.resolvePendingChoice(game, { zone: 'judge', cardId: 'lebu-1' });
 
-  assert.equal(game.enemy.judgeArea.length, 0);
-  assert.ok(game.player.hand.some(card => card.id === 'lebu-1'));
+  assert.equal(Engine.getPendingChoice(game), null, '无可获得牌 → 不暂停');
+  assert.equal(game.enemy.judgeArea.length, 1, '判定区的乐不思蜀原地不动');
+  assert.ok(!game.player.hand.some(card => card.id === 'lebu-1'));
 });
 
 test('Player decline preference suppresses 反馈 entirely', () => {
