@@ -2073,23 +2073,53 @@
           amount: amount,
           nature: damageNature
         };
-        var damageResults = SkillRuntime.runHook(skillRegistry, 'onDamageAfter', damageContext);
-        var sourceCardClaimed = false;
-        for (var damageIndex = 0; damageIndex < damageResults.length; damageIndex += 1) {
-          if (damageResults[damageIndex].result && damageResults[damageIndex].result.claimedSourceCard) {
-            sourceCardClaimed = true;
-          }
-        }
-        if (sourceCard && !sourceCardClaimed) {
-          discardCard(game, sourceCard);
-        }
-        if (game.phase === 'gameover') return true;
+        // M1 (审计二轮): gltjk flow__decreaselife.md / flow__damage.md — 濒死
+        // 结算嵌套在「扣减体力」内, "受到伤害后" 时机 (奸雄/反馈/刚烈/遗计)
+        // 在其之后。此前 hooks 先跑: 1 体力的曹操先发动奸雄拿牌再求桃, 顺序
+        // 与官方相反。现在先进入濒死; 若濒死暂停等待救援, 把 damage-after
+        // 派发与来源牌弃置挂入 pauseState.deferredDamageAfter, 由
+        // processDyingNext 在濒死结束后 flush。
         if (target.hp <= 0) {
           // v7 PR-13: gltjk flow__neardeath.md — 进入濒死结算，按顺序响应；
           // 任何一名响应者将 hp 回复到 1+ 即存活；全部响应完毕仍为 0 才死亡。
           enterDying(game, targetActor, sourceActor);
+          if (game.pauseState && game.pauseState.dying) {
+            if (!game.pauseState.deferredDamageAfter) game.pauseState.deferredDamageAfter = [];
+            game.pauseState.deferredDamageAfter.push(damageContext);
+            return true;
+          }
         }
+        finishDamageAfter(game, damageContext);
         return true;
+      }
+
+      // M1: "受到伤害后" 时机的统一收尾 — 派发 onDamageAfter hooks (目标存活
+      // 且游戏未结束时), 再把未被技能获得的来源牌移入弃牌堆。同步路径由
+      // damage() 直接调用; 濒死暂停路径由 flushDeferredDamageAfter 延迟调用。
+      function finishDamageAfter(game, damageContext) {
+        var targetState = game[damageContext.targetActor];
+        var sourceCardClaimed = false;
+        var targetAlive = targetState && targetState.hp > 0;
+        if (game.phase !== 'gameover' && targetAlive) {
+          var damageResults = SkillRuntime.runHook(skillRegistry, 'onDamageAfter', damageContext);
+          for (var damageIndex = 0; damageIndex < damageResults.length; damageIndex += 1) {
+            if (damageResults[damageIndex].result && damageResults[damageIndex].result.claimedSourceCard) {
+              sourceCardClaimed = true;
+            }
+          }
+        }
+        if (damageContext.sourceCard && !sourceCardClaimed) {
+          discardCard(game, damageContext.sourceCard);
+        }
+      }
+
+      function flushDeferredDamageAfter(game) {
+        var deferred = game.pauseState && game.pauseState.deferredDamageAfter;
+        if (!deferred || !deferred.length) return;
+        game.pauseState.deferredDamageAfter = [];
+        for (var i = 0; i < deferred.length; i += 1) {
+          finishDamageAfter(game, deferred[i]);
+        }
       }
 
       // v7 PR-13: 濒死结算流程 (gltjk flow__neardeath.md)。在 1v1 中：
@@ -2131,6 +2161,7 @@
         if (dyingState.hp >= 1) {
           log(game, actorName(game, dyingActor) + '脱离濒死状态。');
           game.pauseState.dying = null;
+          flushDeferredDamageAfter(game);
           return { saved: true };
         }
         // 全部响应完毕 → 死亡。从当前回合角色起按逆时针依次响应；C2: 同一
@@ -2152,6 +2183,7 @@
             if (dyingState.hp >= 1) {
               log(game, actorName(game, dyingActor) + '脱离濒死状态。');
               game.pauseState.dying = null;
+              flushDeferredDamageAfter(game);
               return { saved: true };
             }
             continue;
@@ -2165,6 +2197,9 @@
         game.winner = opponent(dyingActor);
         log(game, actorName(game, game.winner) + '获胜！');
         game.pauseState.dying = null;
+        // M1: 角色死亡 → 跳过其 "受到伤害后" hooks (finishDamageAfter 内部按
+        // gameover/存活判断), 但仍要把来源牌移入弃牌堆保持牌守恒。
+        flushDeferredDamageAfter(game);
         return { died: true };
       }
 
