@@ -19,9 +19,13 @@ function test(name, fn) {
   }
 }
 
-test('v6.1 marks the deliverable as the current spec-compliance version', () => {
-  assert.match(html, /data-version="6\.1"/, 'body should expose the current v6.1 version');
-  assert.match(html, /v6\.1 规则合规版/, 'header should show v6.1 spec-compliance status');
+test('版本标记跟随当前版本 (data-version 与 package.json 主次版本一致)', () => {
+  // 审计二轮: index.html 此前停在 data-version="6.1" (实际已 v10), 改为与
+  // package.json 的 major.minor 同步校验, 防止再次漂移。
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const majorMinor = pkg.version.split('.').slice(0, 2).join('.');
+  assert.match(html, new RegExp('data-version="' + majorMinor.replace('.', '\\.') + '"'),
+    'body data-version 应与 package.json 主次版本一致 (当前 ' + majorMinor + ')');
   assert.match(html, /GitHub Pages/, 'copy should mention the static-hosted delivery channel');
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "sanguosha-html",
-  "version": "10.1.0",
+  "version": "10.2.0",
   "private": true,
   "type": "module",
   "description": "三国杀 1v1 browser game served as native ES modules from a static GitHub Pages site. v10: data-driven skill/card/equipment metadata, pause/resume player-choice framework, unified response (无懈/闪/杀) dispatch. 31 implemented skills (7 active) verified against official-pack specs. Post-v10 audit fixed rule-compliance gaps: 濒死 negative-HP/multi-桃 rescue, 无懈可击 coverage, 八卦 vs 万箭, 朱雀 card-identity.",
@@ -10,5 +10,8 @@
     "test": "for f in tests/*.mjs; do printf '\\n===== %s\\n' \"$f\"; node \"$f\" || exit 1; done",
     "verify": "npm run build:check && npm test"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "engines": {
+    "node": ">=20.11"
+  }
 }

@@ -1,13 +1,11 @@
 name: CI
 
 # 审计 T2: pages.yml 只在 push 到 main 时跑测试 (合并后), PR 本身不被测试。
-# 本 workflow 在 PR (及非 main 分支 push) 上运行 build:check + 全量测试,
-# 成为合并前的门禁。不含 Pages 部署 (部署仍由 pages.yml 在 main 上负责)。
+# 本 workflow 在 PR 上运行 build:check + 全量测试, 成为合并前的门禁。
+# 审计二轮: 移除 push (branches-ignore main) 触发 — 此前同一 commit 在
+# pull_request + push 下双跑两遍, 浪费且无增益。
 'on':
   pull_request:
-  push:
-    branches-ignore:
-      - main
 
 permissions:
   contents: read

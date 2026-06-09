@@ -35,7 +35,7 @@ npm run build:check
 
 ## 当前版本
 
-`v10 + 审计规则合规修复`：31 个已实现技能（7 个主动）100% 对照官方 spec，35 张牌规则数据驱动，统一的暂停/恢复玩家选择框架与响应（无懈/闪/杀）派发。
+`v10 + 两轮审计规则合规修复`：31 个已实现技能（7 个主动）100% 对照官方 spec，39 张牌规则数据驱动，统一的暂停/恢复玩家选择框架（带 FIFO 队列与全局挂起冻结）与响应（无懈/闪/杀）派发。
 
 架构沿用 v5 的「原生 ES 模块 + GitHub Pages 托管」（详见 `docs/plans/2026-05-13-sanguosha-v5-architecture.md`），工作重心在规则层。
 
@@ -55,11 +55,23 @@ npm run build:check
 - **八卦阵对万箭 (#107)**：万箭齐发的【闪】响应补八卦红判定兜底；顺带统一【杀】与【万箭】两处八卦逻辑。
 - **朱雀羽扇 (#108)**：转火杀改为「本次使用」的临时视为，弃置时还原物理牌身份（此前永久 mutate `card.type`，洗回牌堆变永久火杀）。
 
+### 二轮审计修复（PR #115–#121）
+
+第二轮独立代码审计后的修复，按批次拆 PR：
+
+- **丈八蛇矛牌守恒 (#115)**：主动使用的虚拟【杀】不再凭空进入弃牌堆；奸雄改为获得组成虚拟杀的两张实体牌；朱雀临时火杀进入奸雄手牌前还原物理身份。
+- **暂停/恢复架构闭环 (#116)**：pendingChoice 队列化（并发选择不再互相覆盖导致软死锁）；判定阶段濒死冻结回合流程；挂起时冻结全部公开入口（不可挂着选择跨回合操作）。
+- **伤害后时机 (#117)**：奸雄/反馈/刚烈/遗计移到濒死结算之后（官方顺序）；角色死亡后技能不再触发。
+- **铁索连环传导 (#118)**：横置角色受属性伤害解除连环并向其他横置角色传导等量同属性伤害。
+- **白银狮子 + 判定区归属 (#119)**：任何失去白银狮子的路径都回复 1 点体力；寒冰剑/反馈不再把判定区牌当作角色的牌。
+- **牌规则杂项 (#120)**：五谷丰登逐张亮出按需洗牌；贯石斧可选发动且成本可含装备；火攻展示牌由目标选择；奸雄可获得决斗/南蛮/万箭/火攻实体牌；国色转化乐走无懈链；discardExcess 事务化。
+- **文档与工程卫生 (#121)**：本节所在的 README 数字修正、index.html 版本标记、Node 版本下限声明、CI 双跑修复、Pages 产物瘦身。
+
 ### v6.0 基础（数据驱动 + 暂停/恢复机制）
 
-- **结构化技能元数据** (`src/data/heroes.js` 的 `SKILL_METADATA`)：26 个已实现技能各有 `{ trigger, frequency, optional, mandatory, cost, hooks }` 六字段，跨武将共享的同名技能（mashu / wusheng / longdan / biyue / paoxiao）自动保持一致。UI tooltip 从结构化字段派生分行提示。
-- **结构化牌规则** (`src/data/cards.js` 的 `CARD_RULES`)：35 张牌（基本 / 即时锦囊 / 延时锦囊 / 装备）各有 `{ summary, timing, targets, effect, frequency, responseWindow, engineHooks }`，自动 merge 到 `CARD_CATALOG[id].rule`。
-- **官方规格 cache + audit harness**：`official-skill-cache/sanguosha-standard/official_standard_skill_cache.json` 保存所有 26 个已实现技能的官方规格副本（带 sourceTextSha256）。`tests/v6_skill_audit.test.mjs` + `tests/skill_schema.test.mjs` + `tests/card_rules.test.mjs` 持续校验「cache ↔ specs fixture ↔ heroes.js ↔ cards.js」四方一致。
+- **结构化技能元数据** (`src/data/heroes.js` 的 `SKILL_METADATA`)：每个已实现技能（v6.0 时为 26 个，当前 31 个）各有 `{ trigger, frequency, optional, mandatory, cost, hooks }` 六字段，跨武将共享的同名技能（mashu / wusheng / longdan / biyue / paoxiao）自动保持一致。UI tooltip 从结构化字段派生分行提示。
+- **结构化牌规则** (`src/data/cards.js` 的 `CARD_RULES`)：所有牌（v6.0 时 35 张，当前 39 张；基本 / 即时锦囊 / 延时锦囊 / 装备）各有 `{ summary, timing, targets, effect, frequency, responseWindow, engineHooks }`，自动 merge 到 `CARD_CATALOG[id].rule`。
+- **官方规格 cache + audit harness**：`official-skill-cache/sanguosha-standard/official_standard_skill_cache.json` 保存所有已实现技能的官方规格副本（带 sourceTextSha256）。`tests/v6_skill_audit.test.mjs` + `tests/skill_schema.test.mjs` + `tests/card_rules.test.mjs` 持续校验「cache ↔ specs fixture ↔ heroes.js ↔ cards.js」四方一致。
 - **装备被动效果注册表** (`src/engine/state.js` 的 `EQUIPMENT_EFFECTS`)：诸葛连弩 / 青釭剑 / 仁王盾 的布尔被动通过 `hasEquipmentEffect(state, name)` 查询，与 `SkillRuntime.hasPassiveEffect` 同形。
 - **玩家选择暂停 / 恢复机制**：`game.pendingChoice` + `game.pauseState` + 公开 API `Engine.setSkillPreference` / `getSkillPreference` / `getPendingChoice` / `resolvePendingChoice`。
 - **AI 主动技能感知**：AI 从只识【苦肉】【制衡】扩到全部 5 个主动技（+ 仁德 / 反间 / 观星）+ 2 个出牌期转化（武圣 / 龙胆 把红牌或闪当杀），其余 19 个被动 / 触发 / 锁定技通过引擎 hooks 自动生效。
