@@ -3608,15 +3608,14 @@
         if (card.family === 'equipment') return equipCard(game, actor, card);
 
         if (card.family === 'delayed') {
-          if (card.type === 'shandian') {
-            self.judgeArea.push(card);
-            log(game, actorName(game, actor) + '将【闪电】置入自己的判定区。');
-          } else {
-            var delayedTarget = game[opponent(actor)];
-            delayedTarget.judgeArea.push(card);
-            log(game, actorName(game, actor) + '将【' + card.name + '】置入' + actorName(game, opponent(actor)) + '的判定区。');
-          }
-          return success('延时锦囊生效。');
+          // H1: 延时锦囊放置前开无懈窗口 (gltjk card__scroll.md — 无懈可击可在
+          // 锦囊「对一个目标生效前」抵消; 延时锦囊于放置时即指定目标)。
+          // 乐不思蜀/兵粮寸断 → 对方判定区; 闪电 → 自己判定区。无懈响应者恒为
+          // 非来源方 (opponent(actor))。
+          var delayedSide = (card.type === 'shandian') ? actor : opponent(actor);
+          return checkWuxieAndContinue(game, opponent(actor), '【' + card.name + '】', 'delayed-place', {
+            actor: actor, card: card, options: options, delayedSide: delayedSide
+          });
         }
 
         if (card.type === 'tao') {
@@ -3657,6 +3656,7 @@
           // v7 PR-16: gltjk card__scroll.md 无中生有 (1V1/界限突破/国-标):
           //   "使用目标: 包括你在内的一名角色"。options.wuzhongTarget 可指定
           //   'player' / 'enemy'; 未指定时默认 = actor。
+          // H1: 摸牌前开无懈窗口 (对方可抵消)。
           discardCard(game, card);
           var wzTargetActor = (options.wuzhongTarget === 'player' || options.wuzhongTarget === 'enemy')
             ? options.wuzhongTarget
@@ -3664,9 +3664,10 @@
           if (!game[wzTargetActor]) {
             return fail('无效的【无中生有】目标。');
           }
-          log(game, actorName(game, actor) + '使用【无中生有】' + (wzTargetActor === actor ? '' : '令' + actorName(game, wzTargetActor)) + '摸两张牌。');
-          drawCards(game, wzTargetActor, 2);
-          return finishTrickUse(game, actor, card, success('摸两张牌。'), options);
+          log(game, actorName(game, actor) + '使用【无中生有】' + (wzTargetActor === actor ? '' : '令' + actorName(game, wzTargetActor)) + '。');
+          return checkWuxieAndContinue(game, opponent(actor), '【无中生有】', 'wuzhong', {
+            actor: actor, card: card, options: options, wzTargetActor: wzTargetActor
+          });
         }
 
         if (card.type === 'juedou') {
@@ -3675,8 +3676,18 @@
             actor: actor, card: card, options: options
           });
         }
-        if (card.type === 'nanman') return finishTrickUse(game, actor, card, playAOE(game, actor, card, 'sha', '南蛮入侵'), options);
-        if (card.type === 'wanjian') return finishTrickUse(game, actor, card, playAOE(game, actor, card, 'shan', '万箭齐发'), options);
+        // H1: 南蛮入侵 / 万箭齐发 在 1v1 中只有 1 名目标 (对方), 单个无懈窗口
+        // 即与官方一致。无懈窗口在 playAOE (响应 / 伤害) 之前。
+        if (card.type === 'nanman') {
+          return checkWuxieAndContinue(game, opponent(actor), '【南蛮入侵】', 'nanman', {
+            actor: actor, card: card, options: options
+          });
+        }
+        if (card.type === 'wanjian') {
+          return checkWuxieAndContinue(game, opponent(actor), '【万箭齐发】', 'wanjian', {
+            actor: actor, card: card, options: options
+          });
+        }
 
         if (card.type === 'guohe') {
           // v7 PR-9: 1V1 变体两选项 — 装备区一张 / 看手并弃一张。
@@ -3853,6 +3864,53 @@
         }
         return finishTrickUse(game, ctx.actor, ctx.card,
           resolveJiedaoDecision(game, ctx.actor, opponent(ctx.actor), ctx.card, ctx.options), ctx.options);
+      });
+
+      // H1: 新增 4 个无懈延续 — 无中生有 / 南蛮入侵 / 万箭齐发 / 延时锦囊放置。
+      // wuxied=true → 锦囊被抵消; false → 照常结算。集智 (集智 onCardUse) 在
+      // finishTrickUse 内对非延时锦囊照常触发 (即使被无懈, "使用" 仍成立)。
+      // 延时锦囊放置不属于「非延时锦囊」, 故 delayed-place 不走 finishTrickUse。
+
+      registerWuxieContinuation('wuzhong', function (game, ctx, wuxied) {
+        if (wuxied) {
+          return finishTrickUse(game, ctx.actor, ctx.card, success('无中生有被无懈可击。'), ctx.options);
+        }
+        log(game, actorName(game, ctx.wzTargetActor) + '摸两张牌。');
+        drawCards(game, ctx.wzTargetActor, 2);
+        return finishTrickUse(game, ctx.actor, ctx.card, success('摸两张牌。'), ctx.options);
+      });
+
+      registerWuxieContinuation('nanman', function (game, ctx, wuxied) {
+        if (wuxied) {
+          discardCard(game, ctx.card);
+          return finishTrickUse(game, ctx.actor, ctx.card, success('南蛮入侵被无懈可击。'), ctx.options);
+        }
+        return finishTrickUse(game, ctx.actor, ctx.card,
+          playAOE(game, ctx.actor, ctx.card, 'sha', '南蛮入侵'), ctx.options);
+      });
+
+      registerWuxieContinuation('wanjian', function (game, ctx, wuxied) {
+        if (wuxied) {
+          discardCard(game, ctx.card);
+          return finishTrickUse(game, ctx.actor, ctx.card, success('万箭齐发被无懈可击。'), ctx.options);
+        }
+        return finishTrickUse(game, ctx.actor, ctx.card,
+          playAOE(game, ctx.actor, ctx.card, 'shan', '万箭齐发'), ctx.options);
+      });
+
+      registerWuxieContinuation('delayed-place', function (game, ctx, wuxied) {
+        if (wuxied) {
+          discardCard(game, ctx.card);
+          return success('延时锦囊被无懈可击。');
+        }
+        var side = ctx.delayedSide;
+        game[side].judgeArea.push(ctx.card);
+        if (ctx.card.type === 'shandian') {
+          log(game, actorName(game, ctx.actor) + '将【闪电】置入自己的判定区。');
+        } else {
+          log(game, actorName(game, ctx.actor) + '将【' + ctx.card.name + '】置入' + actorName(game, side) + '的判定区。');
+        }
+        return success('延时锦囊生效。');
       });
 
       function startTurn(game, actor) {
