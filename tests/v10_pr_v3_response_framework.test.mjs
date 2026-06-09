@@ -27,7 +27,7 @@ test('v10 V3: requestPlayerResponse 写 pauseState[pauseKey] + pendingChoice + �
   const fn = engineSrc.match(/function requestPlayerResponse\(game, spec\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn, 'requestPlayerResponse fn 存在');
   assert.match(fn[0], /game\.pauseState\[spec\.pauseKey\]\s*=\s*spec\.source/);
-  assert.match(fn[0], /game\.pendingChoice\s*=\s*pending/);
+  assert.match(fn[0], /setPendingChoice\(game, pending\)/);
   assert.match(fn[0], /return success\(/);
 });
 
@@ -50,7 +50,8 @@ test('注册表迁移收官: resolvePendingChoice 统一经 RESPONSE_KIND_RESOLV
   assert.ok(fn);
   assert.match(fn[0], /var resolver\s*=\s*RESPONSE_KIND_RESOLVERS\[pending\.kind\]/);
   assert.match(fn[0], /if\s*\(!resolver\)\s*return fail/);
-  assert.match(fn[0], /return resolver\(game, pending, decision \|\| \{\}\)/);
+  // H3: resolver 返回后经 finishPendingChoiceResolution 弹出队列 + 续跑挂起回合
+  assert.match(fn[0], /finishPendingChoiceResolution\(game, resolver\(game, pending, decision \|\| \{\}\)\)/);
 });
 
 // ───── shan-response 迁移到框架 (reference impl) ──────────────────────
