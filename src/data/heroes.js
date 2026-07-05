@@ -55,7 +55,9 @@
         { id: 'huangyueying', name: '黄月英', camp: '蜀', gender: 'female', title: '归隐的杰女', maxHp: 3, quote: '哼，谁说女子不如男？', skills: [{ id: 'jizhi', name: '集智', desc: '使用锦囊牌时可摸一张。' }, { id: 'qicai', name: '奇才', desc: '锦囊牌距离无限。' }] },
         { id: 'huatuo', name: '华佗', camp: '群', gender: 'male', title: '神医', maxHp: 3, quote: '早睡早起，方能养生。', skills: [{ id: 'jijiu', name: '急救', desc: '回合外可将红色牌当【桃】。' }, { id: 'qingnang', name: '青囊', desc: '出牌阶段可弃一牌令一名角色回复。' }] },
         { id: 'lvbu', name: '吕布', camp: '群', gender: 'male', title: '武的化身', maxHp: 4, quote: '谁能挡我！', skills: [{ id: 'wushuang', name: '无双', desc: '杀/决斗需要目标连续响应两张。' }] },
-        { id: 'diaochan', name: '貂蝉', camp: '群', gender: 'female', title: '绝世的舞姬', maxHp: 3, quote: '失礼了。', skills: [{ id: 'lijian', name: '离间', desc: '出牌阶段可令两名男性角色决斗。' }, { id: 'biyue', name: '闭月', desc: '结束阶段摸一张牌。' }] }
+        { id: 'diaochan', name: '貂蝉', camp: '群', gender: 'female', title: '绝世的舞姬', maxHp: 3, quote: '失礼了。', skills: [{ id: 'lijian', name: '离间', desc: '出牌阶段可令两名男性角色决斗。' }, { id: 'biyue', name: '闭月', desc: '结束阶段摸一张牌。' }] },
+        // v11 C7 (批次 31): 官方 spec 缓存 (gid 214) 归入标准框架的补充武将
+        { id: 'huaxiong', name: '华雄', camp: '群', gender: 'male', title: '魔将', maxHp: 6, quote: '有能耐的，放马过来！', skills: [{ id: 'yaowu', name: '耀武', desc: '锁定技：受到红色【杀】造成的伤害后，伤害来源回复 1 点体力或摸一张牌。' }] }
       ]);
 
       addHeroPack('wind', [
@@ -181,7 +183,9 @@
         qixi:      { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs'] },
         // v11 C6 (批次 30):
         xiaoji:    { trigger: 'equipmentLoss',     frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['triggerEquipmentLoss'] },
-        jieyin:    { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 2 },     hooks: ['onActiveSkill'] }
+        jieyin:    { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 2 },     hooks: ['onActiveSkill'] },
+        // v11 C7 (批次 31):
+        yaowu:     { trigger: 'damageAfter',       frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDamageAfter'] }
       };
 
       for (var _heroId in HERO_CATALOG) {

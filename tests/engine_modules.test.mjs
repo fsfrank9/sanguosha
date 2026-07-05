@@ -122,8 +122,8 @@ test('engine runtime modules import cleanly through ES module loader', () => {
   assert.equal(typeof JudgementRuntime.evaluateDelayedTrick, 'function');
   assert.equal(typeof JudgementRuntime.isShandianHit, 'function');
   assert.ok(Engine, 'SanguoshaEngine should be importable as an ES module');
-  // v11 C6 (批次 30): 标准包补员 孙尚香 → 68+1。
-  assert.equal(Object.keys(Engine.HERO_CATALOG).length, 69, 'engine should preserve all local heroes');
+  // v11 C6/C7 (批次 30/31): 补员 孙尚香 + 华雄 → 68+2。
+  assert.equal(Object.keys(Engine.HERO_CATALOG).length, 70, 'engine should preserve all local heroes');
   assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes('jizhi'), 'skill implementation status should survive ES module import');
 });
 

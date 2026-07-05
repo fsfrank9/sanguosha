@@ -387,6 +387,21 @@
         els.luoshenPromptPanel.hidden = true;
       }
     }
+    // v11 C7 (批次 31): 耀武 (yaowu-reward) — 玩家作为伤害来源二选一;
+    // 体力满时回复不可选 (resolver 同步校验)。
+    if (els.yaowuRewardPanel) {
+      if (kind === 'yaowu-reward' && pending.actor === 'player') {
+        els.yaowuRewardPanel.hidden = false;
+        if (els.yaowuRewardHint) {
+          els.yaowuRewardHint.textContent =
+            '耀武：你对' + (pending.targetName || '华雄') + '造成了红色【杀】伤害，选择一项奖励。';
+        }
+        if (els.yaowuRecoverBtn) els.yaowuRecoverBtn.disabled = !pending.canRecover;
+      } else {
+        els.yaowuRewardPanel.hidden = true;
+        if (els.yaowuRecoverBtn) els.yaowuRecoverBtn.disabled = false;
+      }
+    }
     // v8 PR-A2: 濒死救援 — responder 用 桃/酒 救援（酒仅自救）
     if (els.dyingRescuePanel) {
       if (kind === 'dying-rescue' && pending.actor === 'player') {
@@ -593,6 +608,17 @@
     });
     if (els.luoshenStopBtn) els.luoshenStopBtn.addEventListener('click', function () {
       var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    // v11 C7 (批次 31): 耀武 奖励二选一
+    if (els.yaowuRecoverBtn) els.yaowuRecoverBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), { choice: 'recover' });
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.yaowuDrawBtn) els.yaowuDrawBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), { choice: 'draw' });
       if (!result.ok) renderLog();
       render();
     });
