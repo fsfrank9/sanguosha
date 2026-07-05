@@ -108,18 +108,9 @@ test('v10 V5: PENDING_MODAL_DISPATCH 注册 wuxieResponsePanel (confirm=null, ca
   assert.match(adapter, /panelId:\s*'wuxieResponsePanel',\s*confirmBtnId:\s*null,\s*cancelBtnId:\s*'wuxieResponseDeclineBtn'/);
 });
 
-test('v10 V5: renderPendingChoice 处理 wuxie-response kind + 据 chainWuxied 选文案', () => {
-  const fn = adapter.match(/els\.wuxieResponsePanel[\s\S]*?els\.wuxieResponsePanel\.hidden\s*=\s*true/);
-  assert.ok(fn);
-  assert.match(fn[0], /kind\s*===\s*'wuxie-response'/);
-  assert.match(fn[0], /pending\.chainWuxied/);
-  assert.match(fn[0], /data-wuxie-card-id/);
-});
-
-test('v10 V5: wuxieResponseChoices click → stage; declineBtn → resolvePendingChoice({use:false})', () => {
-  assert.match(adapter, /wuxieResponseChoices\.addEventListener[\s\S]{0,300}stagedModalChoice\s*=\s*\{[\s\S]{0,200}kind:\s*'pending'/);
-  assert.match(adapter, /wuxieResponseDeclineBtn\.addEventListener[\s\S]{0,160}resolvePendingChoice\(game,\s*\{\s*use:\s*false\s*\}/);
-});
+// v11 A3: 面板渲染/接线断言已由 tests/ui_panels_a3_batch1.test.mjs 的
+// fake-DOM 全链路行为测试取代 (无懈面板: 打出/不使用两条路径)。
+// 保留下方 chainWuxied 文案断言之外的引擎结构断言。
 
 test('v10 V5: newGame 开启 wuxieResponse=ask pref', () => {
   assert.match(adapter, /skillPreferences\.wuxieResponse\s*=\s*'ask'/);
