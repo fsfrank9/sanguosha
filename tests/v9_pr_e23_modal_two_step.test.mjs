@@ -12,7 +12,9 @@ import { loadAllStyles } from './helpers/load-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const css = loadAllStyles();
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v11 B2: 目标区域/火攻成本面板已迁往 mode-panels.js, 源拼接。
+const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8');
 
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
@@ -33,18 +35,20 @@ test('v9 PR-E23: dom-adapter 含 stagedModalChoice 状态变量', () => {
 });
 
 test('v9 PR-E23: targetCardChoices 点击改为 stage (不再直接 resolveTargetCard)', () => {
-  const handler = adapter.match(/els\.targetCardChoices\.addEventListener\('click',\s*function[\s\S]*?\n\s{8}\}\);/);
+  const handler = adapter.match(/els\.targetCardChoices\.addEventListener\('click',\s*function[\s\S]*?\n {6}\}\);/);
   assert.ok(handler);
-  assert.match(handler[0], /stagedModalChoice\s*=\s*\{[\s\S]*?kind:\s*'target'/);
+  // v11 B2: 面板模块内经 setStaged() 写入。
+  assert.match(handler[0], /setStaged\(\{[\s\S]*?kind:\s*'target'/);
   assert.match(handler[0], /_highlightStaged/);
   // 不再在点击时直接 resolve
   assert.doesNotMatch(handler[0], /resolveTargetCard\(/);
 });
 
 test('v9 PR-E23: huogongCostChoices 点击改为 stage (不再直接 resolveHuogong)', () => {
-  const handler = adapter.match(/els\.huogongCostChoices\.addEventListener\('click',\s*function[\s\S]*?\n\s{8}\}\);/);
+  const handler = adapter.match(/els\.huogongCostChoices\.addEventListener\('click',\s*function[\s\S]*?\n {6}\}\);/);
   assert.ok(handler);
-  assert.match(handler[0], /stagedModalChoice\s*=\s*\{[\s\S]*?kind:\s*'huogong'/);
+  // v11 B2: 面板模块内经 setStaged() 写入。
+  assert.match(handler[0], /setStaged\(\{[\s\S]*?kind:\s*'huogong'/);
   assert.match(handler[0], /_highlightStaged/);
   assert.doesNotMatch(handler[0], /resolveHuogong\(/);
 });

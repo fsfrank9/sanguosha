@@ -6,7 +6,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v11 B2: 转化面板已迁往 mode-panels.js, adapter 源为主文件 + 模式面板拼接。
+const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8');
 
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
@@ -53,8 +55,9 @@ test('v10 V8: _handCancel 命中 dispatch → 必 return (不 fall-through 到�
 
 test('v10 V8: conversionNormalBtn / conversionShaBtn click → stage (kind:conversion, asSha:false/true)', () => {
   // 必须是 stage 写入而非直接 resolveConversion 调用
-  assert.match(adapter, /els\.conversionNormalBtn\.addEventListener\([\s\S]{0,400}stagedModalChoice\s*=\s*\{\s*kind:\s*'conversion',\s*asSha:\s*false\s*\}/);
-  assert.match(adapter, /els\.conversionShaBtn\.addEventListener\([\s\S]{0,400}stagedModalChoice\s*=\s*\{\s*kind:\s*'conversion',\s*asSha:\s*true\s*\}/);
+  // v11 B2: 面板模块内经 setStaged() 写入 (语义同 stagedModalChoice 赋值)。
+  assert.match(adapter, /els\.conversionNormalBtn\.addEventListener\([\s\S]{0,400}setStaged\(\{\s*kind:\s*'conversion',\s*asSha:\s*false\s*\}\)/);
+  assert.match(adapter, /els\.conversionShaBtn\.addEventListener\([\s\S]{0,400}setStaged\(\{\s*kind:\s*'conversion',\s*asSha:\s*true\s*\}\)/);
 });
 
 test('v10 V8: _handConfirm stage 提交分支处理 kind=conversion → resolveConversion(staged.asSha)', () => {
@@ -65,10 +68,11 @@ test('v10 V8: _handConfirm stage 提交分支处理 kind=conversion → resolveC
 });
 
 test('v10 V8: hideConversionPanel 与 hideTargetZonePanel / hideHuogongPanel 对称 — 清 staged conversion', () => {
-  const fn = adapter.match(/function hideConversionPanel\(\)\s*\{[\s\S]*?\n {6}\}/);
+  const fn = adapter.match(/function hideConversionPanel\(\)\s*\{[\s\S]*?\n {4}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /stagedModalChoice\.kind\s*===\s*'conversion'/);
-  assert.match(fn[0], /stagedModalChoice\s*=\s*null/);
+  // v11 B2: 面板模块内经 getStaged/setStaged 访问。
+  assert.match(fn[0], /getStaged\(\)\.kind\s*===\s*'conversion'/);
+  assert.match(fn[0], /setStaged\(null\)/);
 });
 
 test('v10 V8: 直接 resolveConversion 调用从 click handler 中清除 (改为 stage)', () => {

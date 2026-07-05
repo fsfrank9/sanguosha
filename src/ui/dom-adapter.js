@@ -1,6 +1,7 @@
       import { SanguoshaEngine } from '../engine/game-engine.js';
       import { createResponsePanels } from './panels/response-panels.js';
       import { createPromptPanels } from './panels/prompt-panels.js';
+      import { createModePanels } from './panels/mode-panels.js';
 
       var Engine = SanguoshaEngine;
       var game = null;
@@ -14,18 +15,8 @@
       // 点候选只 stage (高亮), #handConfirmBtn 才真正 resolve.
       // 形如 { kind: 'target', zone, cardId } 或 { kind: 'huogong', costId }.
       var stagedModalChoice = null;
-      var pendingTiesuoCardId = null;
-      var pendingTargetCardId = null;
-      var pendingTargetZone = null;
-      var pendingHuogongCardId = null;
-      var pendingConversionCardId = null;
-      // v6.1 guanxing pendingChoice tracking: three queues (unassigned / top /
-      // bottom). `guanxingSelected` is the currently highlighted card id from
-      // any zone; clicking 顶/底/取回 buttons moves it accordingly.
-      var guanxingUnassignedIds = [];
-      var guanxingTopIds = [];
-      var guanxingBottomIds = [];
-      var guanxingSelected = null;
+      // v11 B2: 模式面板状态 (pendingTiesuo/Target/Huogong/Conversion,
+      // guanxing 三区) 已随面板迁往 ./panels/mode-panels.js。
       // v6.1 ganglie source-choice picker: 2-card multi-select.
       var skillSelectMode = null;
       var selectedSkillCardIds = [];
@@ -41,6 +32,33 @@
       // v11 B2: 响应类面板装配 — els 为原地填充的稳定引用; render/renderLog/
       // escapeHtml/suitLabel 为函数声明 (提升); stage 语义 = 原 stagedModalChoice
       // 赋值 + render (两步化提交仍由 _handConfirm 的 'pending' 分支统一处理)。
+      // v11 B2: 模式面板装配 — staged 经 get/setStaged 双向共享 (target/
+      // huogong/conversion 三种 staged kind 仍由 _handConfirm 统一提交)。
+      var modePanels = createModePanels({
+        els: els,
+        Engine: Engine,
+        getGame: function () { return game; },
+        render: function () { render(); },
+        escapeHtml: function (text) { return escapeHtml(text); },
+        flashHero: function (side) { return flashHero(side); },
+        findPlayerCard: function (cardId) { return findPlayerCard(cardId); },
+        getStaged: function () { return stagedModalChoice; },
+        setStaged: function (value) { stagedModalChoice = value; },
+        highlightStaged: function (el) { return _highlightStaged(el); }
+      });
+      var showTiesuoPanel = modePanels.showTiesuoPanel;
+      var hideTiesuoPanel = modePanels.hideTiesuoPanel;
+      var showTargetZonePanel = modePanels.showTargetZonePanel;
+      var hideTargetZonePanel = modePanels.hideTargetZonePanel;
+      var showHuogongPanel = modePanels.showHuogongPanel;
+      var hideHuogongPanel = modePanels.hideHuogongPanel;
+      var showConversionPanel = modePanels.showConversionPanel;
+      var hideConversionPanel = modePanels.hideConversionPanel;
+      var showGuanxingPanelFromPending = modePanels.showGuanxingPanelFromPending;
+      var hideGuanxingPanel = modePanels.hideGuanxingPanel;
+      var resolveTargetCard = modePanels.resolveTargetCard;
+      var resolveHuogong = modePanels.resolveHuogong;
+      var resolveConversion = modePanels.resolveConversion;
       // v11 B2: 提示类面板装配 (ctx 语义同 responsePanels)。
       var promptPanels = createPromptPanels({
         els: els,
@@ -618,19 +636,8 @@
       function renderPendingChoice() {
         var pending = game && Engine.getPendingChoice(game);
         var kind = pending && pending.kind;
-        if (els.guanxingModePanel) {
-          if (kind === 'guanxing-reorder' && pending.actor === 'player') {
-            // Open the panel if this is a new pendingChoice (different cards
-            // than the last we rendered). Otherwise keep current zone state.
-            var pendingIds = pending.cards.map(function (c) { return c.id; }).sort().join(',');
-            var localIds = guanxingUnassignedIds.concat(guanxingTopIds, guanxingBottomIds).sort().join(',');
-            if (pendingIds !== localIds) showGuanxingPanelFromPending();
-            else renderGuanxingZones();
-          } else if (guanxingUnassignedIds.length || guanxingTopIds.length || guanxingBottomIds.length) {
-            // pendingChoice cleared (resolved or declined) — close panel.
-            hideGuanxingPanel();
-          }
-        }
+        // v11 B2: 观星模式面板渲染已迁往 ./panels/mode-panels.js。
+        modePanels.render(kind, pending);
         // v11 B2: 提示类面板渲染已迁往 ./panels/prompt-panels.js。
         promptPanels.render(kind, pending);
         // v11 B2: 无懈/决斗/闪族响应面板渲染已迁往 ./panels/response-panels.js。
@@ -663,207 +670,9 @@
         return game && game.player.hand.find(function (card) { return card.id === cardId; });
       }
 
-      function showTiesuoPanel(cardId) {
-        pendingTiesuoCardId = cardId;
-        if (els.tiesuoModePanel) els.tiesuoModePanel.hidden = false;
-        if (els.handHint) els.handHint.textContent = '选择【铁索连环】：重铸，或横置/重置一至两名角色';
-      }
+      // v11 B2: 模式面板显示/隐藏与观星簇已迁往 ./panels/mode-panels.js。
 
-      function hideTiesuoPanel() {
-        pendingTiesuoCardId = null;
-        if (els.tiesuoModePanel) els.tiesuoModePanel.hidden = true;
-      }
-
-      function showTargetZonePanel(cardId) {
-        pendingTargetCardId = cardId;
-        pendingTargetZone = null;
-        if (els.targetZonePanel) els.targetZonePanel.hidden = false;
-        if (els.targetCardChoices) els.targetCardChoices.innerHTML = '<span class="mini-card">先选择一个区域，再点具体目标牌</span>';
-        if (els.handHint) els.handHint.textContent = '选择目标区域：手牌、装备区或延时锦囊区';
-      }
-
-      function hideTargetZonePanel() {
-        pendingTargetCardId = null;
-        pendingTargetZone = null;
-        if (stagedModalChoice && stagedModalChoice.kind === 'target') stagedModalChoice = null;
-        if (els.targetZonePanel) els.targetZonePanel.hidden = true;
-        if (els.targetCardChoices) els.targetCardChoices.innerHTML = '<span class="mini-card">先选择一个区域，再点具体目标牌</span>';
-      }
-
-      function hideHuogongPanel() {
-        pendingHuogongCardId = null;
-        if (stagedModalChoice && stagedModalChoice.kind === 'huogong') stagedModalChoice = null;
-        if (els.huogongModePanel) els.huogongModePanel.hidden = true;
-        if (els.huogongRevealText) els.huogongRevealText.textContent = '火攻：等待展示目标手牌';
-        if (els.huogongCostChoices) els.huogongCostChoices.innerHTML = '<span class="mini-card">同花色牌可用于造成火焰伤害</span>';
-      }
-
-      function showConversionPanel(cardId) {
-        pendingConversionCardId = cardId;
-        var card = findPlayerCard(cardId);
-        if (els.conversionModePanel) els.conversionModePanel.hidden = false;
-        if (els.conversionHint) els.conversionHint.textContent = card ? '【' + card.name + '】可按原牌使用，也可当【杀】使用' : '这张牌可按原牌使用，也可当【杀】使用';
-        if (els.handHint) els.handHint.textContent = '请选择：按原牌使用，或发动技能当【杀】使用';
-      }
-
-      function hideConversionPanel() {
-        pendingConversionCardId = null;
-        // v10 V8: 与 hideTargetZonePanel / hideHuogongPanel 对称, 清掉 staged.
-        if (stagedModalChoice && stagedModalChoice.kind === 'conversion') stagedModalChoice = null;
-        if (els.conversionModePanel) els.conversionModePanel.hidden = true;
-        if (els.conversionHint) els.conversionHint.textContent = '这张牌可按原牌使用，也可当【杀】使用';
-      }
-
-      function guanxingCardMarkup(card, zone) {
-        var selected = guanxingSelected === card.id ? ' selected' : '';
-        return '<button class="mini-card guanxing-card' + selected +
-          '" data-guanxing-card-id="' + escapeHtml(card.id) +
-          '" data-guanxing-zone="' + escapeHtml(zone) +
-          '">【' + escapeHtml(card.name) + '】' + escapeHtml(suitName(card.suit)) + ' ' + escapeHtml(String(card.rank || '')) + '</button>';
-      }
-
-      function guanxingFindCard(id) {
-        var pending = game && Engine.getPendingChoice(game);
-        if (!pending || pending.kind !== 'guanxing-reorder') return null;
-        for (var i = 0; i < pending.cards.length; i += 1) {
-          if (pending.cards[i].id === id) return pending.cards[i];
-        }
-        return null;
-      }
-
-      function renderGuanxingZones() {
-        var unassignedHtml = guanxingUnassignedIds.length
-          ? guanxingUnassignedIds.map(function (id) { var c = guanxingFindCard(id); return c ? guanxingCardMarkup(c, 'unassigned') : ''; }).join('')
-          : '<span class="mini-card">已全部分配</span>';
-        var topHtml = guanxingTopIds.length
-          ? guanxingTopIds.map(function (id, idx) { var c = guanxingFindCard(id); return c ? ('<span class="mini-card guanxing-position-tag">' + (idx + 1) + '</span>' + guanxingCardMarkup(c, 'top')) : ''; }).join('')
-          : '<span class="mini-card">尚无</span>';
-        var bottomHtml = guanxingBottomIds.length
-          ? guanxingBottomIds.map(function (id, idx) { var c = guanxingFindCard(id); return c ? ('<span class="mini-card guanxing-position-tag">' + (idx + 1) + '</span>' + guanxingCardMarkup(c, 'bottom')) : ''; }).join('')
-          : '<span class="mini-card">尚无</span>';
-        if (els.guanxingUnassigned) els.guanxingUnassigned.innerHTML = unassignedHtml;
-        if (els.guanxingTopZone) els.guanxingTopZone.innerHTML = topHtml;
-        if (els.guanxingBottomZone) els.guanxingBottomZone.innerHTML = bottomHtml;
-        if (els.guanxingConfirmBtn) els.guanxingConfirmBtn.disabled = guanxingUnassignedIds.length > 0;
-      }
-
-      function showGuanxingPanelFromPending() {
-        var pending = game && Engine.getPendingChoice(game);
-        if (!pending || pending.kind !== 'guanxing-reorder' || pending.actor !== 'player') {
-          hideGuanxingPanel();
-          return;
-        }
-        guanxingUnassignedIds = pending.cards.map(function (c) { return c.id; });
-        guanxingTopIds = [];
-        guanxingBottomIds = [];
-        guanxingSelected = null;
-        if (els.guanxingModePanel) els.guanxingModePanel.hidden = false;
-        if (els.guanxingHint) {
-          els.guanxingHint.textContent =
-            '观星（准备阶段）：' + pending.cards.length + ' 张待分配。先点一张牌再点 ↑顶 / ↓底 / ↩取回。';
-        }
-        if (els.handHint) els.handHint.textContent = '观星：请把每张牌分配到牌堆顶或牌堆底';
-        renderGuanxingZones();
-      }
-
-      function hideGuanxingPanel() {
-        guanxingUnassignedIds = [];
-        guanxingTopIds = [];
-        guanxingBottomIds = [];
-        guanxingSelected = null;
-        if (els.guanxingModePanel) els.guanxingModePanel.hidden = true;
-        if (els.guanxingHint) els.guanxingHint.textContent = '观星：准备阶段开始时分配预览牌';
-      }
-
-      function guanxingMoveSelectedTo(targetZone) {
-        if (!guanxingSelected) return;
-        var id = guanxingSelected;
-        var sources = [
-          { name: 'unassigned', list: guanxingUnassignedIds },
-          { name: 'top', list: guanxingTopIds },
-          { name: 'bottom', list: guanxingBottomIds }
-        ];
-        for (var i = 0; i < sources.length; i += 1) {
-          var pos = sources[i].list.indexOf(id);
-          if (pos >= 0) sources[i].list.splice(pos, 1);
-        }
-        var target = targetZone === 'top' ? guanxingTopIds : targetZone === 'bottom' ? guanxingBottomIds : guanxingUnassignedIds;
-        target.push(id);
-        guanxingSelected = null;
-        renderGuanxingZones();
-      }
-
-      function confirmGuanxing() {
-        if (!game || guanxingUnassignedIds.length > 0) return;
-        var result = Engine.resolvePendingChoice(game, {
-          topIds: guanxingTopIds.slice(),
-          bottomIds: guanxingBottomIds.slice()
-        });
-        hideGuanxingPanel();
-        if (!result.ok) game.log.push(result.message);
-        render();
-      }
-
-      function declineGuanxing() {
-        if (!game) return;
-        var result = Engine.resolvePendingChoice(game, { decline: true });
-        hideGuanxingPanel();
-        if (!result.ok) game.log.push(result.message);
-        render();
-      }
-
-      function suitName(suit) {
-        var labels = { spade: '黑桃', heart: '红桃', club: '梅花', diamond: '方片' };
-        return labels[suit] || suit || '未知花色';
-      }
-
-      function huogongCostButton(card, usable) {
-        return '<button class="mini-card huogong-cost-choice ' + (usable ? 'usable' : 'unusable') + '" data-huogong-cost-id="' + escapeHtml(card.id) + '" ' + (usable ? '' : 'disabled') + ' title="' + (usable ? '弃置这张牌造成火焰伤害' : '花色不符，不能弃置') + '">【' + escapeHtml(card.name) + '】' + escapeHtml(suitName(card.suit)) + (usable ? ' 可用' : ' 不可用') + '</button>';
-      }
-
-      function showHuogongPanel(cardId) {
-        pendingHuogongCardId = cardId;
-        if (els.huogongModePanel) els.huogongModePanel.hidden = false;
-        var choice = Engine.getHuogongChoice(game, 'player');
-        if (!choice.ok || !choice.revealedCard) {
-          if (els.huogongRevealText) els.huogongRevealText.textContent = '火攻：目标没有手牌，可直接结算无伤害';
-          if (els.huogongCostChoices) els.huogongCostChoices.innerHTML = '<span class="mini-card">目标无手牌，无需弃牌</span>';
-          return;
-        }
-        if (els.huogongRevealText) els.huogongRevealText.textContent = '对方展示【' + choice.revealedCard.name + '】· ' + suitName(choice.revealedCard.suit) + '，请选择是否弃同花色牌';
-        var usable = choice.usableCards.filter(function (card) { return card.id !== cardId; });
-        var unusable = choice.unusableCards.filter(function (card) { return card.id !== cardId; });
-        var html = '<span class="badge">可用牌</span>' + (usable.length ? usable.map(function (card) { return huogongCostButton(card, true); }).join('') : '<span class="mini-card">没有同花色可用牌</span>');
-        html += '<span class="badge">不可用</span>' + (unusable.length ? unusable.map(function (card) { return huogongCostButton(card, false); }).join('') : '<span class="mini-card">无</span>');
-        if (els.huogongCostChoices) els.huogongCostChoices.innerHTML = html;
-        if (els.handHint) els.handHint.textContent = '火攻：选择一张同花色手牌，或点“不弃牌结算”';
-      }
-
-      function targetZoneLabel(zone) {
-        var labels = { hand: '手牌区', equipment: '装备区', judge: '延时锦囊区' };
-        return labels[zone] || '目标区';
-      }
-
-      function targetChoiceButton(entry) {
-        var label = entry.hidden ? (entry.label + '（未知）') : entry.label;
-        return '<button class="mini-card target-card-choice" data-target-zone="' + escapeHtml(entry.zone) + '" data-target-card-id="' + escapeHtml(entry.card.id) + '" title="选择' + escapeHtml(label) + '">' + escapeHtml(label) + '</button>';
-      }
-
-      function showTargetCardChoices(zone) {
-        if (!pendingTargetCardId || !game || !els.targetCardChoices) return;
-        // v9 PR-E23: 重选区域 → 旧 stage 失效
-        if (stagedModalChoice && stagedModalChoice.kind === 'target') stagedModalChoice = null;
-        pendingTargetZone = zone;
-        var choices = Engine.getTargetZoneCards(game, 'enemy', zone);
-        var label = targetZoneLabel(zone);
-        if (!choices.length) {
-          els.targetCardChoices.innerHTML = '<span class="badge">' + escapeHtml(label) + '</span><span class="mini-card">该区域没有可选择的牌，请换一个区域</span>';
-          if (els.handHint) els.handHint.textContent = label + '没有目标牌，请换一个区域';
-          return;
-        }
-        els.targetCardChoices.innerHTML = '<span class="badge">选择' + escapeHtml(label) + '具体牌</span>' + choices.map(targetChoiceButton).join('');
-        if (els.handHint) els.handHint.textContent = '已选' + label + '，现在点具体目标牌';
-      }
+      // v11 B2: 火攻/目标区域面板渲染助手已迁往 ./panels/mode-panels.js。
 
       function cardSkillConfig(skillId) {
         var configs = {
@@ -958,58 +767,7 @@
         render();
       }
 
-      function resolveTargetZone(zone) {
-        if (!pendingTargetCardId || !game) return;
-        showTargetCardChoices(zone);
-      }
-
-      function resolveTargetCard(zone, targetCardId) {
-        if (!pendingTargetCardId || !game || !targetCardId) return;
-        var result = Engine.playCard(game, 'player', pendingTargetCardId, { targetZone: zone, targetCardId: targetCardId });
-        hideTargetZonePanel();
-        if (!result.ok) game.log.push(result.message);
-        render();
-      }
-
-      function resolveHuogong(costCardId, decline) {
-        if (!pendingHuogongCardId || !game) return;
-        var enemyHpBefore = game.enemy.hp;
-        var result = Engine.playCard(game, 'player', pendingHuogongCardId, decline ? { declineHuogong: true } : { huogongCostCardId: costCardId });
-        hideHuogongPanel();
-        if (!result.ok) game.log.push(result.message);
-        if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
-        render();
-      }
-
-      function resolveConversion(asSha) {
-        if (!pendingConversionCardId || !game) return;
-        var cardId = pendingConversionCardId;
-        if (!asSha) {
-          hideConversionPanel();
-          resolveNormalPlayerCard(cardId);
-          return;
-        }
-        var enemyHpBefore = game.enemy.hp;
-        var playerHpBefore = game.player.hp;
-        var result = Engine.playCardAs(game, 'player', cardId, 'sha');
-        hideConversionPanel();
-        if (!result.ok) game.log.push(result.message);
-        if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
-        if (game.player.hp < playerHpBefore) flashHero('player');
-        render();
-      }
-
-      function resolveTiesuo(options) {
-        if (!pendingTiesuoCardId || !game) return;
-        var playerHpBefore = game.player.hp;
-        var enemyHpBefore = game.enemy.hp;
-        var result = Engine.playCard(game, 'player', pendingTiesuoCardId, options);
-        hideTiesuoPanel();
-        if (!result.ok) game.log.push(result.message);
-        if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
-        if (game.player.hp < playerHpBefore) flashHero('player');
-        render();
-      }
+      // v11 B2: 模式面板结算函数已迁往 ./panels/mode-panels.js (经别名回接)。
 
       function resolveNormalPlayerCard(cardId) {
         if (!game) return;
@@ -1670,67 +1428,9 @@
           render();
         });
         if (els.confirmDiscardBtn) els.confirmDiscardBtn.addEventListener('click', confirmDiscardSelection);
-        if (els.tiesuoRecastBtn) els.tiesuoRecastBtn.addEventListener('click', function () { resolveTiesuo({ mode: 'recast' }); });
-        if (els.tiesuoChainEnemyBtn) els.tiesuoChainEnemyBtn.addEventListener('click', function () { resolveTiesuo({ mode: 'chain', targets: ['enemy'] }); });
-        if (els.tiesuoChainSelfBtn) els.tiesuoChainSelfBtn.addEventListener('click', function () { resolveTiesuo({ mode: 'chain', targets: ['player'] }); });
-        if (els.tiesuoChainBothBtn) els.tiesuoChainBothBtn.addEventListener('click', function () { resolveTiesuo({ mode: 'chain', targets: ['player', 'enemy'] }); });
-        if (els.tiesuoCancelBtn) els.tiesuoCancelBtn.addEventListener('click', function () { hideTiesuoPanel(); render(); });
-        if (els.targetHandBtn) els.targetHandBtn.addEventListener('click', function () { resolveTargetZone('hand'); });
-        if (els.targetEquipmentBtn) els.targetEquipmentBtn.addEventListener('click', function () { resolveTargetZone('equipment'); });
-        if (els.targetJudgeBtn) els.targetJudgeBtn.addEventListener('click', function () { resolveTargetZone('judge'); });
-        // v9 PR-E23: 二级面板候选改"选中→确认"两步 — 点候选只 stage + 高亮,
-        // #handConfirmBtn 才 resolve.
-        if (els.targetCardChoices) els.targetCardChoices.addEventListener('click', function (event) {
-          var target = event.target.closest('[data-target-card-id]');
-          if (!target) return;
-          stagedModalChoice = {
-            kind: 'target',
-            zone: target.getAttribute('data-target-zone'),
-            cardId: target.getAttribute('data-target-card-id')
-          };
-          _highlightStaged(target);
-          render();
-        });
-        if (els.huogongCostChoices) els.huogongCostChoices.addEventListener('click', function (event) {
-          var cost = event.target.closest('[data-huogong-cost-id]');
-          if (!cost || cost.disabled) return;
-          stagedModalChoice = { kind: 'huogong', costId: cost.getAttribute('data-huogong-cost-id') };
-          _highlightStaged(cost);
-          render();
-        });
-        if (els.huogongDeclineBtn) els.huogongDeclineBtn.addEventListener('click', function () { resolveHuogong(null, true); });
-        if (els.huogongCancelBtn) els.huogongCancelBtn.addEventListener('click', function () { hideHuogongPanel(); render(); });
-        // v10 V8: card-as 一致性 — 转化面板也走 stage-then-confirm. 点 "按原牌使用"
-        // 或 "当杀使用" 只 stage 高亮; 必须再按 #handConfirmBtn 才真正 resolve.
-        // 与 target/huogong/响应面板 统一交互节奏.
-        if (els.conversionNormalBtn) els.conversionNormalBtn.addEventListener('click', function () {
-          stagedModalChoice = { kind: 'conversion', asSha: false };
-          _highlightStaged(els.conversionNormalBtn);
-          render();
-        });
-        if (els.conversionShaBtn) els.conversionShaBtn.addEventListener('click', function () {
-          stagedModalChoice = { kind: 'conversion', asSha: true };
-          _highlightStaged(els.conversionShaBtn);
-          render();
-        });
-        if (els.conversionCancelBtn) els.conversionCancelBtn.addEventListener('click', function () { hideConversionPanel(); render(); });
-        if (els.guanxingTopBtn) els.guanxingTopBtn.addEventListener('click', function () { guanxingMoveSelectedTo('top'); });
-        if (els.guanxingBottomBtn) els.guanxingBottomBtn.addEventListener('click', function () { guanxingMoveSelectedTo('bottom'); });
-        if (els.guanxingReturnBtn) els.guanxingReturnBtn.addEventListener('click', function () { guanxingMoveSelectedTo('unassigned'); });
-        if (els.guanxingConfirmBtn) els.guanxingConfirmBtn.addEventListener('click', confirmGuanxing);
-        if (els.guanxingDeclineBtn) els.guanxingDeclineBtn.addEventListener('click', declineGuanxing);
-        // Card-click within any guanxing zone — set the highlight.
-        ['guanxingUnassigned', 'guanxingTopZone', 'guanxingBottomZone'].forEach(function (zoneKey) {
-          var el = els[zoneKey];
-          if (!el) return;
-          el.addEventListener('click', function (event) {
-            var btn = event.target.closest('[data-guanxing-card-id]');
-            if (!btn) return;
-            guanxingSelected = btn.getAttribute('data-guanxing-card-id');
-            renderGuanxingZones();
-          });
-        });
-        if (els.targetCancelBtn) els.targetCancelBtn.addEventListener('click', function () { hideTargetZonePanel(); render(); });
+        // v11 B2: 铁索/目标区域/火攻/转化/观星 模式面板事件绑定已迁往
+        // ./panels/mode-panels.js。
+        modePanels.bind();
         if (els.zhihengConfirmBtn) els.zhihengConfirmBtn.addEventListener('click', confirmCardSkill);
         if (els.zhihengCancelBtn) els.zhihengCancelBtn.addEventListener('click', function () { exitSkillSelectMode(); render(); });
         // v11 B2: 提示类面板事件绑定已迁往 ./panels/prompt-panels.js。

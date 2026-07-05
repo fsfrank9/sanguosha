@@ -13,6 +13,10 @@ const html = [
   fs.readFileSync(path.join(root, 'index.html'), 'utf8'),
   loadAllStyles(),
   fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8'),
+  // v11 B2: 面板已拆往 src/ui/panels/, 拼接一并纳入。
+  fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8'),
+  fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8'),
+  fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/data/cards.js'), 'utf8'),
 ].join('\n');
 
