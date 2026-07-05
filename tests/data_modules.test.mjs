@@ -69,7 +69,8 @@ test('data module ES exports reach the engine identity-equal', () => {
   assert.equal(CARD_CATALOG, Engine.CARD_CATALOG, 'engine should reuse the card catalog object');
   assert.equal(Object.keys(Engine.HERO_CATALOG).length, 68, 'engine should preserve all local heroes');
   assert.ok(Engine.HERO_CATALOG.liubei.skills.some((skill) => skill.id === 'rende' && skill.status === 'implemented'));
-  assert.equal(Engine.HERO_CATALOG.sunquan.skills.find((skill) => skill.id === 'jiuyuan').status, 'display');
+  // v11 C1 (批次 25): 救援 已实现 (此前为 display-only 身份技展示)。
+  assert.equal(Engine.HERO_CATALOG.sunquan.skills.find((skill) => skill.id === 'jiuyuan').status, 'implemented');
   assert.ok(Engine.CARD_CATALOG.sha, 'engine should preserve basic card catalog');
   assert.ok(Engine.CARD_CATALOG.huogong, 'engine should preserve trick card catalog');
   assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes('jizhi'), 'implemented skill status should survive ES module import');

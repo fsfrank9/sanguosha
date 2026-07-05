@@ -169,7 +169,10 @@
         kongcheng: { trigger: 'targetValidation',  frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onCardTarget'] },
         biyue:     { trigger: 'turnEnd',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onTurnEnd'] },
         keji:      { trigger: 'discardPhase',      frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onBeforeDiscardPhase'] },
-        jizhi:     { trigger: 'cardUse',           frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onCardUse'] }
+        jizhi:     { trigger: 'cardUse',           frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onCardUse'] },
+        // v11 C1 (批次 25):
+        wushuang:  { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['shanRequiredAgainstSha', 'duelShaRequired'] },
+        jiuyuan:   { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['taoRecoverBonus'] }
       };
 
       for (var _heroId in HERO_CATALOG) {
