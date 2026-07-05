@@ -92,7 +92,8 @@ test('game engine dispatches Jizhi through onCardUse hook seam', () => {
   const finishEnd = source.indexOf('function removeCardFromHand(state, cardId)', finishStart);
   // v10 V5: consumeWuxie signature 加了 4th param preferredCardId. 用宽松前缀 match.
   const wuxieStart = source.indexOf('function consumeWuxie(game, actor, reason');
-  const wuxieEnd = source.indexOf('// v10 V5: 无懈可击 链式响应 框架', wuxieStart);
+  // v11 B1: 链框架已迁往 tricks.js, consumeWuxie 切片终点改为拆分 stub 注释。
+  const wuxieEnd = source.indexOf('// v11 B1: 无懈链框架迁往 ./tricks.js', wuxieStart);
   assert.ok(finishStart >= 0 && finishEnd > finishStart, 'finishTrickUse source should be extractable');
   assert.ok(wuxieStart >= 0 && wuxieEnd > wuxieStart, 'consumeWuxie source should be extractable');
   const finishTrickUseSource = source.slice(finishStart, finishEnd);
