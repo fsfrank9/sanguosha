@@ -8,6 +8,8 @@ import { Engine } from './helpers/load-engine.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+// v11 B1: 银月枪触发/响应已迁往 equipment.js (工厂内缩进 4 空格, 自注册)。
+const equipmentSrc = fs.readFileSync(path.join(root, 'src/engine/equipment.js'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 
 const tests = [];
@@ -26,7 +28,7 @@ test('v10 V4: playAOE shan 路径走 requestPlayerResponse(kind:wanjian-response
 });
 
 test('v10 V4: triggerYinyueQiang 走 requestPlayerResponse(kind:yinyue-response, pauseKey:yinyueResponse)', () => {
-  const fn = engineSrc.match(/function triggerYinyueQiang\(game, holderActor\)\s*\{[\s\S]*?\n {6}\}/);
+  const fn = equipmentSrc.match(/function triggerYinyueQiang\(game, holderActor\)\s*\{[\s\S]*?\n {4}\}/);
   assert.ok(fn);
   assert.match(fn[0], /requestPlayerResponse\(game,\s*\{/);
   assert.match(fn[0], /kind:\s*'yinyue-response'/);
@@ -38,12 +40,12 @@ test('v10 V4: triggerYinyueQiang 走 requestPlayerResponse(kind:yinyue-response,
 
 test('v10 V4: 两 resolver 注册 (wanjian-response / yinyue-response)', () => {
   assert.match(engineSrc, /registerResponseKind\(\s*'wanjian-response'\s*,\s*resolveWanjianResponseChoice\s*\)/);
-  assert.match(engineSrc, /registerResponseKind\(\s*'yinyue-response'\s*,\s*resolveYinyueResponseChoice\s*\)/);
+  assert.match(equipmentSrc, /registerResponseKind\(\s*'yinyue-response'\s*,\s*resolveYinyueResponseChoice\s*\)/);
 });
 
 test('v10 V4: resolver 支持 decision.cardId / decision.use / 默认不出闪', () => {
   const wanjian = engineSrc.match(/function resolveWanjianResponseChoice[\s\S]*?\n {6}\}/);
-  const yinyue = engineSrc.match(/function resolveYinyueResponseChoice[\s\S]*?\n {6}\}/);
+  const yinyue = equipmentSrc.match(/function resolveYinyueResponseChoice[\s\S]*?\n {4}\}/);
   assert.ok(wanjian && yinyue);
   [wanjian[0], yinyue[0]].forEach(function (fnSrc, idx) {
     assert.match(fnSrc, /decision\.cardId/, ['wanjian','yinyue'][idx] + ': 缺 cardId 分支');
