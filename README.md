@@ -2,7 +2,7 @@
 
 纯 HTML/CSS/JavaScript 实现的三国杀 1v1。原生 ES 模块 + GitHub Pages 静态托管:`src/` 就是浏览器加载的源码本身,根 `index.html` 是手写的模块入口——没有打包步骤、没有 npm 运行时依赖。
 
-**当前版本 `v10.2`**:31 个已实现技能(7 个主动)100% 对照官方 spec,39 张牌规则数据驱动,统一的暂停/恢复玩家选择框架(FIFO 队列 + 全局挂起冻结)与响应(无懈/闪/杀)派发,经两轮独立代码审计修复后引擎规则层无已知胜负级偏差。
+**当前版本 `v11`**(批次 11-36 / PR #125-#150 收官):40 个已实现技能(8 个主动)100% 对照官方 spec 并通过四方一致性审计,71 名武将,39 张牌规则数据驱动;引擎按域模块化(伤害濒死/响应/锦囊/装备/AI),牌移动统一走 `moveCard` 原语并由全局牌数守恒断言护航;AI 具备转化 lookahead 与无懈/闪响应期望值决策。1207 条断言全绿,经两轮独立代码审计修复后引擎规则层无已知胜负级偏差。
 
 ## 运行
 
@@ -41,8 +41,12 @@ npm run verify        # build:check + 全量测试(CI 门禁同款)
 index.html            手写模块入口(无内联逻辑)
 src/
   main.js             两行 side-effect import
-  engine/             游戏引擎(game-engine.js 主体 + runtime seam 模块)
-  ui/dom-adapter.js   DOM 适配层(面板渲染/事件绑定)
+  engine/             游戏引擎:game-engine.js 装配主体 + 域模块
+                      (damage-dying / response / tricks / equipment / ai)
+                      + runtime seam(card/state/skill/judgement/phases)
+  ui/
+    dom-adapter.js    DOM 适配层(渲染框架 + 面板注册表)
+    panels/           面板模块(response / prompt / mode 三簇)
   data/               武将/技能/牌的结构化 catalog 与元数据
   styles/             CSS(main.css 为 @import 入口)
 tests/                行为测试 + 架构守护测试(零依赖直跑)
@@ -56,8 +60,8 @@ docs/
 
 ## 内容现状
 
-- 武将 68 名 / 技能条目 123 条 / 唯一技能 ID 118 个。
-- 已接入引擎逻辑的技能 31 个(主动/交互 7 个:制衡、苦肉、仁德、反间、观星、青囊、洛神);未实现技能在 UI 中明确标记,不会"看起来有但触发不了"。
+- 武将 71 名 / 技能条目 128 条 / 唯一技能 ID 123 个。
+- 已接入引擎逻辑的技能 40 个(主动/交互 8 个:制衡、苦肉、仁德、反间、观星、青囊、洛神、结姻);未实现技能在 UI 中明确标记,不会"看起来有但触发不了"。标准包在 1v1 语境已封顶(余下激将/护驾/离间为多人专属,流离/同疾以 reserved hook 待多人激活)。
 - 标准 + 军争核心牌组 39 张牌全部数据驱动;濒死/判定/响应窗口/无懈链/铁索传导等结算对照 `official-skill-cache/gltjk-sanguosha-rules` 官方规则集。
 - 技能逐项的引擎接入说明见 [`docs/history.md`](docs/history.md)。
 
@@ -75,15 +79,16 @@ docs/
 | v9 | UI 全面改版(cream 卷轴风) | `2026-05-14-sanguosha-v9-ui-overhaul.md` |
 | v10 | 响应框架 + dispatch 注册表 | `2026-05-28-sanguosha-v10-stabilize-and-expand.md` |
 | 审计×2 | 两轮规则合规审计修复(#105–#113, #115–#123) | `docs/audit/` + `docs/history.md` |
+| v11 | 守恒硬化 + 域拆分 + 技能 31→40 + AI 期望值决策(#125–#150) | `2026-06-09-sanguosha-v11-roadmap.md`(含收尾盘点) |
 
-## 下一阶段(v11)
+## 下一阶段(v12,已规划未启动)
 
-路线图见 [`docs/plans/2026-06-09-sanguosha-v11-roadmap.md`](docs/plans/2026-06-09-sanguosha-v11-roadmap.md),按优先级:
+路线图见 [`docs/plans/2026-07-05-sanguosha-v12-roadmap.md`](docs/plans/2026-07-05-sanguosha-v12-roadmap.md),按依赖排序:
 
-1. **守恒与回归硬化**:全局牌守恒断言、`moveCard` 原语、UI 面板行为测试补全。
-2. **单体拆分**:`game-engine.js`(~5100 行)按域拆模块,`dom-adapter.js` 面板拆分。
-3. **新技能批量接入**:17 个 cache-ready 技能,引擎+UI+测试三件套齐备地分批落地。
-4. **AI 进阶 / 玩法扩展**:响应决策评估、装备 handler 收口、多人模式(远期)。
+1. **F 结构减重**:技能 handler 域拆分(立"零 registerSkill"守护)、判定区域、playCard 分发表化。
+2. **G 扩展包技能**:风包 spec 缓存补齐后按三件套范式分批接入(技能 40→约 50)。
+3. **H 多人模式**(主战役):座次抽象、距离环、目标选择框架、3 人身份场;红线 1v1 零回归。
+4. **I AI 进阶**:两步 lookahead、可见信息计数建模、多人目标评估。
 
 ## 官方资料对照与缓存
 
