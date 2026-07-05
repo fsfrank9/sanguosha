@@ -8,7 +8,10 @@ import { assertCardConservation } from './helpers/card-conservation.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const heroesSrc = fs.readFileSync(path.join(root, 'src/data/heroes.js'), 'utf8');
-const adapterSrc = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v11 B2: 提示类/响应类面板已迁往 src/ui/panels/, 源为主文件 + 面板模块拼接。
+const adapterSrc = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8');
 
 function makeHuatuoGame() {
   // 华佗 自带 jijiu + qingnang 技能

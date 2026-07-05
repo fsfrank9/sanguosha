@@ -9,7 +9,10 @@ import { Engine } from './helpers/load-engine.mjs';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v11 B2: 提示类/响应类面板已迁往 src/ui/panels/, 源为主文件 + 面板模块拼接。
+const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8');
 
 function c(type, overrides = {}) {
   return Engine.makeTestCard(type, overrides);
@@ -50,13 +53,14 @@ test('dom-adapter: renderPendingChoice 处理两个新 kind 且仅对 player 弹
 test('dom-adapter: 贯石斧多选恰好 2 张 — 选满禁入 + confirm 按钮 2 张门控', () => {
   assert.match(adapter, /guanshiDiscardSelection\.length < 2\) guanshiDiscardSelection\.push/);
   assert.match(adapter, /guanshiConfirmBtn\.disabled = guanshiDiscardSelection\.length !== 2/);
-  assert.match(adapter, /resolvePendingChoice\(game, \{ cardIds: guanshiDiscardSelection\.slice\(\) \}\)/);
+  // v11 B2: 面板模块内经 getGame() 取当前对局。
+  assert.match(adapter, /resolvePendingChoice\(getGame\(\), \{ cardIds: guanshiDiscardSelection\.slice\(\) \}\)/);
   assert.match(adapter, /guanshiDeclineBtn.*addEventListener[\s\S]*?\{ decline: true \}/);
 });
 
 test('dom-adapter: 火攻展示走 stage + hand-confirm 提交 (payload cardId)', () => {
   assert.match(adapter, /data-huogong-show-card-id/);
-  assert.match(adapter, /payload: \{ cardId: cardId \},\s*\n\s*selector: '\[data-huogong-show-card-id="/);
+  assert.match(adapter, /stage\(\{\s*cardId:\s*cardId\s*\},\s*'\[data-huogong-show-card-id="/);
 });
 
 test('dom-adapter: PENDING_MODAL_DISPATCH 登记两个新面板', () => {
