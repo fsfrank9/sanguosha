@@ -1660,6 +1660,8 @@
         discardSourceCardIfPending: discardSourceCardIfPending,
         // applyHanbingPrevent 随装备域迁出后为后置装配的 var, 包装注入
         applyHanbingPrevent: function (g, sa, ta) { return applyHanbingPrevent(g, sa, ta); },
+        // v11 C1: 救援 — 濒死路径同样适用 (桃/急救视为桃)。
+        taoRecoverBonus: function (g, u, t) { return taoRecoverBonus(g, u, t); },
         isArmorIgnoredBySha: isArmorIgnoredBySha
       });
       var damage = DamageDyingRuntime.damage;
@@ -2554,6 +2556,29 @@
         return listShanResponseOptions(state).length > 0;
       }
 
+      // v11 C1: 无双 — 锁定技。吕布的【杀】需目标依次两张【闪】; 决斗中
+      // 吕布的对手每轮需依次打出两张【杀】。
+      function shanRequiredAgainstSha(game, sourceActor) {
+        return hasSkill(game[sourceActor], 'wushuang') ? 2 : 1;
+      }
+
+      function duelShaRequired(game, responder) {
+        return hasSkill(game[opponent(responder)], 'wushuang') ? 2 : 1;
+      }
+
+      // v11 C1: 救援 — 主公技/锁定。其他吴势力角色对主公孙权使用【桃】
+      // (含急救视为桃) 时, 回复量 +1。
+      function taoRecoverBonus(game, userActor, targetActor) {
+        if (userActor === targetActor) return 0;
+        var target = game[targetActor];
+        var user = game[userActor];
+        if (!target || !user || !hasSkill(target, 'jiuyuan')) return 0;
+        if (!game.roles || game.roles[targetActor] !== '主公') return 0;
+        if (user.camp !== '吴') return 0;
+        log(game, actorName(game, targetActor) + '的【救援】生效，回复量 +1。');
+        return 1;
+      }
+
       function continueShaAfterCixiong(game, actor, card, amount) {
         var self = game[actor];
         var targetActor = opponent(actor);
@@ -2594,7 +2619,8 @@
             kind: 'shan-response',
             actor: 'player',
             pauseKey: 'shaResponse',
-            source: { actor: actor, card: card, amount: amount },
+            // v11 C1: 无双 → shanRemaining=2, 首张闪后再开第二个响应窗口。
+            source: { actor: actor, card: card, amount: amount, shanRemaining: shanRequiredAgainstSha(game, actor) },
             // v9 PR-E26: 列出所有可作【闪】的牌 (真闪 + 龙胆/倾国 转化), 玩家自选.
             options: listShanResponseOptions(target),
             meta: { sourceActor: actor, shaName: card.name },
@@ -2604,10 +2630,19 @@
         }
 
         var dodged = false;
-        if (!responseContext.responseLocked && consumeResponse(game, targetActor, 'shan', '【杀】')) {
+        if (!responseContext.responseLocked) {
+          // v11 C1: 无双 — 需依次两张【闪】(每一张都可由八卦判定替代)。
+          var shanNeeded = shanRequiredAgainstSha(game, actor);
+          if (shanNeeded > 1) {
+            log(game, '【无双】锁定：' + actorName(game, targetActor) + '需依次使用两张【闪】。');
+          }
           dodged = true;
-        } else if (!responseContext.responseLocked) {
-          dodged = tryBaguaDodge(game, targetActor, ignoreArmor);
+          for (var shanIndex = 0; shanIndex < shanNeeded; shanIndex += 1) {
+            if (consumeResponse(game, targetActor, 'shan', '【杀】')) continue;
+            if (tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
+            dodged = false;
+            break;
+          }
         }
         return resolveShaAfterResponse(game, actor, card, amount, dodged);
       }
@@ -2761,6 +2796,7 @@
         var amount = saved.amount;
         var target = game.player;
         var d = decision || {};
+        var shanRemaining = saved.shanRemaining || 1;
         var dodged = false;
         if (d.cardId) {
           dodged = consumeResponse(game, 'player', 'shan', '【杀】', d.cardId);
@@ -2770,6 +2806,31 @@
           if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
         } else {
           log(game, actorName(game, 'player') + '选择不打出【闪】。');
+          // v11 C1: 放弃出闪 → 剩余每一张需求都须由八卦判定顶上才算抵消。
+          dodged = true;
+          for (var baguaIndex = 0; baguaIndex < shanRemaining; baguaIndex += 1) {
+            if (!tryBaguaDodge(game, 'player', isArmorIgnoredBySha(game, actor, card))) {
+              dodged = false;
+              break;
+            }
+          }
+          shanRemaining = 1; // 已按剩余需求整体判定完毕
+        }
+        // v11 C1: 无双 — 首张闪成功且仍有剩余需求 → 再开一个响应窗口。
+        if (dodged && shanRemaining > 1) {
+          if (hasShanResponseAvailable(game.player)) {
+            return requestPlayerResponse(game, {
+              kind: 'shan-response',
+              actor: 'player',
+              pauseKey: 'shaResponse',
+              source: { actor: actor, card: card, amount: amount, shanRemaining: shanRemaining - 1 },
+              options: listShanResponseOptions(game.player),
+              meta: { sourceActor: actor, shaName: card.name },
+              logMessage: '【无双】：' + actorName(game, 'player') + '需再使用一张【闪】。',
+              statusMessage: '等待玩家响应【杀】(无双第二张)。'
+            });
+          }
+          // 无第二张可出 → 尝试八卦顶上, 否则未抵消。
           dodged = tryBaguaDodge(game, 'player', isArmorIgnoredBySha(game, actor, card));
         }
         return resolveShaAfterResponse(game, actor, card, amount, dodged);
@@ -2830,9 +2891,18 @@
         }
 
         // 非玩家 ask 路径: AI / 默认 — 走原 consumeResponse 自动消耗
-        if (consumeResponse(game, responder, 'sha', chain.reason)) {
+        // v11 C1: 无双 — 对手为吕布时每轮需依次打出两张【杀】。
+        var duelNeeded = duelShaRequired(game, responder);
+        var duelPaid = 0;
+        while (duelPaid < duelNeeded && consumeResponse(game, responder, 'sha', chain.reason)) {
+          duelPaid += 1;
+        }
+        if (duelPaid === duelNeeded) {
           chain.currentResponder = opponent(responder);
           return advanceDuelChain(game);
+        }
+        if (duelNeeded > 1) {
+          log(game, '【无双】锁定：' + actorName(game, responder) + '未能打出两张【杀】。');
         }
         // 无杀 → 受 1 伤, 链结束
         var loser = responder;
@@ -2856,6 +2926,22 @@
             damage(game, ploser, 1, opponent(ploser), chain.reason, chain.card);
             return success('决斗结算完成。');
           }
+          // v11 C1: 无双 — 玩家每轮需依次两张【杀】; 首张后剩余 >0 则再询问。
+          if (chain.shaRemaining === undefined || chain.shaRemaining === null) {
+            chain.shaRemaining = duelShaRequired(game, 'player');
+          }
+          chain.shaRemaining -= 1;
+          if (chain.shaRemaining > 0) {
+            if (hasShaResponseAvailable(game.player)) {
+              log(game, '【无双】：' + actorName(game, 'player') + '需再打出一张【杀】。');
+              return advanceDuelChain(game);
+            }
+            log(game, '【无双】锁定：' + actorName(game, 'player') + '无法打出第二张【杀】。');
+            game.pauseState.duelChain = null;
+            damage(game, 'player', 1, opponent('player'), chain.reason, chain.card);
+            return success('决斗结算完成。');
+          }
+          chain.shaRemaining = null;
           chain.currentResponder = opponent('player');
           return advanceDuelChain(game);
         }
@@ -3042,8 +3128,10 @@
             return fail('目标体力已满，不能使用【桃】。');
           }
           discardCard(game, card);
-          taoTargetState.hp = Math.min(taoTargetState.maxHp, taoTargetState.hp + 1);
-          log(game, actorName(game, actor) + '使用【桃】' + (taoTargetActor === actor ? '' : '对' + actorName(game, taoTargetActor)) + '，回复 1 点体力。');
+          // v11 C1: 救援 — 其他吴势力角色对主公孙权使用【桃】回复量 +1。
+          var taoHeal = 1 + taoRecoverBonus(game, actor, taoTargetActor);
+          taoTargetState.hp = Math.min(taoTargetState.maxHp, taoTargetState.hp + taoHeal);
+          log(game, actorName(game, actor) + '使用【桃】' + (taoTargetActor === actor ? '' : '对' + actorName(game, taoTargetActor)) + '，回复 ' + taoHeal + ' 点体力。');
           return success('回复体力。');
         }
 

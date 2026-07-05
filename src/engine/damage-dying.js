@@ -23,6 +23,8 @@
     var discardSourceCardIfPending = deps.discardSourceCardIfPending;
     var applyHanbingPrevent = deps.applyHanbingPrevent;
     var isArmorIgnoredBySha = deps.isArmorIgnoredBySha;
+    // v11 C1 (批次 25): 救援 — 吴势力对濒死主公用桃回复量 +1 (由引擎注入)
+    var taoRecoverBonus = deps.taoRecoverBonus;
 
     function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts) {
       if (game.phase === 'gameover') return false;
@@ -336,8 +338,10 @@
       var card = takeCard(game, cardId, { zone: 'hand', actor: responder });
       if (kind === 'tao') {
         discardCard(game, card);
-        dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + 1);
-        log(game, actorName(game, responder) + '对' + actorName(game, dyingActor) + '使用【桃】（濒死救援），回复 1 点体力。');
+        // v11 C1 (批次 25): 救援 — 吴势力对濒死主公用桃回复量 +1
+        var taoHeal = 1 + (taoRecoverBonus ? taoRecoverBonus(game, responder, dyingActor) : 0);
+        dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + taoHeal);
+        log(game, actorName(game, responder) + '对' + actorName(game, dyingActor) + '使用【桃】（濒死救援），回复 ' + taoHeal + ' 点体力。');
         return { healed: true };
       }
       if (kind === 'jiu') {
@@ -367,8 +371,10 @@
           return { skipped: true };
         }
         discardCard(game, card);
-        dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + 1);
-        log(game, actorName(game, responder) + '发动【急救】，将【' + card.name + '】当【桃】对' + actorName(game, dyingActor) + '使用，回复 1 点体力。');
+        // v11 C1 (批次 25): 急救视为使用桃, 同样吃【救援】的 +1
+        var jijiuHeal = 1 + (taoRecoverBonus ? taoRecoverBonus(game, responder, dyingActor) : 0);
+        dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + jijiuHeal);
+        log(game, actorName(game, responder) + '发动【急救】，将【' + card.name + '】当【桃】对' + actorName(game, dyingActor) + '使用，回复 ' + jijiuHeal + ' 点体力。');
         return { healed: true };
       }
       // 未知 kind
