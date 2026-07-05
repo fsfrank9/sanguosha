@@ -295,7 +295,8 @@ test('game engine dispatches Wusheng, Longdan, and Qingguo card-as conversions t
   const responseStart = responseMatch ? responseMatch.index : -1;
   const responseEnd = source.indexOf('function consumeResponse(game, actor, type, reason', responseStart);
   const canPlayStart = source.indexOf('function canPlayCardAs(game, actor, cardOrId, asType)');
-  const canPlayEnd = source.indexOf('function playCardAs(game, actor, cardId, asType)', canPlayStart);
+  // v11 C3 (批次 27): playCardAs 增加 options 形参 (奇袭 targetZone 透传)。
+  const canPlayEnd = source.indexOf('function playCardAs(game, actor, cardId, asType, options)', canPlayStart);
   assert.ok(responseStart >= 0 && responseEnd > responseStart, 'findResponseCard source should be extractable');
   assert.ok(canPlayStart >= 0 && canPlayEnd > canPlayStart, 'canPlayCardAs source should be extractable');
   const responseSource = source.slice(responseStart, responseEnd);

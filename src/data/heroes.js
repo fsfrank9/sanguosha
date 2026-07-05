@@ -174,7 +174,9 @@
         wushuang:  { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['shanRequiredAgainstSha', 'duelShaRequired'] },
         jiuyuan:   { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['taoRecoverBonus'] },
         // v11 C2 (批次 26):
-        lianying:  { trigger: 'handLoss',          frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['handLossHandler'] }
+        lianying:  { trigger: 'handLoss',          frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['handLossHandler'] },
+        // v11 C3 (批次 27):
+        qixi:      { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs'] }
       };
 
       for (var _heroId in HERO_CATALOG) {

@@ -15,7 +15,10 @@
         'wushuang', 'jiuyuan',
         // v11 C2 (批次 26): 统一手牌失去事件 (CardRuntime handLossHandler)
         //   lianying 陆逊  失去最后一张手牌后摸一张牌
-        'lianying'
+        'lianying',
+        // v11 C3 (批次 27): card-as 泛化到锦囊 (playCardAs asType='guohe')
+        //   qixi     甘宁  黑色牌当【过河拆桥】使用
+        'qixi'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,
