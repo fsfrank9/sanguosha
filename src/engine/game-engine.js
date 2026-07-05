@@ -116,6 +116,12 @@
           return triggerQianxunCardTarget(context);
         }
       });
+      // v11 C8 (批次 32): 同疾 (标袁术) — 1v1 恒不拦截的 reserved hook
+      SkillRuntime.registerSkill(skillRegistry, 'tongji', {
+        onCardTarget: function (context) {
+          return triggerTongjiCardTarget(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'tiandu', {
         onJudgementAfterResolve: function (context) {
           return triggerTianduJudgementAfterResolve(context);
@@ -268,6 +274,32 @@
           protected: true,
           message: actorName(context.game, context.targetActor) + '拥有【谦逊】，不能成为【' + context.cardName + '】目标。'
         };
+      }
+
+      // v11 C8 (批次 32): 同疾 (标袁术) — 锁定技。gltjk spec: "其他角色使用
+      // 【杀】选择目标时, 若其手牌数大于其体力值且袁术在其攻击范围内, 不能
+      // 指定除袁术以外的角色为目标"。1v1 中可指定的目标只有对手: 对手是
+      // 袁术则杀本就指向袁术, 对手不是袁术则场上无袁术 — 恒不拦截。与
+      // 流离同为 reserved hook: 扫描 source/target 之外的袁术, 多人模式
+      // 启用后自动生效。
+      function triggerTongjiCardTarget(context) {
+        var game = context.game;
+        if (!context.card || !isShaCard(context.card)) return null;
+        var others = ['player', 'enemy'].filter(function (a) {
+          return a !== context.actor && a !== context.targetActor;
+        });
+        for (var i = 0; i < others.length; i += 1) {
+          var holder = game[others[i]];
+          if (holder && hasSkill(holder, 'tongji')
+              && (holder.hand || []).length > holder.hp
+              && canReachWithSha(game, context.actor, others[i])) {
+            return {
+              protected: true,
+              message: actorName(game, others[i]) + '的【同疾】生效，【杀】必须以其为目标。'
+            };
+          }
+        }
+        return null;
       }
 
       function takeHandCard(game, fromActor, toActor, reason) {
@@ -3476,6 +3508,20 @@
         var state = game[actor];
         if (!state) return null;
         state.flags = state.flags || {};
+        // v11 C8 (批次 32): 妄尊 (标袁术) — gltjk spec: "主公的准备阶段开始
+        // 时, 你可以摸一张牌, 该主公本回合手牌上限 -1"。1v1 实现取对手为
+        // 主公的场景 (袁术自任主公时 +1 牌/-1 上限自净, 不建模); 默认自动,
+        // skillPreferences.wangzun='decline' 可关。放在观星/洛神之前, 避免
+        // 其 pendingChoice 挂起时被跳过。
+        var wangzunHolderActor = opponent(actor);
+        var wangzunHolder = game[wangzunHolderActor];
+        if (wangzunHolder && hasSkill(wangzunHolder, 'wangzun')
+            && game.roles && game.roles[actor] === '主公'
+            && !(wangzunHolder.skillPreferences && wangzunHolder.skillPreferences.wangzun === 'decline')) {
+          log(game, actorName(game, wangzunHolderActor) + '发动【妄尊】，摸一张牌，' + actorName(game, actor) + '本回合手牌上限 -1。');
+          drawCards(game, wangzunHolderActor, 1);
+          state.handLimitDelta = (state.handLimitDelta || 0) - 1;
+        }
         if (hasSkill(state, 'guanxing') && !state.flags.guanxingUsed && game.deck.length > 0) {
           var pref = (state.skillPreferences && state.skillPreferences.guanxing) || null;
           if (pref === 'decline') {

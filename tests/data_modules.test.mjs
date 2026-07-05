@@ -67,8 +67,8 @@ test('data module ES exports reach the engine identity-equal', () => {
   assert.ok(ACTIVE_SKILL_IDS, 'data module should export ACTIVE_SKILL_IDS');
   assert.equal(HERO_CATALOG, Engine.HERO_CATALOG, 'engine should reuse the hero catalog object');
   assert.equal(CARD_CATALOG, Engine.CARD_CATALOG, 'engine should reuse the card catalog object');
-  // v11 C6/C7 (批次 30/31): 补员 孙尚香 + 华雄 → 68+2。
-  assert.equal(Object.keys(Engine.HERO_CATALOG).length, 70, 'engine should preserve all local heroes');
+  // v11 C6-C8 (批次 30-32): 补员 孙尚香 + 华雄 + 标袁术 → 68+3。
+  assert.equal(Object.keys(Engine.HERO_CATALOG).length, 71, 'engine should preserve all local heroes');
   assert.ok(Engine.HERO_CATALOG.liubei.skills.some((skill) => skill.id === 'rende' && skill.status === 'implemented'));
   // v11 C1 (批次 25): 救援 已实现 (此前为 display-only 身份技展示)。
   assert.equal(Engine.HERO_CATALOG.sunquan.skills.find((skill) => skill.id === 'jiuyuan').status, 'implemented');

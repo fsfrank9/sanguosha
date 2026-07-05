@@ -27,6 +27,8 @@
     state.usedSha = false;
     state.usedOrRespondedSha = false;
     state.shaBonus = 0;
+    // v11 C8 (批次 32): 妄尊 等回合级手牌上限修正复位
+    state.handLimitDelta = 0;
     var flags = ensureFlags(state);
     flags.skipPlay = false;
     flags.skipDraw = false;
@@ -43,6 +45,9 @@
     flags.fangtianBonus = false;
     // v8 PR-C4: 青囊 出牌阶段限一次
     flags.qingnangUsed = false;
+    // v11 C8 (批次 32): 结姻 每回合限一次 (批次 30 遗漏复位 — 修复为
+    // 每回合而非每局一次)
+    flags.jieyinUsed = false;
   }
 
   function resetEndOfTurnState(state) {
@@ -50,6 +55,8 @@
     state.usedSha = false;
     state.usedOrRespondedSha = false;
     state.shaBonus = 0;
+    // v11 C8 (批次 32): 回合结束同样清掉手牌上限修正
+    state.handLimitDelta = 0;
     var flags = ensureFlags(state);
     flags.zhihengUsed = false;
     flags.fanjianUsed = false;
@@ -65,6 +72,8 @@
     flags.fangtianBonus = false;
     // v8 PR-C4: 青囊 一次性标记复位
     flags.qingnangUsed = false;
+    // v11 C8 (批次 32): 结姻 复位 (批次 30 遗漏修复)
+    flags.jieyinUsed = false;
   }
 
   export const PhaseRuntime = {
