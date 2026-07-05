@@ -47,6 +47,8 @@
         { id: 'guojia', name: '郭嘉', camp: '魏', gender: 'male', title: '早终的先知', maxHp: 3, quote: '就这样吧。', skills: [{ id: 'tiandu', name: '天妒', desc: '判定牌生效后可获得。' }, { id: 'yiji', name: '遗计', desc: '受到伤害后可摸牌并分配。' }] },
         { id: 'zhenji', name: '甄姬', camp: '魏', gender: 'female', title: '薄幸的美人', maxHp: 3, quote: '凌波微步，罗袜生尘。', skills: [{ id: 'luoshen', name: '洛神', desc: '准备阶段可连续判定获得黑色牌。' }, { id: 'qingguo', name: '倾国', desc: '可将黑色手牌当【闪】使用或打出。' }] },
         { id: 'ganning', name: '甘宁', camp: '吴', gender: 'male', title: '锦帆游侠', maxHp: 4, quote: '接招吧！', skills: [{ id: 'qixi', name: '奇袭', desc: '可将黑色牌当【过河拆桥】使用。' }] },
+        // v11 C6 (批次 30): 标准包补员 — 孙尚香 (吴/女/3勾玉)
+        { id: 'sunshangxiang', name: '孙尚香', camp: '吴', gender: 'female', title: '弓腰姬', maxHp: 3, quote: '夫君，身体要紧。', skills: [{ id: 'jieyin', name: '结姻', desc: '出牌阶段限一次，弃两张手牌令一名受伤的男性角色与你各回复 1 点体力。' }, { id: 'xiaoji', name: '枭姬', desc: '失去装备区里的牌后，摸两张牌。' }] },
         { id: 'lvmeng', name: '吕蒙', camp: '吴', gender: 'male', title: '白衣渡江', maxHp: 4, quote: '克己复礼。', skills: [{ id: 'keji', name: '克己', desc: '若未使用/打出杀，可跳过弃牌阶段。' }] },
         { id: 'luxun', name: '陆逊', camp: '吴', gender: 'male', title: '儒生雄才', maxHp: 3, quote: '牌不是万能的，但是没牌是万万不能的。', skills: [{ id: 'qianxun', name: '谦逊', desc: '不能成为顺手牵羊和乐不思蜀目标。' }, { id: 'lianying', name: '连营', desc: '失去最后手牌后可摸一张。' }] },
         { id: 'daqiao', name: '大乔', camp: '吴', gender: 'female', title: '矜持之花', maxHp: 3, quote: '请休息吧。', skills: [{ id: 'guose', name: '国色', desc: '可将方片牌当【乐不思蜀】使用。' }, { id: 'liuli', name: '流离', desc: '被杀指定时可转移目标。' }] },
@@ -176,7 +178,10 @@
         // v11 C2 (批次 26):
         lianying:  { trigger: 'handLoss',          frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['handLossHandler'] },
         // v11 C3 (批次 27):
-        qixi:      { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs'] }
+        qixi:      { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs'] },
+        // v11 C6 (批次 30):
+        xiaoji:    { trigger: 'equipmentLoss',     frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['triggerEquipmentLoss'] },
+        jieyin:    { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 2 },     hooks: ['onActiveSkill'] }
       };
 
       for (var _heroId in HERO_CATALOG) {

@@ -61,6 +61,8 @@ const VALID_TRIGGERS = new Set([
   'shaTargetedAfter',
   // v11 C2 (批次 26): 连营触发时机 — "你失去最后一张手牌后"
   'handLoss',
+  // v11 C6 (批次 30): 枭姬触发时机 — "你失去装备区里的牌后"
+  'equipmentLoss',
 ]);
 const VALID_FREQUENCIES = new Set([
   'oncePerTurn',

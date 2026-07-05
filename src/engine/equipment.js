@@ -11,6 +11,7 @@
   var actorName = StateRuntime.actorName;
   var opponent = StateRuntime.opponent;
   var canReachWithSha = StateRuntime.canReachWithSha;
+  var hasSkill = StateRuntime.hasSkill;
 
   export function createEquipmentRuntime(deps) {
     var log = deps.log;
@@ -41,6 +42,13 @@
       if (card.type === 'baiyin' && self.hp < self.maxHp && game.phase !== 'gameover') {
         self.hp += 1;
         log(game, actorName(game, actor) + '因失去【白银狮子】回复 1 点体力。');
+      }
+      // v11 C6 (批次 30): 枭姬 (孙尚香) — "失去装备区里的牌后, 摸两张牌"。
+      // 挂在统一装备失去时机上: 替换/被拆/被顺/制衡成本/刚烈弃置 全部生效。
+      if (hasSkill(self, 'xiaoji') && game.phase !== 'gameover'
+          && !(self.skillPreferences && self.skillPreferences.xiaoji === 'decline')) {
+        log(game, actorName(game, actor) + '发动【枭姬】，摸两张牌。');
+        drawCards(game, actor, 2);
       }
     }
 

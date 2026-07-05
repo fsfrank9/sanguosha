@@ -18,11 +18,16 @@
         'lianying',
         // v11 C3 (批次 27): card-as 泛化到锦囊 (playCardAs asType='guohe')
         //   qixi     甘宁  黑色牌当【过河拆桥】使用
-        'qixi'
+        'qixi',
+        // v11 C6 (批次 30): 标准包补员 孙尚香
+        //   xiaoji   孙尚香  失去装备区牌后摸两张 (挂统一装备失去时机)
+        //   jieyin   孙尚香  出牌阶段限一次, 弃两手牌与受伤男性各回复 1
+        'xiaoji', 'jieyin'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,
       // 不占技能按钮.
-      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen'];
+      // v11 C6: jieyin 为出牌阶段主动技 (占技能按钮, 选 2 张手牌)。
+      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin'];
 
       export { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS };

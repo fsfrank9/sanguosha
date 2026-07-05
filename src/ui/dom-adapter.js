@@ -730,6 +730,16 @@
             startHint: '青囊：弃 1 手牌, 令一名受伤的角色回 1 体力 (默认对方受伤优先, 否则自己)',
             selectedHint: function (count) { return '青囊：已选 ' + count + ' / 1 张'; },
             emptyMessage: '请选择一张手牌发动【青囊】。'
+          },
+          // v11 C6 (批次 30): 结姻 — 弃 2 手牌, 与受伤男性对手各回 1
+          jieyin: {
+            name: '结姻',
+            min: 2,
+            max: 2,
+            cardHint: '选择这张牌用于【结姻】',
+            startHint: '结姻：弃 2 张手牌, 与受伤的男性对手各回复 1 点体力 (每回合限一次)',
+            selectedHint: function (count) { return '结姻：已选 ' + count + ' / 2 张'; },
+            emptyMessage: '请选择两张手牌发动【结姻】。'
           }
         };
         return configs[skillId] || null;
