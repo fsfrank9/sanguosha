@@ -27,6 +27,7 @@ const REQUIRED_FILES = [
   'src/ui/dom-adapter.js',
   'src/ui/panels/response-panels.js',
   'src/ui/panels/prompt-panels.js',
+  'src/ui/panels/mode-panels.js',
 ];
 
 const MODULE_ENTRY_REQUIREMENTS = [

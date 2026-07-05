@@ -13,6 +13,8 @@ const html = [
   fs.readFileSync(path.join(root, 'index.html'), 'utf8'),
   loadAllStyles(),
   fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8'),
+  // v11 B2: 目标区域面板已迁往 mode-panels.js, 拼接纳入。
+  fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/data/cards.js'), 'utf8'),
 ].join('\n');
 
@@ -57,7 +59,7 @@ test('玩家 UI 选择顺手/过拆目标区后必须继续选择具体目标牌
   assert.doesNotMatch(html, /guohe:[\s\S]*?随机弃置对方一张手牌/, 'Guohe copy should not describe a random hand discard');
   assert.doesNotMatch(html, /shunshou:[\s\S]*?随机获得对方一张手牌/, 'Shunshou copy should not describe a random hand steal');
 
-  const resolveZoneMatch = html.match(/function resolveTargetZone\(zone\) \{[\s\S]*?\n      \}/);
+  const resolveZoneMatch = html.match(/function resolveTargetZone\(zone\) \{[\s\S]*?\n {4,6}\}/);
   assert.ok(resolveZoneMatch, 'resolveTargetZone should exist');
   assert.doesNotMatch(
     resolveZoneMatch[0],
