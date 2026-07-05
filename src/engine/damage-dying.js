@@ -21,7 +21,8 @@
     var setPendingChoice = deps.setPendingChoice;
     var discardCard = deps.discardCard;
     var discardSourceCardIfPending = deps.discardSourceCardIfPending;
-    var applyHanbingPrevent = deps.applyHanbingPrevent;
+    // v11 E1 (批次 35): 装备伤害修正 handler 表 (装备域后置装配, 包装注入)
+    var applyEquipmentDamageModifiers = deps.applyEquipmentDamageModifiers;
     var isArmorIgnoredBySha = deps.isArmorIgnoredBySha;
     // v11 C1 (批次 25): 救援 — 吴势力对濒死主公用桃回复量 +1 (由引擎注入)
     var taoRecoverBonus = deps.taoRecoverBonus;
@@ -51,46 +52,23 @@
       SkillRuntime.runHook(skillRegistry, 'onDamageModify', damageModifyContext);
       amount = Number(damageModifyContext.amount) || 0;
 
-      if (armor && !ignoreArmor && armor.type === 'tengjia') {
-        if (damageNature === 'fire') {
-          amount += 1;
-          log(game, actorName(game, targetActor) + '的【藤甲】令火焰伤害 +1。');
-        } else if ((sourceCard && sourceCard.type === 'sha') || /南蛮入侵|万箭齐发/.test(reason || '')) {
-          log(game, actorName(game, targetActor) + '的【藤甲】防止了这次伤害。');
-          if (sourceCard) discardSourceCardIfPending(game, sourceCard);
-          return false;
-        }
+      // v11 E1 (批次 35): 装备伤害修正统一走 EquipmentRuntime 的有序
+      // handler 表 (藤甲 火+1/防止 → 古锭 无手牌+1 → 白银 clamp → 寒冰
+      // 弃两张防止, 顺序语义与各自 spec 注释见 equipment.js)。
+      var equipModify = applyEquipmentDamageModifiers(game, {
+        targetActor: targetActor,
+        sourceActor: sourceActor,
+        reason: reason,
+        sourceCard: sourceCard,
+        amount: amount,
+        nature: damageNature,
+        ignoreArmor: ignoreArmor
+      });
+      if (equipModify.prevented) {
+        if (sourceCard) discardSourceCardIfPending(game, sourceCard);
+        return false;
       }
-
-      // v8 PR-B2: 古锭刀 — gltjk card__equipment.md "锁定技, 每当你使用
-      // 【杀】对目标角色造成伤害时, 若其没有手牌, 你令伤害值+1"。
-      // 时机=tengjia 之后、baiyin 之前; 这样 baiyin 仍能把 2 点 clamp
-      // 回 1 点 (符合两件装备同时生效时的 spec 互动)。
-      if (sourceActor && sourceCard && isShaCard(sourceCard) && amount > 0) {
-        var gudingWeapon = game[sourceActor].equipment && game[sourceActor].equipment.weapon;
-        if (gudingWeapon && gudingWeapon.type === 'guding' && (target.hand || []).length === 0) {
-          amount += 1;
-          log(game, actorName(game, sourceActor) + '的【古锭刀】令' + actorName(game, targetActor) + '无手牌伤害 +1。');
-        }
-      }
-
-      if (armor && !ignoreArmor && armor.type === 'baiyin' && amount > 1) {
-        amount = 1;
-        log(game, actorName(game, targetActor) + '的【白银狮子】将伤害防止至 1 点。');
-      }
-
-      // v8 PR-B1: 寒冰剑 — gltjk card__equipment.md：
-      //   "每当你使用【杀】对目标角色造成伤害时, 若其有牌, 你可以防止
-      //    此伤害, 依次弃置其两张牌。"
-      // 时机=hp 扣减前。源装寒冰 + sourceCard 是杀类 + amount > 0 + 目标
-      // 有任意牌 → 按 source.skillPreferences.hanbing 决定 auto/decline。
-      if (amount > 0 && sourceActor && sourceCard && isShaCard(sourceCard)) {
-        var hbResult = applyHanbingPrevent(game, sourceActor, targetActor);
-        if (hbResult && hbResult.prevented) {
-          if (sourceCard) discardSourceCardIfPending(game, sourceCard);
-          return false;
-        }
-      }
+      amount = equipModify.amount;
 
       if (amount <= 0) {
         if (sourceCard) discardSourceCardIfPending(game, sourceCard);

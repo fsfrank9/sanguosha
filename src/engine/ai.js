@@ -10,6 +10,7 @@
   var hasSkill = StateRuntime.hasSkill;
   var opponent = StateRuntime.opponent;
   var canUseUnlimitedSha = StateRuntime.canUseUnlimitedSha;
+  var hasEquipmentEffect = StateRuntime.hasEquipmentEffect;
   var handLimit = StateRuntime.handLimit;
 
   export function createAIRuntime(deps) {
@@ -53,7 +54,7 @@
         count += (state.hand || []).filter(function (c) { return c.type === 'shan'; }).length;
       }
       // 丈八: 任意两张手牌当杀。保守取剩余手牌的一半 (排除已计入的 sha / wusheng-red)。
-      if (state.equipment && state.equipment.weapon && state.equipment.weapon.type === 'zhangba'
+      if (hasEquipmentEffect(state, 'zhangbaTwoHandSha')
           && (state.hand || []).length >= 2) {
         var sparePool = (state.hand || []).filter(function (c) {
           if (isShaType(c.type)) return false;

@@ -1818,8 +1818,8 @@
         setPendingChoice: setPendingChoice,
         discardCard: discardCard,
         discardSourceCardIfPending: discardSourceCardIfPending,
-        // applyHanbingPrevent 随装备域迁出后为后置装配的 var, 包装注入
-        applyHanbingPrevent: function (g, sa, ta) { return applyHanbingPrevent(g, sa, ta); },
+        // v11 E1 (批次 35): 装备伤害修正 handler 表 — 装备域后置装配, 包装注入
+        applyEquipmentDamageModifiers: function (g, ctx) { return applyEquipmentDamageModifiers(g, ctx); },
         // v11 C1: 救援 — 濒死路径同样适用 (桃/急救视为桃)。
         taoRecoverBonus: function (g, u, t) { return taoRecoverBonus(g, u, t); },
         isArmorIgnoredBySha: isArmorIgnoredBySha
@@ -1968,8 +1968,7 @@
           //   响应路径：装备 丈八 且手牌 >= 2 时，consume 2 张手牌当 杀 响应。
           //   spec 是 optional，但响应窗口缺省"自动出杀"——保留旧行为。
           //   skillPreferences.zhangba = 'decline' 可禁用。
-          if (state.equipment && state.equipment.weapon
-              && state.equipment.weapon.type === 'zhangba'
+          if (hasEquipmentEffect(state, 'zhangbaTwoHandSha')
               && state.hand.length >= 2
               && (!state.skillPreferences || state.skillPreferences.zhangba !== 'decline')) {
             var zbActor = game.player === state ? 'player' : 'enemy';
@@ -2121,6 +2120,8 @@
       var equipCard = EquipmentRuntime.equipCard;
       var loseEquipment = EquipmentRuntime.loseEquipment;
       var triggerEquipmentLoss = EquipmentRuntime.triggerEquipmentLoss;
+      // v11 E1 (批次 35): 装备伤害修正 handler 表 (damage-dying 经包装引用)
+      var applyEquipmentDamageModifiers = EquipmentRuntime.applyEquipmentDamageModifiers;
       var applyQilinDiscard = EquipmentRuntime.applyQilinDiscard;
       var resolveQilinPickChoice = EquipmentRuntime.resolveQilinPickChoice;
       var applyHanbingPrevent = EquipmentRuntime.applyHanbingPrevent;
@@ -2677,8 +2678,7 @@
         // 让 damage() 走 fire nature 路径)。已是 fire_sha / thunder_sha 不
         // 重复转。card-as 虚拟杀 (zhangba / wusheng / longdan 等的 virtual)
         // 也走此路径因为它们 card.type === 'sha'。
-        var zhuqueWeapon = self.equipment && self.equipment.weapon;
-        if (zhuqueWeapon && zhuqueWeapon.type === 'zhuque' && card.type === 'sha'
+        if (hasEquipmentEffect(self, 'zhuqueShaToFire') && card.type === 'sha'
             && (!self.skillPreferences || self.skillPreferences.zhuque !== 'decline')) {
           // M1: 朱雀转火杀是「本次使用」的视为效果, 不应永久改写物理牌身份。
           // 记录转化前 type/name, 由 discardCard 在该牌离场时还原; 否则该【杀】
@@ -2700,8 +2700,7 @@
         // 每次 playSha 进入时先清旧标记，避免上次结算残留。
         self.flags = self.flags || {};
         self.flags.fangtianBonus = false;
-        var weaponNow = self.equipment && self.equipment.weapon;
-        if (weaponNow && weaponNow.type === 'fangtian' && self.hand.length === 0) {
+        if (hasEquipmentEffect(self, 'fangtianLastHandBonus') && self.hand.length === 0) {
           self.flags.fangtianBonus = true;
           log(game, '【方天画戟】触发：' + actorName(game, actor) + '使用最后一张手牌【杀】，额外目标数上限 +2 (1v1 中无额外可选目标)。');
         }
@@ -2836,8 +2835,7 @@
       // 需闪场景, 此前【万箭齐发】缺失此兜底 (有八卦无闪的目标必中)。
       function tryBaguaDodge(game, targetActor, ignoreArmor) {
         var target = game[targetActor];
-        var armor = target && target.equipment && target.equipment.armor;
-        if (!armor || armor.type !== 'bagua' || ignoreArmor) return false;
+        if (!target || !hasEquipmentEffect(target, 'baguaShanJudge') || ignoreArmor) return false;
         var baguaJudge = judge(game, targetActor, '【八卦阵】');
         var dodged = false;
         if (baguaJudge && baguaJudge.color === 'red') {
@@ -2953,14 +2951,12 @@
         var self = game[actor];
         var targetActor = opponent(actor);
         var target = game[targetActor];
-        var weapon = self.equipment && self.equipment.weapon;
-
         if (dodged) {
-          if (weapon && weapon.type === 'guanshi') {
+          if (hasEquipmentEffect(self, 'guanshiForceHit')) {
             var guanshiResult = applyGuanshiForcedHit(game, actor, targetActor, card, amount);
             if (guanshiResult) return guanshiResult;
           }
-          if (weapon && weapon.type === 'qinglong') {
+          if (hasEquipmentEffect(self, 'qinglongChase')) {
             var follow = removeFirstCardOfType(self, 'sha');
             if (follow) {
               log(game, actorName(game, actor) + '发动【青龙偃月刀】，继续使用一张【杀】。');
@@ -3826,7 +3822,7 @@
         var self = game[actor];
         cardIds = cardIds || [];
         if (!self) return fail('未知角色。');
-        if (!self.equipment || !self.equipment.weapon || self.equipment.weapon.type !== 'zhangba') return fail('未装备【丈八蛇矛】。');
+        if (!hasEquipmentEffect(self, 'zhangbaTwoHandSha')) return fail('未装备【丈八蛇矛】。');
         if (self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
         if (cardIds.length !== 2) return fail('需要选择两张手牌。');
         var first = removeCardFromHand(self, cardIds[0]);
