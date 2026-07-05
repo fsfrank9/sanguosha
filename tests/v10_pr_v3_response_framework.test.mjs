@@ -9,6 +9,9 @@ import { Engine } from './helpers/load-engine.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+// v11 B1: 响应窗口框架 (请求/队列/注册表/分发) 已迁往 response.js — 框架函数
+// 形状断言改读该模块 (工厂内缩进 4 空格); 调用点/resolver 注册断言仍读引擎。
+const responseSrc = fs.readFileSync(path.join(root, 'src/engine/response.js'), 'utf8');
 
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
@@ -24,7 +27,7 @@ test('v10 V3: Engine 暴露 requestPlayerResponse / resolveResponseChoice / regi
 // ───── 框架代码形状 ──────────────────────────────────────────────────
 
 test('v10 V3: requestPlayerResponse 写 pauseState[pauseKey] + pendingChoice + 返回 success', () => {
-  const fn = engineSrc.match(/function requestPlayerResponse\(game, spec\)\s*\{[\s\S]*?\n {6}\}/);
+  const fn = responseSrc.match(/function requestPlayerResponse\(game, spec\)\s*\{[\s\S]*?\n {4}\}/);
   assert.ok(fn, 'requestPlayerResponse fn 存在');
   assert.match(fn[0], /game\.pauseState\[spec\.pauseKey\]\s*=\s*spec\.source/);
   assert.match(fn[0], /setPendingChoice\(game, pending\)/);
@@ -32,14 +35,14 @@ test('v10 V3: requestPlayerResponse 写 pauseState[pauseKey] + pendingChoice + �
 });
 
 test('v10 V3: RESPONSE_KIND_RESOLVERS 注册表 + registerResponseKind 写入', () => {
-  assert.match(engineSrc, /var RESPONSE_KIND_RESOLVERS\s*=\s*\{\s*\}/);
-  const reg = engineSrc.match(/function registerResponseKind\(kind, resolver\)\s*\{[\s\S]*?\n {6}\}/);
+  assert.match(responseSrc, /var RESPONSE_KIND_RESOLVERS\s*=\s*\{\s*\}/);
+  const reg = responseSrc.match(/function registerResponseKind\(kind, resolver\)\s*\{[\s\S]*?\n {4}\}/);
   assert.ok(reg);
   assert.match(reg[0], /RESPONSE_KIND_RESOLVERS\[kind\]\s*=\s*resolver/);
 });
 
 test('v10 V3: resolveResponseChoice 仅处理注册的 kind, 未注册 → fail', () => {
-  const fn = engineSrc.match(/function resolveResponseChoice\(game, decision\)\s*\{[\s\S]*?\n {6}\}/);
+  const fn = responseSrc.match(/function resolveResponseChoice\(game, decision\)\s*\{[\s\S]*?\n {4}\}/);
   assert.ok(fn);
   assert.match(fn[0], /RESPONSE_KIND_RESOLVERS\[pending\.kind\]/);
   assert.match(fn[0], /未注册的响应类型/);
