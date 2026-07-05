@@ -3871,6 +3871,8 @@
         playCardAs: playCardAs,
         canPlayCard: canPlayCard,
         canPlayCardAs: canPlayCardAs,
+        // v11 C5 (批次 29): 锦囊类转化候选枚举 (国色/奇袭 AI 出牌决策)
+        listCardConversions: listCardConversions,
         useSkill: useSkill,
         startTurn: startTurn,
         endTurn: endTurn,
