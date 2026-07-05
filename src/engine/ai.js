@@ -82,6 +82,47 @@
       return count;
     }
 
+    // v11 D1 (批次 33): 无懈期望值评估 — 替代"有无懈就自动用"。
+    // 只对链的第一张无懈 (chain.wuxied=false) 做取舍; 反无懈 (夺回自己锦囊
+    // 的结算权) 保持既有行为。skillPreferences.wuxiePolicy='always' 回退旧
+    // 行为。规则按锦囊威胁度:
+    //   南蛮/万箭  — 有对应响应牌或血线安全 (hp>2) 时吃 1 伤保无懈
+    //   火攻      — 期望伤害 <1 (需同花色), 血线安全时保留
+    //   决斗      — 杀数占优且血线安全时应战, 否则无懈
+    //   拆/顺     — 有装备要护 或 手牌拮据 (<=2) 时才无懈
+    //   乐/兵粮   — 乐: 手牌有阵容才护回合; 兵粮: 手牌拮据才护摸牌
+    //   闪电/无中/借刀/桃园与五谷的 denial 窗口 — 保持旧行为 (恒用)
+    function aiShouldUseWuxie(game, responder, chain) {
+      if (!game || !chain) return true;
+      var self = game[responder];
+      if (!self) return true;
+      if (self.skillPreferences && self.skillPreferences.wuxiePolicy === 'always') return true;
+      if (chain.wuxied) return true; // 反无懈: 保卫自己已投入的锦囊
+      var opp = game[opponent(responder)];
+      var trick = chain.trickName;
+      var handCount = (self.hand || []).length;
+      var equipCount = ['weapon', 'armor', 'horsePlus', 'horseMinus'].filter(function (slot) {
+        return self.equipment && self.equipment[slot];
+      }).length;
+      if (trick === 'nanman') return aiEstimateShaCount(self) === 0 && self.hp <= 2;
+      if (trick === 'wanjian') return aiEstimateShanCount(self) === 0 && self.hp <= 2;
+      if (trick === 'huogong') return self.hp <= 2;
+      if (trick === 'juedou') {
+        if (self.hp <= 2) return true;
+        return aiEstimateShaCount(self) <= aiEstimateShaCount(opp);
+      }
+      if (trick === 'guohe' || trick === 'shunshou') {
+        return equipCount > 0 || handCount <= 2;
+      }
+      if (trick === 'delayed-place') {
+        var placedType = chain.ctx && chain.ctx.card && chain.ctx.card.type;
+        if (placedType === 'lebusishu') return handCount >= 2;
+        if (placedType === 'bingliang') return handCount <= 2;
+        return true; // 闪电等高威胁延时 → 保持取消
+      }
+      return true; // 无中/借刀/桃园与五谷 denial 窗口/未建模锦囊 → 保持旧行为
+    }
+
     // v8 PR-D1: 出牌/锦囊 score 精细化。对 桃 / 杀 / 决斗 / 锦囊 都按
     // 双方资源 + 自身受伤情况 给梯度分数, 替代原 v6 的 binary heuristic.
     function scoreCardForAI(game, actor, card) {
@@ -539,6 +580,7 @@
       scoreCardForAI: scoreCardForAI,
       aiEstimateShaCount: aiEstimateShaCount,
       aiEstimateShanCount: aiEstimateShanCount,
+      aiShouldUseWuxie: aiShouldUseWuxie,
       aiCloneGame: aiCloneGame,
       aiEvaluateState: aiEvaluateState,
       aiSimulateCardPlay: aiSimulateCardPlay,

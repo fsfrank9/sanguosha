@@ -2084,7 +2084,9 @@
         removeTargetZoneCard: function (g, t, z, id) { return removeTargetZoneCard(g, t, z, id); },
         resolveGuohe1v1: function (g, s, t, o) { return resolveGuohe1v1(g, s, t, o); },
         resolveJiedaoDecision: function (g, s, o, c, op) { return resolveJiedaoDecision(g, s, o, c, op); },
-        scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); }
+        scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); },
+        // v11 D1 (批次 33): AI 无懈期望值 — ai 域后置装配, 包装注入
+        aiShouldUseWuxie: function (g, r, ch) { return aiShouldUseWuxie(g, r, ch); }
       });
       var registerWuxieContinuation = TricksRuntime.registerWuxieContinuation;
       var listWuxieOptions = TricksRuntime.listWuxieOptions;
@@ -4040,6 +4042,8 @@
       var scoreCardForAI = AIRuntime.scoreCardForAI;
       var aiEstimateShaCount = AIRuntime.aiEstimateShaCount;
       var aiEstimateShanCount = AIRuntime.aiEstimateShanCount;
+      // v11 D1 (批次 33): 无懈期望值评估 (tricks 域经包装引用)
+      var aiShouldUseWuxie = AIRuntime.aiShouldUseWuxie;
       var aiCloneGame = AIRuntime.aiCloneGame;
       var aiEvaluateState = AIRuntime.aiEvaluateState;
       var aiSimulateCardPlay = AIRuntime.aiSimulateCardPlay;
@@ -4105,6 +4109,7 @@
         aiCloneGame: aiCloneGame,
         aiEvaluateState: aiEvaluateState,
         aiSimulateCardPlay: aiSimulateCardPlay,
+        aiShouldUseWuxie: aiShouldUseWuxie,
         aiScoreCardWithLookahead: aiScoreCardWithLookahead,
         // v8 PR-D4: threat-aware eval (考虑对方下回合威胁)
         aiEvaluateStateWithThreat: aiEvaluateStateWithThreat,

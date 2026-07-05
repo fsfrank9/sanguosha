@@ -67,6 +67,9 @@ test('H1 南蛮入侵: 对方持【无懈】(auto) → 抵消, 不掉血', () =>
   const game = buildGame();
   game.player.hand = [c('nanman', { id: 'nm' })];
   game.enemy.hand = [c('wuxie', { id: 'nm-wuxie' })]; // 只有无懈, 无杀
+  // v11 D1 (批次 33): AI 无懈走期望值 (无杀响应且 hp<=2 才无懈南蛮) —
+  // 压低血线满足条件, 保持本测试对无懈链的覆盖意图。
+  game.enemy.hp = 2;
   const hp = game.enemy.hp;
   const r = Engine.playCard(game, 'player', 'nm');
   assert.equal(r.ok, true);
@@ -91,6 +94,8 @@ test('H1 万箭齐发: 对方持【无懈】(auto) → 抵消, 不掉血', () =>
   const game = buildGame();
   game.player.hand = [c('wanjian', { id: 'wj' })];
   game.enemy.hand = [c('wuxie', { id: 'wj-wuxie' })]; // 只有无懈, 无闪
+  // v11 D1 (批次 33): 同上 — 无闪响应且 hp<=2 才无懈万箭。
+  game.enemy.hp = 2;
   const hp = game.enemy.hp;
   const r = Engine.playCard(game, 'player', 'wj');
   assert.equal(r.ok, true);
@@ -113,7 +118,8 @@ test('H1 万箭齐发: 对方无【无懈】且无【闪】→ 受 1 点伤害',
 test('H1 乐不思蜀: 对方持【无懈】(auto) → 抵消, 不进入判定区', () => {
   const game = buildGame();
   game.player.hand = [c('lebusishu', { id: 'lbss' })];
-  game.enemy.hand = [c('wuxie', { id: 'lbss-wuxie' })];
+  // v11 D1 (批次 33): 乐只在手牌有阵容 (>=2) 时才护 — 补一张手牌。
+  game.enemy.hand = [c('wuxie', { id: 'lbss-wuxie' }), c('tao', { id: 'lbss-filler' })];
   const r = Engine.playCard(game, 'player', 'lbss');
   assert.equal(r.ok, true);
   assert.equal(game.enemy.judgeArea.length, 0, '被无懈 → 未置入对方判定区');
