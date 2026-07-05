@@ -9,7 +9,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v11 B2: 提示类/响应类面板已迁往 src/ui/panels/, 源为主文件 + 面板模块拼接。
+const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8');
 
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
@@ -29,8 +32,9 @@ stageModals.forEach(function (m) {
     // 取 addEventListener 之后 600 char 窗口 (覆盖整个 handler body).
     const win = adapter.match(new RegExp('els\\.' + m.container + '\\.addEventListener\\(\'click\',[\\s\\S]{0,600}'));
     assert.ok(win, m.container + ' 监听器存在');
-    assert.match(win[0], /stagedModalChoice\s*=\s*\{[\s\S]*?kind:\s*'pending'/);
-    assert.match(win[0], /selector:/);
+    // v11 B2: 面板模块内经注入的 stage(payload, selector) 提交 (语义同
+    // stagedModalChoice={kind:'pending',...} 赋值 + render)。
+    assert.match(win[0], /stage\(\{/);
     // 点击 handler 前 360 char 内不再直接 resolvePendingChoice
     const head = win[0].slice(0, 360);
     assert.doesNotMatch(head, /Engine\.resolvePendingChoice/);
@@ -41,14 +45,14 @@ test('v9 PR-E24: fanjian 4 花色按钮 click → stage (kind:pending, payload.s
   // 从 .forEach(function (key) 取 500 char 窗口 (覆盖 forEach 体).
   const block = adapter.match(/\]\.forEach\(function \(key\)[\s\S]{0,500}/);
   assert.ok(block);
-  assert.match(block[0], /stagedModalChoice\s*=\s*\{[\s\S]*?kind:\s*'pending'[\s\S]*?suit:\s*suit/);
+  assert.match(block[0], /stage\(\{\s*suit:\s*suit\s*\}/);
   assert.doesNotMatch(block[0], /Engine\.resolvePendingChoice/);
 });
 
 test('v9 PR-E24: handleGuohePickClick → stage (kind:pending, payload {zone, cardId})', () => {
-  const fn = adapter.match(/function handleGuohePickClick\(event\)\s*\{[\s\S]*?\n\s{8}\}/);
+  const fn = adapter.match(/function handleGuohePickClick\(event\)\s*\{[\s\S]*?\n\s{4,8}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /stagedModalChoice\s*=\s*\{[\s\S]*?kind:\s*'pending'/);
+  assert.match(fn[0], /stage\(\{\s*zone:\s*zone,\s*cardId:\s*cardId\s*\}/);
   assert.doesNotMatch(fn[0], /Engine\.resolvePendingChoice/);
 });
 

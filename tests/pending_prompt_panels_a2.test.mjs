@@ -4,7 +4,10 @@ import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
 const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const adapterSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v11 B2: 提示类/响应类面板已迁往 src/ui/panels/, 源为主文件 + 面板模块拼接。
+const adapterSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8');
 
 function test(name, fn) {
   try {
@@ -78,11 +81,12 @@ test('v8 PR-A2: dying-rescue 渲染时 桃/酒 用 promptCardChoice + suffix 标
 
 test('v8 PR-A2 / v9 PR-E24: dyingRescueChoices click → stage (kind:pending, payload.cardId)', () => {
   assert.match(adapterSource, /dyingRescueChoices\.addEventListener\([\s\S]{0,300}data-dying-rescue-card-id/);
-  assert.match(adapterSource, /dyingRescueChoices\.addEventListener\([\s\S]{0,400}stagedModalChoice\s*=\s*\{[\s\S]{0,160}cardId:\s*cardId/);
+  // v11 B2: 面板模块内经注入的 stage() 提交。
+  assert.match(adapterSource, /dyingRescueChoices\.addEventListener\([\s\S]{0,400}stage\(\{\s*cardId:\s*cardId\s*\}/);
 });
 
 test('v8 PR-A2: 事件绑定 — dyingRescueDeclineBtn click → resolvePendingChoice({decline:true})', () => {
-  assert.match(adapterSource, /dyingRescueDeclineBtn\.addEventListener[\s\S]{0,200}resolvePendingChoice\(game,\s*\{\s*decline:\s*true\s*\}/);
+  assert.match(adapterSource, /dyingRescueDeclineBtn\.addEventListener[\s\S]{0,200}resolvePendingChoice\(getGame\(\),\s*\{\s*decline:\s*true\s*\}/);
 });
 
 console.log('\nPending prompt panels A2 (qilin + dying) tests passed.');
