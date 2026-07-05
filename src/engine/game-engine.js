@@ -172,6 +172,12 @@
           return triggerGuoseCardAs(context);
         }
       });
+      // v11 C3 (批次 27): 奇袭 (甘宁) onCardAs (黑色牌 → 过河拆桥, proactive only)
+      SkillRuntime.registerSkill(skillRegistry, 'qixi', {
+        onCardAs: function (context) {
+          return triggerQixiCardAs(context);
+        }
+      });
       // v8 PR-C2: 流离 (大乔) onShaTargeted — 杀指定目标后 大乔 可弃 1 牌
       // 把杀转移给"攻击范围内的一名其他角色 (且必须为源此【杀】的合法目标)"。
       // 1v1 中可候选 = 仅源, 但源对自己不能用杀 → 0 合法目标 → 静默不触发。
@@ -1086,6 +1092,18 @@
         if (context.mode !== 'proactive' || context.asType !== 'lebusishu') return null;
         if (!context.card || context.card.suit !== 'diamond') return null;
         return { card: context.card, asName: '乐不思蜀', skillName: '国色', priority: 10 };
+      }
+
+      // v11 C3 (批次 27): 奇袭 (甘宁) — gltjk skill cache:
+      //   "出牌阶段，你可以将一张黑色牌当【过河拆桥】使用。"
+      // 仅 proactive (出牌阶段主动转化); 黑色手牌或装备牌皆可作来源
+      // (spec condition: "发动者有黑色手牌或装备牌", 与武圣同口径)。
+      function triggerQixiCardAs(context) {
+        var state = context.state;
+        if (!state || !hasSkill(state, 'qixi')) return null;
+        if (context.mode !== 'proactive' || context.asType !== 'guohe') return null;
+        if (!context.card || context.card.color !== 'black') return null;
+        return { card: context.card, asName: '过河拆桥', skillName: '奇袭', priority: 10 };
       }
 
       function triggerZhihengActiveSkill(context) {
@@ -3684,12 +3702,14 @@
           original = cardOrId;
         }
         if (!original) return fail('找不到这张牌。');
-        // v8 PR-C1: 国色把方片当乐 — 扩展 asType 白名单
-        if (asType !== 'sha' && asType !== 'lebusishu') return fail('当前只支持转化为【杀】或【乐不思蜀】。');
+        // v8 PR-C1: 国色把方片当乐; v11 C3: 奇袭把黑牌当拆 — asType 白名单
+        if (asType !== 'sha' && asType !== 'lebusishu' && asType !== 'guohe') {
+          return fail('当前只支持转化为【杀】、【乐不思蜀】或【过河拆桥】。');
+        }
         var cardAsContext = { mode: 'proactive', game: game, actor: actor, state: self, card: original, asType: asType };
         var conversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', cardAsContext));
         if (!conversion) return fail('当前武将不能这样转化。');
-        // 路径分支：杀 走原有 canPlayCard 检查；乐 走 virtualLebusishuFromCard
+        // 路径分支：杀 走原有 canPlayCard 检查；乐/拆 走各自虚拟卡检查
         if (asType === 'sha') {
           if (self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
           var playableSha = canPlayCard(game, actor, virtualShaFromCard(original));
@@ -3697,6 +3717,15 @@
           playableSha.skillName = conversion.skillName;
           playableSha.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【杀】使用。';
           return playableSha;
+        }
+        if (asType === 'guohe') {
+          // v11 C3: 奇袭 — 复用普通过河拆桥的 canPlayCard 检查
+          // (对方两区皆空 / 回合与阶段限制在那里统一把关)。
+          var playableGuohe = canPlayCard(game, actor, virtualGuoheFromCard(original));
+          if (!playableGuohe.ok) return playableGuohe;
+          playableGuohe.skillName = conversion.skillName;
+          playableGuohe.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【过河拆桥】使用。';
+          return playableGuohe;
         }
         // lebusishu
         var playableLebu = canPlayCard(game, actor, virtualLebusishuFromCard(original));
@@ -3706,7 +3735,7 @@
         return playableLebu;
       }
 
-      function playCardAs(game, actor, cardId, asType) {
+      function playCardAs(game, actor, cardId, asType, options) {
         var pendingGuard = pendingChoiceGuard(game);
         if (pendingGuard) return pendingGuard;
         var self = game[actor];
@@ -3728,6 +3757,16 @@
             actor: actor, card: virtualLebu, options: {}, delayedSide: opponent(actor)
           });
         }
+        if (asType === 'guohe') {
+          // v11 C3 (批次 27): 奇袭 黑牌当拆 — 与普通过河拆桥一致: 先弃置来源
+          // 实体牌 (discardCard 经 physicalCardOf 落原牌), 再走无懈链 →
+          // guohe continuation (1v1 两选项 pick / options.targetZone 照常)。
+          var virtualGuohe = virtualGuoheFromCard(original);
+          discardCard(game, virtualGuohe);
+          return checkWuxieAndContinue(game, opponent(actor), '【过河拆桥】', 'guohe', {
+            actor: actor, card: virtualGuohe, options: options || {}
+          });
+        }
         return playSha(game, actor, virtualShaFromCard(original));
       }
 
@@ -3739,6 +3778,21 @@
           type: 'lebusishu',
           name: '乐不思蜀',
           family: 'delayed',
+          suit: original.suit,
+          color: original.color,
+          rank: original.rank,
+          physicalCard: original
+        };
+      }
+
+      // v11 C3 (批次 27): 奇袭把黑色牌视为过河拆桥 — 同上构造虚拟卡,
+      // 弃置时经 physicalCardOf 落原实体牌, 不产生 guohe 型幻影牌。
+      function virtualGuoheFromCard(original) {
+        return {
+          id: original.id,
+          type: 'guohe',
+          name: '过河拆桥',
+          family: 'trick',
           suit: original.suit,
           color: original.color,
           rank: original.rank,
