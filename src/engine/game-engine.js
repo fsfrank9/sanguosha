@@ -2818,8 +2818,11 @@
           }
           dodged = true;
           for (var shanIndex = 0; shanIndex < shanNeeded; shanIndex += 1) {
+            // v11 D2 (批次 34): AI 座席每张需求先试八卦判定 (免费闪机会),
+            // 判定失败仍可出真闪; 玩家 auto 座席保持旧顺序 (真闪优先)。
+            if (targetActor !== 'player' && tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
             if (consumeResponse(game, targetActor, 'shan', '【杀】')) continue;
-            if (tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
+            if (targetActor === 'player' && tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
             dodged = false;
             break;
           }
@@ -2875,6 +2878,17 @@
             })
           });
           return success('等待' + actorName(game, actor) + '决定是否发动【贯石斧】。');
+        }
+        // v11 D2 (批次 34): AI 座席期望值门 — 两张牌换 1 点强制伤害, 只在
+        // 斩杀压力 (目标血线 <= 伤害+1) 或手牌充裕 (>=4, 成本可承受) 时
+        // 划算; 玩家 auto 座席保持旧行为 (无条件发动)。
+        if (actor !== 'player') {
+          var guanshiTarget = game[targetActor];
+          var killPressure = guanshiTarget && guanshiTarget.hp <= amount + 1;
+          if (!killPressure && handIds.length < 4) {
+            log(game, actorName(game, actor) + '保留手牌，不发动【贯石斧】。');
+            return null;
+          }
         }
         // auto: 弃 AI 评分最低的两张手牌; 手牌不足两张时用装备补足
         // (坐骑 > 防具 > 武器, 尽量保留战力)。
@@ -3156,9 +3170,14 @@
             });
           }
         }
-        if (consumeResponse(game, targetActor, responseType, '【' + title + '】')) {
+        // v11 D2 (批次 34): AI 座席先试八卦判定 (免费闪机会), 成功则省下
+        // 真闪应对后续威胁; 玩家 auto 座席保持旧顺序 (真闪优先)。
+        if (responseType === 'shan' && targetActor !== 'player'
+            && tryBaguaDodge(game, targetActor, false)) {
           log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
-        } else if (responseType === 'shan' && tryBaguaDodge(game, targetActor, false)) {
+        } else if (consumeResponse(game, targetActor, responseType, '【' + title + '】')) {
+          log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
+        } else if (responseType === 'shan' && targetActor === 'player' && tryBaguaDodge(game, targetActor, false)) {
           // H2: 【万箭齐发】需打出【闪】, 八卦阵 红判定可化解。
           //      (【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦)
           log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
