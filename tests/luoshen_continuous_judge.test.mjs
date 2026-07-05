@@ -32,6 +32,9 @@ function buildGame(playerHero, enemyHero, seed) {
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
 
+// v11 A3 批次二: 洛神面板的渲染与接线正则断言已由
+// tests/ui_panels_a3_batch2.test.mjs 的 fake-DOM 全链路行为测试取代。
+
 test('v8 PR-C5: SKILL_METADATA 已注册 luoshen (preparePhase / onPreparePhase / judgement cost)', () => {
   assert.match(heroesSrc, /luoshen:\s*\{.*trigger:\s*'preparePhase'/);
   assert.match(heroesSrc, /luoshen:\s*\{.*cost:\s*\{\s*type:\s*'judgement'/);
@@ -229,14 +232,6 @@ test('v8 hotfix-2: index.html 含 luoshenPromptPanel + 按钮', () => {
   assert.match(htmlSrc, /id="luoshenContinueBtn"/);
   assert.match(htmlSrc, /id="luoshenStopBtn"/);
   assert.match(htmlSrc, /pending-prompt-panel[^"]*"\s+id="luoshenPromptPanel"/);
-});
-
-test('v8 hotfix-2: dom-adapter 接入 luoshen-continue 渲染 + click 绑定', () => {
-  assert.match(adapterSrc, /luoshenPromptPanel/);
-  assert.match(adapterSrc, /kind === 'luoshen-continue'/);
-  // 两按钮都接 resolvePendingChoice
-  assert.match(adapterSrc, /luoshenContinueBtn[\s\S]{0,200}resolvePendingChoice/);
-  assert.match(adapterSrc, /luoshenStopBtn[\s\S]{0,200}resolvePendingChoice\(game,\s*\{\s*decline:\s*true\s*\}/);
 });
 
 test('v8 hotfix-2: qingnang cardSkillConfig 已在 dom-adapter 注册', () => {

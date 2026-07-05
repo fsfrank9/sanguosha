@@ -16,6 +16,9 @@ function test(name, fn) {
   }
 }
 
+// v11 A3 批次二: qilin 面板的渲染分支与接线正则断言已由
+// tests/ui_panels_a3_batch2.test.mjs 的 fake-DOM 全链路行为测试取代。
+
 test('v8 PR-A2: index.html 含 qilinPickPanel + qilinPickHint + qilinPickChoices + qilinDeclineBtn', () => {
   assert.match(htmlSource, /id="qilinPickPanel"[^>]*hidden/);
   assert.match(htmlSource, /id="qilinPickHint"/);
@@ -48,10 +51,6 @@ test('v8 PR-A2: dom-adapter els 缓存新增 6 个 id (qilin*: 4 / dyingRescue*:
   assert.match(adapterSource, /'dyingRescuePanel',\s*'dyingRescueHint',\s*'dyingRescueChoices',\s*'dyingRescueDeclineBtn'/);
 });
 
-test('v8 PR-A2: renderPendingChoice 含 qilin-pick 分支 (只在 actor=player 时显示)', () => {
-  assert.match(adapterSource, /kind === 'qilin-pick' && pending\.actor === 'player'/);
-});
-
 test('v8 PR-A2: qilin-pick 渲染用 promptCardChoice + 标 +1/-1 马 prefix', () => {
   // 在 qilin-pick 分支内部应当调用 promptCardChoice + dataAttrs.qilinSlot
   assert.match(adapterSource, /qilinSlot:\s*slot/);
@@ -75,17 +74,6 @@ test('v8 PR-A2: dying-rescue 渲染时 桃/酒 用 promptCardChoice + suffix 标
   // 酒带 "酒Ⅱ" suffix, 桃带 "桃" suffix
   assert.match(adapterSource, /'\s*·\s*酒Ⅱ'/);
   assert.match(adapterSource, /'\s*·\s*桃'/);
-});
-
-test('v8 PR-A2 / v9 PR-E24: qilinPickChoices click → stage (kind:pending, payload.slot)', () => {
-  // v9 PR-E24: 改两步化 — 点候选只 stage, #handConfirmBtn 才 resolvePendingChoice.
-  assert.match(adapterSource, /qilinPickChoices\.addEventListener\([\s\S]{0,300}data-qilin-slot/);
-  assert.match(adapterSource, /qilinPickChoices\.addEventListener\([\s\S]{0,400}stagedModalChoice\s*=\s*\{[\s\S]{0,160}slot:\s*slot/);
-});
-
-test('v8 PR-A2: 事件绑定 — qilinDeclineBtn click → resolvePendingChoice({decline:true})', () => {
-  // qilinDeclineBtn 绑定 + decline payload
-  assert.match(adapterSource, /qilinDeclineBtn\.addEventListener[\s\S]{0,200}resolvePendingChoice\(game,\s*\{\s*decline:\s*true\s*\}/);
 });
 
 test('v8 PR-A2 / v9 PR-E24: dyingRescueChoices click → stage (kind:pending, payload.cardId)', () => {
