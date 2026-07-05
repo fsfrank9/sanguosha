@@ -13,6 +13,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ENGINE_RULE_FILES = [
   'src/engine/game-engine.js',
   'src/engine/damage-dying.js',
+  'src/engine/response.js',
   'src/engine/ai.js',
 ];
 const engineSource = ENGINE_RULE_FILES
