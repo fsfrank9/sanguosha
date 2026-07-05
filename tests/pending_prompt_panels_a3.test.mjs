@@ -16,6 +16,9 @@ function test(name, fn) {
   }
 }
 
+// v11 A3 批次三: cixiong-fire / cixiong-choose 面板的渲染分支与接线正则断言
+// 已由 tests/ui_panels_a3_batch3.test.mjs 的 fake-DOM 全链路行为测试取代。
+
 test('v8 PR-A3: index.html 含 cixiongFirePanel + Hint + FireBtn + DeclineBtn', () => {
   assert.match(htmlSource, /id="cixiongFirePanel"[^>]*hidden/);
   assert.match(htmlSource, /id="cixiongFireHint"/);
@@ -46,42 +49,10 @@ test('v8 PR-A3: els 缓存新增 cixiongFire* + cixiongChoose* (8 个 id)', () =
   assert.match(adapterSource, /'cixiongChoosePanel',\s*'cixiongChooseHint',\s*'cixiongChooseChoices',\s*'cixiongChooseDrawBtn'/);
 });
 
-test('v8 PR-A3: renderPendingChoice 含 cixiong-fire 分支 (actor=player)', () => {
-  assert.match(adapterSource, /kind === 'cixiong-fire' && pending\.actor === 'player'/);
-});
-
 test('v8 PR-A3: cixiong-fire 文案提及"异性"和 target 名', () => {
   // 文案应同时含 "异性" 和 actorDisplayName(pending.target)
   assert.match(adapterSource, /'雌雄双股剑：对'\s*\+\s*actorDisplayName\(pending\.target\)/);
   assert.match(adapterSource, /异性/);
-});
-
-test('v8 PR-A3: renderPendingChoice 含 cixiong-choose 分支 (actor=player)', () => {
-  assert.match(adapterSource, /kind === 'cixiong-choose' && pending\.actor === 'player'/);
-});
-
-test('v8 PR-A3: cixiong-choose 渲染手牌用 promptCardChoice + dataAttrs.cixiongDiscardCardId', () => {
-  assert.match(adapterSource, /cixiongDiscardCardId:\s*cardId/);
-  // 文案应提及 sourceActor 名
-  assert.match(adapterSource, /actorDisplayName\(pending\.sourceActor\)/);
-});
-
-test('v8 PR-A3: 事件绑定 — cixiongFireBtn → resolvePendingChoice({fire:true})', () => {
-  assert.match(adapterSource, /cixiongFireBtn\.addEventListener[\s\S]{0,200}resolvePendingChoice\(game,\s*\{\s*fire:\s*true\s*\}/);
-});
-
-test('v8 PR-A3: 事件绑定 — cixiongFireDeclineBtn → resolvePendingChoice({decline:true})', () => {
-  assert.match(adapterSource, /cixiongFireDeclineBtn\.addEventListener[\s\S]{0,200}resolvePendingChoice\(game,\s*\{\s*decline:\s*true\s*\}/);
-});
-
-test('v8 PR-A3 / v9 PR-E24: cixiongChooseChoices click → stage (kind:pending, payload.option=discard)', () => {
-  // v9 PR-E24: 改两步化 — 点候选只 stage, #handConfirmBtn 才 resolvePendingChoice.
-  assert.match(adapterSource, /cixiongChooseChoices\.addEventListener\([\s\S]{0,300}data-cixiong-discard-card-id/);
-  assert.match(adapterSource, /cixiongChooseChoices\.addEventListener\([\s\S]{0,500}stagedModalChoice\s*=\s*\{[\s\S]{0,200}option:\s*'discard',\s*cardId:\s*cardId/);
-});
-
-test('v8 PR-A3: 事件绑定 — cixiongChooseDrawBtn → resolvePendingChoice({option:"draw"})', () => {
-  assert.match(adapterSource, /cixiongChooseDrawBtn\.addEventListener[\s\S]{0,200}resolvePendingChoice\(game,\s*\{\s*option:\s*'draw'\s*\}/);
 });
 
 console.log('\nPending prompt panels A3 (cixiong-fire + cixiong-choose) tests passed.');

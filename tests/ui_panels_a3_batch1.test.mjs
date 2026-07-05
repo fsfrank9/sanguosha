@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
+import { makeStartGameViaUI } from './helpers/ui-game.mjs';
 
 // v11 A3 批次一: 6 个存量面板的全链路行为测试 (弹出 → 点选 → 引擎状态 → 关闭)。
 // 覆盖: 无懈可击响应 / 决斗杀响应 / 鬼才 / 反馈 / 遗计 / 五谷丰登。
@@ -16,29 +17,7 @@ function c(type, overrides = {}) {
   return Engine.makeTestCard(type, overrides);
 }
 
-// 通过真实 UI 路径开一局 (武将可参数化), 然后整形成测试需要的局面。
-function startGameViaUI(playerHero = 'liubei', enemyHero = 'sunquan') {
-  $('lobby1v1Btn').click();
-  $('playerHeroSelect').value = playerHero;
-  $('enemyHeroSelect').value = enemyHero;
-  $('startGameBtn').click();
-  const game = UI.getGame();
-  game.turn = 'player';
-  game.phase = 'play';
-  game.player.hand = [];
-  game.enemy.hand = [];
-  game.player.hp = game.player.maxHp;
-  game.enemy.hp = game.enemy.maxHp;
-  game.player.judgeArea = [];
-  game.enemy.judgeArea = [];
-  game.player.equipment = { weapon: null, armor: null, horseMinus: null, horsePlus: null };
-  game.enemy.equipment = { weapon: null, armor: null, horseMinus: null, horsePlus: null };
-  game.pendingChoice = null;
-  game.pendingChoiceQueue = [];
-  game.pauseState = {};
-  UI.render();
-  return game;
-}
+const startGameViaUI = makeStartGameViaUI($, UI);
 
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
