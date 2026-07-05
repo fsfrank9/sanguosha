@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { assertCardConservation } from './helpers/card-conservation.mjs';
+
+// v11 A1: 引擎变更调用统一包上 assertCardConservation, 断言全场牌守恒。
 
 function test(name, fn) {
   fn();
@@ -34,7 +37,7 @@ test('突袭 default auto: 张辽 takes opponent hand card + draws 1 less', () =
   game.enemy.hand = [c('sha', { id: 'opp-card' })];
   game.deck = [c('shan', { id: 'draw-A' }), c('shan', { id: 'draw-B' })];
 
-  Engine.startTurn(game, 'player');
+  assertCardConservation(game, () => Engine.startTurn(game, 'player'));
 
   // Default behavior: 张辽 stole opponent card + drew 1 instead of 2.
   assert.ok(game.player.hand.some(c => c.id === 'opp-card'), 'stole opponent card');
@@ -48,7 +51,7 @@ test('突袭 with skillPreferences.tuxi=decline: opponent card untouched, full 2
   game.enemy.hand = [c('sha', { id: 'untouched-opp-card' })];
   game.deck = [c('shan', { id: 'd1' }), c('shan', { id: 'd2' })];
 
-  Engine.startTurn(game, 'player');
+  assertCardConservation(game, () => Engine.startTurn(game, 'player'));
 
   assert.ok(game.enemy.hand.some(c => c.id === 'untouched-opp-card'),
     'opponent card NOT taken when 张辽 declines');
@@ -61,7 +64,7 @@ test('突袭 with no opponent hand cards: no-op even on auto', () => {
   game.enemy.hand = [];  // opponent has no hand
   game.deck = [c('shan', { id: 'd1' }), c('shan', { id: 'd2' })];
 
-  Engine.startTurn(game, 'player');
+  assertCardConservation(game, () => Engine.startTurn(game, 'player'));
 
   assert.equal(game.player.hand.length, 2, '张辽 just drew 2 normally; nothing to steal');
 });
@@ -79,7 +82,7 @@ test('遗计 amount=1: single pendingChoice with 2 drawn cards (existing 1v1 cas
   game.enemy.hand = [c('sha', { id: 'enemy-attack', suit: 'spade', color: 'black' })];
   game.turn = 'enemy';
 
-  Engine.playCard(game, 'enemy', 'enemy-attack');
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'enemy-attack'));
 
   const pending = Engine.getPendingChoice(game);
   assert.ok(pending);
@@ -118,13 +121,13 @@ test('遗计 amount=3: prompts player THREE times, one per damage point', () => 
   game.player.hand = [c('tao', { id: 'self-tao' })];
 
   // Start turn → judge phase → shandian fires → 3 damage to guojia → 濒死。
-  Engine.startTurn(game, 'player');
+  assertCardConservation(game, () => Engine.startTurn(game, 'player'));
 
   // 濒死求桃在前 (M1: 扣减体力含濒死结算, 先于 "受到伤害后")
   let pending = Engine.getPendingChoice(game);
   assert.ok(pending, 'expect dying-rescue first');
   assert.equal(pending.kind, 'dying-rescue', 'M1: 濒死结算先于遗计');
-  Engine.resolvePendingChoice(game, { cardId: 'self-tao' });
+  assertCardConservation(game, () => Engine.resolvePendingChoice(game, { cardId: 'self-tao' }));
   assert.equal(game.player.hp, 1, '桃自救回到 1 (hp 0 → 1)');
 
   // 濒死结束后 deferred onDamageAfter 派发遗计, 3 点伤害 = 3 个独立 prompt。
@@ -137,7 +140,7 @@ test('遗计 amount=3: prompts player THREE times, one per damage point', () => 
     assert.equal(pending.currentPoint, point);
     assert.equal(pending.totalPoints, 3);
     assert.equal(pending.drawnIds.length, 2, `point ${point} draws 2 cards`);
-    Engine.resolvePendingChoice(game, { giveIds: [] });
+    assertCardConservation(game, () => Engine.resolvePendingChoice(game, { giveIds: [] }));
   }
 
   // All 3 points resolved; pendingChoice cleared.
@@ -160,7 +163,7 @@ test('遗计 amount=2 with give-some on each point: only chosen cards flow to op
   ];
   // Manually invoke damage with amount=2 (simpler than constructing 闪电).
   game.enemy.hand = [];
-  Engine.drawCards(game, 'enemy', 0);  // no-op, just to ensure engine state initialized
+  assertCardConservation(game, () => Engine.drawCards(game, 'enemy', 0));  // no-op, just to ensure engine state initialized
   // Use a synthetic damage. Engine doesn't expose damage(); use sha + duel
   // is too complex. Instead, set up: enemy plays sha (amount=1) but
   // engine doesn't model amount=2 sha. Skip this test path or simulate by
@@ -191,7 +194,7 @@ test('AI 遗计 / pref=auto: batched single draw, no per-point prompts', () => {
   // (无救援牌时官方时序下郭嘉直接死亡, 遗计不再发动)。
   game.enemy.hand = [c('tao', { id: 'ai-self-tao' })];
 
-  Engine.startTurn(game, 'enemy');
+  assertCardConservation(game, () => Engine.startTurn(game, 'enemy'));
 
   assert.equal(Engine.getPendingChoice(game), null, 'AI never sets pendingChoice for yiji');
   assert.equal(game.enemy.hp, 1, 'AI 桃自救回到 1');

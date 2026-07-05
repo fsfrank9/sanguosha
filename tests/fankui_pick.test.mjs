@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { assertCardConservation } from './helpers/card-conservation.mjs';
+
+// v11 A1: 引擎变更调用统一包上 assertCardConservation, 断言全局牌守恒。
 
 function test(name, fn) {
   fn();
@@ -41,7 +44,7 @@ test('Player 司马懿 takes damage → pendingChoice lists source zones (hand c
   // Damage 司马懿 from caocao. Use a sha play.
   game.enemy.hand.push(c('sha', { id: 'damage-sha', suit: 'spade', color: 'black' }));
 
-  Engine.playCard(game, 'enemy', 'damage-sha');
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'damage-sha'));
 
   const pending = Engine.getPendingChoice(game);
   assert.ok(pending, 'pendingChoice should be set for player 司马懿');
@@ -69,8 +72,8 @@ test('Player resolves zone=hand → random hand card transferred (engine ignores
   game.enemy.hand = [c('sha', { id: 'opp-hand-card', suit: 'heart', color: 'red' })];
   game.enemy.hand.push(c('sha', { id: 'damage-sha', suit: 'spade', color: 'black' }));
 
-  Engine.playCard(game, 'enemy', 'damage-sha');
-  Engine.resolvePendingChoice(game, { zone: 'hand' });
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'damage-sha'));
+  assertCardConservation(game, () => Engine.resolvePendingChoice(game, { zone: 'hand' }));
 
   // Player should now have the one remaining hand card.
   assert.ok(game.player.hand.some(card => card.id === 'opp-hand-card'),
@@ -84,8 +87,8 @@ test('Player resolves zone=equipment with cardId → exact equipment moved', () 
   game.enemy.equipment.armor = c('bagua', { id: 'opp-armor' });
   game.enemy.hand = [c('sha', { id: 'damage-sha', suit: 'spade', color: 'black' })];
 
-  Engine.playCard(game, 'enemy', 'damage-sha');
-  Engine.resolvePendingChoice(game, { zone: 'equipment', cardId: 'opp-armor' });
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'damage-sha'));
+  assertCardConservation(game, () => Engine.resolvePendingChoice(game, { zone: 'equipment', cardId: 'opp-armor' }));
 
   // armor zone gone from opponent, present in player hand.
   assert.equal(game.enemy.equipment.armor, null, 'armor slot cleared');
@@ -100,7 +103,7 @@ test('M3: 来源只有判定区牌 → 反馈无可获得牌, 不设 pendingChoi
   game.enemy.judgeArea = [c('lebusishu', { id: 'lebu-1', suit: 'club', color: 'black' })];
   game.enemy.hand = [c('sha', { id: 'damage-sha', suit: 'spade', color: 'black' })];
 
-  Engine.playCard(game, 'enemy', 'damage-sha');
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'damage-sha'));
 
   assert.equal(Engine.getPendingChoice(game), null, '无可获得牌 → 不暂停');
   assert.equal(game.enemy.judgeArea.length, 1, '判定区的乐不思蜀原地不动');
@@ -113,7 +116,7 @@ test('Player decline preference suppresses 反馈 entirely', () => {
   game.enemy.hand = [c('sha', { id: 'wont-take', suit: 'heart', color: 'red' })];
   game.enemy.hand.push(c('sha', { id: 'damage-sha', suit: 'spade', color: 'black' }));
 
-  Engine.playCard(game, 'enemy', 'damage-sha');
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'damage-sha'));
 
   assert.equal(Engine.getPendingChoice(game), null, 'decline: no pending choice');
   assert.equal(game.player.hand.length, 0, 'decline: nothing taken');
@@ -127,7 +130,7 @@ test('AI 司马懿 keeps the legacy auto random-hand path (no pendingChoice)', (
   game.enemy.hand = [c('sha', { id: 'ai-target', suit: 'heart', color: 'red' })];
   game.player.hand = [c('sha', { id: 'pl-damage-sha', suit: 'spade', color: 'black' })];
 
-  Engine.playCard(game, 'player', 'pl-damage-sha');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'pl-damage-sha'));
 
   assert.equal(Engine.getPendingChoice(game), null, 'AI never sets pendingChoice for 反馈');
   // AI 司马懿 took the (only) hand card from player.
@@ -140,7 +143,7 @@ test('Source with no gainable cards (no hand, no equip, no judge) → no pending
   // Source plays only the damaging sha (no other hand cards, no equip, no judge).
   game.enemy.hand = [c('sha', { id: 'sole-sha', suit: 'spade', color: 'black' })];
 
-  Engine.playCard(game, 'enemy', 'sole-sha');
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'sole-sha'));
 
   // After playing, source has 0 hand, 0 equip, 0 judge → 反馈 finds nothing.
   assert.equal(Engine.getPendingChoice(game), null);
@@ -154,8 +157,8 @@ test('Invalid zone decision restores pendingChoice', () => {
     c('sha', { id: 'banana-card', suit: 'heart', color: 'red' }),
     c('sha', { id: 'damage-sha', suit: 'spade', color: 'black' })
   ];
-  Engine.playCard(game, 'enemy', 'damage-sha');
-  const result = Engine.resolvePendingChoice(game, { zone: 'invalid-zone' });
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'damage-sha'));
+  const result = assertCardConservation(game, () => Engine.resolvePendingChoice(game, { zone: 'invalid-zone' }));
   assert.equal(result.ok, false);
   assert.ok(Engine.getPendingChoice(game), 'invalid input must not consume the prompt');
 });
