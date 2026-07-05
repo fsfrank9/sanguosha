@@ -207,6 +207,12 @@
           return triggerQingnangActiveSkill(context);
         }
       });
+      // v11 C6 (批次 30): 结姻 (孙尚香) — 出牌阶段限一次的主动技
+      SkillRuntime.registerSkill(skillRegistry, 'jieyin', {
+        onActiveSkill: function (context) {
+          return triggerJieyinActiveSkill(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'fanjian', {
         onActiveSkill: function (context) {
           return triggerFanjianActiveSkill(context);
@@ -226,7 +232,9 @@
         kurou: true,
         rende: true,
         fanjian: true,
-        qingnang: true
+        qingnang: true,
+        // v11 C6 (批次 30): 结姻
+        jieyin: true
       };
 
       function cardTargetProtection(game, actor, targetActor, card, displayName) {
@@ -1189,6 +1197,38 @@
         target.hp = Math.min(target.maxHp, target.hp + 1);
         log(game, actorName(game, actor) + '发动【青囊】，弃置【' + costCard.name + '】，令' + actorName(game, targetActor) + '回复 1 点体力。');
         return success('青囊完成。');
+      }
+
+      // v11 C6 (批次 30): 结姻 (孙尚香) — gltjk skill cache:
+      //   "出牌阶段限一次，你可以弃置两张手牌并选择一名已受伤的男性角色，
+      //    你和其各回复 1 点体力。"
+      // 1v1: 目标恒为对手 (须男性且已受伤); 自身满血时只有目标受益 (封顶)。
+      function triggerJieyinActiveSkill(context) {
+        if (context.skillId !== 'jieyin') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        var cardIds = context.cardIds || [];
+        if (!self || !hasSkill(self, 'jieyin')) return null;
+        if (self.flags.jieyinUsed) return fail('【结姻】每回合限一次。');
+        var targetActor = opponent(actor);
+        var target = game[targetActor];
+        if (!target || target.gender !== 'male') return fail('【结姻】需要一名男性角色为目标。');
+        if (target.hp >= target.maxHp) return fail('目标未受伤，不能发动【结姻】。');
+        if (cardIds.length !== 2 || cardIds[0] === cardIds[1]) return fail('请选择两张不同的手牌弃置。');
+        var inHand = cardIds.every(function (id) {
+          return (self.hand || []).some(function (item) { return item.id === id; });
+        });
+        if (!inHand) return fail('选择的手牌不存在。');
+        var firstCost = removeCardFromHand(self, cardIds[0]);
+        var secondCost = removeCardFromHand(self, cardIds[1]);
+        discardCard(game, firstCost);
+        discardCard(game, secondCost);
+        self.flags.jieyinUsed = true;
+        self.hp = Math.min(self.maxHp, self.hp + 1);
+        target.hp = Math.min(target.maxHp, target.hp + 1);
+        log(game, actorName(game, actor) + '发动【结姻】，弃置【' + firstCost.name + '】、【' + secondCost.name + '】，与' + actorName(game, targetActor) + '各回复 1 点体力。');
+        return success('结姻完成。');
       }
 
       function triggerRendeActiveSkill(context) {

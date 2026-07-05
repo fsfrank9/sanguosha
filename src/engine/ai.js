@@ -369,6 +369,18 @@
         if (candidates.length) return { skillId: 'zhiheng', cardIds: [candidates[0].card.id] };
       }
 
+      // v11 C6 (批次 30): 结姻 — 与受伤男性对手"各回复 1", 也给敌方回血,
+      // 净收益仅在自保紧急时成立: 自身 hp<=2 且受伤 + 目标男性受伤 +
+      // 手牌足够 (>=3, 保留至少 1 张) 时弃两张最低分牌换自身 +1。
+      if (hasSkill(self, 'jieyin') && !self.flags.jieyinUsed
+          && self.hp < self.maxHp && self.hp <= 2 && self.hand.length >= 3
+          && target && target.gender === 'male' && target.hp < target.maxHp) {
+        var jieyinCandidates = self.hand
+          .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
+          .sort(function (a, b) { return a.score - b.score; });
+        return { skillId: 'jieyin', cardIds: [jieyinCandidates[0].card.id, jieyinCandidates[1].card.id] };
+      }
+
       // 青囊: heal whenever 自身 is wounded and 有手牌可弃。优先自救；
       // 自己满血但对方受伤时不会触发（不应该给敌人回血）。
       if (hasSkill(self, 'qingnang') && !self.flags.qingnangUsed && self.hand.length > 0 && self.hp < self.maxHp) {
