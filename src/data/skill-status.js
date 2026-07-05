@@ -25,7 +25,11 @@
         'xiaoji', 'jieyin',
         // v11 C7 (批次 31): 华雄 入编 + 新交互 kind 'yaowu-reward'
         //   yaowu    华雄   锁定技: 受红色杀伤害后, 来源选 回复 1 / 摸一张
-        'yaowu'
+        'yaowu',
+        // v11 C8 (批次 32): 标准版袁术 入编
+        //   wangzun  袁术   主公准备阶段: 袁术摸一张 + 主公本回合手牌上限 -1
+        //   tongji   袁术   锁定技: 1v1 恒不拦截 (reserved, 多人激活, 同流离)
+        'wangzun', 'tongji'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,

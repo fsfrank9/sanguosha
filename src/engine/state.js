@@ -92,7 +92,9 @@
 
   function handLimit(game, actor) {
     var state = game[actor];
-    return Math.max(0, state.hp || 0);
+    // v11 C8 (批次 32): handLimitDelta — 回合级手牌上限修正 (妄尊 -1 等),
+    // 由 resetActorTurnState / resetEndOfTurnState 复位。
+    return Math.max(0, (state.hp || 0) + (state.handLimitDelta || 0));
   }
 
   function getActorStatus(game, actor) {
