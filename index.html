@@ -351,11 +351,14 @@
           </div>
         </div>
         <!-- v9 PR-E21: 升级为 pending-prompt-panel 卷轴风. -->
+        <!-- v11 C4 (批次 28): 转化候选泛化 — conversionExtraChoices 动态列
+             锦囊类转化按钮 (国色 方片→乐 / 奇袭 黑牌→拆), 杀按钮按候选显隐. -->
         <div class="conversion-mode-panel pending-prompt-panel" id="conversionModePanel" hidden>
           <span class="pending-prompt-panel__hint" id="conversionHint">这张牌可按原牌使用，也可当【杀】使用</span>
           <div class="pending-prompt-panel__actions">
             <button class="btn small" id="conversionNormalBtn">按原牌使用</button>
             <button class="btn small" id="conversionShaBtn">当【杀】使用</button>
+            <span id="conversionExtraChoices"></span>
             <button class="btn small" id="conversionCancelBtn">取消</button>
           </div>
         </div>
