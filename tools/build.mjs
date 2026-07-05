@@ -18,6 +18,7 @@ const REQUIRED_FILES = [
   'src/engine/state.js',
   'src/engine/phases.js',
   'src/engine/judgement.js',
+  'src/engine/ai.js',
   'src/engine/game-engine.js',
   'src/ui/dom-adapter.js',
 ];

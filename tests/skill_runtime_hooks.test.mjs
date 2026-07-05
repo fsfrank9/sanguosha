@@ -309,7 +309,8 @@ test('game engine dispatches Wusheng, Longdan, and Qingguo card-as conversions t
 test('game engine dispatches implemented active skills through onActiveSkill hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const useStart = source.indexOf('function useSkill(game, actor, skillId, cardIds, options)');
-  const useEnd = source.indexOf('function scoreCardForAI(game, actor, card)', useStart);
+  // v11 B1: scoreCardForAI 迁往 ai.js, 切片结束锚改为紧随其后的 AI 拆分注释。
+  const useEnd = source.indexOf('// v11 B1: AI 域拆分', useStart);
   assert.ok(useStart >= 0 && useEnd > useStart, 'useSkill source should be extractable');
   const useSkillSource = source.slice(useStart, useEnd);
 
