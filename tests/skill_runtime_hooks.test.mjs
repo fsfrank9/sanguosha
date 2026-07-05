@@ -221,11 +221,14 @@ test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
 });
 
 test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
+  // v11 B1: damage 域已迁往 damage-dying.js — damage 切片读该模块 (到文件尾,
+  // 覆盖 finishDamageAfter 的 onDamageAfter 派发); 技能注册/触发器断言仍读引擎。
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
-  const damageEnd = source.indexOf('function findResponseCard(', damageStart);
+  const damageModule = fs.readFileSync(path.join(root, 'src/engine/damage-dying.js'), 'utf8');
+  const damageStart = damageModule.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
+  const damageEnd = damageModule.length;
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
-  const damageSource = source.slice(damageStart, damageEnd);
+  const damageSource = damageModule.slice(damageStart, damageEnd);
 
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]jianxiong['"]/, 'Jianxiong should be registered with SkillRuntime.registerSkill');
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]jianxiong['"][\s\S]*?onDamageAfter\s*:/, 'Jianxiong should register an onDamageAfter hook');
@@ -237,14 +240,17 @@ test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
 });
 
 test('game engine dispatches Ganglie through onDamageAfter and finalizes its judgment card', () => {
+  // v11 B1: damage 域已迁往 damage-dying.js — damage 切片读该模块 (到文件尾,
+  // 覆盖 finishDamageAfter 的 onDamageAfter 派发); 技能注册/触发器断言仍读引擎。
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
-  const damageEnd = source.indexOf('function findResponseCard(', damageStart);
+  const damageModule = fs.readFileSync(path.join(root, 'src/engine/damage-dying.js'), 'utf8');
+  const damageStart = damageModule.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
+  const damageEnd = damageModule.length;
   const ganglieStart = source.indexOf('function triggerGanglieDamageAfter(context)');
   const ganglieEnd = source.indexOf('function triggerTianduJudgementAfterResolve(context)', ganglieStart);
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
   assert.ok(ganglieStart >= 0 && ganglieEnd > ganglieStart, 'Ganglie helper source should be extractable');
-  const damageSource = source.slice(damageStart, damageEnd);
+  const damageSource = damageModule.slice(damageStart, damageEnd);
   const ganglieSource = source.slice(ganglieStart, ganglieEnd);
 
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]ganglie['"]/, 'Ganglie should be registered with SkillRuntime.registerSkill');
@@ -258,14 +264,17 @@ test('game engine dispatches Ganglie through onDamageAfter and finalizes its jud
 });
 
 test('game engine dispatches Fankui through onDamageAfter and gains a source-area card', () => {
+  // v11 B1: damage 域已迁往 damage-dying.js — damage 切片读该模块 (到文件尾,
+  // 覆盖 finishDamageAfter 的 onDamageAfter 派发); 技能注册/触发器断言仍读引擎。
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
-  const damageEnd = source.indexOf('function findResponseCard(', damageStart);
+  const damageModule = fs.readFileSync(path.join(root, 'src/engine/damage-dying.js'), 'utf8');
+  const damageStart = damageModule.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
+  const damageEnd = damageModule.length;
   const fankuiStart = source.indexOf('function triggerFankuiDamageAfter(context)');
   const fankuiEnd = source.indexOf('function triggerGanglieDamageAfter(context)', fankuiStart);
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
   assert.ok(fankuiStart >= 0 && fankuiEnd > fankuiStart, 'Fankui helper source should be extractable');
-  const damageSource = source.slice(damageStart, damageEnd);
+  const damageSource = damageModule.slice(damageStart, damageEnd);
   const fankuiSource = source.slice(fankuiStart, fankuiEnd);
 
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]fankui['"]/, 'Fankui should be registered with SkillRuntime.registerSkill');
@@ -361,11 +370,14 @@ test('game engine dispatches Tiandu judgement-card gain through onJudgementAfter
 });
 
 test('game engine dispatches Yiji per-damage-point draw through onDamageAfter hook seam', () => {
+  // v11 B1: damage 域已迁往 damage-dying.js — damage 切片读该模块 (到文件尾,
+  // 覆盖 finishDamageAfter 的 onDamageAfter 派发); 技能注册/触发器断言仍读引擎。
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
-  const damageEnd = source.indexOf('function findResponseCard(state, type', damageStart);
+  const damageModule = fs.readFileSync(path.join(root, 'src/engine/damage-dying.js'), 'utf8');
+  const damageStart = damageModule.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
+  const damageEnd = damageModule.length;
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
-  const damageSource = source.slice(damageStart, damageEnd);
+  const damageSource = damageModule.slice(damageStart, damageEnd);
 
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yiji['"][\s\S]*?onDamageAfter\s*:/, 'Yiji should register an onDamageAfter hook');
   assert.match(source, /triggerYijiDamageAfter\(context\)/, 'Yiji hook should delegate to an isolated helper');
@@ -380,12 +392,14 @@ test('game engine dispatches Luoyi through draw and damage-modifier hook seams',
   const drawStart = source.indexOf('function performDrawPhase(game, actor)');
   const drawHelperStart = source.indexOf('function triggerLuoyiDrawPhase(context)', drawStart);
   const drawEnd = drawHelperStart >= 0 ? drawHelperStart : source.indexOf('function isArmorIgnoredBySha(game, sourceActor, card)', drawStart);
-  const damageStart = source.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
-  const damageEnd = source.indexOf('function findResponseCard(state, type', damageStart);
+  // v11 B1: damage 域已迁往 damage-dying.js, 切片改读该模块 (到文件尾)。
+  const damageModule = fs.readFileSync(path.join(root, 'src/engine/damage-dying.js'), 'utf8');
+  const damageStart = damageModule.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');
+  const damageEnd = damageModule.length;
   assert.ok(drawStart >= 0 && drawEnd > drawStart, 'draw phase source should be extractable');
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
   const drawSource = source.slice(drawStart, drawEnd);
-  const damageSource = source.slice(damageStart, damageEnd);
+  const damageSource = damageModule.slice(damageStart, damageEnd);
 
   assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]luoyi['"][\s\S]*?onDrawPhase\s*:[\s\S]*?onDamageModify\s*:/, 'Luoyi should register draw and damage modifier hooks');
   assert.match(source, /triggerLuoyiDrawPhase\(context\)/, 'Luoyi draw hook should delegate to an isolated helper');

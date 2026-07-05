@@ -9,7 +9,15 @@ import { fileURLToPath } from 'node:url';
 // shift/pop/赋值 —— 新增裸站点会在这里立刻爆, 防止再开"牌凭空增减"的洞。
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const engineSource = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+// v11 B1: 域拆分后, 引擎规则代码分布在主文件 + 各域模块, 守护一并覆盖。
+const ENGINE_RULE_FILES = [
+  'src/engine/game-engine.js',
+  'src/engine/damage-dying.js',
+  'src/engine/ai.js',
+];
+const engineSource = ENGINE_RULE_FILES
+  .map((rel) => fs.readFileSync(path.join(root, rel), 'utf8'))
+  .join('\n');
 
 // 允许保留的裸操作 (逐行精确匹配, 语义见各行注释):
 const ALLOWED_RAW_LINES = [
