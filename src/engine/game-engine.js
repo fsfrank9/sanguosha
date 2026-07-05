@@ -18,6 +18,11 @@
       var isShaCard = CardRuntime.isShaCard;
       var isNormalTrickCard = CardRuntime.isNormalTrickCard;
       var physicalCardOf = CardRuntime.physicalCardOf;
+      // v11 A2: 牌移动原语 — 所有"牌离开/进入区域"的站点统一走这四个出口。
+      var findCardZone = CardRuntime.findCardZone;
+      var takeCard = CardRuntime.takeCard;
+      var putCard = CardRuntime.putCard;
+      var moveCard = CardRuntime.moveCard;
       var actorName = StateRuntime.actorName;
       var opponent = StateRuntime.opponent;
       var hasSkill = StateRuntime.hasSkill;
@@ -243,8 +248,7 @@
         var to = game[toActor];
         if (!from || !to || !from.hand.length) return null;
         var index = randomHandIndex(game, from);
-        var card = from.hand.splice(index, 1)[0];
-        to.hand.push(card);
+        var card = moveCard(game, from.hand[index], { zone: 'hand', actor: fromActor }, { zone: 'hand', actor: toActor });
         log(game, actorName(game, toActor) + (reason || '获得') + actorName(game, fromActor) + '的一张手牌。');
         return card;
       }
@@ -332,6 +336,7 @@
       function reshuffleIfNeeded(game) {
         if (game.deck.length > 0 || game.discard.length === 0) return;
         log(game, '牌堆耗尽，洗混弃牌堆形成新的牌堆。');
+        // 唯一的整堆搬移站点 (弃牌堆→洗混→新牌堆), 不走逐张 moveCard。
         game.deck = shuffle(game.discard.splice(0), game.random);
       }
 
@@ -340,8 +345,7 @@
         for (var i = 0; i < count; i += 1) {
           reshuffleIfNeeded(game);
           if (game.deck.length === 0) break;
-          var card = game.deck.pop();
-          game[actor].hand.push(card);
+          var card = moveCard(game, null, { zone: 'deck' }, { zone: 'hand', actor: actor });
           drawn.push(card);
         }
         if (drawn.length > 0) {
@@ -406,13 +410,14 @@
         if (hit.zone === 'hand') {
           return removeCardFromHand(state, cardId);
         }
-        // equipment
-        state.equipment[hit.slot] = null;
-        // M2: 制衡/苦肉/武圣转化等把装备区牌当成本, 同样是"失去装备" —
-        // 传入 game 的调用方会触发失去时机 (白银狮子回血)。
+        // equipment — M2: 制衡/苦肉/武圣转化等把装备区牌当成本, 同样是"失去
+        // 装备" — 传入 game 的调用方会触发失去时机 (白银狮子回血)。
         if (game) {
           var ownerActor = game.player === state ? 'player' : 'enemy';
+          takeCard(game, cardId, { zone: 'equipment', actor: ownerActor, slot: hit.slot });
           triggerEquipmentLoss(game, ownerActor, hit.card);
+        } else {
+          state.equipment[hit.slot] = null;
         }
         return hit.card;
       }
@@ -482,7 +487,7 @@
         // 的实体牌已在转化时弃置, 再推入弃牌堆会凭空多出一张牌污染牌堆。
         if (card && card.virtual) return;
         var physicalCard = physicalCardOf(card);
-        if (physicalCard) game.discard.push(physicalCard);
+        if (physicalCard) putCard(game, physicalCard, { zone: 'discard' });
       }
 
       function triggerJianxiongDamageAfter(game, targetActor, sourceCard) {
@@ -494,10 +499,7 @@
           var components = sourceCard.physicalCards || [];
           var gainedNames = [];
           components.forEach(function (component) {
-            var discardIndex = game.discard.indexOf(component);
-            if (discardIndex === -1) return;
-            game.discard.splice(discardIndex, 1);
-            target.hand.push(component);
+            if (!moveCard(game, component, { zone: 'discard' }, { zone: 'hand', actor: targetActor })) return;
             gainedNames.push(component.name);
           });
           if (!gainedNames.length) return null;
@@ -509,10 +511,9 @@
         // M5: 被朱雀临时转化的【杀】进入奸雄手牌前还原物理身份, 与 discardCard 一致。
         restoreZhuqueIdentity(sourceCard);
         // L2: 决斗/南蛮/万箭/火攻 在使用时已进弃牌堆 — 奸雄获得时从弃牌堆取回,
-        // 保持牌守恒 (杀类牌仍在结算中, 不在弃牌堆, indexOf 命中不了)。
-        var discardIdx = game.discard.indexOf(physicalSourceCard);
-        if (discardIdx !== -1) game.discard.splice(discardIdx, 1);
-        target.hand.push(physicalSourceCard);
+        // 保持牌守恒 (杀类牌仍在结算中不在弃牌堆, takeCard 取不到, 直接入手)。
+        takeCard(game, physicalSourceCard, { zone: 'discard' });
+        putCard(game, physicalSourceCard, { zone: 'hand', actor: targetActor });
         log(game, actorName(game, targetActor) + '发动【奸雄】，获得了造成伤害的【' + physicalSourceCard.name + '】。');
         return { claimedSourceCard: true };
       }
@@ -581,7 +582,7 @@
         var autoZone = (source.hand && source.hand.length) ? 'hand' : 'equipment';
         var gained = removeTargetZoneCard(game, sourceActor, autoZone);
         if (!gained || !gained.card) return null;
-        target.hand.push(gained.card);
+        putCard(game, gained.card, { zone: 'hand', actor: targetActor });
         log(game, actorName(game, targetActor) + '发动【反馈】，获得' + actorName(game, sourceActor) + '的一张' + gained.zone + '牌。');
         return { gainedSourceCard: true };
       }
@@ -606,7 +607,7 @@
           setPendingChoice(game, pending);
           return fail('找不到目标牌，请重新选择。');
         }
-        holderState.hand.push(gained.card);
+        putCard(game, gained.card, { zone: 'hand', actor: holder });
         log(game, actorName(game, holder) + '发动【反馈】，获得' + actorName(game, sourceActor) + '的一张' + gained.zone + '牌。');
         return success('反馈完成。');
       }
@@ -791,9 +792,8 @@
         for (var i = 0; i < cardIds.length; i += 1) {
           var id = cardIds[i];
           // Hand?
-          var handIdx = source.hand.findIndex(function (c) { return c.id === id; });
-          if (handIdx >= 0) {
-            var hcard = source.hand.splice(handIdx, 1)[0];
+          var hcard = takeCard(game, id, { zone: 'hand', actor: sourceActor });
+          if (hcard) {
             discardCard(game, hcard);
             discarded.push(hcard);
             continue;
@@ -803,8 +803,7 @@
             return source.equipment && source.equipment[s] && source.equipment[s].id === id;
           });
           if (slotKey) {
-            var ecard = source.equipment[slotKey];
-            source.equipment[slotKey] = null;
+            var ecard = takeCard(game, id, { zone: 'equipment', actor: sourceActor, slot: slotKey });
             discardCard(game, ecard);
             triggerEquipmentLoss(game, sourceActor, ecard);
             discarded.push(ecard);
@@ -901,7 +900,7 @@
         var state = context.state || game[actor];
         var physicalCard = physicalCardOf(context.card);
         if (!state || !physicalCard || !hasSkill(state, 'tiandu')) return null;
-        state.hand.push(physicalCard);
+        putCard(game, physicalCard, { zone: 'hand', actor: actor });
         context.claimed = true;
         log(game, actorName(game, actor) + '发动【天妒】，获得了判定牌【' + physicalCard.name + '】。');
         return { claimedJudgementCard: true };
@@ -1179,7 +1178,7 @@
           var giveCard = removeCardFromHand(self, id);
           if (giveCard) {
             given.push(giveCard);
-            target.hand.push(giveCard);
+            putCard(game, giveCard, { zone: 'hand', actor: context.targetActor });
           }
         });
         if (!given.length) return fail('没有成功给出任何牌。');
@@ -1224,7 +1223,7 @@
         if (!cardIds.length) return fail('请选择一张交给对方的牌。');
         var fanjianCard = removeCardFromHand(self, cardIds[0]);
         if (!fanjianCard) return fail('选择的牌不存在。');
-        target.hand.push(fanjianCard);
+        putCard(game, fanjianCard, { zone: 'hand', actor: targetActor });
         self.flags.fanjianUsed = true;
         log(game, actorName(game, actor) + '发动【反间】，将【' + fanjianCard.name + '】交给' + actorName(game, targetActor) + '。');
 
@@ -1393,13 +1392,12 @@
         if (!slot) return fail('装备槽位未知。');
         removeCardFromHand(self, card.id);
         if (self.equipment[slot]) {
-          var replaced = self.equipment[slot];
-          self.equipment[slot] = null;
+          var replaced = takeCard(game, self.equipment[slot], { zone: 'equipment', actor: actor, slot: slot });
           discardCard(game, replaced);
           log(game, actorName(game, actor) + '替换并弃置了原有装备【' + replaced.name + '】。');
           triggerEquipmentLoss(game, actor, replaced);
         }
-        self.equipment[slot] = card;
+        putCard(game, card, { zone: 'equipment', actor: actor, slot: slot });
         log(game, actorName(game, actor) + '装备了【' + card.name + '】。');
         return success('装备成功。');
       }
@@ -1407,9 +1405,8 @@
       function loseEquipment(game, actor, slot) {
         var self = game[actor];
         if (!self || !self.equipment) return fail('未知角色。');
-        var card = self.equipment[slot];
+        var card = takeCard(game, self.equipment[slot], { zone: 'equipment', actor: actor, slot: slot });
         if (!card) return fail('该槽位没有装备。');
-        self.equipment[slot] = null;
         discardCard(game, card);
         log(game, actorName(game, actor) + '失去了【' + card.name + '】。');
         triggerEquipmentLoss(game, actor, card);
@@ -1517,7 +1514,7 @@
           discarded += 1;
         }
         while (discarded < 2 && (target.hand || []).length > 0) {
-          var hcard = target.hand.shift();
+          var hcard = takeCard(game, target.hand[0], { zone: 'hand', actor: targetActor });
           if (hcard) {
             discardCard(game, hcard);
             log(game, '【寒冰剑】依次弃置' + actorName(game, targetActor) + '手牌【' + hcard.name + '】。');
@@ -1596,8 +1593,7 @@
             .map(function (card) { return { card: card, score: scoreCardForAI(game, targetActor, card) }; })
             .sort(function (a, b) { return a.score - b.score; });
           var worstCard = sortedCixiong[0].card;
-          var worstIdx = target.hand.findIndex(function (c) { return c.id === worstCard.id; });
-          var dropped = target.hand.splice(worstIdx, 1)[0];
+          var dropped = takeCard(game, worstCard, { zone: 'hand', actor: targetActor });
           discardCard(game, dropped);
           log(game, actorName(game, targetActor) + '因【雌雄双股剑】弃置【' + dropped.name + '】。');
           return null;
@@ -1644,7 +1640,7 @@
             var cardId = decision && decision.cardId;
             var idx = cardId ? target.hand.findIndex(function (c) { return c.id === cardId; }) : 0;
             if (idx < 0) idx = 0;
-            var dropped = target.hand.splice(idx, 1)[0];
+            var dropped = takeCard(game, target.hand[idx], { zone: 'hand', actor: targetActor });
             discardCard(game, dropped);
             log(game, actorName(game, targetActor) + '弃置【' + dropped.name + '】响应【雌雄双股剑】。');
           }
@@ -1777,8 +1773,8 @@
           setPendingChoice(game, pending);
           return fail('该牌不在【五谷丰登】的亮出池中。');
         }
-        var picked = pool.splice(poolIdx, 1)[0];
-        game[picker].hand.push(picked);
+        var picked = pool.splice(poolIdx, 1)[0];  // pool 是在途池, 不是区域
+        putCard(game, picked, { zone: 'hand', actor: picker });
         log(game, actorName(game, picker) + '从【五谷丰登】选择获得【' + picked.name + '】。');
         // H1b-2: 该 picker 选完 → idx+1 回到逐目标驱动 (下一名先开无懈窗口),
         // pool 引用沿用 (累计 splice)。
@@ -1846,7 +1842,7 @@
         if (!shaResult || !shaResult.ok) {
           // Second legality check failed at playSha entry (target protection / distance
           // changed since canPlayCard). Return sha to opponent's hand and transfer weapon.
-          opponentState.hand.push(borrowedSha);
+          putCard(game, borrowedSha, { zone: 'hand', actor: opponentActor });
           log(game, '【杀】不再合法（second legality check）；交出武器。');
           return transferWeaponJiedao(game, sourceActor, opponentActor);
         }
@@ -1855,11 +1851,9 @@
 
       function transferWeaponJiedao(game, sourceActor, opponentActor) {
         var opponentState = game[opponentActor];
-        var sourceState = game[sourceActor];
         var weapon = opponentState.equipment && opponentState.equipment.weapon;
         if (!weapon) return success('【借刀杀人】无效果（目标无武器）。');
-        opponentState.equipment.weapon = null;
-        sourceState.hand.push(weapon);
+        moveCard(game, weapon, { zone: 'equipment', actor: opponentActor, slot: 'weapon' }, { zone: 'hand', actor: sourceActor });
         log(game, actorName(game, sourceActor) + '因【借刀杀人】获得【' + weapon.name + '】，置入手牌。');
         return success('借刀杀人获得武器。');
       }
@@ -2322,7 +2316,7 @@
         if (!responderState || !dyingState) return { skipped: true };
         var idx = responderState.hand.findIndex(function (c) { return c.id === cardId; });
         if (idx < 0) return { skipped: true };
-        var card = responderState.hand.splice(idx, 1)[0];
+        var card = takeCard(game, cardId, { zone: 'hand', actor: responder });
         if (kind === 'tao') {
           discardCard(game, card);
           dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + 1);
@@ -2333,7 +2327,7 @@
           // 酒 使用方法Ⅱ: 仅 self
           if (responder !== dyingActor) {
             // 不允许救他人时用酒；回退到不消耗
-            responderState.hand.splice(idx, 0, card);
+            putCard(game, card, { zone: 'hand', actor: responder, index: idx });
             return { skipped: true };
           }
           discardCard(game, card);
@@ -2348,11 +2342,11 @@
         if (kind === 'jijiu') {
           if (!hasSkill(responderState, 'jijiu') || game.turn === responder) {
             // 条件不满足时回退
-            responderState.hand.splice(idx, 0, card);
+            putCard(game, card, { zone: 'hand', actor: responder, index: idx });
             return { skipped: true };
           }
           if (card.color !== 'red' || card.type === 'tao' || card.type === 'jiu') {
-            responderState.hand.splice(idx, 0, card);
+            putCard(game, card, { zone: 'hand', actor: responder, index: idx });
             return { skipped: true };
           }
           discardCard(game, card);
@@ -2361,7 +2355,7 @@
           return { healed: true };
         }
         // 未知 kind
-        responderState.hand.splice(idx, 0, card);
+        putCard(game, card, { zone: 'hand', actor: responder, index: idx });
         return { skipped: true };
       }
 
@@ -2531,8 +2525,9 @@
               && state.equipment.weapon.type === 'zhangba'
               && state.hand.length >= 2
               && (!state.skillPreferences || state.skillPreferences.zhangba !== 'decline')) {
-            var zbFirst = state.hand.shift();
-            var zbSecond = state.hand.shift();
+            var zbActor = game.player === state ? 'player' : 'enemy';
+            var zbFirst = takeCard(game, state.hand[0], { zone: 'hand', actor: zbActor });
+            var zbSecond = takeCard(game, state.hand[0], { zone: 'hand', actor: zbActor });
             return {
               card: {
                 id: 'zhangba-resp-' + zbFirst.id + '-' + zbSecond.id,
@@ -2592,7 +2587,7 @@
             return c.id === preferredCardId && c.type === 'wuxie';
           });
           if (idx < 0) return false;
-          card = state.hand.splice(idx, 1)[0];
+          card = takeCard(game, preferredCardId, { zone: 'hand', actor: actor });
         } else {
           card = removeFirstCardOfType(game[actor], 'wuxie');
         }
@@ -2806,7 +2801,8 @@
 
       function judge(game, actor, reason, opts) {
         reshuffleIfNeeded(game);
-        var card = game.deck.pop();
+        // 判定牌离开牌堆进入在途结算, 结算收尾统一 discardCard (或被天妒等收走)。
+        var card = takeCard(game, null, { zone: 'deck' });
         if (!card) return null;
         log(game, actorName(game, actor) + '进行' + reason + '判定：【' + card.name + '】' + card.suit + ' ' + card.rank + '。');
         var state = game[actor];
@@ -2871,6 +2867,7 @@
           state.flags.skipPlay = false;
           state.flags.skipDraw = false;
           if (!state.judgeArea) state.judgeArea = [];
+          // 整批取出判定区待结算牌 (在途), 逐张结算后 discardCard / 移动。
           pending = state.judgeArea.splice(0);
           startIdx = 0;
         }
@@ -2940,10 +2937,10 @@
           });
           if (foeAlreadyShandian) {
             // 对手已有 闪电 → 非合法目标 → 全部不合法 → 回到自己
-            game[actor].judgeArea.push(trick);
+            putCard(game, trick, { zone: 'judgeArea', actor: actor });
             log(game, '【闪电】移动失败（对手判定区已有同名牌），留在' + actorName(game, actor) + '的判定区。');
           } else {
-            foeState.judgeArea.push(trick);
+            putCard(game, trick, { zone: 'judgeArea', actor: foeActor });
             log(game, '【闪电】移至' + actorName(game, foeActor) + '的判定区。');
           }
         }
@@ -3038,13 +3035,10 @@
           log(game, actorName(game, actor) + '将【遗计】本点所摸的牌全部留给自己。');
         } else {
           var opp = opponent(actor);
-          var oppState = game[opp];
           var moved = [];
           for (var i = 0; i < validIds.length; i += 1) {
-            var idx = state.hand.findIndex(function (c) { return c.id === validIds[i]; });
-            if (idx < 0) continue;
-            var card = state.hand.splice(idx, 1)[0];
-            oppState.hand.push(card);
+            var card = moveCard(game, validIds[i], { zone: 'hand', actor: actor }, { zone: 'hand', actor: opp });
+            if (!card) continue;
             moved.push(card.name);
           }
           if (moved.length > 0) {
@@ -3080,9 +3074,8 @@
         var resolvedCard = originalCard;
         var declined = !decision.cardId;
         if (!declined) {
-          var idx = holderState.hand.findIndex(function (c) { return c.id === decision.cardId; });
-          if (idx < 0) return fail('找不到这张牌。');
-          var replacement = holderState.hand.splice(idx, 1)[0];
+          var replacement = takeCard(game, decision.cardId, { zone: 'hand', actor: holder });
+          if (!replacement) return fail('找不到这张牌。');
           if (originalCard) discardCard(game, originalCard);
           resolvedCard = replacement;
           log(game, actorName(game, holder) + '发动【鬼才】，用【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）代替' + actorName(game, judgementActor) + '的判定牌。');
@@ -3204,16 +3197,16 @@
         }
         if (!picked || !picked.card) return null;
         if (zone === 'hand') {
-          return { card: target.hand.splice(picked.index, 1)[0], zone: '手牌' };
+          return { card: takeCard(game, picked.card, { zone: 'hand', actor: targetActor }), zone: '手牌' };
         }
         if (zone === 'equipment') {
-          target.equipment[picked.slot] = null;
+          takeCard(game, picked.card, { zone: 'equipment', actor: targetActor, slot: picked.slot });
           // M2: 被拆/被顺/被反馈拿走装备同样是"失去装备区里的牌"
           triggerEquipmentLoss(game, targetActor, picked.card);
           return { card: picked.card, zone: '装备区' };
         }
         if (zone === 'judge') {
-          return { card: target.judgeArea.splice(picked.index, 1)[0], zone: '判定区' };
+          return { card: takeCard(game, picked.card, { zone: 'judgeArea', actor: targetActor }), zone: '判定区' };
         }
         return null;
       }
@@ -3995,7 +3988,7 @@
           for (var wi = 0; wi < wuguTargetCount; wi++) {
             reshuffleIfNeeded(game);
             if (game.deck.length === 0) break;
-            wuguPool.push(game.deck.pop());
+            wuguPool.push(takeCard(game, null, { zone: 'deck' }));  // 亮出池是在途池
           }
           discardCard(game, card);
           if (wuguPool.length < wuguTargetCount) {
@@ -4078,7 +4071,7 @@
         var opt = ctx.options || {};
         var stolenInfo = removeTargetZoneCard(game, opponent(ctx.actor), opt.targetZone, opt.targetCardId);
         if (stolenInfo && stolenInfo.card) {
-          self.hand.push(stolenInfo.card);
+          putCard(game, stolenInfo.card, { zone: 'hand', actor: ctx.actor });
           log(game, actorName(game, ctx.actor) + '使用【顺手牵羊】，获得了'
             + actorName(game, opponent(ctx.actor)) + stolenInfo.zone + '的一张牌。');
         }
@@ -4121,7 +4114,7 @@
           : removeFirstMatchingCard(self, function (item) { return item.suit === revealed.suit; });
         if (!cost) return finishTrickUse(game, ctx.actor, ctx.card, success('没有同花色牌可弃，火攻未造成伤害。'), opt);
         if (cost.suit !== revealed.suit) {
-          self.hand.push(cost);
+          putCard(game, cost, { zone: 'hand', actor: ctx.actor });
           return fail('请选择与展示牌同花色的手牌。');
         }
         discardCard(game, cost);
@@ -4198,7 +4191,7 @@
           return success('延时锦囊被无懈可击。');
         }
         var side = ctx.delayedSide;
-        game[side].judgeArea.push(ctx.card);
+        putCard(game, ctx.card, { zone: 'judgeArea', actor: side });
         if (ctx.card.type === 'shandian') {
           log(game, actorName(game, ctx.actor) + '将【闪电】置入自己的判定区。');
         } else {
@@ -4273,8 +4266,8 @@
         var pool = ctx.pool;
         if (!pool.length) { ctx.idx += 1; return advanceWuguTargets(game, ctx); }
         if (pool.length === 1) {
-          var only = pool.shift();
-          game[picker].hand.push(only);
+          var only = pool.shift();  // pool 是在途池
+          putCard(game, only, { zone: 'hand', actor: picker });
           log(game, actorName(game, picker) + '从【五谷丰登】获得【' + only.name + '】。');
           ctx.idx += 1;
           return advanceWuguTargets(game, ctx);
@@ -4290,8 +4283,8 @@
             var ps = scoreCardForAI(game, picker, pool[pi]);
             if (ps > bestPoolScore) { bestPoolScore = ps; bestPoolIdx = pi; }
           }
-          var picked = pool.splice(bestPoolIdx, 1)[0];
-          pickerState.hand.push(picked);
+          var picked = pool.splice(bestPoolIdx, 1)[0];  // pool 是在途池
+          putCard(game, picked, { zone: 'hand', actor: picker });
           log(game, actorName(game, picker) + '从【五谷丰登】获得【' + picked.name + '】。');
           ctx.idx += 1;
           return advanceWuguTargets(game, ctx);
@@ -4425,7 +4418,7 @@
         var card = judge(game, actor, '【洛神】');
         if (!card) return null;
         if (card.color === 'black') {
-          state.hand.push(card);
+          putCard(game, card, { zone: 'hand', actor: actor });
           log(game, actorName(game, actor) + '获得【洛神】判定牌【' + card.name + '】。');
           return startLuoshenStep(game, actor, pref);
         }
@@ -4646,8 +4639,8 @@
         var first = removeCardFromHand(self, cardIds[0]);
         var second = removeCardFromHand(self, cardIds[1]);
         if (!first || !second) {
-          if (first) self.hand.push(first);
-          if (second) self.hand.push(second);
+          if (first) putCard(game, first, { zone: 'hand', actor: actor });
+          if (second) putCard(game, second, { zone: 'hand', actor: actor });
           return fail('选择的手牌不存在。');
         }
         discardCard(game, first);

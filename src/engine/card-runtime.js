@@ -84,6 +84,124 @@
     return card && card.physicalCard ? card.physicalCard : card;
   }
 
+  // ======================================================================
+  // v11 A2: 牌移动原语。"牌离开/进入某区域"收敛到单一受控出口, 任何新的
+  // 获得/弃置/转移路径都必须走这里 (架构守护测试禁止引擎新增裸 push/splice),
+  // 由 A1 的全局守恒断言护航。
+  //
+  // 区域描述符:
+  //   { zone: 'deck', position?: 'top'|'bottom' }   数组尾部是牌堆顶
+  //   { zone: 'discard' }
+  //   { zone: 'hand', actor: 'player'|'enemy', index?: number }
+  //   { zone: 'equipment', actor, slot: 'weapon'|'armor'|'horseMinus'|'horsePlus' }
+  //   { zone: 'judgeArea', actor, position?: 'top'|'bottom' }
+  //
+  // "结算中"的牌 (响应窗口/五谷池/判定牌等在途状态) 不是区域: takeCard 之后、
+  // putCard 之前, 牌由调用方 (pendingChoice/pauseState) 临时持有。
+  // ======================================================================
+
+  var EQUIP_SLOTS = ['weapon', 'armor', 'horseMinus', 'horsePlus'];
+
+  function zoneArrayOf(game, ref) {
+    if (!ref) return null;
+    if (ref.zone === 'deck') return game.deck;
+    if (ref.zone === 'discard') return game.discard;
+    var state = game[ref.actor];
+    if (!state) return null;
+    if (ref.zone === 'hand') return state.hand;
+    if (ref.zone === 'judgeArea') return state.judgeArea;
+    return null;
+  }
+
+  function cardIdOf(card) {
+    return card && typeof card === 'object' ? card.id : card;
+  }
+
+  // 定位一张牌当前所在的区域描述符; 在途 (不在任何区域) 返回 null。
+  function findCardZone(game, cardOrId) {
+    var id = cardIdOf(cardOrId);
+    var refs = [{ zone: 'deck' }, { zone: 'discard' }];
+    for (var a = 0; a < 2; a += 1) {
+      var actor = a === 0 ? 'player' : 'enemy';
+      refs.push({ zone: 'hand', actor: actor });
+      refs.push({ zone: 'judgeArea', actor: actor });
+    }
+    for (var i = 0; i < refs.length; i += 1) {
+      var list = zoneArrayOf(game, refs[i]);
+      if (!list) continue;
+      for (var j = 0; j < list.length; j += 1) {
+        if (list[j].id === id) return refs[i];
+      }
+    }
+    for (var b = 0; b < 2; b += 1) {
+      var owner = b === 0 ? 'player' : 'enemy';
+      var equipment = game[owner] && game[owner].equipment;
+      if (!equipment) continue;
+      for (var s = 0; s < EQUIP_SLOTS.length; s += 1) {
+        var slot = EQUIP_SLOTS[s];
+        if (equipment[slot] && equipment[slot].id === id) {
+          return { zone: 'equipment', actor: owner, slot: slot };
+        }
+      }
+    }
+    return null;
+  }
+
+  // 把牌从 from 区域移出并返回实体牌; 不在该区域返回 null。
+  // card 传 null 且 from 为 deck 时取牌堆顶 (等价旧 deck.pop())。
+  // 纯移动: 装备失去时机等副作用仍由调用方触发。
+  function takeCard(game, cardOrId, from) {
+    if (!from) return null;
+    if (from.zone === 'equipment') {
+      var state = game[from.actor];
+      var held = state && state.equipment ? state.equipment[from.slot] : null;
+      if (!held) return null;
+      if (cardOrId !== null && held.id !== cardIdOf(cardOrId)) return null;
+      state.equipment[from.slot] = null;
+      return held;
+    }
+    var list = zoneArrayOf(game, from);
+    if (!list || list.length === 0) return null;
+    if (cardOrId === null) {
+      if (from.zone !== 'deck') return null;
+      return from.position === 'bottom' ? list.shift() : list.pop();
+    }
+    var id = cardIdOf(cardOrId);
+    for (var i = 0; i < list.length; i += 1) {
+      if (list[i].id === id) return list.splice(i, 1)[0];
+    }
+    return null;
+  }
+
+  // 把实体牌放入 to 区域并返回它。虚拟牌禁止入区 (组成它的实体牌才可移动)。
+  function putCard(game, card, to) {
+    if (!card || !to) return null;
+    if (card.virtual) throw new Error('putCard: 虚拟牌不能进入区域 (' + card.id + ')');
+    if (to.zone === 'equipment') {
+      game[to.actor].equipment[to.slot] = card;
+      return card;
+    }
+    var list = zoneArrayOf(game, to);
+    if (!list) return null;
+    if (to.zone === 'hand' && typeof to.index === 'number') {
+      list.splice(to.index, 0, card);
+    } else if ((to.zone === 'deck' || to.zone === 'judgeArea') && to.position === 'bottom') {
+      list.unshift(card);
+    } else {
+      list.push(card);
+    }
+    return card;
+  }
+
+  // moveCard(game, card, from, to): 单一受控的区域间移动。
+  // from 传 null 时自动定位 (牌必须在某个区域, 在途牌应直接 putCard)。
+  function moveCard(game, cardOrId, from, to) {
+    var origin = from || findCardZone(game, cardOrId);
+    var card = takeCard(game, cardOrId, origin);
+    if (!card) return null;
+    return putCard(game, card, to);
+  }
+
   export const CardRuntime = {
     makeTestCard: makeTestCard,
     makeCard: makeCard,
@@ -92,5 +210,9 @@
     isShaType: isShaType,
     isShaCard: isShaCard,
     isNormalTrickCard: isNormalTrickCard,
-    physicalCardOf: physicalCardOf
+    physicalCardOf: physicalCardOf,
+    findCardZone: findCardZone,
+    takeCard: takeCard,
+    putCard: putCard,
+    moveCard: moveCard
   };
