@@ -151,6 +151,12 @@
           return triggerGanglieDamageAfter(context);
         }
       });
+      // v11 C7 (批次 31): 耀武 (华雄) — 受红色杀伤害后, 来源二选一奖励
+      SkillRuntime.registerSkill(skillRegistry, 'yaowu', {
+        onDamageAfter: function (context) {
+          return triggerYaowuDamageAfter(context);
+        }
+      });
       SkillRuntime.registerSkill(skillRegistry, 'longdan', {
         onCardAs: function (context) {
           return triggerLongdanCardAs(context);
@@ -755,6 +761,66 @@
           return { suspendedForGanglieFire: true };
         }
         return runGanglieJudgement(game, targetActor, sourceActor);
+      }
+
+      // v11 C7 (批次 31): 耀武 (华雄) — 锁定技。gltjk skill cache:
+      //   "当你受到红色【杀】造成的伤害后, 伤害来源选择一项:
+      //    回复 1 点体力, 或摸一张牌。"
+      // 选择权在伤害来源: AI/auto 来源按 受伤→回血 否则→摸牌; 玩家来源
+      // 经 pendingChoice 'yaowu-reward' 面板二选一 (体力满时只能摸牌)。
+      function triggerYaowuDamageAfter(context) {
+        var game = context.game;
+        var targetActor = context.targetActor;
+        var sourceActor = context.sourceActor;
+        var target = game[targetActor];
+        var source = game[sourceActor];
+        if (!target || !sourceActor || !source || !hasSkill(target, 'yaowu') || game.phase === 'gameover') return null;
+        var sourceCard = context.sourceCard;
+        if (!sourceCard || !isShaCard(sourceCard) || sourceCard.color !== 'red') return null;
+        log(game, actorName(game, targetActor) + '的【耀武】被触发，' + actorName(game, sourceActor) + '选择一项奖励。');
+        var pref = (source.skillPreferences && source.skillPreferences.yaowuReward)
+          || (sourceActor === 'player' ? 'ask' : 'auto');
+        if (pref === 'ask') {
+          setPendingChoice(game, {
+            kind: 'yaowu-reward',
+            actor: sourceActor,
+            targetName: actorName(game, targetActor),
+            canRecover: source.hp < source.maxHp
+          });
+          return { suspendedForYaowu: true };
+        }
+        // auto: 受伤 → 回血, 否则 → 摸一张
+        return applyYaowuReward(game, sourceActor, source.hp < source.maxHp ? 'recover' : 'draw');
+      }
+
+      function applyYaowuReward(game, sourceActor, choice) {
+        var source = game[sourceActor];
+        if (!source) return null;
+        if (choice === 'recover' && source.hp < source.maxHp) {
+          source.hp += 1;
+          log(game, actorName(game, sourceActor) + '因【耀武】回复 1 点体力。');
+        } else {
+          log(game, actorName(game, sourceActor) + '因【耀武】摸一张牌。');
+          drawCards(game, sourceActor, 1);
+        }
+        return { yaowuRewarded: true };
+      }
+
+      function resolveYaowuRewardChoice(game, pending, decision) {
+        var sourceActor = pending.actor;
+        var source = game[sourceActor];
+        if (!source) return fail('未知角色。');
+        var choice = decision && decision.choice;
+        if (choice !== 'recover' && choice !== 'draw') {
+          setPendingChoice(game, pending);
+          return fail('请选择 recover 或 draw。');
+        }
+        if (choice === 'recover' && source.hp >= source.maxHp) {
+          setPendingChoice(game, pending);
+          return fail('体力已满，只能选择摸牌。');
+        }
+        applyYaowuReward(game, sourceActor, choice);
+        return success('耀武奖励结算完成。');
       }
 
       function runGanglieJudgement(game, targetActor, sourceActor) {
@@ -2238,6 +2304,8 @@
       registerResponseKind('guohe-1v1-pick', resolveGuohe1v1PickChoice);
       registerResponseKind('dying-rescue', resolveDyingRescueChoice);
       registerResponseKind('luoshen-continue', resolveLuoshenContinueChoice);
+      // v11 C7 (批次 31): 耀武 — 伤害来源的奖励二选一
+      registerResponseKind('yaowu-reward', resolveYaowuRewardChoice);
 
       function resolveGuanxingChoice(game, pending, decision) {
         var actor = pending.actor;

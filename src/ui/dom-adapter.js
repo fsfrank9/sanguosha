@@ -134,6 +134,8 @@
           'wuguPickPanel', 'wuguPickHint', 'wuguPickChoices',
           // v8 hotfix-2: 洛神 (luoshen-continue) 面板 — 准备阶段连续判定决定
           'luoshenPromptPanel', 'luoshenPromptHint', 'luoshenContinueBtn', 'luoshenStopBtn',
+          // v11 C7 (批次 31): 耀武 (yaowu-reward) 面板 — 伤害来源奖励二选一
+          'yaowuRewardPanel', 'yaowuRewardHint', 'yaowuRecoverBtn', 'yaowuDrawBtn',
           // v9 PR-E25/E26: 闪响应面板 — 被【杀】时玩家选用哪张牌当闪 (V4: 万箭/银月复用)
           'shanResponsePanel', 'shanResponseHint', 'shanResponseChoices', 'shanResponseDeclineBtn',
           // v10 V5: 无懈可击 响应面板 — 锦囊 targeting 玩家时弹
@@ -1253,6 +1255,8 @@
         { panelId: 'wuxieResponsePanel',    confirmBtnId: null,                     cancelBtnId: 'wuxieResponseDeclineBtn' },
         { panelId: 'duelResponsePanel',     confirmBtnId: null,                     cancelBtnId: 'duelResponseDeclineBtn' },
         { panelId: 'luoshenPromptPanel',    confirmBtnId: 'luoshenContinueBtn',     cancelBtnId: 'luoshenStopBtn' },
+        // v11 C7 (批次 31): 耀武 — 必选二选一 (无 cancel 语义)
+        { panelId: 'yaowuRewardPanel',      confirmBtnId: null,                     cancelBtnId: null },
         { panelId: 'guanxingModePanel',     confirmBtnId: 'guanxingConfirmBtn',     cancelBtnId: 'guanxingDeclineBtn' },
         { panelId: 'zhihengModePanel',      confirmBtnId: 'zhihengConfirmBtn',      cancelBtnId: 'zhihengCancelBtn' },
         { panelId: 'gangliePromptPanel',    confirmBtnId: 'ganglieFireBtn',         cancelBtnId: 'ganglieDeclineBtn' },

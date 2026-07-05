@@ -474,6 +474,14 @@
           <span class="badge pending-prompt-panel__hint" id="wuguPickHint">五谷丰登：从亮出的牌中选 1 张</span>
           <div class="wugu-pick-choices pending-prompt-panel__choices" id="wuguPickChoices" aria-live="polite"></div>
         </div>
+        <!-- v11 C7 (批次 31): 耀武 — 伤害来源二选一 (回复 1 体力 / 摸一张牌) -->
+        <div class="yaowu-reward-panel pending-prompt-panel" id="yaowuRewardPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="yaowuRewardHint">耀武：选择回复 1 点体力，或摸一张牌</span>
+          <div class="yaowu-actions pending-prompt-panel__actions">
+            <button class="btn small" id="yaowuRecoverBtn">回复 1 点体力</button>
+            <button class="btn small" id="yaowuDrawBtn">摸一张牌</button>
+          </div>
+        </div>
         <div class="luoshen-prompt-panel pending-prompt-panel" id="luoshenPromptPanel" hidden>
           <span class="badge pending-prompt-panel__hint" id="luoshenPromptHint">洛神：是否进行判定？黑色获得入手, 红色结束</span>
           <div class="luoshen-actions pending-prompt-panel__actions">

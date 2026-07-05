@@ -22,7 +22,10 @@
         // v11 C6 (批次 30): 标准包补员 孙尚香
         //   xiaoji   孙尚香  失去装备区牌后摸两张 (挂统一装备失去时机)
         //   jieyin   孙尚香  出牌阶段限一次, 弃两手牌与受伤男性各回复 1
-        'xiaoji', 'jieyin'
+        'xiaoji', 'jieyin',
+        // v11 C7 (批次 31): 华雄 入编 + 新交互 kind 'yaowu-reward'
+        //   yaowu    华雄   锁定技: 受红色杀伤害后, 来源选 回复 1 / 摸一张
+        'yaowu'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,
