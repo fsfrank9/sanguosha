@@ -146,7 +146,9 @@ test('L2: 万箭齐发致伤 → 奸雄获得万箭牌', () => {
 test('L3: 国色方片当乐 → 可被无懈可击抵消 (不再绕过无懈窗口)', () => {
   const game = makeGame('daqiao', 'sunquan');
   game.player.hand = [c('sha', { id: 'dia-sha', suit: 'diamond', color: 'red' })];
-  game.enemy.hand = [c('wuxie', { id: 'foe-wuxie', suit: 'spade', color: 'black' })];
+  // v11 D1 (批次 33): AI 无懈走期望值 — 乐只在手牌有阵容 (>=2) 时才护,
+  // 补一张手牌满足条件, 保持本测试对无懈链的覆盖意图。
+  game.enemy.hand = [c('wuxie', { id: 'foe-wuxie', suit: 'spade', color: 'black' }), c('tao', { id: 'foe-filler' })];
 
   const result = Engine.playCardAs(game, 'player', 'dia-sha', 'lebusishu');
   assert.equal(result.ok, true, result.message);

@@ -33,6 +33,8 @@
     var resolveGuohe1v1 = deps.resolveGuohe1v1;
     var resolveJiedaoDecision = deps.resolveJiedaoDecision;
     var scoreCardForAI = deps.scoreCardForAI;
+    // v11 D1 (批次 33): AI 无懈期望值评估 (ai 域后置装配, 包装注入)
+    var aiShouldUseWuxie = deps.aiShouldUseWuxie;
 
     // v10 V5: 无懈可击 链式响应 框架.
     //   每张锦囊触发 wuxie 检查: 先问 target 是否无懈; 若是, 再问 source 是否反无懈;
@@ -117,6 +119,15 @@
 
       // 非玩家 ask 路径: AI / 默认 auto — 有无懈则自动用
       if (hasWuxie) {
+        // v11 D1 (批次 33): AI 座席不再"有无懈就用" — 期望值为负时保留
+        // (aiShouldUseWuxie, 由 ai 域注入)。玩家默认 auto 座席保持旧行为
+        // (UI 玩家走 ask 路径), 反无懈 (chain.wuxied) 亦保持旧行为。
+        var evHold = responder !== 'player'
+          && aiShouldUseWuxie && !aiShouldUseWuxie(game, responder, chain);
+        if (evHold) {
+          log(game, actorName(game, responder) + '保留【无懈可击】。');
+          return settleWuxieChain(game);
+        }
         consumeWuxie(game, responder, chain.reason);
         chain.wuxied = !chain.wuxied;
         chain.currentResponder = opponent(responder);
