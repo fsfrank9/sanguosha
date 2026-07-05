@@ -28,6 +28,8 @@
     var needsDiscard = deps.needsDiscard;
     var getDiscardCount = deps.getDiscardCount;
     var getHuogongChoice = deps.getHuogongChoice;
+    // v11 C5 (批次 29): 锦囊类转化候选枚举 (与 UI 转化面板同源)
+    var listCardConversions = deps.listCardConversions;
 
     // v8 PR-D1: AI 评估辅助 — non-destructive estimators that count cards
     // a state could play / respond as 杀 or 闪, including card-as conversion
@@ -220,12 +222,16 @@
 
     // 模拟 playCard / playCardAs, 返回 simulated game (post-state) 或 null.
     // null 表示模拟失败 (suspended pendingChoice / 抛异常 / 不合法).
+    // v11 C5 (批次 29): mode 泛化 — 'normal' 走 playCard, 'asSha' 走杀转化
+    // (旧语义), 其余字符串直接作为 asType ('lebusishu' / 'guohe') 走 playCardAs。
     function aiSimulateCardPlay(g, actor, card, mode, options) {
       var clone = aiCloneGame(g);
       try {
         var result;
         if (mode === 'asSha') {
           result = playCardAs(clone, actor, card.id, 'sha');
+        } else if (mode && mode !== 'normal') {
+          result = playCardAs(clone, actor, card.id, mode);
         } else {
           result = playCard(clone, actor, card.id, options || null);
         }
@@ -260,10 +266,19 @@
 
     // 综合分: 启发 + lookahead delta. sim 失败时回退仅启发.
     // v8 PR-D4: 评估改用 threat-aware 版本, 让 AI 考虑下回合对手反击潜力.
+    // v11 C5 (批次 29): 转化模式按"转化后的虚拟牌形状"打启发分 —
+    // 杀/乐不思蜀/过河拆桥 各按其 scoreCardForAI 分支评估。
     function aiScoreCardWithLookahead(g, actor, card, mode) {
-      var heuristic = (mode === 'asSha')
-        ? scoreCardForAI(g, actor, { type: 'sha', family: 'basic', color: card.color })
-        : scoreCardForAI(g, actor, card);
+      var heuristic;
+      if (mode === 'asSha') {
+        heuristic = scoreCardForAI(g, actor, { type: 'sha', family: 'basic', color: card.color });
+      } else if (mode === 'lebusishu') {
+        heuristic = scoreCardForAI(g, actor, { type: 'lebusishu', family: 'delayed', color: card.color });
+      } else if (mode === 'guohe') {
+        heuristic = scoreCardForAI(g, actor, { type: 'guohe', family: 'trick', color: card.color });
+      } else {
+        heuristic = scoreCardForAI(g, actor, card);
+      }
       var preEval = aiEvaluateStateWithThreat(g, actor);
       var sim = aiSimulateCardPlay(g, actor, card, mode);
       if (!sim) return heuristic;
@@ -291,9 +306,22 @@
             if (asScore > 0) candidates.push({ card: card, mode: 'asSha', score: asScore });
           }
         }
+        // v11 C5 (批次 29): 锦囊类转化 (国色 方片→乐 / 奇袭 黑牌→拆)。
+        // 杀转化上面已单独处理; 同型转化 (真拆当拆) 无意义, 跳过。
+        if (listCardConversions) {
+          listCardConversions(game, actor, card).forEach(function (conv) {
+            if (conv.asType === 'sha' || card.type === conv.asType) return;
+            var convScore = aiScoreCardWithLookahead(game, actor, card, conv.asType);
+            if (convScore > 0) {
+              candidates.push({ card: card, mode: 'convert', asType: conv.asType, score: convScore });
+            }
+          });
+        }
       });
       candidates.sort(function (a, b) { return b.score - a.score; });
-      return candidates.length ? { card: candidates[0].card, mode: candidates[0].mode } : null;
+      return candidates.length
+        ? { card: candidates[0].card, mode: candidates[0].mode, asType: candidates[0].asType }
+        : null;
     }
 
     function aiChooseSkillAction(game, actor) {
@@ -408,6 +436,10 @@
         // 武圣 / 龙胆 conversion path: engine routes through playCardAs →
         // playSha so the virtual 杀 is properly resolved.
         cardResult = playCardAs(game, actor, card.id, 'sha');
+      } else if (choice.mode === 'convert') {
+        // v11 C5 (批次 29): 锦囊类转化 (国色/奇袭) — 按 asType 走 playCardAs;
+        // AI 侧 guohe 结算走 resolveGuohe1v1 的 auto 路径, 无需目标参数。
+        cardResult = playCardAs(game, actor, card.id, choice.asType);
       } else {
         var cardOptions;
         if (card.type === 'tiesuo') cardOptions = { mode: 'chain', targets: [opponent(actor)] };
