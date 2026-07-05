@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { assertCardConservation } from './helpers/card-conservation.mjs';
+
+// v11 A1: 所有推进引擎状态的 Engine.* 调用均原地包上 assertCardConservation (全局牌守恒断言)。
 
 function test(name, fn) {
   fn();
@@ -39,7 +42,7 @@ test('Player 夏侯惇 takes damage → pendingChoice ganglie-fire (yes/no promp
   game.phase = 'play';
   game.enemy.hand = [c('sha', { id: 'attack-sha', suit: 'spade', color: 'black' })];
 
-  Engine.playCard(game, 'enemy', 'attack-sha');
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'attack-sha'));
 
   const pending = Engine.getPendingChoice(game);
   assert.ok(pending);
@@ -56,8 +59,8 @@ test('Player 夏侯惇 declines → no judgement, no damage to source', () => {
   game.enemy.hp = game.enemy.maxHp;
   game.deck = [c('sha', { id: 'would-be-judge', suit: 'spade', color: 'black' })];
 
-  Engine.playCard(game, 'enemy', 'attack-sha');
-  Engine.resolvePendingChoice(game, { fire: false });
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'attack-sha'));
+  assertCardConservation(game, () => Engine.resolvePendingChoice(game, { fire: false }));
 
   assert.equal(game.enemy.hp, game.enemy.maxHp, 'source unaffected when 夏侯惇 declines');
   // Judge card untouched in deck (no judgement happened).
@@ -73,7 +76,7 @@ test('skillPreferences.ganglie=decline suppresses 夏侯惇\'s fire prompt entir
   game.phase = 'play';
   game.enemy.hand = [c('sha', { id: 'attack-sha', suit: 'spade', color: 'black' })];
 
-  Engine.playCard(game, 'enemy', 'attack-sha');
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'attack-sha'));
 
   assert.equal(Engine.getPendingChoice(game), null, 'decline pref means no prompt');
   assert.ok(game.log.some(l => /选择不发动【刚烈】/.test(l)));
@@ -91,17 +94,17 @@ test('Player source picks the 2 specific hand cards to discard', () => {
   ];
   game.deck = [c('sha', { id: 'judge-black', suit: 'club', color: 'black' })];
 
-  Engine.playCard(game, 'player', 'attack-sha');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'attack-sha'));
   const pending = Engine.getPendingChoice(game);
   assert.ok(pending);
   assert.equal(pending.kind, 'ganglie-source-choice');
   assert.equal(pending.actor, 'player');
 
   // Player picks 2 specific cards (not the keep-this card).
-  Engine.resolvePendingChoice(game, {
+  assertCardConservation(game, () => Engine.resolvePendingChoice(game, {
     mode: 'discard',
     cardIds: ['discard-this-1', 'discard-this-2']
-  });
+  }));
 
   assert.equal(game.player.hp, game.player.maxHp, 'no damage taken');
   assert.ok(game.player.hand.some(c => c.id === 'keep-this'), 'unselected card stays in hand');
@@ -120,7 +123,7 @@ test('Player source can include equipment in the 2-card discard', () => {
   game.player.equipment.weapon = c('zhuge', { id: 'equip-weapon' });
   game.deck = [c('sha', { id: 'judge-black', suit: 'club', color: 'black' })];
 
-  Engine.playCard(game, 'player', 'attack-sha');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'attack-sha'));
   const pending = Engine.getPendingChoice(game);
   assert.ok(pending);
   // pendingChoice candidates should include hand cards + equipment.
@@ -128,10 +131,10 @@ test('Player source can include equipment in the 2-card discard', () => {
   assert.ok(candidateIds.includes('spare-hand'), 'hand card is a candidate');
   assert.ok(candidateIds.includes('equip-weapon'), 'equipment card is a candidate');
 
-  Engine.resolvePendingChoice(game, {
+  assertCardConservation(game, () => Engine.resolvePendingChoice(game, {
     mode: 'discard',
     cardIds: ['spare-hand', 'equip-weapon']
-  });
+  }));
 
   assert.equal(game.player.equipment.weapon, null, 'equipment slot cleared');
   assert.ok(game.discard.some(c => c.id === 'equip-weapon'), 'equipment card in discard');
@@ -148,8 +151,8 @@ test('Player source can refuse the discard option and take 1 damage instead', ()
   game.deck = [c('sha', { id: 'judge-black', suit: 'club', color: 'black' })];
 
   const hpBefore = game.player.hp;
-  Engine.playCard(game, 'player', 'attack-sha');
-  Engine.resolvePendingChoice(game, { mode: 'takeDamage' });
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'attack-sha'));
+  assertCardConservation(game, () => Engine.resolvePendingChoice(game, { mode: 'takeDamage' }));
 
   assert.equal(game.player.hp, hpBefore - 1, 'player took 1 damage instead of discarding');
   assert.ok(game.player.hand.some(c => c.id === 'precious-1'), 'precious cards kept');
@@ -168,8 +171,8 @@ test('Discard with 1 cardId fails and restores pendingChoice', () => {
   ];
   game.deck = [c('sha', { id: 'judge-black', suit: 'club', color: 'black' })];
 
-  Engine.playCard(game, 'player', 'attack-sha');
-  const r = Engine.resolvePendingChoice(game, { mode: 'discard', cardIds: ['card-a'] });
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'attack-sha'));
+  const r = assertCardConservation(game, () => Engine.resolvePendingChoice(game, { mode: 'discard', cardIds: ['card-a'] }));
   assert.equal(r.ok, false);
   assert.ok(Engine.getPendingChoice(game), 'invalid input must not consume the prompt');
 });
@@ -183,11 +186,11 @@ test('Discard with same cardId twice fails', () => {
   ];
   game.deck = [c('sha', { id: 'judge-black', suit: 'club', color: 'black' })];
 
-  Engine.playCard(game, 'player', 'attack-sha');
-  const r = Engine.resolvePendingChoice(game, {
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'attack-sha'));
+  const r = assertCardConservation(game, () => Engine.resolvePendingChoice(game, {
     mode: 'discard',
     cardIds: ['lone-card', 'lone-card']
-  });
+  }));
   assert.equal(r.ok, false, 'cannot discard same card twice');
   assert.ok(Engine.getPendingChoice(game));
 });
@@ -207,7 +210,7 @@ test('AI 夏侯惇 auto-fires + AI source auto-discards 2 (no pendingChoice)', (
   ];
   game.deck = [c('sha', { id: 'judge-black', suit: 'club', color: 'black' })];
 
-  Engine.playCard(game, 'player', 'attack-sha');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'attack-sha'));
 
   assert.equal(Engine.getPendingChoice(game), null, 'auto path consumes both prompts without suspension');
   assert.equal(game.player.hand.length, 0, 'AI source auto-discarded its remaining 2 cards');

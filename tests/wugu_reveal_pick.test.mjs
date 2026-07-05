@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { assertCardConservation } from './helpers/card-conservation.mjs';
+
+// v11 A1: 所有推进引擎状态的调用均包上 assertCardConservation 全局牌守恒断言
+// (五谷展示池中的在途牌由 helper 深扫 pendingChoice 计入)。
 
 function makeGame() {
   const game = Engine.newGame({ seed: 77, startWithFirstTurn: true });
@@ -34,7 +38,7 @@ test('v7 PR-7 / v8 PR-D2: 1v1 X=2 — auto path 按 scoreCard 挑最高分, 不�
   // X=2 → reveal top 2 = [shan, sha] (pool 顺序: revealed[0]=top=shan, [1]=mid=sha)
   game.deck = [deckCard('bottom', 'tao', '桃'), deckCard('mid', 'sha', '杀'), deckCard('top', 'shan', '闪')];
   dealWugu(game.player, 'wugu-auto');
-  Engine.playCard(game, 'player', 'wugu-auto');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'wugu-auto'));
   // pool = [shan, sha]; player AI 挑 高分 sha (闪 score 0 vs 杀 score >0)
   assert.ok(game.player.hand.some((c) => c.id === 'mid'), 'player AI picked higher-scoring 杀, not deterministic 闪');
   assert.ok(game.enemy.hand.some((c) => c.id === 'top'), 'enemy got remaining 闪');
@@ -46,7 +50,7 @@ test('v7 PR-7: player ask → pendingChoice "wugu-pick" with full pool', () => {
   // default pref = ask for player
   game.deck = [deckCard('a', 'tao', '桃'), deckCard('b', 'sha', '杀')];
   dealWugu(game.player, 'wugu-ask');
-  Engine.playCard(game, 'player', 'wugu-ask');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'wugu-ask'));
   assert.ok(game.pendingChoice);
   assert.equal(game.pendingChoice.kind, 'wugu-pick');
   assert.equal(game.pendingChoice.actor, 'player');
@@ -61,9 +65,9 @@ test('v7 PR-7: resolveWuguPickChoice → 玩家选 cardId, opponent 自动取剩
   const game = makeGame();
   game.deck = [deckCard('rare', 'tao', '桃'), deckCard('cheap', 'shan', '闪')];
   dealWugu(game.player, 'wugu-resolve');
-  Engine.playCard(game, 'player', 'wugu-resolve');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'wugu-resolve'));
   // Pool revealed; player chooses 'rare' (the 桃)
-  const result = Engine.resolvePendingChoice(game, { cardId: 'rare' });
+  const result = assertCardConservation(game, () => Engine.resolvePendingChoice(game, { cardId: 'rare' }));
   assert.equal(result.ok, true);
   assert.ok(game.player.hand.some((c) => c.id === 'rare'));
   assert.ok(game.enemy.hand.some((c) => c.id === 'cheap'));
@@ -74,8 +78,8 @@ test('v7 PR-7: 玩家选了不存在的 cardId → fail，重设 pendingChoice',
   const game = makeGame();
   game.deck = [deckCard('x', 'tao', '桃'), deckCard('y', 'sha', '杀')];
   dealWugu(game.player, 'wugu-bad-id');
-  Engine.playCard(game, 'player', 'wugu-bad-id');
-  const result = Engine.resolvePendingChoice(game, { cardId: 'no-such-id' });
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'wugu-bad-id'));
+  const result = assertCardConservation(game, () => Engine.resolvePendingChoice(game, { cardId: 'no-such-id' }));
   assert.equal(result.ok, false);
   assert.ok(game.pendingChoice, '失败后 pendingChoice 应被重置');
   assert.equal(game.pendingChoice.kind, 'wugu-pick');
@@ -87,7 +91,7 @@ test('v7 PR-7: 牌堆不足 X 张 → 终止使用结算 (spec)', () => {
   game.discard = []; // empty discard so reshuffle can't help
   dealWugu(game.player, 'wugu-empty');
   game.player.skillPreferences.wugu = 'auto';
-  const result = Engine.playCard(game, 'player', 'wugu-empty');
+  const result = assertCardConservation(game, () => Engine.playCard(game, 'player', 'wugu-empty'));
   assert.equal(result.ok, true);
   // wugu was discarded, but no cards distributed
   assert.equal(game.player.hand.length, 0, 'player hand 不变（除了 wugu 自身被消耗）');
@@ -100,7 +104,7 @@ test('v7 PR-7: enemy turn — AI source 完全 auto，无 pause', () => {
   game.turn = 'enemy';
   game.deck = [deckCard('e1', 'tao', '桃'), deckCard('e2', 'sha', '杀')];
   dealWugu(game.enemy, 'wugu-enemy');
-  Engine.playCard(game, 'enemy', 'wugu-enemy');
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'wugu-enemy'));
   assert.equal(game.pendingChoice, null);
   // enemy (source, AI auto) takes 'e2' (top, last popped) wait — let's verify:
   // deck = [e1, e2]; pop() returns last → first pop = e2; second pop = e1.
@@ -115,7 +119,7 @@ test('v7 PR-7: 全 auto 时剩余牌应被弃 (X=3 假设 但 1v1 X=2 不会有�
   game.player.skillPreferences.wugu = 'auto';
   game.deck = [deckCard('a1', 'tao', '桃'), deckCard('a2', 'sha', '杀')];
   dealWugu(game.player, 'wugu-no-leftover');
-  Engine.playCard(game, 'player', 'wugu-no-leftover');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'wugu-no-leftover'));
   // 双方各取 1，无剩余 → 弃牌堆里只有 wugu 自身
   const wuguDiscarded = game.discard.filter((c) => c.id === 'wugu-no-leftover').length;
   const otherDiscarded = game.discard.filter((c) => ['a1', 'a2'].indexOf(c.id) >= 0).length;

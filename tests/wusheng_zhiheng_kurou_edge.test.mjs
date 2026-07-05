@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { assertCardConservation } from './helpers/card-conservation.mjs';
+
+// v11 A1: 所有推进引擎状态的 Engine.* 调用统一包裹 assertCardConservation, 断言全场牌守恒。
 
 function test(name, fn) {
   fn();
@@ -35,7 +38,7 @@ test('苦肉 at hp=1 succeeds (lose 1 → hp=0 → game over, but spec-allowed)'
   // Pad deck so the 2-draw resolves before the game-over branch.
   game.deck = [c('sha', { id: 'kurou-draw-1' }), c('sha', { id: 'kurou-draw-2' })];
 
-  const result = Engine.useSkill(game, 'player', 'kurou');
+  const result = assertCardConservation(game, () => Engine.useSkill(game, 'player', 'kurou'));
 
   assert.equal(result.ok, true, 'spec allows hp=1 苦肉');
   assert.equal(game.player.hp, 0, 'lost 1 HP → 0');
@@ -48,7 +51,7 @@ test('苦肉 at hp>1 still works (legacy path unchanged)', () => {
   const game = buildGame('huanggai', 'caocao');
   game.player.hp = 3;
   game.deck = [c('sha', { id: 'd1' }), c('sha', { id: 'd2' })];
-  const result = Engine.useSkill(game, 'player', 'kurou');
+  const result = assertCardConservation(game, () => Engine.useSkill(game, 'player', 'kurou'));
   assert.equal(result.ok, true);
   assert.equal(game.player.hp, 2);
   assert.equal(game.player.hand.length, 2);
@@ -58,7 +61,7 @@ test('苦肉 at hp>1 still works (legacy path unchanged)', () => {
 test('苦肉 at hp=0 (dead) blocked', () => {
   const game = buildGame('huanggai', 'caocao');
   game.player.hp = 0;
-  const result = Engine.useSkill(game, 'player', 'kurou');
+  const result = assertCardConservation(game, () => Engine.useSkill(game, 'player', 'kurou'));
   assert.equal(result.ok, false);
   assert.match(result.message, /体力不足/);
 });
@@ -72,7 +75,7 @@ test('制衡 can discard equipment cards (spec: 手牌或装备区牌)', () => {
   // Deck for the 2 draws after discarding 2.
   game.deck = [c('shan', { id: 'draw-1' }), c('shan', { id: 'draw-2' })];
 
-  const result = Engine.useSkill(game, 'player', 'zhiheng', ['equip-zhuge', 'hand-sha']);
+  const result = assertCardConservation(game, () => Engine.useSkill(game, 'player', 'zhiheng', ['equip-zhuge', 'hand-sha']));
 
   assert.equal(result.ok, true, 'equipment + hand mix should be accepted');
   assert.equal(game.player.equipment.weapon, null, 'equipment slot cleared');
@@ -86,7 +89,7 @@ test('制衡 with only hand cards still works', () => {
   const game = buildGame('sunquan', 'caocao');
   game.player.hand = [c('sha', { id: 'h1' }), c('sha', { id: 'h2' })];
   game.deck = [c('shan', { id: 'd1' }), c('shan', { id: 'd2' })];
-  const result = Engine.useSkill(game, 'player', 'zhiheng', ['h1', 'h2']);
+  const result = assertCardConservation(game, () => Engine.useSkill(game, 'player', 'zhiheng', ['h1', 'h2']));
   assert.equal(result.ok, true);
   assert.equal(game.player.hand.length, 2);
 });
@@ -95,7 +98,7 @@ test('制衡 with bogus card id rejected (not in hand or equipment)', () => {
   const game = buildGame('sunquan', 'caocao');
   game.player.hand = [c('sha', { id: 'real' })];
   game.deck = [c('shan', { id: 'd1' })];
-  const result = Engine.useSkill(game, 'player', 'zhiheng', ['nonexistent']);
+  const result = assertCardConservation(game, () => Engine.useSkill(game, 'player', 'zhiheng', ['nonexistent']));
   assert.equal(result.ok, false, 'no valid cards → fail');
 });
 
@@ -112,7 +115,7 @@ test('武圣 response: scans hand AND equipment for red cards (heart-suit weapon
   game.phase = 'play';
   game.player.hp = game.player.maxHp;
 
-  Engine.playCard(game, 'enemy', 'attack-sha');
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'attack-sha'));
 
   // 武圣 should respond with the red weapon as a 闪 — wait, response to 杀
   // needs 闪, not sha. Let me reconsider.
@@ -135,7 +138,7 @@ test('武圣 play-phase: 关羽 卸下红色武器当 杀 使用，命中并清�
   assert.equal(can.ok, true, 'canPlayCardAs should accept equipment red card');
 
   const hpBefore = game.enemy.hp;
-  const result = Engine.playCardAs(game, 'player', 'red-weapon', 'sha');
+  const result = assertCardConservation(game, () => Engine.playCardAs(game, 'player', 'red-weapon', 'sha'));
   assert.equal(result.ok, true, result.message);
   assert.equal(game.player.equipment.weapon, null, 'equipment slot cleared after conversion');
   assert.equal(game.enemy.hp, hpBefore - 1, 'sha hit for 1 damage');
@@ -158,7 +161,7 @@ test('武圣 关羽 juedou response: pulls a red equipment weapon when no red ha
   game.player.hp = game.player.maxHp;
   game.enemy.hp = game.enemy.maxHp;
 
-  Engine.playCard(game, 'player', 'juedou-card');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'juedou-card'));
 
   // After juedou: 关羽 should have responded with the equipment-as-sha.
   // Outcome: guanyu has no more sha after first reply → caocao wins juedou? No, juedou alternates;

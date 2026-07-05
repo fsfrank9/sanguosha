@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { assertCardConservation } from './helpers/card-conservation.mjs';
+
+// v11 A1: 所有推进引擎状态的调用均包上 assertCardConservation (全局牌守恒断言)。
 
 function makeGame() {
   const game = Engine.newGame({ seed: 91, startWithFirstTurn: true });
@@ -21,7 +24,7 @@ test('v7 PR-14: 丈八蛇矛 使用 path 已实现 (Engine.playZhangbaSha 旧路
     { id: 'h2', type: 'shan', name: '闪', suit: 'heart', color: 'red' }
   ];
   const hpBefore = game.enemy.hp;
-  const result = Engine.playZhangbaSha(game, 'player', ['h1', 'h2']);
+  const result = assertCardConservation(game, () => Engine.playZhangbaSha(game, 'player', ['h1', 'h2']));
   assert.equal(result.ok, true);
   assert.equal(game.enemy.hp, hpBefore - 1, '丈八虚拟杀命中（enemy 无闪）');
   // H1 修复后: seed 91 的 enemy 是曹操, 【奸雄】获得造成伤害的两张组成实体牌
@@ -44,7 +47,7 @@ test('v7 PR-14: 决斗响应 — 拥有 丈八 + 无杀 + 2 张手牌 → 自动
   ];
   const enemyHpBefore = game.enemy.hp;
   const playerHpBefore = game.player.hp;
-  Engine.playCard(game, 'player', 'duel');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'duel'));
   // 决斗 由 enemy 先响应：无 sha 但 丈八+2手 → 自动弃 2 手当杀响应。
   // 然后轮到 player 响应：player 无 sha，无 丈八 → 不能响应 → 受到 1 点伤害。
   assert.equal(game.player.hp, playerHpBefore - 1, 'player 没杀响应，受到 1 dmg');
@@ -66,7 +69,7 @@ test('v7 PR-14: 决斗响应 — 拥有 丈八 + 只 1 张手牌 → 无法响�
     { id: 'duel-vs-1', type: 'juedou', name: '决斗', family: 'trick', suit: 'spade', color: 'black' }
   ];
   const enemyHpBefore = game.enemy.hp;
-  Engine.playCard(game, 'player', 'duel-vs-1');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'duel-vs-1'));
   assert.equal(game.enemy.hp, enemyHpBefore - 1, 'enemy 只 1 手牌 → 丈八无法响应 → 受 1 dmg');
   // 那张手牌还在
   assert.ok(game.enemy.hand.some((c) => c.id === 'only-1'));
@@ -83,7 +86,7 @@ test('v7 PR-14: 决斗响应 — 拥有 丈八 + 真 sha → 优先用真 sha', 
   game.player.hand = [
     { id: 'duel-priority', type: 'juedou', name: '决斗', family: 'trick', suit: 'spade', color: 'black' }
   ];
-  Engine.playCard(game, 'player', 'duel-priority');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'duel-priority'));
   // enemy 用真 sha 响应; player 无 sha → 受 1 dmg
   assert.ok(game.discard.some((c) => c.id === 'real-sha'), '真 sha 被使用');
   assert.ok(game.enemy.hand.some((c) => c.id === 'tao-keep'), '桃 仍保留');
@@ -102,7 +105,7 @@ test('v7 PR-14: skillPreferences.zhangba="decline" → 不走丈八响应路径'
     { id: 'duel-decline', type: 'juedou', name: '决斗', family: 'trick', suit: 'spade', color: 'black' }
   ];
   const enemyHpBefore = game.enemy.hp;
-  Engine.playCard(game, 'player', 'duel-decline');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'duel-decline'));
   assert.equal(game.enemy.hp, enemyHpBefore - 1, 'decline → 不响应 → 受 1 dmg');
   assert.ok(game.enemy.hand.some((c) => c.id === 'keep-1'), '手牌保留');
   assert.ok(game.enemy.hand.some((c) => c.id === 'keep-2'), '手牌保留');
@@ -119,7 +122,7 @@ test('v7 PR-14: 南蛮入侵响应 — 丈八 同样可用 (需要打出杀响�
     { id: 'nm', type: 'nanman', name: '南蛮入侵', family: 'trick', suit: 'spade', color: 'black' }
   ];
   const enemyHpBefore = game.enemy.hp;
-  Engine.playCard(game, 'player', 'nm');
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'nm'));
   assert.equal(game.enemy.hp, enemyHpBefore, '南蛮被丈八响应成功 → 无伤');
   assert.equal(game.enemy.hand.length, 0, '2 张手牌被弃');
 });
