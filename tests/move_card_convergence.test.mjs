@@ -73,8 +73,10 @@ test('game-engine 绑定了 CardRuntime 的四个牌移动原语', () => {
 });
 
 test('UI 层不直接操作牌区域', () => {
-  const uiSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
-  assert.doesNotMatch(uiSource, RAW_MUTATION, 'dom-adapter 不应裸操作 hand/deck/discard/judgeArea/equipment');
+  // v11 B2: dom-adapter 面板逐步拆往 src/ui/panels/, 一并纳入守护。
+  const uiSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+    + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8');
+  assert.doesNotMatch(uiSource, RAW_MUTATION, 'UI 层不应裸操作 hand/deck/discard/judgeArea/equipment');
 });
 
 for (const [name, fn] of tests) {

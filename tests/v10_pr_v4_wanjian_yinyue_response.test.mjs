@@ -10,7 +10,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
 // v11 B1: 银月枪触发/响应已迁往 equipment.js (工厂内缩进 4 空格, 自注册)。
 const equipmentSrc = fs.readFileSync(path.join(root, 'src/engine/equipment.js'), 'utf8');
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v11 B2: 闪/无懈/决斗响应面板已迁往 src/ui/panels/response-panels.js,
+// adapter 源为主文件 + 面板模块拼接 (渲染/文案类断言两处皆可命中)。
+const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8');
 
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }
