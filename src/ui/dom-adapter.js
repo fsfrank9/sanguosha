@@ -1,4 +1,5 @@
       import { SanguoshaEngine } from '../engine/game-engine.js';
+      import { createResponsePanels } from './panels/response-panels.js';
 
       var Engine = SanguoshaEngine;
       var game = null;
@@ -36,6 +37,23 @@
       var playerRole = '主公';
       var enemyRole = '反贼';
       var els = {};
+
+      // v11 B2: 响应类面板装配 — els 为原地填充的稳定引用; render/renderLog/
+      // escapeHtml/suitLabel 为函数声明 (提升); stage 语义 = 原 stagedModalChoice
+      // 赋值 + render (两步化提交仍由 _handConfirm 的 'pending' 分支统一处理)。
+      var responsePanels = createResponsePanels({
+        els: els,
+        Engine: Engine,
+        getGame: function () { return game; },
+        render: function () { render(); },
+        renderLog: function () { renderLog(); },
+        escapeHtml: function (text) { return escapeHtml(text); },
+        suitLabel: function (suit) { return suitLabel(suit); },
+        stage: function (payload, selector) {
+          stagedModalChoice = { kind: 'pending', payload: payload, selector: selector };
+          render();
+        }
+      });
 
       function $(id) {
         return document.getElementById(id);
@@ -963,91 +981,8 @@
             els.luoshenPromptPanel.hidden = true;
           }
         }
-        // v10 V5: 无懈可击 响应 — 锦囊 targeting 玩家时弹. 文案据 chainWuxied 区分:
-        //   false="对方使用【X】，是否打出【无懈】？"
-        //   true="对方对【X】打出【无懈】，是否再【无懈】？"
-        if (els.wuxieResponsePanel) {
-          if (kind === 'wuxie-response' && pending.actor === 'player') {
-            els.wuxieResponsePanel.hidden = false;
-            if (els.wuxieResponseHint) {
-              var wxReason = pending.reason || '锦囊';
-              els.wuxieResponseHint.textContent = pending.chainWuxied
-                ? '对方对' + wxReason + '打出【无懈可击】，是否再【无懈】反制？'
-                : '对方使用' + wxReason + '，是否打出【无懈可击】抵消？';
-            }
-            if (els.wuxieResponseChoices) {
-              var wuxieOpts = pending.options || [];
-              els.wuxieResponseChoices.innerHTML = wuxieOpts.length
-                ? wuxieOpts.map(function (opt) {
-                    var suit = suitLabel(opt.suit);
-                    var rank = opt.rank ? String(opt.rank).toUpperCase() : '';
-                    return '<button class="mini-card wuxie-response-choice" data-wuxie-card-id="'
-                      + escapeHtml(opt.cardId) + '" title="用此【无懈】响应">'
-                      + escapeHtml(opt.name) + ' ' + suit + rank + '</button>';
-                  }).join('')
-                : '<span class="mini-card">无可用的【无懈可击】</span>';
-            }
-          } else {
-            els.wuxieResponsePanel.hidden = true;
-          }
-        }
-        // v10 V6: 决斗 响应 — 对方发起【决斗】, 玩家选用哪张牌当【杀】响应.
-        // 候选含真【杀】 + 龙胆 / 武圣 转化. 不出 → 自己受 1 伤.
-        if (els.duelResponsePanel) {
-          if (kind === 'sha-duel-response' && pending.actor === 'player') {
-            els.duelResponsePanel.hidden = false;
-            if (els.duelResponseHint) {
-              els.duelResponseHint.textContent =
-                '对方对你发起' + (pending.reason || '【决斗】')
-                + '，请选择一张牌当【杀】响应，或不出（受 1 点伤害）。';
-            }
-            if (els.duelResponseChoices) {
-              var duelOpts = pending.options || [];
-              els.duelResponseChoices.innerHTML = duelOpts.length
-                ? duelOpts.map(function (opt) {
-                    var suit = suitLabel(opt.suit);
-                    var rank = opt.rank ? String(opt.rank).toUpperCase() : '';
-                    var prefix = opt.via ? opt.via + '·' : '';
-                    return '<button class="mini-card duel-response-choice" data-duel-card-id="'
-                      + escapeHtml(opt.cardId) + '" title="用此牌当【杀】">'
-                      + escapeHtml(prefix + opt.name) + ' ' + suit + rank + '</button>';
-                  }).join('')
-                : '<span class="mini-card">无可用的【杀】</span>';
-            }
-          } else {
-            els.duelResponsePanel.hidden = true;
-          }
-        }
-        // v9 PR-E25/E26: 闪响应 — 被【杀】攻击时玩家选用哪张牌当【闪】.
-        // v10 V4: 万箭齐发 (wanjian-response) + 银月枪 (yinyue-response) 复用此面板.
-        // 各 kind 通过 pending.sourceName / shaName 决定文案 (V3 用 shaName, V4 用 sourceName).
-        var SHAN_RESPONSE_KINDS = ['shan-response', 'wanjian-response', 'yinyue-response'];
-        if (els.shanResponsePanel) {
-          if (SHAN_RESPONSE_KINDS.indexOf(kind) >= 0 && pending.actor === 'player') {
-            els.shanResponsePanel.hidden = false;
-            if (els.shanResponseHint) {
-              var srcLabel = pending.sourceName || pending.shaName || '杀';
-              var verb = kind === 'yinyue-response' ? '发动' : '使用';
-              els.shanResponseHint.textContent =
-                '对方' + verb + '【' + srcLabel + '】，点选一张牌当【闪】后按下方【确认】，或点【不出【闪】】。';
-            }
-            if (els.shanResponseChoices) {
-              var shanOpts = pending.options || [];
-              els.shanResponseChoices.innerHTML = shanOpts.length
-                ? shanOpts.map(function (opt) {
-                    var suit = suitLabel(opt.suit);
-                    var rank = opt.rank ? String(opt.rank).toUpperCase() : '';
-                    var prefix = opt.via ? opt.via + '·' : '';
-                    return '<button class="mini-card shan-response-choice" data-shan-card-id="'
-                      + escapeHtml(opt.cardId) + '" title="用此牌当【闪】">'
-                      + escapeHtml(prefix + opt.name) + ' ' + suit + rank + '</button>';
-                  }).join('')
-                : '<span class="mini-card">无可用的【闪】</span>';
-            }
-          } else {
-            els.shanResponsePanel.hidden = true;
-          }
-        }
+        // v11 B2: 无懈/决斗/闪族响应面板渲染已迁往 ./panels/response-panels.js。
+        responsePanels.render(kind, pending);
         // v8 PR-A2: 濒死救援 — responder 用 桃/酒 救援（酒仅自救）
         if (els.dyingRescuePanel) {
           if (kind === 'dying-rescue' && pending.actor === 'player') {
@@ -2396,59 +2331,8 @@
           if (!result.ok) renderLog();
           render();
         });
-        // v9 PR-E26: 闪响应 — 候选两步化. 点候选 (真闪/转化牌) 只 stage 高亮,
-        // #handConfirmBtn 才 resolvePendingChoice({cardId}); 不出 → {use:false}.
-        // resolvePendingChoice 后引擎完成【杀】结算, enemyStep 轮询自动续上.
-        if (els.shanResponseChoices) els.shanResponseChoices.addEventListener('click', function (event) {
-          var btn = event.target.closest('[data-shan-card-id]');
-          if (!btn) return;
-          var cardId = btn.getAttribute('data-shan-card-id');
-          stagedModalChoice = {
-            kind: 'pending',
-            payload: { cardId: cardId },
-            selector: '[data-shan-card-id="' + cardId + '"]'
-          };
-          render();
-        });
-        if (els.shanResponseDeclineBtn) els.shanResponseDeclineBtn.addEventListener('click', function () {
-          var result = Engine.resolvePendingChoice(game, { use: false });
-          if (!result.ok) renderLog();
-          render();
-        });
-        // v10 V5: 无懈可击 响应 — 候选两步化, decline 直接 resolve.
-        if (els.wuxieResponseChoices) els.wuxieResponseChoices.addEventListener('click', function (event) {
-          var btn = event.target.closest('[data-wuxie-card-id]');
-          if (!btn) return;
-          var cardId = btn.getAttribute('data-wuxie-card-id');
-          stagedModalChoice = {
-            kind: 'pending',
-            payload: { cardId: cardId },
-            selector: '[data-wuxie-card-id="' + cardId + '"]'
-          };
-          render();
-        });
-        if (els.wuxieResponseDeclineBtn) els.wuxieResponseDeclineBtn.addEventListener('click', function () {
-          var result = Engine.resolvePendingChoice(game, { use: false });
-          if (!result.ok) renderLog();
-          render();
-        });
-        // v10 V6: 决斗 响应 — 候选两步化, decline 直接 resolve {use:false}.
-        if (els.duelResponseChoices) els.duelResponseChoices.addEventListener('click', function (event) {
-          var btn = event.target.closest('[data-duel-card-id]');
-          if (!btn) return;
-          var cardId = btn.getAttribute('data-duel-card-id');
-          stagedModalChoice = {
-            kind: 'pending',
-            payload: { cardId: cardId },
-            selector: '[data-duel-card-id="' + cardId + '"]'
-          };
-          render();
-        });
-        if (els.duelResponseDeclineBtn) els.duelResponseDeclineBtn.addEventListener('click', function () {
-          var result = Engine.resolvePendingChoice(game, { use: false });
-          if (!result.ok) renderLog();
-          render();
-        });
+        // v11 B2: 闪/无懈/决斗响应面板事件绑定已迁往 ./panels/response-panels.js。
+        responsePanels.bind();
         // v9 PR-E9: 选将网格 — card click → 设当前 pick side 的 hero.
         // (tab 在非当前 side 时 hidden, 不可点; 不再绑 click.)
         if (els.heroPickGrid) els.heroPickGrid.addEventListener('click', function (event) {

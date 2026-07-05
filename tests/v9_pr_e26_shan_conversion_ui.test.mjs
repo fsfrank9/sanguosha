@@ -5,7 +5,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v11 B2: 闪/无懈/决斗响应面板已迁往 src/ui/panels/response-panels.js,
+// adapter 源为主文件 + 面板模块拼接 (渲染/文案类断言两处皆可命中)。
+const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8');
 const engine = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
 
 const tests = [];
@@ -42,7 +45,8 @@ test('v9 PR-E26: renderPendingChoice 渲染 shanResponseChoices 候选 (data-sha
 test('v9 PR-E26: shanResponseChoices click → stage (kind:pending, payload.cardId)', () => {
   const win = adapter.match(/els\.shanResponseChoices\.addEventListener\('click',[\s\S]{0,400}/);
   assert.ok(win);
-  assert.match(win[0], /stagedModalChoice\s*=\s*\{[\s\S]*?kind:\s*'pending'/);
+  // v11 B2: 面板模块内经注入的 stage() 提交 (语义同 stagedModalChoice 赋值)。
+  assert.match(win[0], /stage\(\{\s*cardId:\s*cardId\s*\}/);
   assert.match(win[0], /data-shan-card-id/);
 });
 

@@ -9,7 +9,10 @@ import { loadAllStyles } from './helpers/load-styles.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const css = loadAllStyles();
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v11 B2: 闪/无懈/决斗响应面板已迁往 src/ui/panels/response-panels.js,
+// adapter 源为主文件 + 面板模块拼接 (渲染/文案类断言两处皆可命中)。
+const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8');
 const engine = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
 
 const tests = [];
@@ -77,8 +80,9 @@ test('v9 PR-E25: renderPendingChoice 处理 shan-response kind (v10 V4: 走 SHAN
 
 test('v9 PR-E25/E26: shanResponseChoices click → stage; DeclineBtn → resolvePendingChoice({use:false})', () => {
   // v9 PR-E26: 候选两步化 — 点候选 stage, 不出按钮直接 decline.
-  assert.match(adapter, /shanResponseChoices\.addEventListener\([\s\S]{0,300}stagedModalChoice\s*=\s*\{[\s\S]{0,160}kind:\s*'pending'/);
-  assert.match(adapter, /shanResponseDeclineBtn\.addEventListener[\s\S]{0,160}resolvePendingChoice\(game,\s*\{\s*use:\s*false\s*\}/);
+  // v11 B2: 面板模块内点候选经注入的 stage() 提交 (语义同 stagedModalChoice 赋值)。
+  assert.match(adapter, /shanResponseChoices\.addEventListener\([\s\S]{0,300}stage\(\{\s*cardId:\s*cardId\s*\}/);
+  assert.match(adapter, /shanResponseDeclineBtn\.addEventListener[\s\S]{0,160}resolvePendingChoice\(getGame\(\),\s*\{\s*use:\s*false\s*\}/);
 });
 
 test('v9 PR-E25: enemyStep 有 pendingChoice 时暂停轮询 (不推进 AI)', () => {

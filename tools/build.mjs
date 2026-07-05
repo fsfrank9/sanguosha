@@ -25,6 +25,7 @@ const REQUIRED_FILES = [
   'src/engine/ai.js',
   'src/engine/game-engine.js',
   'src/ui/dom-adapter.js',
+  'src/ui/panels/response-panels.js',
 ];
 
 const MODULE_ENTRY_REQUIREMENTS = [
