@@ -20,7 +20,16 @@
     zhuque:  { zhuqueShaToFire: true },
     // v8 PR-B4: 银月枪 — 回合外用/打出黑色手牌时, 可令攻击范围内一名角色
     // 选打闪或受 1 dmg (marker; 实际在 consumeResponse / consumeWuxie 内)
-    yinyue:  { yinyueOutOfTurnBlackHit: true }
+    yinyue:  { yinyueOutOfTurnBlackHit: true },
+    // v11 E1 (批次 35): 装备副作用 handler 收口 — 引擎规则文件不再出现
+    // 裸 `.type === 'xxx'` 装备判断, 一律经此注册表查 flag; 复杂伤害修正
+    // (藤甲/古锭/白银/寒冰) 的 handler 本体收进 equipment.js 的
+    // EQUIPMENT_DAMAGE_MODIFIERS 有序表。
+    bagua:   { baguaShanJudge: true },
+    guanshi: { guanshiForceHit: true },
+    qinglong:{ qinglongChase: true },
+    fangtian:{ fangtianLastHandBonus: true },
+    zhangba: { zhangbaTwoHandSha: true }
   };
 
   function equipmentSlots(state) {

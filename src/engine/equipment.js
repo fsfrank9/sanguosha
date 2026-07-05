@@ -150,6 +150,79 @@
       return success('麒麟弓结算完成。');
     }
 
+    // ==================================================================
+    // v11 E1 (批次 35): 装备伤害修正 handler 收口 — 藤甲/古锭/白银/寒冰
+    // 从 damage() 的内联块整体迁入, 按固定顺序执行 (顺序即 spec 互动语义:
+    // 藤甲 火+1/防止 → 古锭 无手牌+1 → 白银 clamp 到 1 → 寒冰 弃两张防止)。
+    // handler 契约: (game, ctx) → null | { amount } | { prevented: true };
+    // ctx = { targetActor, sourceActor, reason, sourceCard, amount, nature,
+    // ignoreArmor }。prevented 的来源牌弃置由调用方 (damage) 统一收尾。
+    // ==================================================================
+
+    function applyTengjiaModifier(game, ctx) {
+      var target = game[ctx.targetActor];
+      var armor = target && target.equipment && target.equipment.armor;
+      if (!armor || ctx.ignoreArmor || armor.type !== 'tengjia') return null;
+      if (ctx.nature === 'fire') {
+        log(game, actorName(game, ctx.targetActor) + '的【藤甲】令火焰伤害 +1。');
+        return { amount: ctx.amount + 1 };
+      }
+      if ((ctx.sourceCard && ctx.sourceCard.type === 'sha') || /南蛮入侵|万箭齐发/.test(ctx.reason || '')) {
+        log(game, actorName(game, ctx.targetActor) + '的【藤甲】防止了这次伤害。');
+        return { prevented: true };
+      }
+      return null;
+    }
+
+    // v8 PR-B2: 古锭刀 — "锁定技, 每当你使用【杀】对目标角色造成伤害时,
+    // 若其没有手牌, 你令伤害值+1"。时机=藤甲之后、白银之前 (白银仍能把
+    // 2 点 clamp 回 1 点, 符合两件装备同时生效的 spec 互动)。
+    function applyGudingModifier(game, ctx) {
+      if (!ctx.sourceActor || !ctx.sourceCard || !CardRuntime.isShaCard(ctx.sourceCard) || ctx.amount <= 0) return null;
+      var source = game[ctx.sourceActor];
+      var target = game[ctx.targetActor];
+      var weapon = source && source.equipment && source.equipment.weapon;
+      if (!weapon || weapon.type !== 'guding') return null;
+      if (target && (target.hand || []).length === 0) {
+        log(game, actorName(game, ctx.sourceActor) + '的【古锭刀】令' + actorName(game, ctx.targetActor) + '无手牌伤害 +1。');
+        return { amount: ctx.amount + 1 };
+      }
+      return null;
+    }
+
+    function applyBaiyinModifier(game, ctx) {
+      var target = game[ctx.targetActor];
+      var armor = target && target.equipment && target.equipment.armor;
+      if (!armor || ctx.ignoreArmor || armor.type !== 'baiyin' || ctx.amount <= 1) return null;
+      log(game, actorName(game, ctx.targetActor) + '的【白银狮子】将伤害防止至 1 点。');
+      return { amount: 1 };
+    }
+
+    // v8 PR-B1: 寒冰剑 — "每当你使用【杀】对目标角色造成伤害时, 若其有牌,
+    // 你可以防止此伤害, 依次弃置其两张牌"。时机=hp 扣减前、白银之后。
+    function applyHanbingModifier(game, ctx) {
+      if (ctx.amount <= 0 || !ctx.sourceActor || !ctx.sourceCard || !CardRuntime.isShaCard(ctx.sourceCard)) return null;
+      var hbResult = applyHanbingPrevent(game, ctx.sourceActor, ctx.targetActor);
+      if (hbResult && hbResult.prevented) return { prevented: true };
+      return null;
+    }
+
+    var EQUIPMENT_DAMAGE_MODIFIERS = [
+      { name: 'tengjia', apply: applyTengjiaModifier },
+      { name: 'guding', apply: applyGudingModifier },
+      { name: 'baiyin', apply: applyBaiyinModifier },
+      { name: 'hanbing', apply: applyHanbingModifier }
+    ];
+
+    function applyEquipmentDamageModifiers(game, ctx) {
+      for (var i = 0; i < EQUIPMENT_DAMAGE_MODIFIERS.length; i += 1) {
+        var result = EQUIPMENT_DAMAGE_MODIFIERS[i].apply(game, ctx);
+        if (result && result.prevented) return { prevented: true, amount: ctx.amount };
+        if (result && typeof result.amount === 'number') ctx.amount = result.amount;
+      }
+      return { prevented: false, amount: ctx.amount };
+    }
+
     // v8 PR-B1: 寒冰剑 — 由 damage() 在 hp 扣减前调用。源装寒冰且
     // sourceCard 是杀类时尝试触发。skillPreferences.hanbing:
     //   'auto'  (默认): 触发 → 按 装备 > 判定 > 手牌优先级弃 2 张, 防止伤害
@@ -393,6 +466,7 @@
       applyQilinDiscard: applyQilinDiscard,
       resolveQilinPickChoice: resolveQilinPickChoice,
       applyHanbingPrevent: applyHanbingPrevent,
+      applyEquipmentDamageModifiers: applyEquipmentDamageModifiers,
       applyWeaponHitEffects: applyWeaponHitEffects,
       applyCixiongOnDesignate: applyCixiongOnDesignate,
       fireCixiongTargetChoice: fireCixiongTargetChoice,
