@@ -44,7 +44,10 @@
         findPlayerCard: function (cardId) { return findPlayerCard(cardId); },
         getStaged: function () { return stagedModalChoice; },
         setStaged: function (value) { stagedModalChoice = value; },
-        highlightStaged: function (el) { return _highlightStaged(el); }
+        highlightStaged: function (el) { return _highlightStaged(el); },
+        // v11 C4 (批次 28): 转化面板"按原牌"分支回接主 adapter 的常规出牌
+        // 路由 (B2 迁出时漏注入, 由 C4 面板行为测试暴露)。
+        resolveNormalPlayerCard: function (cardId) { return resolveNormalPlayerCard(cardId); }
       });
       var showTiesuoPanel = modePanels.showTiesuoPanel;
       var hideTiesuoPanel = modePanels.hideTiesuoPanel;
@@ -107,7 +110,7 @@
           'tiesuoChainBothBtn', 'tiesuoCancelBtn', 'targetZonePanel', 'targetHandBtn',
           'targetEquipmentBtn', 'targetJudgeBtn', 'targetCancelBtn', 'targetCardChoices', 'huogongModePanel',
           'huogongRevealText', 'huogongCostChoices', 'huogongDeclineBtn', 'huogongCancelBtn', 'conversionModePanel',
-          'conversionHint', 'conversionNormalBtn', 'conversionShaBtn', 'conversionCancelBtn', 'guanxingModePanel',
+          'conversionHint', 'conversionNormalBtn', 'conversionShaBtn', 'conversionExtraChoices', 'conversionCancelBtn', 'guanxingModePanel',
           'guanxingHint', 'guanxingUnassigned', 'guanxingTopZone', 'guanxingBottomZone',
           'guanxingTopBtn', 'guanxingBottomBtn', 'guanxingReturnBtn', 'guanxingConfirmBtn', 'guanxingDeclineBtn',
           'zhihengModePanel',
@@ -319,10 +322,22 @@
 
       function playerCardAction(card) {
         var normal = Engine.canPlayCard(game, 'player', card);
-        var asSha = Engine.canPlayCardAs(game, 'player', card, 'sha');
-        if (normal.ok && asSha.ok) return { mode: 'choice', playable: { ok: true, message: '可按原牌使用，也可当【杀】使用。' }, normal: normal, asSha: asSha };
+        // v11 C4 (批次 28): 转化候选泛化 — 杀/乐不思蜀/过河拆桥 统一探测,
+        // 面板据 conversions 动态列按钮; 唯一候选时直接按该 asType 转化。
+        var conversions = Engine.listCardConversions(game, 'player', card);
+        if (normal.ok && conversions.length) {
+          return { mode: 'choice', playable: { ok: true, message: '可按原牌使用，也可发动技能转化使用。' }, normal: normal, conversions: conversions };
+        }
         if (normal.ok) return { mode: 'normal', playable: normal };
-        if (asSha.ok) return { mode: 'asSha', playable: asSha };
+        if (conversions.length === 1 && conversions[0].asType === 'sha') {
+          return { mode: 'asSha', playable: conversions[0].playable };
+        }
+        if (conversions.length === 1) {
+          return { mode: 'convert', playable: conversions[0].playable, asType: conversions[0].asType };
+        }
+        if (conversions.length > 1) {
+          return { mode: 'choice', playable: { ok: true, message: '选择要发动的转化技能。' }, conversions: conversions };
+        }
         return { mode: 'blocked', playable: normal };
       }
 
@@ -836,7 +851,9 @@
           render();
           return;
         }
-        if (action && action.mode === 'asSha') {
+        if (action && (action.mode === 'asSha' || action.mode === 'convert')) {
+          // v11 C4 (批次 28): 原牌不可用 + 唯一转化候选 → 直接按该 asType
+          // 转化 (asSha 为杀专用旧模式, convert 为锦囊类泛化模式)。
           hideTiesuoPanel();
           hideTargetZonePanel();
           hideHuogongPanel();
@@ -844,7 +861,9 @@
           hideConversionPanel();
           var enemyHpBefore = game.enemy.hp;
           var playerHpBefore = game.player.hp;
-          var result = Engine.playCardAs(game, 'player', cardId, 'sha');
+          var result = action.mode === 'asSha'
+            ? Engine.playCardAs(game, 'player', cardId, 'sha')
+            : Engine.playCardAs(game, 'player', cardId, action.asType);
           if (!result.ok) {
             game.log.push(result.message);
           }

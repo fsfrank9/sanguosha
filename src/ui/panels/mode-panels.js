@@ -13,6 +13,9 @@
     var getStaged = ctx.getStaged;
     var setStaged = ctx.setStaged;
     var _highlightStaged = ctx.highlightStaged;
+    // v11 C4 (批次 28): B2 迁出时漏注入 — 转化面板"按原牌"分支需要回到
+    // 主 adapter 的常规出牌路由 (火攻/铁索等特殊牌照常弹各自面板)。
+    var resolveNormalPlayerCard = ctx.resolveNormalPlayerCard;
 
     var pendingTiesuoCardId = null;
     var pendingTargetCardId = null;
@@ -71,9 +74,25 @@
       var game = getGame();
       pendingConversionCardId = cardId;
       var card = findPlayerCard(cardId);
+      // v11 C4 (批次 28): 转化候选泛化 — 面板动态列出这张牌的全部可用转化:
+      // 杀按钮按候选显隐, 锦囊类转化 (国色 方片→乐 / 奇袭 黑牌→拆) 动态成钮。
+      var conversions = (game && card && Engine.listCardConversions)
+        ? Engine.listCardConversions(game, 'player', card) : [];
+      var hasSha = conversions.some(function (conv) { return conv.asType === 'sha'; });
+      var extras = conversions.filter(function (conv) { return conv.asType !== 'sha'; });
+      if (els.conversionShaBtn) els.conversionShaBtn.hidden = !hasSha;
+      if (els.conversionExtraChoices) {
+        els.conversionExtraChoices.innerHTML = extras.map(function (conv) {
+          return '<button class="btn small" data-conversion-as="' + escapeHtml(conv.asType) + '">当【'
+            + escapeHtml(conv.asName) + '】使用（' + escapeHtml(conv.skillName || '技能') + '）</button>';
+        }).join('');
+      }
+      var optionNames = conversions.map(function (conv) { return '【' + conv.asName + '】'; }).join('、');
       if (els.conversionModePanel) els.conversionModePanel.hidden = false;
-      if (els.conversionHint) els.conversionHint.textContent = card ? '【' + card.name + '】可按原牌使用，也可当【杀】使用' : '这张牌可按原牌使用，也可当【杀】使用';
-      if (els.handHint) els.handHint.textContent = '请选择：按原牌使用，或发动技能当【杀】使用';
+      if (els.conversionHint) els.conversionHint.textContent = card
+        ? '【' + card.name + '】可按原牌使用，也可当' + (optionNames || '【杀】') + '使用'
+        : '这张牌可按原牌使用，也可当【杀】使用';
+      if (els.handHint) els.handHint.textContent = '请选择：按原牌使用，或发动技能转化使用';
     }
 
     function hideConversionPanel() {
@@ -82,6 +101,8 @@
       // v10 V8: 与 hideTargetZonePanel / hideHuogongPanel 对称, 清掉 staged.
       if (getStaged() && getStaged().kind === 'conversion') setStaged(null);
       if (els.conversionModePanel) els.conversionModePanel.hidden = true;
+      if (els.conversionShaBtn) els.conversionShaBtn.hidden = false;
+      if (els.conversionExtraChoices) els.conversionExtraChoices.innerHTML = '';
       if (els.conversionHint) els.conversionHint.textContent = '这张牌可按原牌使用，也可当【杀】使用';
     }
 
@@ -276,6 +297,9 @@
       render();
     }
 
+    // v11 C4 (批次 28): asSha 形参泛化为转化载体 (沿用 v10 V8 staged 字段名
+    // 保持 stage-then-confirm 守护不变) — false = 按原牌; true = 'sha'
+    // (旧语义); 字符串 = 直接指定 asType ('lebusishu' / 'guohe')。
     function resolveConversion(asSha) {
       var game = getGame();
       if (!pendingConversionCardId || !game) return;
@@ -285,9 +309,10 @@
         resolveNormalPlayerCard(cardId);
         return;
       }
+      var asType = asSha === true ? 'sha' : asSha;
       var enemyHpBefore = game.enemy.hp;
       var playerHpBefore = game.player.hp;
-      var result = Engine.playCardAs(game, 'player', cardId, 'sha');
+      var result = Engine.playCardAs(game, 'player', cardId, asType);
       hideConversionPanel();
       if (!result.ok) game.log.push(result.message);
       if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
@@ -369,6 +394,15 @@
       if (els.conversionShaBtn) els.conversionShaBtn.addEventListener('click', function () {
         setStaged({ kind: 'conversion', asSha: true });
         _highlightStaged(els.conversionShaBtn);
+        render();
+      });
+      // v11 C4 (批次 28): 锦囊类转化按钮 (动态生成) — staged.asSha 复用为
+      // asType 字符串载体 ('lebusishu' / 'guohe'), 同走 stage-then-confirm。
+      if (els.conversionExtraChoices) els.conversionExtraChoices.addEventListener('click', function (event) {
+        var choice = event.target.closest('[data-conversion-as]');
+        if (!choice) return;
+        setStaged({ kind: 'conversion', asSha: choice.getAttribute('data-conversion-as') });
+        _highlightStaged(choice);
         render();
       });
       if (els.conversionCancelBtn) els.conversionCancelBtn.addEventListener('click', function () { hideConversionPanel(); render(); });

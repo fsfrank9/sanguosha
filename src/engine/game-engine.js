@@ -3800,6 +3800,27 @@
         };
       }
 
+      // v11 C4 (批次 28): 枚举一张牌当前可用的主动转化 (proactive card-as)。
+      // UI 转化面板据此动态列按钮 — 新增 asType 时只需扩这张表,
+      // 面板与 playerCardAction 无需再改。每项含 asType/asName/skillName/playable。
+      var PROACTIVE_CARD_AS_TYPES = [
+        { asType: 'sha', asName: '杀' },
+        { asType: 'lebusishu', asName: '乐不思蜀' },
+        { asType: 'guohe', asName: '过河拆桥' }
+      ];
+
+      function listCardConversions(game, actor, cardOrId) {
+        var list = [];
+        for (var i = 0; i < PROACTIVE_CARD_AS_TYPES.length; i += 1) {
+          var entry = PROACTIVE_CARD_AS_TYPES[i];
+          var playable = canPlayCardAs(game, actor, cardOrId, entry.asType);
+          if (playable.ok) {
+            list.push({ asType: entry.asType, asName: entry.asName, skillName: playable.skillName, playable: playable });
+          }
+        }
+        return list;
+      }
+
       function getGuanxingPreview(game, actor) {
         var self = game[actor];
         if (!self) return fail('未知角色。');
@@ -3893,6 +3914,7 @@
         playZhangbaSha: playZhangbaSha,
         canPlayCard: canPlayCard,
         canPlayCardAs: canPlayCardAs,
+        listCardConversions: listCardConversions,
         playCard: playCard,
         playCardAs: playCardAs,
         useSkill: useSkill,
