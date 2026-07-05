@@ -66,18 +66,21 @@ test('H2 万箭齐发: 目标八卦无闪, 黑判定 → 八卦失败 → 受 1 
   assert.equal(game.enemy.hp, hp - 1, '八卦黑判定不化解 → 受 1 点伤害');
 });
 
-test('H2 万箭齐发: 目标八卦且有闪 → 优先用闪 (不触发八卦判定)', () => {
+// v11 D2 (批次 34): AI 座席改为八卦优先 (免费闪机会, 判定失败仍可出真闪)。
+// 旧断言 "优先用闪不触发八卦" 随策略翻转 — 黑判定失败后兜底出闪, 结果不变
+// 但判定牌已消耗; 红判定省闪的正向路径见 ai_response_ev.test.mjs。
+test('H2 万箭齐发: AI 目标八卦且有闪 → 先判定, 黑失败后兜底出闪', () => {
   const game = buildGame();
   game.player.hand = [c('wanjian', { id: 'wj-shan' })];
   game.enemy.hand = [c('shan', { id: 'enemy-shan' })];
   game.enemy.equipment.armor = c('bagua', { id: 'bg3' });
-  game.deck = [blackJudge('unused')]; // 即便是黑判定, 也应先用闪化解
+  game.deck = [blackJudge('judged')]; // 黑判定 → 八卦失败 → 真闪兜底
   const hp = game.enemy.hp;
   const r = Engine.playCard(game, 'player', 'wj-shan');
   assert.equal(r.ok, true);
-  assert.equal(game.enemy.hp, hp, '有闪 → 用闪化解 → 不掉血');
+  assert.equal(game.enemy.hp, hp, '八卦失败后用闪化解 → 不掉血');
   assert.ok(game.discard.some((card) => card.id === 'enemy-shan'), '闪已消耗');
-  assert.ok(game.deck.some((card) => card.id === 'unused'), '未进行八卦判定 → 判定牌仍在牌堆');
+  assert.ok(game.discard.some((card) => card.id === 'judged'), '八卦判定牌已消耗');
 });
 
 // --- 南蛮入侵: 八卦不触发 (需【杀】而非【闪】) ---
