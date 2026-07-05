@@ -102,6 +102,47 @@
 
   var EQUIP_SLOTS = ['weapon', 'armor', 'horseMinus', 'horsePlus'];
 
+  // ======================================================================
+  // v11 C2 (批次 26): 统一手牌失去事件 — 在原语层结算。
+  //
+  // takeCard 把牌移出手牌时, 在牌上打一个不可枚举的 _handOrigin 标记 (指向
+  // 原持有者 state; 不可枚举 → JSON 深克隆 / census 深扫都看不到, 不会造成
+  // 循环引用或双重计数)。putCard 落位时结算:
+  //   - 回到同一 state 的手牌 = 在途还原 (火攻同花色不符退回 / 濒死救援
+  //     校验失败退回等路径), 不算失去;
+  //   - 落到其他任何区域 (弃牌堆/对方手牌/装备/判定区/牌堆) = 失去已提交,
+  //     通知引擎注册的 handLossHandler (连营等技能在那里消费)。
+  // 窄签名助手 (removeCardFromHand / removeFirstMatchingCard) 不经 takeCard,
+  // 由 game-engine 在 splice 前调 markHandOrigin 补标记, 保证出口全覆盖。
+  // ======================================================================
+
+  var handLossHandler = null;
+
+  function setHandLossHandler(fn) {
+    handLossHandler = fn;
+  }
+
+  function markHandOrigin(state, card) {
+    if (!state || !card || typeof card !== 'object') return card;
+    Object.defineProperty(card, '_handOrigin', {
+      value: state,
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+    return card;
+  }
+
+  function clearHandOrigin(card) {
+    if (card && card._handOrigin) delete card._handOrigin;
+  }
+
+  function settleHandLoss(game, origin, to) {
+    if (!origin || !handLossHandler) return;
+    if (to.zone === 'hand' && game[to.actor] === origin) return; // 在途还原
+    handLossHandler(game, origin);
+  }
+
   function zoneArrayOf(game, ref) {
     if (!ref) return null;
     if (ref.zone === 'deck') return game.deck;
@@ -168,7 +209,12 @@
     }
     var id = cardIdOf(cardOrId);
     for (var i = 0; i < list.length; i += 1) {
-      if (list[i].id === id) return list.splice(i, 1)[0];
+      if (list[i].id === id) {
+        var taken = list.splice(i, 1)[0];
+        // v11 C2: 手牌出口打在途标记, putCard 落位时结算失去事件。
+        if (from.zone === 'hand') markHandOrigin(game[from.actor], taken);
+        return taken;
+      }
     }
     return null;
   }
@@ -177,8 +223,11 @@
   function putCard(game, card, to) {
     if (!card || !to) return null;
     if (card.virtual) throw new Error('putCard: 虚拟牌不能进入区域 (' + card.id + ')');
+    var origin = card._handOrigin || null;
     if (to.zone === 'equipment') {
       game[to.actor].equipment[to.slot] = card;
+      clearHandOrigin(card);
+      settleHandLoss(game, origin, to);
       return card;
     }
     var list = zoneArrayOf(game, to);
@@ -190,6 +239,8 @@
     } else {
       list.push(card);
     }
+    clearHandOrigin(card);
+    settleHandLoss(game, origin, to);
     return card;
   }
 
@@ -214,5 +265,7 @@
     findCardZone: findCardZone,
     takeCard: takeCard,
     putCard: putCard,
-    moveCard: moveCard
+    moveCard: moveCard,
+    markHandOrigin: markHandOrigin,
+    setHandLossHandler: setHandLossHandler
   };

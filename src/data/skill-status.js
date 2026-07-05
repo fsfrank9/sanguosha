@@ -12,7 +12,10 @@
         // v11 C1 被动技能接入 (批次 25):
         //   wushuang 吕布  杀/决斗需目标连续响应两张 (闪×2 / 杀×2)
         //   jiuyuan  孙权  主公技: 吴势力对濒死的孙权用桃回复量 +1
-        'wushuang', 'jiuyuan'
+        'wushuang', 'jiuyuan',
+        // v11 C2 (批次 26): 统一手牌失去事件 (CardRuntime handLossHandler)
+        //   lianying 陆逊  失去最后一张手牌后摸一张牌
+        'lianying'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,
