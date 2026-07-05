@@ -101,17 +101,8 @@ test('v10 V6: PENDING_MODAL_DISPATCH 注册 duelResponsePanel (confirm=null, can
   assert.match(adapter, /panelId:\s*'duelResponsePanel',\s*confirmBtnId:\s*null,\s*cancelBtnId:\s*'duelResponseDeclineBtn'/);
 });
 
-test('v10 V6: renderPendingChoice 处理 sha-duel-response kind', () => {
-  assert.match(adapter, /kind\s*===\s*'sha-duel-response'[\s\S]{0,400}duelResponsePanel\.hidden\s*=\s*false/);
-  // 候选用 via 前缀显示 (龙胆· / 武圣·)
-  assert.match(adapter, /opt\.via\s*\?\s*opt\.via/);
-  assert.match(adapter, /data-duel-card-id/);
-});
-
-test('v10 V6: duelResponseChoices click → stage; declineBtn → resolvePendingChoice({use:false})', () => {
-  assert.match(adapter, /duelResponseChoices\.addEventListener[\s\S]{0,300}stagedModalChoice\s*=\s*\{[\s\S]{0,200}kind:\s*'pending'/);
-  assert.match(adapter, /duelResponseDeclineBtn\.addEventListener[\s\S]{0,160}resolvePendingChoice\(game,\s*\{\s*use:\s*false\s*\}/);
-});
+// v11 A3: 面板弹出/点选/关闭的接线断言已由 tests/ui_panels_a3_batch1.test.mjs
+// 的 fake-DOM 全链路行为测试取代 (决斗面板: 出杀/不出两条路径)。
 
 test('v10 V6: newGame 开启 shaDuelResponse=ask pref', () => {
   assert.match(adapter, /skillPreferences\.shaDuelResponse\s*=\s*'ask'/);

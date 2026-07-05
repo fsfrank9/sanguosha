@@ -32,9 +32,8 @@ test('v8 PR-A5: els 缓存新增 wuguPickPanel / wuguPickHint / wuguPickChoices'
   assert.match(adapterSource, /'wuguPickPanel',\s*'wuguPickHint',\s*'wuguPickChoices'/);
 });
 
-test('v8 PR-A5: renderPendingChoice 含 wugu-pick 分支 (actor=player)', () => {
-  assert.match(adapterSource, /kind === 'wugu-pick' && pending\.actor === 'player'/);
-});
+// v11 A3: wugu-pick 渲染分支/候选渲染/点选接线断言已由
+// tests/ui_panels_a3_batch1.test.mjs 的 fake-DOM 全链路行为测试取代。
 
 test('v8 PR-A5: wugu-pick 文案区分 source=self vs source=opponent', () => {
   // 应当有 pending.sourceActor === pending.actor 分支判断 "你" vs actorDisplayName
@@ -42,16 +41,6 @@ test('v8 PR-A5: wugu-pick 文案区分 source=self vs source=opponent', () => {
   // 文案应当含 "亮出" + "请挑"
   assert.match(adapterSource, /亮出/);
   assert.match(adapterSource, /请挑/);
-});
-
-test('v8 PR-A5: wugu-pick 渲染 pool 用 promptCardChoice + dataAttrs.wuguCardId', () => {
-  assert.match(adapterSource, /wuguCardId:\s*card\.id/);
-});
-
-test('v8 PR-A5 / v9 PR-E24: wuguPickChoices click → stage (kind:pending, payload.cardId)', () => {
-  // v9 PR-E24: 改两步化 — 点候选只 stage, #handConfirmBtn 才 resolvePendingChoice.
-  assert.match(adapterSource, /wuguPickChoices\.addEventListener\([\s\S]{0,300}data-wugu-card-id/);
-  assert.match(adapterSource, /wuguPickChoices\.addEventListener\([\s\S]{0,400}stagedModalChoice\s*=\s*\{[\s\S]{0,160}cardId:\s*cardId/);
 });
 
 test('v8 PR-A5: wugu 无 decline 按钮（spec：必须挑一张）', () => {
