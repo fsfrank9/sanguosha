@@ -28,6 +28,8 @@
       var takeCard = CardRuntime.takeCard;
       var putCard = CardRuntime.putCard;
       var moveCard = CardRuntime.moveCard;
+      // v11 C2: 窄签名手牌出口 (removeCardFromHand 等) 的在途标记补口
+      var markHandOrigin = CardRuntime.markHandOrigin;
       var actorName = StateRuntime.actorName;
       var opponent = StateRuntime.opponent;
       var hasSkill = StateRuntime.hasSkill;
@@ -386,6 +388,7 @@
       function removeCardFromHand(state, cardId) {
         var index = state.hand.findIndex(function (card) { return card.id === cardId; });
         if (index < 0) return null;
+        markHandOrigin(state, state.hand[index]);
         return state.hand.splice(index, 1)[0];
       }
 
@@ -444,6 +447,7 @@
       function removeFirstMatchingCard(state, predicate) {
         var index = state.hand.findIndex(predicate);
         if (index < 0) return null;
+        markHandOrigin(state, state.hand[index]);
         return state.hand.splice(index, 1)[0];
       }
 
@@ -1667,6 +1671,22 @@
       var damage = DamageDyingRuntime.damage;
       var enterDying = DamageDyingRuntime.enterDying;
       var resolveDyingRescueChoice = DamageDyingRuntime.resolveDyingRescueChoice;
+
+      // v11 C2 (批次 26): 连营 — 统一手牌失去事件的第一个消费者。
+      // CardRuntime 在 putCard 落位提交手牌失去后回调这里; 在途还原路径
+      // (火攻同花色不符退回 / 濒死救援校验失败退回等) 不会触发。
+      // spec: 失去最后一张手牌后, 可以摸一张牌 (默认自动, decline 可关)。
+      CardRuntime.setHandLossHandler(function (game, originState) {
+        if (!game || game.phase === 'gameover') return;
+        if (!originState || (originState.hand || []).length > 0) return;
+        if (!hasSkill(originState, 'lianying')) return;
+        if (originState.skillPreferences && originState.skillPreferences.lianying === 'decline') return;
+        var actor = game.player === originState ? 'player'
+          : (game.enemy === originState ? 'enemy' : null);
+        if (!actor) return;
+        log(game, actorName(game, actor) + '发动【连营】，摸一张牌。');
+        drawCards(game, actor, 1);
+      });
 
       // v9 PR-E26: 判定一张手牌能否当【闪】响应 — 真闪 / 龙胆(杀) / 倾国(黑牌).
       // 返回 { via: null|'龙胆'|'倾国' } 或 null.
