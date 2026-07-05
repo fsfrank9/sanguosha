@@ -20,6 +20,7 @@ const REQUIRED_FILES = [
   'src/engine/judgement.js',
   'src/engine/damage-dying.js',
   'src/engine/response.js',
+  'src/engine/tricks.js',
   'src/engine/ai.js',
   'src/engine/game-engine.js',
   'src/ui/dom-adapter.js',

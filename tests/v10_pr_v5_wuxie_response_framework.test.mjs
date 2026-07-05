@@ -7,6 +7,9 @@ import { Engine } from './helpers/load-engine.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+// v11 B1: 无懈链框架已迁往 tricks.js — 框架形状断言改读该模块 (工厂内缩进
+// 4 空格); 各 trick 调用点与 continuation 注册断言仍读引擎源。
+const tricksSrc = fs.readFileSync(path.join(root, 'src/engine/tricks.js'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
@@ -16,8 +19,8 @@ function test(name, fn) { tests.push([name, fn]); }
 // ───── 引擎: 链状态机 ────────────────────────────────────────────────
 
 test('v10 V5: WUXIE_CONTINUATIONS 注册表 + registerWuxieContinuation', () => {
-  assert.match(engineSrc, /var WUXIE_CONTINUATIONS\s*=\s*\{\s*\}/);
-  assert.match(engineSrc, /function registerWuxieContinuation\(trickName, fn\)/);
+  assert.match(tricksSrc, /var WUXIE_CONTINUATIONS\s*=\s*\{\s*\}/);
+  assert.match(tricksSrc, /function registerWuxieContinuation\(trickName, fn\)/);
 });
 
 test('v10 V5: 5 个 trick 注册 wuxie continuation (juedou/guohe/shunshou/huogong/jiedao)', () => {
@@ -28,13 +31,13 @@ test('v10 V5: 5 个 trick 注册 wuxie continuation (juedou/guohe/shunshou/huogo
 });
 
 test('v10 V5: checkWuxieAndContinue 入口 + advanceWuxieChain 推进 + settleWuxieChain 结算', () => {
-  assert.match(engineSrc, /function checkWuxieAndContinue\(game, targetActor, reason, trickName, ctx\)/);
-  assert.match(engineSrc, /function advanceWuxieChain\(game\)/);
-  assert.match(engineSrc, /function settleWuxieChain\(game\)/);
+  assert.match(tricksSrc, /function checkWuxieAndContinue\(game, targetActor, reason, trickName, ctx\)/);
+  assert.match(tricksSrc, /function advanceWuxieChain\(game\)/);
+  assert.match(tricksSrc, /function settleWuxieChain\(game\)/);
 });
 
 test('v10 V5: advanceWuxieChain — 玩家 ask 走 requestPlayerResponse(kind:wuxie-response)', () => {
-  const fn = engineSrc.match(/function advanceWuxieChain\(game\)\s*\{[\s\S]*?\n {6}\}/);
+  const fn = tricksSrc.match(/function advanceWuxieChain\(game\)\s*\{[\s\S]*?\n {4}\}/);
   assert.ok(fn);
   assert.match(fn[0], /wuxieResponse\s*===\s*'ask'/);
   assert.match(fn[0], /requestPlayerResponse\(game,\s*\{/);
@@ -43,7 +46,7 @@ test('v10 V5: advanceWuxieChain — 玩家 ask 走 requestPlayerResponse(kind:wu
 });
 
 test('v10 V5: advanceWuxieChain — AI 自动 use (有无懈则消耗 + 翻转 + 递归)', () => {
-  const fn = engineSrc.match(/function advanceWuxieChain\(game\)\s*\{[\s\S]*?\n {6}\}/);
+  const fn = tricksSrc.match(/function advanceWuxieChain\(game\)\s*\{[\s\S]*?\n {4}\}/);
   assert.ok(fn);
   assert.match(fn[0], /consumeWuxie\(game,\s*responder,\s*chain\.reason\)/);
   assert.match(fn[0], /chain\.wuxied\s*=\s*!chain\.wuxied/);
@@ -52,11 +55,11 @@ test('v10 V5: advanceWuxieChain — AI 自动 use (有无懈则消耗 + 翻转 +
 });
 
 test('v10 V5: resolveWuxieResponseChoice 注册到 RESPONSE_KIND_RESOLVERS', () => {
-  assert.match(engineSrc, /registerResponseKind\(\s*'wuxie-response'\s*,\s*resolveWuxieResponseChoice\s*\)/);
+  assert.match(tricksSrc, /registerResponseKind\(\s*'wuxie-response'\s*,\s*resolveWuxieResponseChoice\s*\)/);
 });
 
 test('v10 V5: resolveWuxieResponseChoice — cardId / use / 默认 decline 三分支', () => {
-  const fn = engineSrc.match(/function resolveWuxieResponseChoice[\s\S]*?\n {6}\}/);
+  const fn = tricksSrc.match(/function resolveWuxieResponseChoice[\s\S]*?\n {4}\}/);
   assert.ok(fn);
   assert.match(fn[0], /decision\.cardId/);
   assert.match(fn[0], /decision\.use/);
