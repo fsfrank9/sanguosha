@@ -24,9 +24,10 @@ test('v10 V5: WUXIE_CONTINUATIONS 注册表 + registerWuxieContinuation', () => 
 });
 
 test('v10 V5: 5 个 trick 注册 wuxie continuation (juedou/guohe/shunshou/huogong/jiedao)', () => {
+  // v11 B1 第五步: continuation 已随框架迁入 tricks.js。
   ['juedou', 'guohe', 'shunshou', 'huogong', 'jiedao'].forEach(function (trick) {
     const re = new RegExp("registerWuxieContinuation\\(\\s*'" + trick + "'\\s*,");
-    assert.match(engineSrc, re, trick + ': 应注册');
+    assert.match(tricksSrc, re, trick + ': 应注册');
   });
 });
 
