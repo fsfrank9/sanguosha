@@ -1057,6 +1057,130 @@
           }
         }
       ]
+    },
+    {
+      "gid": 216,
+      "name": "夏侯渊",
+      "detailUrl": "https://www.sanguosha.com/hero",
+      "localHeroId": "xiahouyuan",
+      "skills": [
+        {
+          "name": "神速",
+          "localSkillId": "shensu",
+          "sourceTextRef": "cb8c87a86770",
+          "implementationSpec": {
+            "summary": "出牌阶段选择发动，视为对对手使用一张【杀】。",
+            "timing": "出牌阶段选择发动，视为对对手使用一张【杀】。",
+            "condition": "出牌阶段，发动者拥有技能且本回合未发动。",
+            "cost": "跳过阶段的实体成本在 1v1 引擎中折算为本回合一次技能标记。",
+            "effect": "对对手结算一张无实体【杀】，仍进入普通杀响应和伤害流程。",
+            "frequency": "每回合一次",
+            "engineHooks": [
+              "onActiveSkill",
+              "playSha"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 217,
+      "name": "曹仁",
+      "detailUrl": "https://www.sanguosha.com/hero",
+      "localHeroId": "caoren",
+      "skills": [
+        {
+          "name": "据守",
+          "localSkillId": "jushou",
+          "sourceTextRef": "52978f58e247",
+          "implementationSpec": {
+            "summary": "结束阶段触发，可选择发动。",
+            "timing": "结束阶段触发，可选择发动。",
+            "condition": "回合结束且拥有该技能。",
+            "cost": "无牌成本。",
+            "effect": "摸三张牌并切换翻面标记。",
+            "frequency": "每个结束阶段一次",
+            "engineHooks": [
+              "onTurnEnd",
+              "drawCards"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 218,
+      "name": "黄忠",
+      "detailUrl": "https://www.sanguosha.com/hero",
+      "localHeroId": "huangzhong",
+      "skills": [
+        {
+          "name": "烈弓",
+          "localSkillId": "liegong",
+          "sourceTextRef": "6049d98e2228",
+          "implementationSpec": {
+            "summary": "使用【杀】指定目标后的闪响应窗口。",
+            "timing": "使用【杀】指定目标后的闪响应窗口。",
+            "condition": "目标手牌数不小于发动者体力值，或不大于发动者攻击范围。",
+            "cost": "无成本，锁定适用。",
+            "effect": "本次【杀】的目标不能打出【闪】响应。",
+            "frequency": "每次满足条件的【杀】结算适用",
+            "engineHooks": [
+              "onNeedResponse",
+              "sha.responseLock"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 219,
+      "name": "魏延",
+      "detailUrl": "https://www.sanguosha.com/hero",
+      "localHeroId": "weiyan",
+      "skills": [
+        {
+          "name": "狂骨",
+          "localSkillId": "kuanggu",
+          "sourceTextRef": "fc69474f49b4",
+          "implementationSpec": {
+            "summary": "造成伤害后的技能结算窗口。",
+            "timing": "造成伤害后的技能结算窗口。",
+            "condition": "发动者造成伤害且已受伤。",
+            "cost": "无牌成本。",
+            "effect": "发动者回复1点体力，不超过体力上限。",
+            "frequency": "每次造成伤害后可结算",
+            "engineHooks": [
+              "onDamageAfter",
+              "recoverHp"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 220,
+      "name": "小乔",
+      "detailUrl": "https://www.sanguosha.com/hero",
+      "localHeroId": "xiaoqiao",
+      "skills": [
+        {
+          "name": "红颜",
+          "localSkillId": "hongyan",
+          "sourceTextRef": "6cc9cae2ed65",
+          "implementationSpec": {
+            "summary": "任意检查牌花色时持续适用。",
+            "timing": "任意检查牌花色时持续适用。",
+            "condition": "小乔拥有该技能。",
+            "cost": "无成本，锁定适用。",
+            "effect": "其黑桃牌按红桃参与技能和判定相关检查。",
+            "frequency": "锁定效果，持续适用",
+            "engineHooks": [
+              "cardSuitModifier"
+            ]
+          }
+        }
+      ]
     }
   ],
   "failures": []

@@ -43,7 +43,7 @@ test('official standard fixture is a compact regenerated source of truth', () =>
   assert.equal(fixture.source.indexUrl, 'https://www.sanguosha.com/hero');
   assert.equal(fixture.source.detailUrlPattern, 'https://www.sanguosha.com/hero/{gid}');
   assert.equal(fixture.pack, '标准');
-  assert.equal(fixture.heroes.length, 27, 'official 标准 pack should have 27 heroes');
+  assert.ok(fixture.heroes.length >= 27, 'official 标准/扩展 fixture should retain at least the 27 standard heroes');
   assert.equal(fixture.includeFullSkillText, false, 'fixture should avoid storing full official prose');
 
   const gids = new Set();

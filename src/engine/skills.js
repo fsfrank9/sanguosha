@@ -22,6 +22,10 @@
         var triggerYijiDamageAfter = deps.triggerYijiDamageAfter;
         var triggerGanglieDamageAfter = deps.triggerGanglieDamageAfter;
         var triggerYaowuDamageAfter = deps.triggerYaowuDamageAfter;
+        var triggerJushouTurnEnd = deps.triggerJushouTurnEnd;
+        var triggerKuangguDamageAfter = deps.triggerKuangguDamageAfter;
+        var triggerLiegongNeedResponse = deps.triggerLiegongNeedResponse;
+        var triggerShensuActiveSkill = deps.triggerShensuActiveSkill;
         var triggerLongdanCardAs = deps.triggerLongdanCardAs;
         var triggerWushengCardAs = deps.triggerWushengCardAs;
         var triggerQingguoCardAs = deps.triggerQingguoCardAs;
@@ -39,6 +43,11 @@
         SkillRuntime.registerSkill(skillRegistry, 'biyue', {
         onTurnEnd: function (context) {
           triggerBiyue(context.game, context.actor);
+        }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'jushou', {
+        onTurnEnd: function (context) {
+          return triggerJushouTurnEnd(context);
         }
       });
         SkillRuntime.registerSkill(skillRegistry, 'keji', {
@@ -150,6 +159,16 @@
           return triggerYaowuDamageAfter(context);
         }
       });
+        SkillRuntime.registerSkill(skillRegistry, 'kuanggu', {
+        onDamageAfter: function (context) {
+          return triggerKuangguDamageAfter(context);
+        }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'liegong', {
+        onNeedResponse: function (context) {
+          return triggerLiegongNeedResponse(context.game, context.actor, context.targetActor, context.responseType, context.card);
+        }
+      });
         SkillRuntime.registerSkill(skillRegistry, 'longdan', {
         onCardAs: function (context) {
           return triggerLongdanCardAs(context);
@@ -184,6 +203,11 @@
         SkillRuntime.registerSkill(skillRegistry, 'liuli', {
         onShaTargeted: function (context) {
           return triggerLiuliOnShaTargeted(context);
+        }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'shensu', {
+        onActiveSkill: function (context) {
+          return triggerShensuActiveSkill(context);
         }
       });
         SkillRuntime.registerSkill(skillRegistry, 'zhiheng', {
@@ -235,6 +259,7 @@
         fanjian: true,
         qingnang: true,
           // v11 C6 (批次 30): 结姻
-        jieyin: true
+        jieyin: true,
+        shensu: true
       };
 

@@ -193,7 +193,13 @@
         yaowu:     { trigger: 'damageAfter',       frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
         // v11 C8 (批次 32):
         wangzun:   { trigger: 'preparePhase',      frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['processPreparePhase'] },
-        tongji:    { trigger: 'targetValidation',  frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onCardTarget'] }
+        tongji:    { trigger: 'targetValidation',  frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onCardTarget'] },
+        // v12 G: 风包 1v1 可达技能元数据。
+        shensu:   { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onActiveSkill'] },
+        jushou:   { trigger: 'turnEnd',           frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onTurnEnd'] },
+        liegong:  { trigger: 'cardUse',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onNeedResponse'] },
+        kuanggu:  { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
+        hongyan:  { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['cardSuitModifier'] },
       };
 
       for (var _heroId in HERO_CATALOG) {
