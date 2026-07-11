@@ -16,6 +16,7 @@ const ENGINE_RULE_FILES = [
   'src/engine/response.js',
   'src/engine/tricks.js',
   'src/engine/equipment.js',
+  'src/engine/judge-area.js',
   'src/engine/ai.js',
 ];
 const engineSource = ENGINE_RULE_FILES
@@ -77,7 +78,8 @@ test('UI 层不直接操作牌区域', () => {
   const uiSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
     + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
     + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8')
-    + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8');
+    + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8')
+    + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8');
   assert.doesNotMatch(uiSource, RAW_MUTATION, 'UI 层不应裸操作 hand/deck/discard/judgeArea/equipment');
 });
 

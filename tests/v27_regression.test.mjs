@@ -13,6 +13,7 @@ const html = [
   fs.readFileSync(path.join(root, 'index.html'), 'utf8'),
   loadAllStyles(),
   fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8'),
+  fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/data/cards.js'), 'utf8'),
 ].join('\n');
 
@@ -96,7 +97,7 @@ test('双方英雄池一致且 UI 有去重逻辑，禁止同英雄对战', () =
   assert.match(html, /<select id="enemyHeroSelect">/);
   assert.match(html, /function populateHeroSelects/, 'JS 应有 populateHeroSelects 从同一来源填充两侧');
   // 池来源就是 Engine.HERO_CATALOG (函数内对两 select 走相同 fill 路径)
-  assert.match(html, /fill\(els\.playerHeroSelect[\s\S]{0,200}fill\(els\.enemyHeroSelect/, '同一 fill 函数应用到两 select');
+  assert.match(html, /fillHeroSelect\(els\.playerHeroSelect[\s\S]{0,200}fillHeroSelect\(els\.enemyHeroSelect/, '同一 fill 函数应用到两 select');
   // 去重逻辑仍在
   assert.match(html, /function ensureDistinctHeroes/, 'UI should enforce different heroes');
   assert.match(html, /option\.disabled = option\.value === otherValue/, 'same hero option should be disabled on the opposite side');

@@ -15,6 +15,7 @@ const html = [
   fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8'),
   // v11 B2: 模式面板已迁往 mode-panels.js, 拼接纳入。
   fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8'),
+  fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/data/cards.js'), 'utf8'),
 ].join('\n');
 

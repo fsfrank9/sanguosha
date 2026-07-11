@@ -6,6 +6,7 @@ import { Engine } from './helpers/load-engine.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const heroesSrc = fs.readFileSync(path.join(root, 'src/data/heroes.js'), 'utf8');
 const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+const skillsSrc = fs.readFileSync(path.join(root, 'src/engine/skills.js'), 'utf8');
 
 function makeDaqiaoGame() {
   const game = Engine.newGame({ seed: 110, startWithFirstTurn: true, playerHero: 'sunquan', enemyHero: 'daqiao' });
@@ -32,7 +33,7 @@ test('v8 PR-C2: SKILL_METADATA 已注册 liuli (trigger=shaTargetedAfter)', () =
 });
 
 test('v8 PR-C2: 引擎注册 liuli onShaTargeted hook + 调用 triggerLiuliOnShaTargeted', () => {
-  assert.match(engineSrc, /SkillRuntime\.registerSkill\(skillRegistry,\s*'liuli'/);
+  assert.match(skillsSrc, /SkillRuntime\.registerSkill\(skillRegistry,\s*'liuli'/);
   assert.match(engineSrc, /function triggerLiuliOnShaTargeted/);
 });
 

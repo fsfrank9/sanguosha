@@ -4,6 +4,7 @@ import path from 'node:path';
 import { SkillRuntime } from './helpers/load-engine.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
+const skillsSource = fs.readFileSync(path.join(root, 'src/engine/skills.js'), 'utf8');
 assert.ok(SkillRuntime, 'ES module should export SkillRuntime');
 
 function test(name, fn) {
@@ -69,7 +70,7 @@ test('runHook executes matching hooks in registration order with shared context'
 test('game engine registers Biyue through the shared skill registry seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]biyue['"]/, 'Biyue should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]biyue['"]/, 'Biyue should be registered with SkillRuntime.registerSkill');
   assert.match(source, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onTurnEnd['"]/, 'turn completion should dispatch the onTurnEnd hook through SkillRuntime.runHook');
 });
 
@@ -80,8 +81,8 @@ test('game engine dispatches Keji through onBeforeDiscardPhase hook seam', () =>
   assert.ok(finishStart >= 0 && finishEnd > finishStart, 'finishPlayPhase source should be extractable');
   const finishPlayPhaseSource = source.slice(finishStart, finishEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]keji['"]/, 'Keji should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /onBeforeDiscardPhase\s*:/, 'Keji should register an onBeforeDiscardPhase hook');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]keji['"]/, 'Keji should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /onBeforeDiscardPhase\s*:/, 'Keji should register an onBeforeDiscardPhase hook');
   assert.match(finishPlayPhaseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onBeforeDiscardPhase['"]/, 'finishPlayPhase should dispatch onBeforeDiscardPhase before entering discard');
   assert.doesNotMatch(finishPlayPhaseSource, /hasSkill\(\s*state\s*,\s*['"]keji['"]/, 'finishPlayPhase should no longer directly own Keji skill detection');
 });
@@ -99,8 +100,8 @@ test('game engine dispatches Jizhi through onCardUse hook seam', () => {
   const finishTrickUseSource = source.slice(finishStart, finishEnd);
   const consumeWuxieSource = source.slice(wuxieStart, wuxieEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]jizhi['"]/, 'Jizhi should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /onCardUse\s*:/, 'Jizhi should register an onCardUse hook');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]jizhi['"]/, 'Jizhi should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /onCardUse\s*:/, 'Jizhi should register an onCardUse hook');
   assert.match(finishTrickUseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardUse['"]/, 'finishTrickUse should dispatch successful trick use through onCardUse');
   assert.match(consumeWuxieSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardUse['"]/, 'consumeWuxie should dispatch response Wuxie through onCardUse');
   assert.doesNotMatch(finishTrickUseSource, /triggerJizhi\(/, 'finishTrickUse should no longer directly trigger Jizhi');
@@ -114,8 +115,8 @@ test('game engine dispatches Yingzi through onDrawPhase hook seam', () => {
   assert.ok(drawStart >= 0 && drawEnd > drawStart, 'performDrawPhase source should be extractable');
   const performDrawPhaseSource = source.slice(drawStart, drawEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yingzi['"]/, 'Yingzi should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yingzi['"][\s\S]*?onDrawPhase\s*:/, 'Yingzi should register an onDrawPhase hook');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yingzi['"]/, 'Yingzi should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yingzi['"][\s\S]*?onDrawPhase\s*:/, 'Yingzi should register an onDrawPhase hook');
   assert.match(performDrawPhaseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDrawPhase['"]/, 'performDrawPhase should dispatch draw-stage skills through onDrawPhase');
   assert.doesNotMatch(performDrawPhaseSource, /hasSkill\([^)]*['"]yingzi['"]/, 'performDrawPhase should no longer directly own Yingzi skill detection');
 });
@@ -127,8 +128,8 @@ test('game engine dispatches Tuxi through onDrawPhase hook seam', () => {
   assert.ok(drawStart >= 0 && drawEnd > drawStart, 'performDrawPhase source should be extractable');
   const performDrawPhaseSource = source.slice(drawStart, drawEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tuxi['"]/, 'Tuxi should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tuxi['"][\s\S]*?onDrawPhase\s*:/, 'Tuxi should register an onDrawPhase hook');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tuxi['"]/, 'Tuxi should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tuxi['"][\s\S]*?onDrawPhase\s*:/, 'Tuxi should register an onDrawPhase hook');
   assert.match(performDrawPhaseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDrawPhase['"]/, 'performDrawPhase should dispatch draw-stage skills through onDrawPhase');
   assert.doesNotMatch(performDrawPhaseSource, /hasSkill\([^)]*['"]tuxi['"]/, 'performDrawPhase should no longer directly own Tuxi skill detection');
 });
@@ -179,8 +180,8 @@ test('game engine dispatches Kongcheng through onCardTarget hook seam', () => {
   const canPlaySource = source.slice(canPlayStart, canPlayEnd);
   const playShaSource = source.slice(playShaStart, playShaEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]kongcheng['"]/, 'Kongcheng should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]kongcheng['"][\s\S]*?onCardTarget\s*:/, 'Kongcheng should register an onCardTarget hook');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]kongcheng['"]/, 'Kongcheng should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]kongcheng['"][\s\S]*?onCardTarget\s*:/, 'Kongcheng should register an onCardTarget hook');
   assert.match(source, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardTarget['"]/, 'target validation should dispatch through onCardTarget');
   assert.doesNotMatch(canPlaySource, /isKongchengProtected|hasSkill\([^)]*['"]kongcheng['"]/, 'canPlayCard should no longer directly own Kongcheng target protection');
   assert.doesNotMatch(playShaSource, /isKongchengProtected|hasSkill\([^)]*['"]kongcheng['"]/, 'playSha should no longer directly own Kongcheng target protection');
@@ -197,9 +198,9 @@ test('game engine dispatches Qianxun through onCardTarget hook seam', () => {
   const canPlaySource = source.slice(canPlayStart, canPlayEnd);
   const playCardSource = source.slice(playCardStart, playCardEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qianxun['"]/, 'Qianxun should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qianxun['"][\s\S]*?onCardTarget\s*:/, 'Qianxun should register an onCardTarget hook');
-  assert.match(source, /triggerQianxunCardTarget\(context\)/, 'Qianxun hook should delegate target-protection logic to an isolated helper');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qianxun['"]/, 'Qianxun should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qianxun['"][\s\S]*?onCardTarget\s*:/, 'Qianxun should register an onCardTarget hook');
+  assert.match(skillsSource, /triggerQianxunCardTarget\(context\)/, 'Qianxun hook should delegate target-protection logic to an isolated helper');
   assert.match(canPlaySource, /cardTargetProtection\(game, actor, opponent\(actor\), card\)/, 'canPlayCard should use shared target protection for Qianxun-protected cards');
   assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"]qianxun['"]/, 'canPlayCard should not directly hard-code Qianxun detection');
   assert.doesNotMatch(playCardSource, /hasSkill\([^)]*['"]qianxun['"]/, 'playCard should not directly hard-code Qianxun detection');
@@ -212,9 +213,9 @@ test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
   assert.ok(playShaStart >= 0 && playShaEnd > playShaStart, 'playSha source should be extractable');
   const playShaSource = source.slice(playShaStart, playShaEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tieqi['"]/, 'Tieqi should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tieqi['"][\s\S]*?onNeedResponse\s*:/, 'Tieqi should register an onNeedResponse hook');
-  assert.match(source, /triggerTieqiNeedResponse\(context\.game, context\.actor, context\.targetActor, context\.responseType, context\.card\)/, 'Tieqi hook should forward the triggering card for narrow response-window filtering');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tieqi['"]/, 'Tieqi should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tieqi['"][\s\S]*?onNeedResponse\s*:/, 'Tieqi should register an onNeedResponse hook');
+  assert.match(skillsSource, /triggerTieqiNeedResponse\(context\.game, context\.actor, context\.targetActor, context\.responseType, context\.card\)/, 'Tieqi hook should forward the triggering card for narrow response-window filtering');
   assert.match(source, /function triggerTieqiNeedResponse\(game, actor, targetActor, responseType, triggeringCard\)/, 'Tieqi response helper should accept the triggering card');
   assert.match(source, /!isShaCard\(triggeringCard\)/, 'Tieqi response helper should self-filter to Sha response windows only');
   assert.match(playShaSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onNeedResponse['"]/, 'playSha should dispatch the Shan response window through onNeedResponse');
@@ -231,9 +232,9 @@ test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
   const damageSource = damageModule.slice(damageStart, damageEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]jianxiong['"]/, 'Jianxiong should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]jianxiong['"][\s\S]*?onDamageAfter\s*:/, 'Jianxiong should register an onDamageAfter hook');
-  assert.match(source, /triggerJianxiongDamageAfter\(context\.game, context\.targetActor, context\.sourceCard\)/, 'Jianxiong hook should forward the damaged actor and damaging card');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]jianxiong['"]/, 'Jianxiong should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]jianxiong['"][\s\S]*?onDamageAfter\s*:/, 'Jianxiong should register an onDamageAfter hook');
+  assert.match(skillsSource, /triggerJianxiongDamageAfter\(context\.game, context\.targetActor, context\.sourceCard\)/, 'Jianxiong hook should forward the damaged actor and damaging card');
   assert.match(source, /function triggerJianxiongDamageAfter\(game, targetActor, sourceCard\)/, 'Jianxiong helper should isolate the damage-after side effect');
   assert.match(damageSource, /var damageContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should build a complete damage-after context');
   assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch through onDamageAfter');
@@ -254,9 +255,9 @@ test('game engine dispatches Ganglie through onDamageAfter and finalizes its jud
   const damageSource = damageModule.slice(damageStart, damageEnd);
   const ganglieSource = source.slice(ganglieStart, ganglieEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]ganglie['"]/, 'Ganglie should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]ganglie['"][\s\S]*?onDamageAfter\s*:/, 'Ganglie should register an onDamageAfter hook');
-  assert.match(source, /triggerGanglieDamageAfter\(context\)/, 'Ganglie hook should forward the damage context to an isolated helper');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]ganglie['"]/, 'Ganglie should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]ganglie['"][\s\S]*?onDamageAfter\s*:/, 'Ganglie should register an onDamageAfter hook');
+  assert.match(skillsSource, /triggerGanglieDamageAfter\(context\)/, 'Ganglie hook should forward the damage context to an isolated helper');
   assert.match(ganglieSource, /judge\(\s*game\s*,\s*targetActor\s*,\s*['"]【刚烈】['"]\s*\)/, 'Ganglie should perform a judgment owned by the damaged Xiahou Dun actor');
   assert.match(ganglieSource, /resolveJudgementCard\(\s*game\s*,\s*targetActor\s*,\s*target\s*,\s*['"]【刚烈】['"]\s*,\s*ganglieJudge\s*\)/, 'Ganglie should route its judgment card through the shared finalizer');
   assert.match(ganglieSource, /ganglieJudge\.suit\s*!==\s*['"]heart['"]/, 'Ganglie should only retaliate when the judgment is not heart');
@@ -278,9 +279,9 @@ test('game engine dispatches Fankui through onDamageAfter and gains a source-are
   const damageSource = damageModule.slice(damageStart, damageEnd);
   const fankuiSource = source.slice(fankuiStart, fankuiEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]fankui['"]/, 'Fankui should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]fankui['"][\s\S]*?onDamageAfter\s*:/, 'Fankui should register an onDamageAfter hook');
-  assert.match(source, /triggerFankuiDamageAfter\(context\)/, 'Fankui hook should forward the damage context to an isolated helper');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]fankui['"]/, 'Fankui should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]fankui['"][\s\S]*?onDamageAfter\s*:/, 'Fankui should register an onDamageAfter hook');
+  assert.match(skillsSource, /triggerFankuiDamageAfter\(context\)/, 'Fankui hook should forward the damage context to an isolated helper');
   assert.match(fankuiSource, /sourceActor\s*===\s*targetActor|targetActor\s*===\s*sourceActor/, 'Fankui should ignore self-damage contexts instead of moving Sima Yi own cards');
   assert.match(fankuiSource, /removeTargetZoneCard\(\s*game\s*,\s*sourceActor\s*,\s*autoZone\s*\)/, 'Fankui should remove one gainable card from the damage source area');
   // v11 A2: 获得牌统一走 moveCard 原语 (putCard 入手牌), 不再裸 push。
@@ -302,15 +303,15 @@ test('game engine dispatches Wusheng, Longdan, and Qingguo card-as conversions t
   const responseSource = source.slice(responseStart, responseEnd);
   const canPlaySource = source.slice(canPlayStart, canPlayEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]longdan['"]/, 'Longdan should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]wusheng['"]/, 'Wusheng should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qingguo['"]/, 'Qingguo should be registered with SkillRuntime.registerSkill');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]longdan['"][\s\S]*?onCardAs\s*:/, 'Longdan should register an onCardAs hook');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]wusheng['"][\s\S]*?onCardAs\s*:/, 'Wusheng should register an onCardAs hook');
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qingguo['"][\s\S]*?onCardAs\s*:/, 'Qingguo should register an onCardAs hook');
-  assert.match(source, /triggerLongdanCardAs\(context\)/, 'Longdan hook should delegate conversion decisions to an isolated helper');
-  assert.match(source, /triggerWushengCardAs\(context\)/, 'Wusheng hook should delegate conversion decisions to an isolated helper');
-  assert.match(source, /triggerQingguoCardAs\(context\)/, 'Qingguo hook should delegate conversion decisions to an isolated helper');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]longdan['"]/, 'Longdan should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]wusheng['"]/, 'Wusheng should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qingguo['"]/, 'Qingguo should be registered with SkillRuntime.registerSkill');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]longdan['"][\s\S]*?onCardAs\s*:/, 'Longdan should register an onCardAs hook');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]wusheng['"][\s\S]*?onCardAs\s*:/, 'Wusheng should register an onCardAs hook');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qingguo['"][\s\S]*?onCardAs\s*:/, 'Qingguo should register an onCardAs hook');
+  assert.match(skillsSource, /triggerLongdanCardAs\(context\)/, 'Longdan hook should delegate conversion decisions to an isolated helper');
+  assert.match(skillsSource, /triggerWushengCardAs\(context\)/, 'Wusheng hook should delegate conversion decisions to an isolated helper');
+  assert.match(skillsSource, /triggerQingguoCardAs\(context\)/, 'Qingguo hook should delegate conversion decisions to an isolated helper');
   assert.match(responseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardAs['"]\s*,\s*responseContext\s*\)/, 'automatic response selection should dispatch conversion opportunities through onCardAs');
   assert.match(canPlaySource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardAs['"]\s*,\s*cardAsContext\s*\)/, 'proactive card-as validation should dispatch through onCardAs');
   assert.doesNotMatch(responseSource, /hasSkill\([^)]*['"](?:wusheng|longdan|qingguo)['"]/, 'findResponseCard should no longer directly own Wusheng, Longdan, or Qingguo detection');
@@ -327,14 +328,14 @@ test('game engine dispatches implemented active skills through onActiveSkill hoo
 
   const activeSkills = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing'];
   for (const skill of activeSkills) {
-    assert.match(source, new RegExp(`SkillRuntime\\.registerSkill\\(\\s*skillRegistry\\s*,\\s*['"]${skill}['"]`), `${skill} should be registered with SkillRuntime.registerSkill`);
-    assert.match(source, new RegExp(`SkillRuntime\\.registerSkill\\(\\s*skillRegistry\\s*,\\s*['"]${skill}['"][\\s\\S]*?onActiveSkill\\s*:`), `${skill} should register an onActiveSkill hook`);
+    assert.match(skillsSource, new RegExp(`SkillRuntime\\.registerSkill\\(\\s*skillRegistry\\s*,\\s*['"]${skill}['"]`), `${skill} should be registered with SkillRuntime.registerSkill`);
+    assert.match(skillsSource, new RegExp(`SkillRuntime\\.registerSkill\\(\\s*skillRegistry\\s*,\\s*['"]${skill}['"][\\s\\S]*?onActiveSkill\\s*:`), `${skill} should register an onActiveSkill hook`);
   }
-  assert.match(source, /triggerZhihengActiveSkill\(context\)/, 'Zhiheng active hook should delegate to an isolated helper');
-  assert.match(source, /triggerKurouActiveSkill\(context\)/, 'Kurou active hook should delegate to an isolated helper');
-  assert.match(source, /triggerRendeActiveSkill\(context\)/, 'Rende active hook should delegate to an isolated helper');
-  assert.match(source, /triggerFanjianActiveSkill\(context\)/, 'Fanjian active hook should delegate to an isolated helper');
-  assert.match(source, /triggerGuanxingActiveSkill\(context\)/, 'Guanxing active hook should delegate to an isolated helper');
+  assert.match(skillsSource, /triggerZhihengActiveSkill\(context\)/, 'Zhiheng active hook should delegate to an isolated helper');
+  assert.match(skillsSource, /triggerKurouActiveSkill\(context\)/, 'Kurou active hook should delegate to an isolated helper');
+  assert.match(skillsSource, /triggerRendeActiveSkill\(context\)/, 'Rende active hook should delegate to an isolated helper');
+  assert.match(skillsSource, /triggerFanjianActiveSkill\(context\)/, 'Fanjian active hook should delegate to an isolated helper');
+  assert.match(skillsSource, /triggerGuanxingActiveSkill\(context\)/, 'Guanxing active hook should delegate to an isolated helper');
   assert.match(useSkillSource, /var activeSkillContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*self[\s\S]*targetActor:\s*opponent\(actor\)[\s\S]*skillId:\s*skillId[\s\S]*cardIds:\s*cardIds[\s\S]*options:\s*options[\s\S]*\}/, 'useSkill should build a complete active-skill context');
   assert.match(useSkillSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onActiveSkill['"]\s*,\s*activeSkillContext\s*\)/, 'useSkill should dispatch active skills through onActiveSkill');
   assert.match(useSkillSource, /selectActiveSkillResult\(\s*activeSkillResults\s*,\s*skillId\s*\)/, 'useSkill should select the matching active skill hook result');
@@ -348,8 +349,8 @@ test('game engine dispatches Guanxing preview through onSkillPreview hook seam',
   assert.ok(previewStart >= 0 && previewEnd > previewStart, 'getGuanxingPreview source should be extractable');
   const previewSource = source.slice(previewStart, previewEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]guanxing['"][\s\S]*?onSkillPreview\s*:/, 'Guanxing should register a non-consuming preview hook');
-  assert.match(source, /triggerGuanxingPreview\(context\)/, 'Guanxing preview hook should delegate to an isolated helper');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]guanxing['"][\s\S]*?onSkillPreview\s*:/, 'Guanxing should register a non-consuming preview hook');
+  assert.match(skillsSource, /triggerGuanxingPreview\(context\)/, 'Guanxing preview hook should delegate to an isolated helper');
   assert.match(previewSource, /var previewContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*self[\s\S]*skillId:\s*['"]guanxing['"][\s\S]*\}/, 'getGuanxingPreview should build a preview context');
   assert.match(previewSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onSkillPreview['"]\s*,\s*previewContext\s*\)/, 'getGuanxingPreview should dispatch preview through onSkillPreview');
   assert.match(previewSource, /selectActiveSkillResult\(\s*previewResults\s*,\s*['"]guanxing['"]\s*\)/, 'getGuanxingPreview should select Guanxing preview hook result');
@@ -358,14 +359,15 @@ test('game engine dispatches Guanxing preview through onSkillPreview hook seam',
 
 test('game engine dispatches Tiandu judgement-card gain through onJudgementAfterResolve hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const judgeStart = source.indexOf('function judge(game, actor, reason, opts)');
-  const processStart = source.indexOf('function processJudgeArea(game, actor)', judgeStart);
-  const processEnd = source.indexOf('function removeTargetZoneCard(game, targetActor, zone, cardId)', processStart);
+  const judgeAreaSource = fs.readFileSync(path.join(root, 'src/engine/judge-area.js'), 'utf8');
+  const judgeStart = judgeAreaSource.indexOf('function judge(game, actor, reason, opts)');
+  const processStart = judgeAreaSource.indexOf('function processJudgeArea(game, actor)', judgeStart);
+  const processEnd = judgeAreaSource.indexOf('return {', processStart);
   assert.ok(judgeStart >= 0 && processStart > judgeStart && processEnd > processStart, 'judgement source should be extractable');
-  const judgementSource = source.slice(judgeStart, processEnd);
+  const judgementSource = judgeAreaSource.slice(judgeStart, processEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tiandu['"][\s\S]*?onJudgementAfterResolve\s*:/, 'Tiandu should register an onJudgementAfterResolve hook');
-  assert.match(source, /triggerTianduJudgementAfterResolve\(context\)/, 'Tiandu hook should delegate to an isolated helper');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tiandu['"][\s\S]*?onJudgementAfterResolve\s*:/, 'Tiandu should register an onJudgementAfterResolve hook');
+  assert.match(skillsSource, /triggerTianduJudgementAfterResolve\(context\)/, 'Tiandu hook should delegate to an isolated helper');
   assert.match(judgementSource, /var judgementContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*state[\s\S]*reason:\s*reason[\s\S]*card:\s*card[\s\S]*\}/, 'judge should build a judgement context before discarding the judgement card');
   assert.match(judgementSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onJudgementAfterResolve['"]\s*,\s*judgementContext\s*\)/, 'judge should dispatch judgement-card resolution through SkillRuntime');
   assert.match(judgementSource, /if \(!judgementContext\.claimed\) \{[\s\S]*discardCard\(game, card\);[\s\S]*\}/, 'unclaimed judgement cards should still enter discard');
@@ -381,8 +383,8 @@ test('game engine dispatches Yiji per-damage-point draw through onDamageAfter ho
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage source should be extractable');
   const damageSource = damageModule.slice(damageStart, damageEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yiji['"][\s\S]*?onDamageAfter\s*:/, 'Yiji should register an onDamageAfter hook');
-  assert.match(source, /triggerYijiDamageAfter\(context\)/, 'Yiji hook should delegate to an isolated helper');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yiji['"][\s\S]*?onDamageAfter\s*:/, 'Yiji should register an onDamageAfter hook');
+  assert.match(skillsSource, /triggerYijiDamageAfter\(context\)/, 'Yiji hook should delegate to an isolated helper');
   assert.match(source, /function triggerYijiDamageAfter\(context\) \{[\s\S]*var target = game\[targetActor\][\s\S]*hasSkill\(target, ['"]yiji['"]\)[\s\S]*for \(var i = 0; i < context\.amount; i \+= 1\) \{[\s\S]*drawCards\(game, targetActor, 2\);[\s\S]*\}/, 'Yiji helper should self-filter and draw two cards once per damage point');
   assert.match(damageSource, /var damageContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should include damage amount in the hook context');
   assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch damage-after skills through SkillRuntime');
@@ -403,7 +405,7 @@ test('game engine dispatches Luoyi through draw and damage-modifier hook seams',
   const drawSource = source.slice(drawStart, drawEnd);
   const damageSource = damageModule.slice(damageStart, damageEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]luoyi['"][\s\S]*?onDrawPhase\s*:[\s\S]*?onDamageModify\s*:/, 'Luoyi should register draw and damage modifier hooks');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]luoyi['"][\s\S]*?onDrawPhase\s*:[\s\S]*?onDamageModify\s*:/, 'Luoyi should register draw and damage modifier hooks');
   assert.match(source, /triggerLuoyiDrawPhase\(context\)/, 'Luoyi draw hook should delegate to an isolated helper');
   assert.match(source, /triggerLuoyiDamageModify\(context\)/, 'Luoyi damage hook should delegate to an isolated helper');
   assert.doesNotMatch(drawSource, /hasSkill\([^)]*['"]luoyi['"]/, 'performDrawPhase should not directly own Luoyi skill detection');
@@ -418,13 +420,14 @@ test('game engine dispatches Luoyi through draw and damage-modifier hook seams',
 
 test('game engine dispatches Guicai through judgement before-resolve hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const judgeStart = source.indexOf('function judge(game, actor, reason, opts)');
-  const judgeEnd = source.indexOf('function resolveJudgementCard(game, actor, state, reason, card)', judgeStart);
+  const judgeAreaSource = fs.readFileSync(path.join(root, 'src/engine/judge-area.js'), 'utf8');
+  const judgeStart = judgeAreaSource.indexOf('function judge(game, actor, reason, opts)');
+  const judgeEnd = judgeAreaSource.indexOf('function resolveJudgementCard(game, actor, state, reason, card)', judgeStart);
   assert.ok(judgeStart >= 0 && judgeEnd > judgeStart, 'judge source should be extractable');
-  const judgeSource = source.slice(judgeStart, judgeEnd);
+  const judgeSource = judgeAreaSource.slice(judgeStart, judgeEnd);
 
-  assert.match(source, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]guicai['"][\s\S]*?onJudgementBeforeResolve\s*:/, 'Guicai should register an onJudgementBeforeResolve hook');
-  assert.match(source, /triggerGuicaiJudgementBeforeResolve\(context\)/, 'Guicai hook should delegate to an isolated helper');
+  assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]guicai['"][\s\S]*?onJudgementBeforeResolve\s*:/, 'Guicai should register an onJudgementBeforeResolve hook');
+  assert.match(skillsSource, /triggerGuicaiJudgementBeforeResolve\(context\)/, 'Guicai hook should delegate to an isolated helper');
   // v6.1 (cross-actor fix): the holder may be either the judgement actor
   // (own-judgement case) or the opponent (司马懿 replacing opponent's
   // judgement). We accept `state` or `holderState` as the variable name.

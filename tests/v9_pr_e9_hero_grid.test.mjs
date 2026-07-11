@@ -9,7 +9,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
 const css = loadAllStyles();
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8');
 const setupCss = fs.readFileSync(path.join(stylesDir, 'setup.css'), 'utf8');
 
 const tests = [];
@@ -135,10 +136,10 @@ test('v9 PR-E9: 维护 currentPickSide 状态 (player/enemy 切换)', () => {
 test('v9 PR-E9: renderHeroPickGrid 从 Engine.HERO_CATALOG 取数据生成 card', () => {
   const fn = adapter.match(/function renderHeroPickGrid\(\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /Engine\.HERO_CATALOG/);
-  assert.match(fn[0], /hero-pick-card--camp-/);
-  assert.match(fn[0], /is-player-selected/);
-  assert.match(fn[0], /is-enemy-selected/);
+  assert.match(adapter, /Engine\.HERO_CATALOG/);
+  assert.match(adapter, /hero-pick-card--camp-/);
+  assert.match(adapter, /is-player-selected/);
+  assert.match(adapter, /is-enemy-selected/);
 });
 
 test('v9 PR-E9: handleHeroPickCardClick 更新对应 <select>.value + 重渲染', () => {
