@@ -62,6 +62,44 @@
     return game[actor].name;
   }
 
+  function normalizeSeats(game) {
+    if (game && Array.isArray(game.seats) && game.seats.length) return game.seats.slice();
+    return ['player', 'enemy'];
+  }
+
+  function seatList(game) {
+    return normalizeSeats(game);
+  }
+
+  function aliveSeats(game) {
+    return normalizeSeats(game).filter(function (actor) {
+      var state = game && game[actor];
+      return state && typeof state.hp === 'number' && state.hp > 0;
+    });
+  }
+
+  function nextSeat(game, actor, includeDead) {
+    var seats = normalizeSeats(game);
+    var idx = seats.indexOf(actor);
+    if (idx < 0) return seats[0] || null;
+    for (var step = 1; step <= seats.length; step += 1) {
+      var candidate = seats[(idx + step) % seats.length];
+      if (includeDead || aliveSeats(game).indexOf(candidate) >= 0) return candidate;
+    }
+    return actor;
+  }
+
+  function seatsFrom(game, actor, includeSelf) {
+    var seats = normalizeSeats(game);
+    var idx = seats.indexOf(actor);
+    if (idx < 0) return seats.slice();
+    var ordered = [];
+    for (var step = includeSelf ? 0 : 1; step < seats.length + (includeSelf ? 0 : 1); step += 1) {
+      ordered.push(seats[(idx + step) % seats.length]);
+    }
+    return ordered;
+  }
+
   function opponent(actor) {
     return actor === 'player' ? 'enemy' : 'player';
   }
@@ -82,7 +120,13 @@
     var from = game[fromActor];
     var to = game[toActor];
     if (!from || !to) return Infinity;
-    var distance = 1;
+    var seats = normalizeSeats(game);
+    var fromIdx = seats.indexOf(fromActor);
+    var toIdx = seats.indexOf(toActor);
+    var ring = seats.length > 1 && fromIdx >= 0 && toIdx >= 0
+      ? Math.min((toIdx - fromIdx + seats.length) % seats.length, (fromIdx - toIdx + seats.length) % seats.length)
+      : 1;
+    var distance = Math.max(1, ring);
     if (to.equipment && to.equipment.horsePlus) distance += 1;
     if (from.equipment && from.equipment.horseMinus) distance -= 1;
     distance += SkillRuntime.sumPassiveEffect(from, 'outgoingDistance');
@@ -114,7 +158,7 @@
 
   function aliveActorCount(game) {
     if (!game) return 0;
-    var actors = ['player', 'enemy'];
+    var actors = normalizeSeats(game);
     var count = 0;
     for (var i = 0; i < actors.length; i += 1) {
       var s = game[actors[i]];
@@ -125,6 +169,10 @@
 
   export const StateRuntime = {
     actorName: actorName,
+    seatList: seatList,
+    aliveSeats: aliveSeats,
+    nextSeat: nextSeat,
+    seatsFrom: seatsFrom,
     opponent: opponent,
     hasSkill: hasSkill,
     canUseUnlimitedSha: canUseUnlimitedSha,

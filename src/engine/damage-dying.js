@@ -11,6 +11,8 @@
   var putCard = CardRuntime.putCard;
   var actorName = StateRuntime.actorName;
   var opponent = StateRuntime.opponent;
+  var aliveSeats = StateRuntime.aliveSeats;
+  var seatsFrom = StateRuntime.seatsFrom;
   var hasSkill = StateRuntime.hasSkill;
 
   export function createDamageDyingRuntime(deps) {
@@ -184,10 +186,7 @@
       }
       log(game, actorName(game, dyingActor) + '体力为 0，进入濒死状态。');
       var turnActor = game.turn || dyingActor;
-      var responderQueue = [turnActor];
-      if (opponent(turnActor) && opponent(turnActor) !== turnActor) {
-        responderQueue.push(opponent(turnActor));
-      }
+      var responderQueue = seatsFrom(game, turnActor, true).filter(function (seat) { return !!game[seat]; });
       game.pauseState.dying = {
         actor: dyingActor,
         source: sourceActor,
@@ -237,16 +236,30 @@
         // skipped (无【桃】/【酒】或放弃) → 进入下一名响应者
         saved.idx += 1;
       }
-      // All responders exhausted, no save → die. 1v1 中胜者恒为对手。
+      // All responders exhausted, no save → die. H5: 身份场按阵营判胜，1v1 保持对手获胜。
       log(game, actorName(game, dyingActor) + '没有人救援，死亡。');
-      game.phase = 'gameover';
-      game.winner = opponent(dyingActor);
-      log(game, actorName(game, game.winner) + '获胜！');
+      var winner = determineWinner(game, dyingActor);
+      if (winner) {
+        game.phase = 'gameover';
+        game.winner = winner;
+        log(game, (winner === 'lordSide' ? '主忠方' : winner === 'rebelSide' ? '反贼方' : actorName(game, winner)) + '获胜！');
+      }
       game.pauseState.dying = null;
       // M1: 角色死亡 → 跳过其 "受到伤害后" hooks (finishDamageAfter 内部按
       // gameover/存活判断), 但仍要把来源牌移入弃牌堆保持牌守恒。
       flushDeferredDamageAfter(game);
       return { died: true };
+    }
+
+    function determineWinner(game, deadActor) {
+      var roles = game.roles || {};
+      if (!Array.isArray(game.seats) || game.seats.length < 3) return opponent(deadActor);
+      var alive = aliveSeats(game).filter(function (seat) { return seat !== deadActor; });
+      var lord = game.seats.find(function (seat) { return roles[seat] === '主公'; });
+      if (deadActor === lord || (lord && alive.indexOf(lord) < 0)) return 'rebelSide';
+      var rebelsAlive = alive.some(function (seat) { return roles[seat] === '反贼'; });
+      if (!rebelsAlive) return 'lordSide';
+      return null;
     }
 
     function attemptDyingRescue(game, responder, dyingActor) {

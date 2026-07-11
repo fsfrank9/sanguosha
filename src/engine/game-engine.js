@@ -34,6 +34,10 @@
       var markHandOrigin = CardRuntime.markHandOrigin;
       var actorName = StateRuntime.actorName;
       var opponent = StateRuntime.opponent;
+      var seatList = StateRuntime.seatList;
+      var aliveSeats = StateRuntime.aliveSeats;
+      var nextSeat = StateRuntime.nextSeat;
+      var seatsFrom = StateRuntime.seatsFrom;
       var hasSkill = StateRuntime.hasSkill;
       var canUseUnlimitedSha = StateRuntime.canUseUnlimitedSha;
       var weaponRange = StateRuntime.weaponRange;
@@ -1656,7 +1660,7 @@
         if (game.pauseState && game.pauseState.playSha) {
           var saved = game.pauseState.playSha;
           game.pauseState.playSha = null;
-          return continueShaAfterCixiong(game, saved.actor, saved.card, saved.amount);
+          return continueShaAfterCixiong(game, saved.actor, saved.card, saved.amount, saved.targetActor);
         }
         return success('雌雄双股剑结算完成。');
       }
@@ -2204,11 +2208,15 @@
       function newGame(options) {
         options = options || {};
         var random = makeRng(options.seed || Date.now());
-        var roles = {
+        var seats = (options.seats && options.seats.length ? options.seats.slice() : ['player', 'enemy']);
+        var roles = options.roles ? clone(options.roles) : {
           player: options.playerRole || '主公',
           enemy: options.enemyRole || '反贼'
         };
-        var firstActor = options.firstActor || firstActorFromRoles(roles, 'player');
+        if (seats.length >= 3 && !options.roles) {
+          roles = { player: options.playerRole || '主公', enemy: options.enemyRole || '反贼', ally: options.allyRole || '忠臣' };
+        }
+        var firstActor = options.firstActor || firstActorFromRoles(roles, seats[0] || 'player');
         var game = {
           version: '3.0.0',
           random: random,
@@ -2224,13 +2232,21 @@
           pendingChoiceQueue: [],
           pauseState: {},
           roles: roles,
+          seats: seats,
           firstActor: firstActor,
+          mode: seats.length >= 3 ? 'identity3' : 'duel',
           player: makePlayer(clone(HERO_CATALOG[options.playerHero] || HEROES.player)),
           enemy: makePlayer(clone(HERO_CATALOG[options.enemyHero] || HEROES.enemy))
         };
+        for (var si = 0; si < seats.length; si += 1) {
+          var seat = seats[si];
+          if (!game[seat]) {
+            var heroKey = options[seat + 'Hero'];
+            game[seat] = makePlayer(clone(HERO_CATALOG[heroKey] || HEROES.enemy));
+          }
+        }
         game.deck = buildDeck(game, random);
-        drawCards(game, 'player', 4);
-        drawCards(game, 'enemy', 4);
+        seatList(game).forEach(function (seat) { drawCards(game, seat, 4); });
         log(game, '乱世开局：' + actorName(game, firstActor) + '为主公先手。');
         if (options.startWithFirstTurn) startTurn(game, firstActor);
         return game;
@@ -2327,7 +2343,7 @@
         //   顺手 (1V1): 目标 "有牌的对手"，无距离限制 — PR-10 已生效
         //   兵粮 (1V1): 目标 "对手"，无距离限制 — PR-11 已生效
         // 至此 1V1 标准包内已无距离限制的锦囊牌。
-        if (isShaCard(card) && !canReachWithSha(game, actor, opponent(actor))) return fail('距离不足，当前武器范围无法使用【杀】。');
+        if (isShaCard(card) && !legalTargetsForCard(game, actor, card).some(function (seat) { return seat !== actor; })) return fail('距离不足，当前武器范围无法使用【杀】。');
         if (isShaCard(card) && self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
         if (card.type === 'tao') {
           // v7 PR-1: gltjk 基本牌·桃 使用方法Ⅰ —— 使用目标"包括你在内的一名已受伤的角色"。
@@ -2425,9 +2441,29 @@
         return null;
       }
 
+      function defaultHostileTarget(game, actor) {
+        var candidates = aliveSeats(game).filter(function (seat) { return seat !== actor; });
+        return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : candidates[0];
+      }
+
+      function normalizeSingleTarget(game, actor, options) {
+        var requested = options && (options.target || (options.targets && options.targets[0]));
+        var targetActor = requested || defaultHostileTarget(game, actor);
+        return targetActor;
+      }
+
+      function legalTargetsForCard(game, actor, card) {
+        return aliveSeats(game).filter(function (seat) {
+          if (seat === actor) return card && (card.type === 'tao' || card.type === 'wuzhong');
+          if (isShaCard(card)) return canReachWithSha(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
+          return true;
+        });
+      }
+
       function playSha(game, actor, card) {
+        var options = arguments[3] || {};
         var self = game[actor];
-        var targetActor = opponent(actor);
+        var targetActor = normalizeSingleTarget(game, actor, options);
         var target = game[targetActor];
         var targetProtection = cardTargetProtection(game, actor, targetActor, card, '杀');
         if (targetProtection) return fail(targetProtection.message);
@@ -2477,7 +2513,7 @@
         var cixiongResult = applyCixiongOnDesignate(game, actor, targetActor);
         if (cixiongResult && cixiongResult.paused) {
           if (!game.pauseState) game.pauseState = {};
-          game.pauseState.playSha = { actor: actor, card: card, amount: amount };
+          game.pauseState.playSha = { actor: actor, targetActor: targetActor, card: card, amount: amount };
           return success('【雌雄双股剑】结算中…');
         }
 
@@ -2491,7 +2527,7 @@
           card: card
         });
 
-        return continueShaAfterCixiong(game, actor, card, amount);
+        return continueShaAfterCixiong(game, actor, card, amount, targetActor);
       }
 
       // v9 PR-E25/E26: 非消耗式探测 — 玩家是否有【闪】可作响应 (真闪 + 转化候选).
@@ -2525,7 +2561,7 @@
 
       function continueShaAfterCixiong(game, actor, card, amount) {
         var self = game[actor];
-        var targetActor = opponent(actor);
+        var targetActor = arguments[4] || opponent(actor);
         var target = game[targetActor];
         var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
 
@@ -2564,7 +2600,7 @@
             actor: 'player',
             pauseKey: 'shaResponse',
             // v11 C1: 无双 → shanRemaining=2, 首张闪后再开第二个响应窗口。
-            source: { actor: actor, card: card, amount: amount, shanRemaining: shanRequiredAgainstSha(game, actor) },
+            source: { actor: actor, targetActor: targetActor, card: card, amount: amount, shanRemaining: shanRequiredAgainstSha(game, actor) },
             // v9 PR-E26: 列出所有可作【闪】的牌 (真闪 + 龙胆/倾国 转化), 玩家自选.
             options: listShanResponseOptions(target),
             meta: { sourceActor: actor, shaName: card.name },
@@ -2591,7 +2627,7 @@
             break;
           }
         }
-        return resolveShaAfterResponse(game, actor, card, amount, dodged);
+        return resolveShaAfterResponse(game, actor, card, amount, dodged, targetActor);
       }
 
       // H2: 八卦阵 — 需要打出【闪】时 (响应【杀】或【万箭齐发】) 若目标装备
@@ -2714,7 +2750,7 @@
       // continueShaAfterCixiong 拆出, 供同步路径 + shan-response 暂停恢复共用.
       function resolveShaAfterResponse(game, actor, card, amount, dodged) {
         var self = game[actor];
-        var targetActor = opponent(actor);
+        var targetActor = arguments[5] || opponent(actor);
         var target = game[targetActor];
         if (dodged) {
           if (hasEquipmentEffect(self, 'guanshiForceHit')) {
@@ -2778,7 +2814,7 @@
               kind: 'shan-response',
               actor: 'player',
               pauseKey: 'shaResponse',
-              source: { actor: actor, card: card, amount: amount, shanRemaining: shanRemaining - 1 },
+              source: { actor: actor, targetActor: saved.targetActor, card: card, amount: amount, shanRemaining: shanRemaining - 1 },
               options: listShanResponseOptions(game.player),
               meta: { sourceActor: actor, shaName: card.name },
               logMessage: '【无双】：' + actorName(game, 'player') + '需再使用一张【闪】。',
@@ -2788,7 +2824,7 @@
           // 无第二张可出 → 尝试八卦顶上, 否则未抵消。
           dodged = tryBaguaDodge(game, 'player', isArmorIgnoredBySha(game, actor, card));
         }
-        return resolveShaAfterResponse(game, actor, card, amount, dodged);
+        return resolveShaAfterResponse(game, actor, card, amount, dodged, saved.targetActor);
       }
 
       // v10 V3: 注册到 response framework. UI 通过 resolvePendingChoice 或
@@ -3075,7 +3111,7 @@
       }
 
       function playShaCardHandler(game, actor, card, options, self) {
-        return playSha(game, actor, card);
+        return playSha(game, actor, card, options);
       }
 
       function playEquipmentCardHandler(game, actor, card, options, self) {
@@ -3614,7 +3650,7 @@
         });
         resetEndOfTurnState(game[ending]);
         log(game, actorName(game, ending) + '结束回合。');
-        return startTurn(game, opponent(ending));
+        return startTurn(game, nextSeat(game, ending));
       }
 
       function endTurn(game) {
@@ -3911,6 +3947,11 @@
         discardSelected: discardSelected,
         handLimit: handLimit,
         getActorStatus: getActorStatus,
+        seatList: seatList,
+        aliveSeats: aliveSeats,
+        nextSeat: nextSeat,
+        seatsFrom: seatsFrom,
+        legalTargetsForCard: legalTargetsForCard,
         endTurn: endTurn,
         setSkillPreference: setSkillPreference,
         getSkillPreference: getSkillPreference,
