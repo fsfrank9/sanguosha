@@ -12,7 +12,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
 const css = loadAllStyles();
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8');
 const setupCss = fs.readFileSync(path.join(stylesDir, 'setup.css'), 'utf8');
 
 const tests = [];
@@ -98,19 +99,19 @@ test('v9 PR-E11: renderHeroPickGrid 用 [hidden] 切换非当前 side 的 tab + 
   const fn = adapter.match(/function renderHeroPickGrid\(\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
   // tab hidden 逻辑
-  assert.match(fn[0], /heroPickPlayerTab\.hidden\s*=\s*\(currentPickSide\s*!==?\s*['"]player['"]\)/);
-  assert.match(fn[0], /heroPickEnemyTab\.hidden\s*=\s*\(currentPickSide\s*!==?\s*['"]enemy['"]\)/);
+  assert.match(adapter, /heroPickPlayerTab\.hidden\s*=\s*\(currentPickSide\s*!==?\s*['"]player['"]\)/);
+  assert.match(adapter, /heroPickEnemyTab\.hidden\s*=\s*\(currentPickSide\s*!==?\s*['"]enemy['"]\)/);
   // random btn hidden 逻辑
-  assert.match(fn[0], /randomPlayerHeroBtn\.hidden\s*=/);
-  assert.match(fn[0], /randomEnemyHeroBtn\.hidden\s*=/);
+  assert.match(adapter, /randomPlayerHeroBtn\.hidden\s*=/);
+  assert.match(adapter, /randomEnemyHeroBtn\.hidden\s*=/);
 });
 
 test('v9 PR-E11: renderHeroPickGrid 给被对方选走的 card 加 disabled + .is-locked', () => {
   const fn = adapter.match(/function renderHeroPickGrid\(\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /is-locked/);
+  assert.match(adapter, /is-locked/);
   // disabled 属性 (locked 时)
-  assert.match(fn[0], /locked\s*\?\s*['"]\s*disabled['"]/);
+  assert.match(adapter, /locked\s*\?\s*['"]\s*disabled['"]/);
 });
 
 test('v9 PR-E11: 非当前 pick side 的 tab hidden=true (锁定切换, v10 V2 后无 click handler)', () => {

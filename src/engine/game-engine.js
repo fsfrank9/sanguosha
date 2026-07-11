@@ -2999,7 +2999,27 @@
           if (huogongChoice.usableCostIds.indexOf(options.huogongCostCardId) < 0) return fail('请选择与展示牌同花色的手牌。');
         }
         card = removeCardFromHand(self, cardId);
+        return playCardWithRegisteredHandler(game, actor, card, options, self);
+      }
 
+      var PLAY_HANDLERS = {};
+      function registerPlayHandler(key, handler) {
+        PLAY_HANDLERS[key] = handler;
+      }
+
+      function playHandlerKey(card) {
+        if (isShaCard(card)) return 'sha';
+        if (card && card.family === 'equipment') return 'equipment';
+        if (card && card.family === 'delayed') return 'delayed';
+        return (card && card.type) || 'default';
+      }
+
+      function playCardWithRegisteredHandler(game, actor, card, options, self) {
+        var handler = PLAY_HANDLERS[playHandlerKey(card)] || PLAY_HANDLERS.default;
+        return handler(game, actor, card, options || {}, self);
+      }
+
+      function playCardLegacyDispatch(game, actor, card, options, self) {
         if (isShaCard(card)) return playSha(game, actor, card);
 
         if (card.family === 'equipment') return equipCard(game, actor, card);
@@ -3190,6 +3210,10 @@
         discardCard(game, card);
         return success('卡牌已使用。');
       }
+
+      ['sha', 'equipment', 'delayed', 'tao', 'jiu', 'wuzhong', 'juedou', 'nanman', 'wanjian', 'guohe', 'shunshou', 'taoyuan', 'wugu', 'huogong', 'tiesuo', 'jiedao', 'default'].forEach(function (key) {
+        registerPlayHandler(key, playCardLegacyDispatch);
+      });
 
       // v11 B1 第五步: 各锦囊 continuation / 桃园五谷逐目标推进 / 火攻结算
       // 已随框架迁入 ./tricks.js (见下方 TricksRuntime 装配)。

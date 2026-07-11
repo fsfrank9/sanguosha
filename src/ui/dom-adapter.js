@@ -2,6 +2,7 @@
       import { createResponsePanels } from './panels/response-panels.js';
       import { createPromptPanels } from './panels/prompt-panels.js';
       import { createModePanels } from './panels/mode-panels.js';
+      import { createLobbyPanels } from './panels/lobby-panels.js';
 
       var Engine = SanguoshaEngine;
       var game = null;
@@ -28,6 +29,12 @@
       var playerRole = '主公';
       var enemyRole = '反贼';
       var els = {};
+
+      var lobbyPanels = createLobbyPanels({
+        els: els,
+        Engine: Engine,
+        escapeHtml: escapeHtml
+      });
 
       // v11 B2: 响应类面板装配 — els 为原地填充的稳定引用; render/renderLog/
       // escapeHtml/suitLabel 为函数声明 (提升); stage 语义 = 原 stagedModalChoice
@@ -1011,30 +1018,12 @@
         }
       }
 
-      function heroPackLabel(pack) {
-        var labels = { standard: '标准', wind: '风', forest: '林', fire: '火', mountain: '山', sp: 'SP' };
-        return labels[pack] || pack || '扩展';
-      }
-
-      function heroSortKey(hero) {
-        var order = { standard: 1, wind: 2, forest: 3, fire: 4, mountain: 5, sp: 6 };
-        return String(order[hero.pack] || 9) + '-' + hero.camp + '-' + hero.name;
-      }
-
       function populateHeroSelects() {
         if (!els.playerHeroSelect || !els.enemyHeroSelect) return;
         var currentPlayer = els.playerHeroSelect.value || 'liubei';
         var currentEnemy = els.enemyHeroSelect.value || 'caocao';
-        var heroes = Object.keys(Engine.HERO_CATALOG).map(function (id) { return Engine.HERO_CATALOG[id]; })
-          .sort(function (a, b) { return heroSortKey(a).localeCompare(heroSortKey(b), 'zh-Hans-CN'); });
-        function fill(select, selected) {
-          select.innerHTML = heroes.map(function (hero) {
-            return '<option value="' + escapeHtml(hero.id) + '">' + escapeHtml('[' + heroPackLabel(hero.pack) + '] ' + hero.name + ' · ' + hero.camp + ' · ' + (hero.skills || []).map(function (skill) { return skill.name; }).join('/')) + '</option>';
-          }).join('');
-          select.value = Engine.HERO_CATALOG[selected] ? selected : (select === els.playerHeroSelect ? 'liubei' : 'caocao');
-        }
-        fill(els.playerHeroSelect, currentPlayer);
-        fill(els.enemyHeroSelect, currentEnemy);
+        lobbyPanels.fillHeroSelect(els.playerHeroSelect, currentPlayer, 'liubei');
+        lobbyPanels.fillHeroSelect(els.enemyHeroSelect, currentEnemy, 'caocao');
         ensureDistinctHeroes('player');
         renderHeroPickGrid();
       }
@@ -1058,54 +1047,13 @@
       }
 
       function renderHeroPickGrid() {
-        if (!els.heroPickGrid) return;
-        var heroes = Object.keys(Engine.HERO_CATALOG).map(function (id) { return Engine.HERO_CATALOG[id]; })
-          .sort(function (a, b) { return heroSortKey(a).localeCompare(heroSortKey(b), 'zh-Hans-CN'); });
-        var playerVal = els.playerHeroSelect ? els.playerHeroSelect.value : '';
-        var enemyVal = els.enemyHeroSelect ? els.enemyHeroSelect.value : '';
-        els.heroPickGrid.innerHTML = heroes.map(function (hero) {
-          var classes = ['hero-pick-card', 'hero-pick-card--camp-' + (hero.camp || '?')];
-          var isPlayerPicked = hero.id === playerVal && playerVal !== '';
-          var isEnemyPicked = hero.id === enemyVal && enemyVal !== '';
-          if (isPlayerPicked) classes.push('is-player-selected');
-          if (isEnemyPicked) classes.push('is-enemy-selected');
-          // v9 PR-E11: 当前 side 不能选已被对方选走的 hero, 锁定 + disable.
-          var locked = (currentPickSide === 'player' && isEnemyPicked)
-                    || (currentPickSide === 'enemy' && isPlayerPicked);
-          if (locked) classes.push('is-locked');
-          return '<button type="button" class="' + classes.join(' ') + '" data-hero-id="' + escapeHtml(hero.id) + '"' + (locked ? ' disabled' : '') + '>'
-            + '<span class="hero-pick-card__camp">' + escapeHtml(hero.camp || '?') + '</span>'
-            + '<span class="hero-pick-card__name">' + escapeHtml(hero.name) + '</span>'
-            + '</button>';
-        }).join('');
-        // tab values + 可见性 (顺序选将只显示当前 side 的 tab)
-        if (els.heroPickPlayerValue) {
-          var pH = playerVal ? Engine.HERO_CATALOG[playerVal] : null;
-          els.heroPickPlayerValue.textContent = pH ? pH.name : '未选';
-        }
-        if (els.heroPickEnemyValue) {
-          var eH = enemyVal ? Engine.HERO_CATALOG[enemyVal] : null;
-          els.heroPickEnemyValue.textContent = eH ? eH.name : '未选';
-        }
-        if (els.heroPickPlayerTab) {
-          els.heroPickPlayerTab.hidden = (currentPickSide !== 'player');
-          els.heroPickPlayerTab.classList.toggle('is-active', currentPickSide === 'player');
-        }
-        if (els.heroPickEnemyTab) {
-          els.heroPickEnemyTab.hidden = (currentPickSide !== 'enemy');
-          els.heroPickEnemyTab.classList.toggle('is-active', currentPickSide === 'enemy');
-        }
-        // 随机按钮也只显示当前 side 的
-        if (els.randomPlayerHeroBtn) els.randomPlayerHeroBtn.hidden = (currentPickSide !== 'player');
-        if (els.randomEnemyHeroBtn) els.randomEnemyHeroBtn.hidden = (currentPickSide !== 'enemy');
-        if (els.heroPickPrompt) {
-          var sideRole = currentPickSide === 'player' ? playerRole : enemyRole;
-          if (currentPickSide === 'player') {
-            els.heroPickPrompt.textContent = sideRole === '主公' ? '您是主公，请选将' : '您是反贼，请选将';
-          } else {
-            els.heroPickPrompt.textContent = sideRole === '主公' ? '请为对手 (主公) 选将' : '请为对手 (反贼) 选将';
-          }
-        }
+        lobbyPanels.renderHeroPickGrid({
+          currentPickSide: currentPickSide,
+          playerVal: els.playerHeroSelect ? els.playerHeroSelect.value : '',
+          enemyVal: els.enemyHeroSelect ? els.enemyHeroSelect.value : '',
+          playerRole: playerRole,
+          enemyRole: enemyRole
+        });
       }
 
       function handleHeroPickCardClick(heroId) {

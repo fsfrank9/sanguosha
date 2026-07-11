@@ -2,7 +2,7 @@
 
 纯 HTML/CSS/JavaScript 实现的三国杀 1v1。原生 ES 模块 + GitHub Pages 静态托管:`src/` 就是浏览器加载的源码本身,根 `index.html` 是手写的模块入口——没有打包步骤、没有 npm 运行时依赖。
 
-**当前版本 `v11`**(批次 11-36 / PR #125-#150 收官):40 个已实现技能(8 个主动)100% 对照官方 spec 并通过四方一致性审计,71 名武将,39 张牌规则数据驱动;引擎按域模块化(伤害濒死/响应/锦囊/装备/AI),牌移动统一走 `moveCard` 原语并由全局牌数守恒断言护航;AI 具备转化 lookahead 与无懈/闪响应期望值决策。1207 条断言全绿,经两轮独立代码审计修复后引擎规则层无已知胜负级偏差。
+**当前版本 `v12-F`**:在 v11 收官基础上完成结构减重第二轮。技能注册、判定区结算、playCard 分发入口、大厅/选将 UI 面板继续从主文件拆出;40 个已实现技能(8 个主动)和 71 名武将行为保持 1v1 零回归。牌移动统一走 `moveCard` 原语并由全局牌数守恒断言护航;AI 具备转化 lookahead 与无懈/闪响应期望值决策。
 
 ## 运行
 
@@ -42,11 +42,11 @@ index.html            手写模块入口(无内联逻辑)
 src/
   main.js             两行 side-effect import
   engine/             游戏引擎:game-engine.js 装配主体 + 域模块
-                      (damage-dying / response / tricks / equipment / ai)
+                      (skills / judge-area / damage-dying / response / tricks / equipment / ai)
                       + runtime seam(card/state/skill/judgement/phases)
   ui/
     dom-adapter.js    DOM 适配层(渲染框架 + 面板注册表)
-    panels/           面板模块(response / prompt / mode 三簇)
+    panels/           面板模块(lobby / response / prompt / mode 四簇)
   data/               武将/技能/牌的结构化 catalog 与元数据
   styles/             CSS(main.css 为 @import 入口)
 tests/                行为测试 + 架构守护测试(零依赖直跑)
@@ -81,14 +81,13 @@ docs/
 | 审计×2 | 两轮规则合规审计修复(#105–#113, #115–#123) | `docs/audit/` + `docs/history.md` |
 | v11 | 守恒硬化 + 域拆分 + 技能 31→40 + AI 期望值决策(#125–#150) | `2026-06-09-sanguosha-v11-roadmap.md`(含收尾盘点) |
 
-## 下一阶段(v12,已规划未启动)
+## 下一阶段(v12)
 
-路线图见 [`docs/plans/2026-07-05-sanguosha-v12-roadmap.md`](docs/plans/2026-07-05-sanguosha-v12-roadmap.md),按依赖排序:
+路线图见 [`docs/plans/2026-07-05-sanguosha-v12-roadmap.md`](docs/plans/2026-07-05-sanguosha-v12-roadmap.md),当前 **F 结构减重已完成**;后续按依赖排序继续推进:
 
-1. **F 结构减重**:技能 handler 域拆分(立"零 registerSkill"守护)、判定区域、playCard 分发表化。
-2. **G 扩展包技能**:风包 spec 缓存补齐后按三件套范式分批接入(技能 40→约 50)。
-3. **H 多人模式**(主战役):座次抽象、距离环、目标选择框架、3 人身份场;红线 1v1 零回归。
-4. **I AI 进阶**:两步 lookahead、可见信息计数建模、多人目标评估。
+1. **G 扩展包技能**:风包 spec 缓存补齐后按三件套范式分批接入(技能 40→约 50)。
+2. **H 多人模式**(主战役):座次抽象、距离环、目标选择框架、3 人身份场;红线 1v1 零回归。
+3. **I AI 进阶**:两步 lookahead、可见信息计数建模、多人目标评估。
 
 ## 官方资料对照与缓存
 
