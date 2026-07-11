@@ -74,6 +74,10 @@
         triggerYijiDamageAfter: triggerYijiDamageAfter,
         triggerGanglieDamageAfter: triggerGanglieDamageAfter,
         triggerYaowuDamageAfter: triggerYaowuDamageAfter,
+        triggerJushouTurnEnd: triggerJushouTurnEnd,
+        triggerKuangguDamageAfter: triggerKuangguDamageAfter,
+        triggerLiegongNeedResponse: triggerLiegongNeedResponse,
+        triggerShensuActiveSkill: triggerShensuActiveSkill,
         triggerLongdanCardAs: triggerLongdanCardAs,
         triggerWushengCardAs: triggerWushengCardAs,
         triggerQingguoCardAs: triggerQingguoCardAs,
@@ -641,6 +645,57 @@
       //    回复 1 点体力, 或摸一张牌。"
       // 选择权在伤害来源: AI/auto 来源按 受伤→回血 否则→摸牌; 玩家来源
       // 经 pendingChoice 'yaowu-reward' 面板二选一 (体力满时只能摸牌)。
+      function triggerJushouTurnEnd(context) {
+        var game = context.game;
+        var actor = context.actor;
+        var state = game[actor];
+        if (!state || !hasSkill(state, 'jushou') || game.phase === 'gameover') return null;
+        var pref = state.skillPreferences && state.skillPreferences.jushou;
+        if (pref === 'decline') {
+          log(game, actorName(game, actor) + '选择不发动【据守】。');
+          return null;
+        }
+        drawCards(game, actor, 3);
+        state.turnedOver = !state.turnedOver;
+        log(game, actorName(game, actor) + '发动【据守】，摸三张牌并' + (state.turnedOver ? '翻面。' : '翻回正面。'));
+        return { triggeredJushou: true };
+      }
+
+      function triggerKuangguDamageAfter(context) {
+        var game = context.game;
+        var sourceActor = context.sourceActor;
+        var source = game[sourceActor];
+        if (!source || !hasSkill(source, 'kuanggu') || source.hp >= source.maxHp || game.phase === 'gameover') return null;
+        source.hp = Math.min(source.maxHp, source.hp + 1);
+        log(game, actorName(game, sourceActor) + '发动【狂骨】，造成伤害后回复 1 点体力。');
+        return { triggeredKuanggu: true };
+      }
+
+      function triggerLiegongNeedResponse(game, actor, targetActor, responseType, triggeringCard) {
+        var source = game[actor];
+        var target = game[targetActor];
+        if (responseType !== 'shan' || !source || !target || !hasSkill(source, 'liegong')) return null;
+        var targetHand = (target.hand || []).length;
+        if (targetHand >= source.hp || targetHand <= source.attackRange) {
+          log(game, actorName(game, actor) + '发动【烈弓】，' + actorName(game, targetActor) + '不能打出【闪】。');
+          return { responseLocked: true };
+        }
+        return null;
+      }
+
+      function triggerShensuActiveSkill(context) {
+        if (context.skillId !== 'shensu') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        if (!self || !hasSkill(self, 'shensu')) return null;
+        if (self.flags.shensuUsed) return fail('【神速】每回合限一次。');
+        var card = { id: 'virtual-shensu-' + actor + '-' + game.turn, name: '杀', type: 'sha', suit: 'spade', color: 'black', virtual: true };
+        self.flags.shensuUsed = true;
+        log(game, actorName(game, actor) + '发动【神速】，视为对' + actorName(game, opponent(actor)) + '使用一张【杀】。');
+        return playSha(game, actor, card, 1);
+      }
+
       function triggerYaowuDamageAfter(context) {
         var game = context.game;
         var targetActor = context.targetActor;
