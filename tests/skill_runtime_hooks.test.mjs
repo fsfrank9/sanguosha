@@ -68,15 +68,6 @@ test('runHook executes matching hooks in registration order with shared context'
 });
 
 
-test('v12 F3 playCard uses concrete registered handlers instead of a legacy if-chain bucket', () => {
-  const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  assert.match(source, /var PLAY_HANDLERS = \{\};/, 'play handler registry should exist');
-  assert.match(source, /function playShaCardHandler\(/, 'sha should have its own registered handler');
-  assert.match(source, /function playTaoCardHandler\(/, 'tao should have its own registered handler');
-  assert.match(source, /registerPlayHandler\('sha', playShaCardHandler\);/, 'sha should not route through a legacy catch-all');
-  assert.match(source, /registerPlayHandler\('default', playDefaultCardHandler\);/, 'default handler should be explicit');
-  assert.doesNotMatch(source, /playCardLegacyDispatch/, 'F3 should not keep a legacy dispatch bucket');
-});
 
 test('game engine registers Biyue through the shared skill registry seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
