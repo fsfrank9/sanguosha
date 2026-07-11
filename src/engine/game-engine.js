@@ -9,6 +9,8 @@
       import { createResponseRuntime } from './response.js';
       import { createTricksRuntime } from './tricks.js';
       import { createEquipmentRuntime } from './equipment.js';
+      import { createJudgeAreaRuntime } from './judge-area.js';
+      import { installStandardSkillHandlers, PLAY_PHASE_ACTIVE_SKILLS } from './skills.js';
       import { HERO_CATALOG, HEROES } from '../data/heroes.js';
       import { CARD_CATALOG, CARD_INFO, PHASES } from '../data/cards.js';
       import { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS } from '../data/skill-status.js';
@@ -49,205 +51,44 @@
 
       SkillRuntime.annotateSkillStatus(HERO_CATALOG, IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS);
       var skillRegistry = SkillRuntime.createRegistry();
-      SkillRuntime.registerSkill(skillRegistry, 'biyue', {
-        onTurnEnd: function (context) {
-          triggerBiyue(context.game, context.actor);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'keji', {
-        onBeforeDiscardPhase: function (context) {
-          return triggerKejiBeforeDiscard(context.game, context.actor, context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'jizhi', {
-        onCardUse: function (context) {
-          return triggerJizhi(context.game, context.actor, context.card, context.options);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'yingzi', {
-        onDrawPhase: function (context) {
-          var state = context.game[context.actor];
-          if (!state || !hasSkill(state, 'yingzi')) return;
-          context.drawCount += 1;
-          log(context.game, actorName(context.game, context.actor) + '发动【英姿】，摸牌阶段额外摸一张牌。');
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'tuxi', {
-        onDrawPhase: function (context) {
-          var game = context.game;
-          var actor = context.actor;
-          var state = game[actor];
-          if (!state || !hasSkill(state, 'tuxi')) return;
-          if (game[opponent(actor)].hand.length <= 0) return;
-          // v6.1: spec condition is "发动者**选择**发动". Read
-          // skillPreferences.tuxi to honor the choice: 'decline' skips
-          // entirely. Default is auto-fire (preserves v5/v6 behavior so
-          // existing tests + AI continue to work without per-turn toggles).
-          var pref = state.skillPreferences && state.skillPreferences.tuxi;
-          if (pref === 'decline') {
-            log(game, actorName(game, actor) + '选择本回合不发动【突袭】。');
-            return;
-          }
-          takeHandCard(game, opponent(actor), actor, '发动【突袭】，获得');
-          context.drawCount = Math.max(0, context.drawCount - 1);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'luoyi', {
-        onDrawPhase: function (context) {
-          return triggerLuoyiDrawPhase(context);
-        },
-        onDamageModify: function (context) {
-          return triggerLuoyiDamageModify(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'kongcheng', {
-        onCardTarget: function (context) {
-          var target = context.game[context.targetActor];
-          if (!target || !hasSkill(target, 'kongcheng') || target.hand.length !== 0) return null;
-          if (!isShaType(context.cardType) && context.cardType !== 'juedou') return null;
-          return {
-            protected: true,
-            message: actorName(context.game, context.targetActor) + '处于【空城】状态，不能成为【' + context.cardName + '】目标。'
-          };
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'qianxun', {
-        onCardTarget: function (context) {
-          return triggerQianxunCardTarget(context);
-        }
-      });
-      // v11 C8 (批次 32): 同疾 (标袁术) — 1v1 恒不拦截的 reserved hook
-      SkillRuntime.registerSkill(skillRegistry, 'tongji', {
-        onCardTarget: function (context) {
-          return triggerTongjiCardTarget(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'tiandu', {
-        onJudgementAfterResolve: function (context) {
-          return triggerTianduJudgementAfterResolve(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'guicai', {
-        onJudgementBeforeResolve: function (context) {
-          return triggerGuicaiJudgementBeforeResolve(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'tieqi', {
-        onNeedResponse: function (context) {
-          return triggerTieqiNeedResponse(context.game, context.actor, context.targetActor, context.responseType, context.card);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'jianxiong', {
-        onDamageAfter: function (context) {
-          return triggerJianxiongDamageAfter(context.game, context.targetActor, context.sourceCard);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'fankui', {
-        onDamageAfter: function (context) {
-          return triggerFankuiDamageAfter(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'yiji', {
-        onDamageAfter: function (context) {
-          return triggerYijiDamageAfter(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'ganglie', {
-        onDamageAfter: function (context) {
-          return triggerGanglieDamageAfter(context);
-        }
-      });
-      // v11 C7 (批次 31): 耀武 (华雄) — 受红色杀伤害后, 来源二选一奖励
-      SkillRuntime.registerSkill(skillRegistry, 'yaowu', {
-        onDamageAfter: function (context) {
-          return triggerYaowuDamageAfter(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'longdan', {
-        onCardAs: function (context) {
-          return triggerLongdanCardAs(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'wusheng', {
-        onCardAs: function (context) {
-          return triggerWushengCardAs(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'qingguo', {
-        onCardAs: function (context) {
-          return triggerQingguoCardAs(context);
-        }
-      });
-      // v8 PR-C1: 国色 (大乔) onCardAs (方片 → 乐不思蜀, proactive only)
-      SkillRuntime.registerSkill(skillRegistry, 'guose', {
-        onCardAs: function (context) {
-          return triggerGuoseCardAs(context);
-        }
-      });
-      // v11 C3 (批次 27): 奇袭 (甘宁) onCardAs (黑色牌 → 过河拆桥, proactive only)
-      SkillRuntime.registerSkill(skillRegistry, 'qixi', {
-        onCardAs: function (context) {
-          return triggerQixiCardAs(context);
-        }
-      });
-      // v8 PR-C2: 流离 (大乔) onShaTargeted — 杀指定目标后 大乔 可弃 1 牌
-      // 把杀转移给"攻击范围内的一名其他角色 (且必须为源此【杀】的合法目标)"。
-      // 1v1 中可候选 = 仅源, 但源对自己不能用杀 → 0 合法目标 → 静默不触发。
-      // 多人模式启用后此 hook 自动生效。
-      SkillRuntime.registerSkill(skillRegistry, 'liuli', {
-        onShaTargeted: function (context) {
-          return triggerLiuliOnShaTargeted(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'zhiheng', {
-        onActiveSkill: function (context) {
-          return triggerZhihengActiveSkill(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'kurou', {
-        onActiveSkill: function (context) {
-          return triggerKurouActiveSkill(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'rende', {
-        onActiveSkill: function (context) {
-          return triggerRendeActiveSkill(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'qingnang', {
-        onActiveSkill: function (context) {
-          return triggerQingnangActiveSkill(context);
-        }
-      });
-      // v11 C6 (批次 30): 结姻 (孙尚香) — 出牌阶段限一次的主动技
-      SkillRuntime.registerSkill(skillRegistry, 'jieyin', {
-        onActiveSkill: function (context) {
-          return triggerJieyinActiveSkill(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'fanjian', {
-        onActiveSkill: function (context) {
-          return triggerFanjianActiveSkill(context);
-        }
-      });
-      SkillRuntime.registerSkill(skillRegistry, 'guanxing', {
-        onActiveSkill: function (context) {
-          return triggerGuanxingActiveSkill(context);
-        },
-        onSkillPreview: function (context) {
-          return triggerGuanxingPreview(context);
-        }
-      });
 
-      var PLAY_PHASE_ACTIVE_SKILLS = {
-        zhiheng: true,
-        kurou: true,
-        rende: true,
-        fanjian: true,
-        qingnang: true,
-        // v11 C6 (批次 30): 结姻
-        jieyin: true
-      };
+      installStandardSkillHandlers(skillRegistry, {
+        hasSkill: hasSkill,
+        opponent: opponent,
+        actorName: actorName,
+        isShaType: isShaType,
+        log: log,
+        takeHandCard: takeHandCard,
+        triggerBiyue: triggerBiyue,
+        triggerKejiBeforeDiscard: triggerKejiBeforeDiscard,
+        triggerJizhi: triggerJizhi,
+        triggerLuoyiDrawPhase: triggerLuoyiDrawPhase,
+        triggerLuoyiDamageModify: triggerLuoyiDamageModify,
+        triggerQianxunCardTarget: triggerQianxunCardTarget,
+        triggerTongjiCardTarget: triggerTongjiCardTarget,
+        triggerTianduJudgementAfterResolve: triggerTianduJudgementAfterResolve,
+        triggerGuicaiJudgementBeforeResolve: triggerGuicaiJudgementBeforeResolve,
+        triggerTieqiNeedResponse: triggerTieqiNeedResponse,
+        triggerJianxiongDamageAfter: triggerJianxiongDamageAfter,
+        triggerFankuiDamageAfter: triggerFankuiDamageAfter,
+        triggerYijiDamageAfter: triggerYijiDamageAfter,
+        triggerGanglieDamageAfter: triggerGanglieDamageAfter,
+        triggerYaowuDamageAfter: triggerYaowuDamageAfter,
+        triggerLongdanCardAs: triggerLongdanCardAs,
+        triggerWushengCardAs: triggerWushengCardAs,
+        triggerQingguoCardAs: triggerQingguoCardAs,
+        triggerGuoseCardAs: triggerGuoseCardAs,
+        triggerQixiCardAs: triggerQixiCardAs,
+        triggerLiuliOnShaTargeted: triggerLiuliOnShaTargeted,
+        triggerZhihengActiveSkill: triggerZhihengActiveSkill,
+        triggerKurouActiveSkill: triggerKurouActiveSkill,
+        triggerRendeActiveSkill: triggerRendeActiveSkill,
+        triggerQingnangActiveSkill: triggerQingnangActiveSkill,
+        triggerJieyinActiveSkill: triggerJieyinActiveSkill,
+        triggerFanjianActiveSkill: triggerFanjianActiveSkill,
+        triggerGuanxingActiveSkill: triggerGuanxingActiveSkill,
+        triggerGuanxingPreview: triggerGuanxingPreview
+      });
 
       function cardTargetProtection(game, actor, targetActor, card, displayName) {
         var cardType = card && card.type ? card.type : card;
@@ -2135,154 +1976,23 @@
 
       // v11 B1: 银月枪触发与响应已迁往 ./equipment.js (见 EquipmentRuntime 装配)。
 
-      function judge(game, actor, reason, opts) {
-        reshuffleIfNeeded(game);
-        // 判定牌离开牌堆进入在途结算, 结算收尾统一 discardCard (或被天妒等收走)。
-        var card = takeCard(game, null, { zone: 'deck' });
-        if (!card) return null;
-        log(game, actorName(game, actor) + '进行' + reason + '判定：【' + card.name + '】' + card.suit + ' ' + card.rank + '。');
-        var state = game[actor];
-        var judgementContext = {
-          game: game,
-          actor: actor,
-          state: state,
-          reason: reason,
-          card: card,
-          originalCard: card,
-          replaced: false,
-          // v6.1: only processJudgeArea's caller can suspend a judgement
-          // mid-resolution (it has the pauseState snapshot to resume from).
-          // Other callers (bagua armor judge, ganglie judge, tieqi judge)
-          // run judge() inside their own multi-step logic with no resume
-          // point, so 鬼才 falls back to auto-fire there. processJudgeArea
-          // passes `{ pausable: true }`; others leave the default false.
-          pausable: !!(opts && opts.pausable)
-        };
-        SkillRuntime.runHook(skillRegistry, 'onJudgementBeforeResolve', judgementContext);
-        return judgementContext.card;
-      }
-
-      function resolveJudgementCard(game, actor, state, reason, card) {
-        if (!card) return;
-        var judgementContext = {
-          game: game,
-          actor: actor,
-          state: state,
-          reason: reason,
-          card: card
-        };
-        SkillRuntime.runHook(skillRegistry, 'onJudgementAfterResolve', judgementContext);
-        if (!judgementContext.claimed) {
-          discardCard(game, card);
-        }
-      }
-
-      function judgementReasonFor(trick) {
-        if (!trick) return null;
-        if (trick.type === 'lebusishu') return '【乐不思蜀】';
-        if (trick.type === 'bingliang') return '【兵粮寸断】';
-        if (trick.type === 'shandian') return '【闪电】';
-        return null;
-      }
-
-      // Re-entrant judge-area processor. State that needs to survive a pause
-      // (e.g. 鬼才 prompting) is held on game.pauseState.judgeArea so the
-      // same function can resume from the right trick index after the player
-      // resolves the prompt.
-      function processJudgeArea(game, actor) {
-        var state = game[actor];
-        state.flags = state.flags || {};
-        if (!game.pauseState) game.pauseState = {};
-        var saved = game.pauseState.judgeArea;
-        var pending;
-        var startIdx;
-        if (saved && saved.actor === actor) {
-          pending = saved.pending;
-          startIdx = saved.idx;
-        } else {
-          state.flags.skipPlay = false;
-          state.flags.skipDraw = false;
-          if (!state.judgeArea) state.judgeArea = [];
-          // 整批取出判定区待结算牌 (在途), 逐张结算后 discardCard / 移动。
-          pending = state.judgeArea.splice(0);
-          startIdx = 0;
-        }
-        for (var i = startIdx; i < pending.length; i += 1) {
-          var trick = pending[i];
-          var reason = judgementReasonFor(trick);
-          var judgementCard = reason ? judge(game, actor, reason, { pausable: true }) : null;
-          if (game.pendingChoice) {
-            // judge() invoked a hook that asked for a choice. Snapshot the
-            // iteration so resolvePendingChoice can pick up where we left off.
-            game.pauseState.judgeArea = {
-              actor: actor,
-              pending: pending,
-              idx: i,
-              currentTrick: trick,
-              currentReason: reason,
-              currentJudgementCard: judgementCard
-            };
-            return { suspended: true };
-          }
-          applyJudgeAreaOutcome(game, actor, state, trick, reason, judgementCard);
-          if (game.phase === 'gameover') {
-            if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
-            return { ok: true };
-          }
-          if (game.pendingChoice) {
-            // H2: outcome 结算本身产生了待玩家选择 (如【闪电】命中致濒死求桃 /
-            // 遗计逐点分配)。此前这里不检查, 濒死角色会带着挂起的 pendingChoice
-            // 照常摸牌进入出牌阶段。挂起并标记 outcomeApplied (idx 已前进),
-            // 由 finishPendingChoiceResolution 在所有选择排空后续跑回合。
-            game.pauseState.judgeArea = {
-              actor: actor,
-              pending: pending,
-              idx: i + 1,
-              outcomeApplied: true
-            };
-            return { suspended: true };
-          }
-        }
-        // Clear the snapshot if we exited cleanly.
-        if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
-        return { ok: true };
-      }
-
-      function applyJudgeAreaOutcome(game, actor, state, trick, reason, judgementCard) {
-        var outcome = evaluateDelayedTrick(trick, judgementCard);
-        if (outcome.skipPlay) {
-          state.flags.skipPlay = true;
-          log(game, actorName(game, actor) + '【乐不思蜀】判定失败，跳过出牌阶段。');
-        }
-        if (outcome.skipDraw) {
-          state.flags.skipDraw = true;
-          log(game, actorName(game, actor) + '【兵粮寸断】判定失败，跳过摸牌阶段。');
-        }
-        if (trick.type === 'shandian' && outcome.hit) {
-          damage(game, actor, outcome.damage, null, '【闪电】');
-        } else if (trick.type === 'shandian' && outcome.moveToNext) {
-          // v7 PR-12: gltjk card__scroll.md 注 — "若其下家不是此【闪电】的
-          // 合法目标，则将对应的实体牌置入其下家的下家的判定区，以此类推。
-          // 若所有角色都不是此【闪电】的合法目标，则将对应的实体牌置入其
-          // 判定区。" 在 1v1 中只有 2 名角色：下家=对手；下家的下家=自己。
-          // PR-6 已定义 "判定区里有同名延时锦囊的角色 = 非合法目标"。
-          var foeActor = opponent(actor);
-          var foeState = game[foeActor];
-          var foeAlreadyShandian = (foeState.judgeArea || []).some(function (j) {
-            return j && j.type === 'shandian';
-          });
-          if (foeAlreadyShandian) {
-            // 对手已有 闪电 → 非合法目标 → 全部不合法 → 回到自己
-            putCard(game, trick, { zone: 'judgeArea', actor: actor });
-            log(game, '【闪电】移动失败（对手判定区已有同名牌），留在' + actorName(game, actor) + '的判定区。');
-          } else {
-            putCard(game, trick, { zone: 'judgeArea', actor: foeActor });
-            log(game, '【闪电】移至' + actorName(game, foeActor) + '的判定区。');
-          }
-        }
-        resolveJudgementCard(game, actor, state, reason, judgementCard);
-        if (outcome.discardTrick) discardCard(game, trick);
-      }
+      var JudgeAreaRuntime = createJudgeAreaRuntime({
+        skillRegistry: skillRegistry,
+        reshuffleIfNeeded: reshuffleIfNeeded,
+        takeCard: takeCard,
+        putCard: putCard,
+        discardCard: discardCard,
+        log: log,
+        actorName: actorName,
+        evaluateDelayedTrick: evaluateDelayedTrick,
+        damage: function (g, a, n, s, r, c, nature, opts) { return damage(g, a, n, s, r, c, nature, opts); },
+        opponent: opponent
+      });
+      var judge = JudgeAreaRuntime.judge;
+      var resolveJudgementCard = JudgeAreaRuntime.resolveJudgementCard;
+      var judgementReasonFor = JudgeAreaRuntime.judgementReasonFor;
+      var processJudgeArea = JudgeAreaRuntime.processJudgeArea;
+      var applyJudgeAreaOutcome = JudgeAreaRuntime.applyJudgeAreaOutcome;
 
       function getPendingChoice(game) {
         return (game && game.pendingChoice) || null;
