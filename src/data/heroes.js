@@ -193,7 +193,19 @@
         yaowu:     { trigger: 'damageAfter',       frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
         // v11 C8 (批次 32):
         wangzun:   { trigger: 'preparePhase',      frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['processPreparePhase'] },
-        tongji:    { trigger: 'targetValidation',  frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onCardTarget'] }
+        tongji:    { trigger: 'targetValidation',  frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onCardTarget'] },
+        // v12 G: 扩展包技能池（风包优先 + 后续包一项可达主动技）
+        shensu:    { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onActiveSkill'] },
+        jushou:    { trigger: 'turnEnd',           frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onTurnEnd'] },
+        liegong:   { trigger: 'cardUse',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onNeedResponse'] },
+        kuanggu:   { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
+        tianxiang: { trigger: 'damageBefore',      frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['reservedDamageRedirect'] },
+        hongyan:   { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['effectiveJudgementCard'] },
+        buqu:      { trigger: 'dying',             frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'judgement' },                hooks: ['processDyingNext'] },
+        leiji:     { trigger: 'response-window',   frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['consumeResponse'] },
+        guidao:    { trigger: 'beforeJudgement',   frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand', count: 1 },       hooks: ['onJudgementBeforeResolve'] },
+        mengjin:   { trigger: 'cardUse',           frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['shaDodgedAfter'] },
+        qiangxi:   { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'loseHp', count: 1 },         hooks: ['onActiveSkill'] }
       };
 
       for (var _heroId in HERO_CATALOG) {

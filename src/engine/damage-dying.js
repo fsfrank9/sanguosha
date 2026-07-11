@@ -26,6 +26,7 @@
     var isArmorIgnoredBySha = deps.isArmorIgnoredBySha;
     // v11 C1 (批次 25): 救援 — 吴势力对濒死主公用桃回复量 +1 (由引擎注入)
     var taoRecoverBonus = deps.taoRecoverBonus;
+    var reshuffleIfNeeded = deps.reshuffleIfNeeded;
 
     function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts) {
       if (game.phase === 'gameover') return false;
@@ -236,6 +237,23 @@
         }
         // skipped (无【桃】/【酒】或放弃) → 进入下一名响应者
         saved.idx += 1;
+      }
+      // 周泰【不屈】: 响应者全部放弃后, 亮出一张不屈牌；若点数不重复则维持濒死但不死亡。
+      if (hasSkill(dyingState, 'buqu')) {
+        dyingState.buquCards = dyingState.buquCards || [];
+        if (reshuffleIfNeeded) reshuffleIfNeeded(game);
+        if (game.deck && game.deck.length) {
+          var buquCard = takeCard(game, null, { zone: 'deck' });
+          dyingState.buquCards.push(buquCard);
+          var ranks = dyingState.buquCards.map(function (c) { return c.rank; });
+          var unique = ranks.every(function (rank, index) { return ranks.indexOf(rank) === index; });
+          log(game, actorName(game, dyingActor) + '发动【不屈】，亮出【' + buquCard.name + '】' + buquCard.rank + (unique ? '，点数未重复，暂不死亡。' : '，点数重复。'));
+          if (unique) {
+            game.pauseState.dying = null;
+            flushDeferredDamageAfter(game);
+            return { saved: true, buqu: true };
+          }
+        }
       }
       // All responders exhausted, no save → die. 1v1 中胜者恒为对手。
       log(game, actorName(game, dyingActor) + '没有人救援，死亡。');

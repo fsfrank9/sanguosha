@@ -19,10 +19,18 @@ function test(name, fn) {
   console.log(`✓ ${name}`);
 }
 
-const cache = readJson(
-  'official-skill-cache/sanguosha-standard/official_standard_skill_cache.json',
-);
-const specs = readJson('tests/fixtures/official_standard_skill_specs.json');
+const cache = mergeSkillDocs([
+  readJson('official-skill-cache/sanguosha-standard/official_standard_skill_cache.json'),
+  readJson('official-skill-cache/sanguosha-expansion/official_expansion_skill_cache.json'),
+]);
+const specs = mergeSkillDocs([
+  readJson('tests/fixtures/official_standard_skill_specs.json'),
+  readJson('tests/fixtures/official_expansion_skill_specs.json'),
+]);
+
+function mergeSkillDocs(docs) {
+  return { heroes: docs.flatMap((doc) => doc.heroes || []) };
+}
 
 function indexByLocalId(doc, specKey) {
   const map = new Map();
@@ -61,6 +69,9 @@ const VALID_TRIGGERS = new Set([
   'shaTargetedAfter',
   // v11 C2 (批次 26): 连营触发时机 — "你失去最后一张手牌后"
   'handLoss',
+  'dying',
+  'damageBefore',
+  'response-window',
   // v11 C6 (批次 30): 枭姬触发时机 — "你失去装备区里的牌后"
   'equipmentLoss',
 ]);

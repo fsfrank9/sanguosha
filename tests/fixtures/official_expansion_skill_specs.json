@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "indexUrl": "https://www.sanguosha.com/hero",
+    "detailUrlPattern": "https://www.sanguosha.com/hero/{gid}",
+    "rawCachePath": ".cache/sanguosha-official/official_expansion_skill_texts.json",
+    "rawCachePolicy": "cache-first: use local/raw official text only outside committed fixtures; public file stores paraphrased specs.",
+    "sourceTextDigestAlgorithm": "sha256 prefix 12 hex chars over hero name, skill name, and local raw official text",
+    "publicContentPolicy": "This committed fixture stores paraphrased implementation specs and source references, not official prose."
+  },
+  "pack": "扩展包",
+  "includeFullSkillText": false,
+  "containsImplementationSpecs": true,
+  "heroes": [
+    {
+      "gid": 1001,
+      "name": "夏侯渊",
+      "detailUrl": "official-skill-cache/gltjk-sanguosha-rules",
+      "localHeroId": "xiahouyuan",
+      "skills": [
+        {
+          "name": "神速",
+          "localSkillId": "shensu",
+          "sourceTextRef": "2de00836a256",
+          "spec": {
+            "summary": "出牌阶段可视为使用一张杀。",
+            "timing": "出牌阶段主动发动。",
+            "condition": "1v1 中目标为对手且本回合未发动过。",
+            "cost": "跳过阶段的实体成本在当前 1v1 实现中抽象为一次技能次数。",
+            "effect": "视为对对手使用一张虚拟【杀】并进入完整杀结算。",
+            "frequency": "每回合一次",
+            "engineHooks": [
+              "onActiveSkill",
+              "playSha"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 1002,
+      "name": "曹仁",
+      "detailUrl": "official-skill-cache/gltjk-sanguosha-rules",
+      "localHeroId": "caoren",
+      "skills": [
+        {
+          "name": "据守",
+          "localSkillId": "jushou",
+          "sourceTextRef": "50d78e5e05ae",
+          "spec": {
+            "summary": "结束阶段摸牌并翻面。",
+            "timing": "结束阶段。",
+            "condition": "持有据守且未选择关闭。",
+            "cost": "无实体牌成本。",
+            "effect": "摸三张牌并切换翻面标记。",
+            "frequency": "每个结束阶段一次",
+            "engineHooks": [
+              "onTurnEnd",
+              "drawCards"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 1003,
+      "name": "黄忠",
+      "detailUrl": "official-skill-cache/gltjk-sanguosha-rules",
+      "localHeroId": "huangzhong",
+      "skills": [
+        {
+          "name": "烈弓",
+          "localSkillId": "liegong",
+          "sourceTextRef": "c5c1533f2332",
+          "spec": {
+            "summary": "使用杀时在目标手牌数满足条件时锁定其闪响应。",
+            "timing": "杀要求目标出闪的响应窗口。",
+            "condition": "来源拥有烈弓且目标手牌数不少于来源体力或不多于一张。",
+            "cost": "无成本。",
+            "effect": "当前杀的闪响应被锁定，目标不能使用闪。",
+            "frequency": "每次合法杀响应窗口",
+            "engineHooks": [
+              "onNeedResponse",
+              "responseLocked"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 1004,
+      "name": "魏延",
+      "detailUrl": "official-skill-cache/gltjk-sanguosha-rules",
+      "localHeroId": "weiyan",
+      "skills": [
+        {
+          "name": "狂骨",
+          "localSkillId": "kuanggu",
+          "sourceTextRef": "2d03b3ad50cd",
+          "spec": {
+            "summary": "造成伤害后若已受伤则回复体力。",
+            "timing": "伤害结算后的技能时机。",
+            "condition": "来源拥有狂骨且伤害后体力未满。",
+            "cost": "无成本。",
+            "effect": "来源回复一点体力。",
+            "frequency": "每次造成伤害后可触发",
+            "engineHooks": [
+              "onDamageAfter",
+              "recoverHp"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 1005,
+      "name": "小乔",
+      "detailUrl": "official-skill-cache/gltjk-sanguosha-rules",
+      "localHeroId": "xiaoqiao",
+      "skills": [
+        {
+          "name": "天香",
+          "localSkillId": "tianxiang",
+          "sourceTextRef": "5b1b24e02366",
+          "spec": {
+            "summary": "受到伤害时可弃红桃转移伤害。",
+            "timing": "受到伤害前。",
+            "condition": "当前 1v1 暂保留为多人目标框架后的 reserved 技能。",
+            "cost": "弃一张红桃牌。",
+            "effect": "将伤害转移给其他角色并令其摸牌；当前 1v1 无合法其他目标。",
+            "frequency": "每次受到伤害前",
+            "engineHooks": [
+              "reservedDamageRedirect"
+            ]
+          }
+        },
+        {
+          "name": "红颜",
+          "localSkillId": "hongyan",
+          "sourceTextRef": "3401130a4f39",
+          "spec": {
+            "summary": "黑桃牌按红桃处理。",
+            "timing": "需要读取牌花色的判定/结算点。",
+            "condition": "持有红颜且牌面为黑桃。",
+            "cost": "无成本。",
+            "effect": "黑桃判定牌在本地判定中视为红桃且颜色视为红色。",
+            "frequency": "锁定常驻",
+            "engineHooks": [
+              "effectiveJudgementCard"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 1006,
+      "name": "周泰",
+      "detailUrl": "official-skill-cache/gltjk-sanguosha-rules",
+      "localHeroId": "zhoutai",
+      "skills": [
+        {
+          "name": "不屈",
+          "localSkillId": "buqu",
+          "sourceTextRef": "f99f65e191cd",
+          "spec": {
+            "summary": "濒死无人救援后亮出不屈牌，点数不重复则不死亡。",
+            "timing": "濒死救援全部结束即将死亡前。",
+            "condition": "持有不屈且仍处于濒死。",
+            "cost": "从牌堆顶亮出一张不屈牌。",
+            "effect": "若所有不屈牌点数互不相同，则结束濒死并暂不死亡；重复则死亡。",
+            "frequency": "每次即将死亡前",
+            "engineHooks": [
+              "processDyingNext",
+              "buquCards"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 1007,
+      "name": "张角",
+      "detailUrl": "official-skill-cache/gltjk-sanguosha-rules",
+      "localHeroId": "zhangjiao",
+      "skills": [
+        {
+          "name": "雷击",
+          "localSkillId": "leiji",
+          "sourceTextRef": "91fc2840a4b4",
+          "spec": {
+            "summary": "打出闪后判定，黑桃则对对手造成雷电伤害。",
+            "timing": "打出闪响应后。",
+            "condition": "持有雷击且刚打出闪。",
+            "cost": "进行一次判定。",
+            "effect": "判定为黑桃时，对 1v1 对手造成两点雷电伤害。",
+            "frequency": "每次打出闪后",
+            "engineHooks": [
+              "consumeResponse",
+              "judge",
+              "damageThunder"
+            ]
+          }
+        },
+        {
+          "name": "鬼道",
+          "localSkillId": "guidao",
+          "sourceTextRef": "78fe83b13696",
+          "spec": {
+            "summary": "判定前可用黑色牌替换判定牌。",
+            "timing": "判定牌生效前。",
+            "condition": "持有鬼道且有黑色手牌或装备牌。",
+            "cost": "打出一张黑色牌替换原判定牌。",
+            "effect": "原判定牌进入弃牌堆，新牌成为判定结果。",
+            "frequency": "每次判定前",
+            "engineHooks": [
+              "onJudgementBeforeResolve"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 1008,
+      "name": "庞德",
+      "detailUrl": "official-skill-cache/gltjk-sanguosha-rules",
+      "localHeroId": "pangde",
+      "skills": [
+        {
+          "name": "猛进",
+          "localSkillId": "mengjin",
+          "sourceTextRef": "31827060d72c",
+          "spec": {
+            "summary": "杀被闪抵消后可弃置目标一张牌。",
+            "timing": "杀被目标闪避后。",
+            "condition": "来源拥有猛进且目标有可弃置牌。",
+            "cost": "无成本。",
+            "effect": "弃置目标默认优先区域的一张牌。",
+            "frequency": "每次杀被闪抵消后",
+            "engineHooks": [
+              "shaDodgedAfter",
+              "discardTargetCard"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 1009,
+      "name": "典韦",
+      "detailUrl": "official-skill-cache/gltjk-sanguosha-rules",
+      "localHeroId": "dianwei",
+      "skills": [
+        {
+          "name": "强袭",
+          "localSkillId": "qiangxi",
+          "sourceTextRef": "bfe36bca4031",
+          "spec": {
+            "summary": "出牌阶段限一次，失去体力或弃武器对目标造成伤害。",
+            "timing": "出牌阶段主动发动。",
+            "condition": "持有强袭且本回合未发动。",
+            "cost": "失去一点体力；若指定 weaponCost 且有武器则可弃置武器。",
+            "effect": "对 1v1 目标造成一点普通伤害。",
+            "frequency": "每回合一次",
+            "engineHooks": [
+              "onActiveSkill",
+              "damage"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

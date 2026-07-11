@@ -29,12 +29,14 @@
         // v11 C8 (批次 32): 标准版袁术 入编
         //   wangzun  袁术   主公准备阶段: 袁术摸一张 + 主公本回合手牌上限 -1
         //   tongji   袁术   锁定技: 1v1 恒不拦截 (reserved, 多人激活, 同流离)
-        'wangzun', 'tongji'
+        'wangzun', 'tongji',
+        // v12 G: 扩展包技能池（风包 + 火包一项可达主动技）
+        'shensu', 'jushou', 'liegong', 'kuanggu', 'hongyan', 'buqu', 'leiji', 'guidao', 'mengjin', 'qiangxi'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,
       // 不占技能按钮.
       // v11 C6: jieyin 为出牌阶段主动技 (占技能按钮, 选 2 张手牌)。
-      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin'];
+      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin', 'shensu', 'qiangxi'];
 
       export { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS };

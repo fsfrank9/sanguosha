@@ -10,10 +10,10 @@ import { HERO_CATALOG, IMPLEMENTED_SKILL_IDS } from './helpers/load-engine.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const SPEC_FIXTURE_PATH = path.join(
-  root,
-  'tests/fixtures/official_standard_skill_specs.json',
-);
+const SPEC_FIXTURE_PATHS = [
+  path.join(root, 'tests/fixtures/official_standard_skill_specs.json'),
+  path.join(root, 'tests/fixtures/official_expansion_skill_specs.json'),
+];
 const REQUIRED_SPEC_FIELDS = [
   'summary',
   'timing',
@@ -32,9 +32,11 @@ const REQUIRED_SCHEMA_FIELDS = [
 ];
 
 function loadSpecsByLocalId() {
-  const json = JSON.parse(fs.readFileSync(SPEC_FIXTURE_PATH, 'utf8'));
+  const docs = SPEC_FIXTURE_PATHS.map((fixturePath) =>
+    JSON.parse(fs.readFileSync(fixturePath, 'utf8')),
+  );
   const byId = new Map();
-  for (const hero of json.heroes || []) {
+  for (const hero of docs.flatMap((json) => json.heroes || [])) {
     for (const skill of hero.skills || []) {
       if (skill.localSkillId) {
         byId.set(skill.localSkillId, { hero: hero.localHeroId || hero.name, ...skill });

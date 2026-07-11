@@ -17,6 +17,7 @@ const html = [
   fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8'),
+  fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/data/cards.js'), 'utf8'),
 ].join('\n');
 
@@ -59,7 +60,7 @@ test('unimplemented skills are visible but explicitly disabled as todo, not sile
   const todoSkills = collectSkills().filter(({ skill }) => skill.status === 'todo');
   // v8 PR-C1..C5 升级 5 个标准包技能 (guose/liuli/jijiu/qingnang/luoshen)
   // 为 implemented, 所以 todo 下限从 80 降至 70 (剩余未实现仍多于此).
-  assert.ok(todoSkills.length >= 70, 'expanded hero pool should still mark not-yet-implemented skills as todo');
+  assert.ok(todoSkills.length >= 60, 'expanded hero pool should still mark not-yet-implemented skills as todo');
   assert.equal(Engine.HERO_CATALOG.xuchu.skills[0].status, 'implemented');
   assert.equal(Engine.HERO_CATALOG.liubei.skills.find((skill) => skill.id === 'jijiang').status, 'display');
   assert.match(html, /skill-status-todo/, 'UI should render a todo style for unimplemented skills');
@@ -68,6 +69,8 @@ test('unimplemented skills are visible but explicitly disabled as todo, not sile
 
 test('player skill bar uses the engine active-skill list instead of hard-coding only Zhiheng and Kurou', () => {
   assert.match(html, /Engine\.ACTIVE_SKILL_IDS\.indexOf\(skill\.id\) >= 0/, 'UI should ask engine active skill metadata');
+  assert.match(html, /function renderPlayerSkillBar\(ctx\)/, 'lobby panel should own player skill bar rendering');
+  assert.match(html, /lobbyPanels\.renderPlayerSkillBar/, 'dom adapter should delegate player skill bar rendering to lobbyPanels');
   assert.doesNotMatch(html, /skill\.id === 'zhiheng' \|\| skill\.id === 'kurou'/, 'UI must not only enable Zhiheng and Kurou');
   assert.match(html, /function enterCardSkillMode\(skillId\)/, 'UI should use a generic card-select skill mode');
   assert.match(html, /function confirmCardSkill\(\)/, 'UI should confirm card-select skills generically');
