@@ -2,6 +2,7 @@
       import { createResponsePanels } from './panels/response-panels.js';
       import { createPromptPanels } from './panels/prompt-panels.js';
       import { createModePanels } from './panels/mode-panels.js';
+      import { createLobbyPanels } from './panels/lobby-panels.js';
 
       var Engine = SanguoshaEngine;
       var game = null;
@@ -28,6 +29,12 @@
       var playerRole = '主公';
       var enemyRole = '反贼';
       var els = {};
+
+      var lobbyPanels = createLobbyPanels({
+        els: els,
+        Engine: Engine,
+        escapeHtml: escapeHtml
+      });
 
       // v11 B2: 响应类面板装配 — els 为原地填充的稳定引用; render/renderLog/
       // escapeHtml/suitLabel 为函数声明 (提升); stage 语义 = 原 stagedModalChoice
@@ -193,56 +200,6 @@
           .replace(/'/g, '&#039;');
       }
 
-      var SKILL_TRIGGER_LABELS = {
-        playPhase: '出牌阶段',
-        drawPhase: '摸牌阶段',
-        preparePhase: '准备阶段',
-        discardPhase: '弃牌阶段',
-        turnEnd: '结束阶段',
-        damageAfter: '受伤后',
-        beforeJudgement: '判定前',
-        afterJudgement: '判定后',
-        cardUse: '使用牌',
-        cardConvert: '转化',
-        targetValidation: '目标合法性',
-        passive: '被动'
-      };
-      var SKILL_FREQUENCY_LABELS = {
-        oncePerTurn: '每回合一次',
-        unlimited: '无限制',
-        passiveAlways: '锁定'
-      };
-
-      function formatSkillCost(cost) {
-        if (!cost || cost.type === 'none') return '';
-        var n = cost.count === 'any' ? '若干' : cost.count;
-        switch (cost.type) {
-          case 'discardOwn': return '弃' + n + '张牌';
-          case 'giveHand':   return '交' + n + '张手牌';
-          case 'playHand':   return '打出' + n + '张手牌';
-          case 'loseHp':     return '失去 ' + cost.count + ' 体力';
-          case 'reduceDraw': return '少摸' + n + '张';
-          case 'judgement':  return '判定';
-          default:           return '';
-        }
-      }
-
-      function formatSkillTooltip(skill, statusText) {
-        var parts = [];
-        if (skill.desc) parts.push(skill.desc);
-        var tags = [];
-        var triggerLabel = SKILL_TRIGGER_LABELS[skill.trigger];
-        var freqLabel = SKILL_FREQUENCY_LABELS[skill.frequency];
-        var costLabel = formatSkillCost(skill.cost);
-        if (skill.mandatory) tags.push('锁定技');
-        if (triggerLabel) tags.push('时机：' + triggerLabel);
-        if (freqLabel) tags.push('频率：' + freqLabel);
-        if (costLabel) tags.push('消耗：' + costLabel);
-        if (tags.length) parts.push(tags.join('　'));
-        if (statusText) parts.push(statusText);
-        return parts.join('｜');
-      }
-
       function renderHero(actor) {
         var state = game[actor];
         els[actor + 'Name'].textContent = state.name;
@@ -261,64 +218,12 @@
         var rebelBadge = els[actor + 'RebelBadge'];
         if (rebelBadge) rebelBadge.hidden = role !== '反贼';
         if (els[actor + 'Ribbon']) els[actor + 'Ribbon'].textContent = state.camp;
-        if (actor === 'player' && els.playerSkillBar) {
-          els.playerSkillBar.innerHTML = (state.skills || []).map(function (skill) {
-            var isActiveSkill = Engine.ACTIVE_SKILL_IDS.indexOf(skill.id) >= 0;
-            var active = game.turn === 'player' && game.phase === 'play' && !enemyThinking && !game.winner && isActiveSkill && skill.status === 'implemented';
-            if (skill.id === 'zhiheng' && state.flags && state.flags.zhihengUsed) active = false;
-            if (skill.id === 'fanjian' && state.flags && state.flags.fanjianUsed) active = false;
-            if (skill.id === 'guanxing' && state.flags && state.flags.guanxingUsed) active = false;
-            if ((skill.id === 'rende' || skill.id === 'fanjian') && !state.hand.length) active = false;
-            // v6.1: spec allows 苦肉 at hp=1 (hp→0 ends the game in 1v1 but
-            // is a valid choice). Only block when truly dead.
-            if (skill.id === 'kurou' && state.hp <= 0) active = false;
-            var statusClass = skill.status ? ' skill-status-' + skill.status : '';
-            var statusText = skill.statusText || (skill.status === 'todo' ? '未实现' : '');
-            var label = skill.name + (skill.status === 'todo' ? '·未实现' : '');
-            var title = formatSkillTooltip(skill, statusText);
-            var dataAttrs = '';
-            // v6B/6C-bis: officially-optional or auto-firing skills get a
-            // toggle on the skill bar so the player can flip auto-fire vs
-            // opt-out / opt-in. Click handler is special-cased downstream
-            // so the button can be enabled outside of play.
-            //   luoyi (default auto) ↔ 'decline'  — opt out of the trade
-            //   tieqi (default auto) ↔ 'decline'  — opt out of the judge
-            //   yiji  (default auto) ↔ 'ask'      — opt in to distribute
-            if (skill.id === 'luoyi' && skill.status === 'implemented') {
-              var luoyiPref = state.skillPreferences && state.skillPreferences.luoyi;
-              var luoyiDeclined = luoyiPref === 'decline';
-              active = !enemyThinking && !game.winner && game.turn === 'player';
-              label = skill.name + '·' + (luoyiDeclined ? '本回合跳过' : '自动发动');
-              title = formatSkillTooltip(skill, statusText) + '｜点击切换本回合是否发动';
-              dataAttrs = ' data-skill-toggle="luoyi"';
-              if (luoyiDeclined) statusClass += ' skill-toggle-off';
-            } else if (skill.id === 'tieqi' && skill.status === 'implemented') {
-              var tieqiPref = state.skillPreferences && state.skillPreferences.tieqi;
-              var tieqiDeclined = tieqiPref === 'decline';
-              active = !enemyThinking && !game.winner && game.turn === 'player';
-              label = skill.name + '·' + (tieqiDeclined ? '不发动' : '自动发动');
-              title = formatSkillTooltip(skill, statusText) + '｜点击切换本【杀】是否触发铁骑判定';
-              dataAttrs = ' data-skill-toggle="tieqi"';
-              if (tieqiDeclined) statusClass += ' skill-toggle-off';
-            } else if (skill.id === 'yiji' && skill.status === 'implemented') {
-              var yijiPref = state.skillPreferences && state.skillPreferences.yiji;
-              var yijiAsk = yijiPref === 'ask';
-              active = !enemyThinking && !game.winner && game.turn === 'player';
-              label = skill.name + '·' + (yijiAsk ? '手动分配' : '全部留己');
-              title = formatSkillTooltip(skill, statusText) + '｜点击切换：摸完后是否弹出分配面板';
-              dataAttrs = ' data-skill-toggle="yiji"';
-              if (yijiAsk) statusClass += ' skill-toggle-on';
-            } else if (skill.id === 'tuxi' && skill.status === 'implemented') {
-              var tuxiPref = state.skillPreferences && state.skillPreferences.tuxi;
-              var tuxiDeclined = tuxiPref === 'decline';
-              active = !enemyThinking && !game.winner && game.turn === 'player';
-              label = skill.name + '·' + (tuxiDeclined ? '不发动' : '自动发动');
-              title = formatSkillTooltip(skill, statusText) + '｜点击切换本回合摸牌阶段是否发动';
-              dataAttrs = ' data-skill-toggle="tuxi"';
-              if (tuxiDeclined) statusClass += ' skill-toggle-off';
-            }
-            return '<button class="mini-card skill-button' + statusClass + '" data-skill-id="' + escapeHtml(skill.id) + '"' + dataAttrs + ' ' + (active ? '' : 'disabled') + ' title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
-          }).join('') || '<span class="mini-card">无技能</span>';
+        if (actor === 'player') {
+          lobbyPanels.renderPlayerSkillBar({
+            state: state,
+            game: game,
+            enemyThinking: enemyThinking
+          });
         }
       }
 
@@ -1011,30 +916,12 @@
         }
       }
 
-      function heroPackLabel(pack) {
-        var labels = { standard: '标准', wind: '风', forest: '林', fire: '火', mountain: '山', sp: 'SP' };
-        return labels[pack] || pack || '扩展';
-      }
-
-      function heroSortKey(hero) {
-        var order = { standard: 1, wind: 2, forest: 3, fire: 4, mountain: 5, sp: 6 };
-        return String(order[hero.pack] || 9) + '-' + hero.camp + '-' + hero.name;
-      }
-
       function populateHeroSelects() {
         if (!els.playerHeroSelect || !els.enemyHeroSelect) return;
         var currentPlayer = els.playerHeroSelect.value || 'liubei';
         var currentEnemy = els.enemyHeroSelect.value || 'caocao';
-        var heroes = Object.keys(Engine.HERO_CATALOG).map(function (id) { return Engine.HERO_CATALOG[id]; })
-          .sort(function (a, b) { return heroSortKey(a).localeCompare(heroSortKey(b), 'zh-Hans-CN'); });
-        function fill(select, selected) {
-          select.innerHTML = heroes.map(function (hero) {
-            return '<option value="' + escapeHtml(hero.id) + '">' + escapeHtml('[' + heroPackLabel(hero.pack) + '] ' + hero.name + ' · ' + hero.camp + ' · ' + (hero.skills || []).map(function (skill) { return skill.name; }).join('/')) + '</option>';
-          }).join('');
-          select.value = Engine.HERO_CATALOG[selected] ? selected : (select === els.playerHeroSelect ? 'liubei' : 'caocao');
-        }
-        fill(els.playerHeroSelect, currentPlayer);
-        fill(els.enemyHeroSelect, currentEnemy);
+        lobbyPanels.fillHeroSelect(els.playerHeroSelect, currentPlayer, 'liubei');
+        lobbyPanels.fillHeroSelect(els.enemyHeroSelect, currentEnemy, 'caocao');
         ensureDistinctHeroes('player');
         renderHeroPickGrid();
       }
@@ -1058,54 +945,13 @@
       }
 
       function renderHeroPickGrid() {
-        if (!els.heroPickGrid) return;
-        var heroes = Object.keys(Engine.HERO_CATALOG).map(function (id) { return Engine.HERO_CATALOG[id]; })
-          .sort(function (a, b) { return heroSortKey(a).localeCompare(heroSortKey(b), 'zh-Hans-CN'); });
-        var playerVal = els.playerHeroSelect ? els.playerHeroSelect.value : '';
-        var enemyVal = els.enemyHeroSelect ? els.enemyHeroSelect.value : '';
-        els.heroPickGrid.innerHTML = heroes.map(function (hero) {
-          var classes = ['hero-pick-card', 'hero-pick-card--camp-' + (hero.camp || '?')];
-          var isPlayerPicked = hero.id === playerVal && playerVal !== '';
-          var isEnemyPicked = hero.id === enemyVal && enemyVal !== '';
-          if (isPlayerPicked) classes.push('is-player-selected');
-          if (isEnemyPicked) classes.push('is-enemy-selected');
-          // v9 PR-E11: 当前 side 不能选已被对方选走的 hero, 锁定 + disable.
-          var locked = (currentPickSide === 'player' && isEnemyPicked)
-                    || (currentPickSide === 'enemy' && isPlayerPicked);
-          if (locked) classes.push('is-locked');
-          return '<button type="button" class="' + classes.join(' ') + '" data-hero-id="' + escapeHtml(hero.id) + '"' + (locked ? ' disabled' : '') + '>'
-            + '<span class="hero-pick-card__camp">' + escapeHtml(hero.camp || '?') + '</span>'
-            + '<span class="hero-pick-card__name">' + escapeHtml(hero.name) + '</span>'
-            + '</button>';
-        }).join('');
-        // tab values + 可见性 (顺序选将只显示当前 side 的 tab)
-        if (els.heroPickPlayerValue) {
-          var pH = playerVal ? Engine.HERO_CATALOG[playerVal] : null;
-          els.heroPickPlayerValue.textContent = pH ? pH.name : '未选';
-        }
-        if (els.heroPickEnemyValue) {
-          var eH = enemyVal ? Engine.HERO_CATALOG[enemyVal] : null;
-          els.heroPickEnemyValue.textContent = eH ? eH.name : '未选';
-        }
-        if (els.heroPickPlayerTab) {
-          els.heroPickPlayerTab.hidden = (currentPickSide !== 'player');
-          els.heroPickPlayerTab.classList.toggle('is-active', currentPickSide === 'player');
-        }
-        if (els.heroPickEnemyTab) {
-          els.heroPickEnemyTab.hidden = (currentPickSide !== 'enemy');
-          els.heroPickEnemyTab.classList.toggle('is-active', currentPickSide === 'enemy');
-        }
-        // 随机按钮也只显示当前 side 的
-        if (els.randomPlayerHeroBtn) els.randomPlayerHeroBtn.hidden = (currentPickSide !== 'player');
-        if (els.randomEnemyHeroBtn) els.randomEnemyHeroBtn.hidden = (currentPickSide !== 'enemy');
-        if (els.heroPickPrompt) {
-          var sideRole = currentPickSide === 'player' ? playerRole : enemyRole;
-          if (currentPickSide === 'player') {
-            els.heroPickPrompt.textContent = sideRole === '主公' ? '您是主公，请选将' : '您是反贼，请选将';
-          } else {
-            els.heroPickPrompt.textContent = sideRole === '主公' ? '请为对手 (主公) 选将' : '请为对手 (反贼) 选将';
-          }
-        }
+        lobbyPanels.renderHeroPickGrid({
+          currentPickSide: currentPickSide,
+          playerVal: els.playerHeroSelect ? els.playerHeroSelect.value : '',
+          enemyVal: els.enemyHeroSelect ? els.enemyHeroSelect.value : '',
+          playerRole: playerRole,
+          enemyRole: enemyRole
+        });
       }
 
       function handleHeroPickCardClick(heroId) {

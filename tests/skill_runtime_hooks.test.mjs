@@ -67,6 +67,8 @@ test('runHook executes matching hooks in registration order with shared context'
   ]);
 });
 
+
+
 test('game engine registers Biyue through the shared skill registry seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
 
@@ -359,14 +361,15 @@ test('game engine dispatches Guanxing preview through onSkillPreview hook seam',
 
 test('game engine dispatches Tiandu judgement-card gain through onJudgementAfterResolve hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const judgeStart = source.indexOf('function judge(game, actor, reason, opts)');
-  const processStart = source.indexOf('function processJudgeArea(game, actor)', judgeStart);
-  const processEnd = source.indexOf('function removeTargetZoneCard(game, targetActor, zone, cardId)', processStart);
+  const judgeAreaSource = fs.readFileSync(path.join(root, 'src/engine/judge-area.js'), 'utf8');
+  const judgeStart = judgeAreaSource.indexOf('function judge(game, actor, reason, opts)');
+  const processStart = judgeAreaSource.indexOf('function processJudgeArea(game, actor)', judgeStart);
+  const processEnd = judgeAreaSource.indexOf('return {', processStart);
   assert.ok(judgeStart >= 0 && processStart > judgeStart && processEnd > processStart, 'judgement source should be extractable');
-  const judgementSource = source.slice(judgeStart, processEnd);
+  const judgementSource = judgeAreaSource.slice(judgeStart, processEnd);
 
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tiandu['"][\s\S]*?onJudgementAfterResolve\s*:/, 'Tiandu should register an onJudgementAfterResolve hook');
-  assert.match(source, /triggerTianduJudgementAfterResolve\(context\)/, 'Tiandu hook should delegate to an isolated helper');
+  assert.match(skillsSource, /triggerTianduJudgementAfterResolve\(context\)/, 'Tiandu hook should delegate to an isolated helper');
   assert.match(judgementSource, /var judgementContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*state[\s\S]*reason:\s*reason[\s\S]*card:\s*card[\s\S]*\}/, 'judge should build a judgement context before discarding the judgement card');
   assert.match(judgementSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onJudgementAfterResolve['"]\s*,\s*judgementContext\s*\)/, 'judge should dispatch judgement-card resolution through SkillRuntime');
   assert.match(judgementSource, /if \(!judgementContext\.claimed\) \{[\s\S]*discardCard\(game, card\);[\s\S]*\}/, 'unclaimed judgement cards should still enter discard');
@@ -419,13 +422,14 @@ test('game engine dispatches Luoyi through draw and damage-modifier hook seams',
 
 test('game engine dispatches Guicai through judgement before-resolve hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const judgeStart = source.indexOf('function judge(game, actor, reason, opts)');
-  const judgeEnd = source.indexOf('function resolveJudgementCard(game, actor, state, reason, card)', judgeStart);
+  const judgeAreaSource = fs.readFileSync(path.join(root, 'src/engine/judge-area.js'), 'utf8');
+  const judgeStart = judgeAreaSource.indexOf('function judge(game, actor, reason, opts)');
+  const judgeEnd = judgeAreaSource.indexOf('function resolveJudgementCard(game, actor, state, reason, card)', judgeStart);
   assert.ok(judgeStart >= 0 && judgeEnd > judgeStart, 'judge source should be extractable');
-  const judgeSource = source.slice(judgeStart, judgeEnd);
+  const judgeSource = judgeAreaSource.slice(judgeStart, judgeEnd);
 
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]guicai['"][\s\S]*?onJudgementBeforeResolve\s*:/, 'Guicai should register an onJudgementBeforeResolve hook');
-  assert.match(source, /triggerGuicaiJudgementBeforeResolve\(context\)/, 'Guicai hook should delegate to an isolated helper');
+  assert.match(skillsSource, /triggerGuicaiJudgementBeforeResolve\(context\)/, 'Guicai hook should delegate to an isolated helper');
   // v6.1 (cross-actor fix): the holder may be either the judgement actor
   // (own-judgement case) or the opponent (司马懿 replacing opponent's
   // judgement). We accept `state` or `holderState` as the variable name.

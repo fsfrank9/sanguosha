@@ -9,6 +9,7 @@
       import { createResponseRuntime } from './response.js';
       import { createTricksRuntime } from './tricks.js';
       import { createEquipmentRuntime } from './equipment.js';
+      import { createJudgeAreaRuntime } from './judge-area.js';
       import { installStandardSkillHandlers, PLAY_PHASE_ACTIVE_SKILLS } from './skills.js';
       import { HERO_CATALOG, HEROES } from '../data/heroes.js';
       import { CARD_CATALOG, CARD_INFO, PHASES } from '../data/cards.js';
@@ -1975,154 +1976,23 @@
 
       // v11 B1: 银月枪触发与响应已迁往 ./equipment.js (见 EquipmentRuntime 装配)。
 
-      function judge(game, actor, reason, opts) {
-        reshuffleIfNeeded(game);
-        // 判定牌离开牌堆进入在途结算, 结算收尾统一 discardCard (或被天妒等收走)。
-        var card = takeCard(game, null, { zone: 'deck' });
-        if (!card) return null;
-        log(game, actorName(game, actor) + '进行' + reason + '判定：【' + card.name + '】' + card.suit + ' ' + card.rank + '。');
-        var state = game[actor];
-        var judgementContext = {
-          game: game,
-          actor: actor,
-          state: state,
-          reason: reason,
-          card: card,
-          originalCard: card,
-          replaced: false,
-          // v6.1: only processJudgeArea's caller can suspend a judgement
-          // mid-resolution (it has the pauseState snapshot to resume from).
-          // Other callers (bagua armor judge, ganglie judge, tieqi judge)
-          // run judge() inside their own multi-step logic with no resume
-          // point, so 鬼才 falls back to auto-fire there. processJudgeArea
-          // passes `{ pausable: true }`; others leave the default false.
-          pausable: !!(opts && opts.pausable)
-        };
-        SkillRuntime.runHook(skillRegistry, 'onJudgementBeforeResolve', judgementContext);
-        return judgementContext.card;
-      }
-
-      function resolveJudgementCard(game, actor, state, reason, card) {
-        if (!card) return;
-        var judgementContext = {
-          game: game,
-          actor: actor,
-          state: state,
-          reason: reason,
-          card: card
-        };
-        SkillRuntime.runHook(skillRegistry, 'onJudgementAfterResolve', judgementContext);
-        if (!judgementContext.claimed) {
-          discardCard(game, card);
-        }
-      }
-
-      function judgementReasonFor(trick) {
-        if (!trick) return null;
-        if (trick.type === 'lebusishu') return '【乐不思蜀】';
-        if (trick.type === 'bingliang') return '【兵粮寸断】';
-        if (trick.type === 'shandian') return '【闪电】';
-        return null;
-      }
-
-      // Re-entrant judge-area processor. State that needs to survive a pause
-      // (e.g. 鬼才 prompting) is held on game.pauseState.judgeArea so the
-      // same function can resume from the right trick index after the player
-      // resolves the prompt.
-      function processJudgeArea(game, actor) {
-        var state = game[actor];
-        state.flags = state.flags || {};
-        if (!game.pauseState) game.pauseState = {};
-        var saved = game.pauseState.judgeArea;
-        var pending;
-        var startIdx;
-        if (saved && saved.actor === actor) {
-          pending = saved.pending;
-          startIdx = saved.idx;
-        } else {
-          state.flags.skipPlay = false;
-          state.flags.skipDraw = false;
-          if (!state.judgeArea) state.judgeArea = [];
-          // 整批取出判定区待结算牌 (在途), 逐张结算后 discardCard / 移动。
-          pending = state.judgeArea.splice(0);
-          startIdx = 0;
-        }
-        for (var i = startIdx; i < pending.length; i += 1) {
-          var trick = pending[i];
-          var reason = judgementReasonFor(trick);
-          var judgementCard = reason ? judge(game, actor, reason, { pausable: true }) : null;
-          if (game.pendingChoice) {
-            // judge() invoked a hook that asked for a choice. Snapshot the
-            // iteration so resolvePendingChoice can pick up where we left off.
-            game.pauseState.judgeArea = {
-              actor: actor,
-              pending: pending,
-              idx: i,
-              currentTrick: trick,
-              currentReason: reason,
-              currentJudgementCard: judgementCard
-            };
-            return { suspended: true };
-          }
-          applyJudgeAreaOutcome(game, actor, state, trick, reason, judgementCard);
-          if (game.phase === 'gameover') {
-            if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
-            return { ok: true };
-          }
-          if (game.pendingChoice) {
-            // H2: outcome 结算本身产生了待玩家选择 (如【闪电】命中致濒死求桃 /
-            // 遗计逐点分配)。此前这里不检查, 濒死角色会带着挂起的 pendingChoice
-            // 照常摸牌进入出牌阶段。挂起并标记 outcomeApplied (idx 已前进),
-            // 由 finishPendingChoiceResolution 在所有选择排空后续跑回合。
-            game.pauseState.judgeArea = {
-              actor: actor,
-              pending: pending,
-              idx: i + 1,
-              outcomeApplied: true
-            };
-            return { suspended: true };
-          }
-        }
-        // Clear the snapshot if we exited cleanly.
-        if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
-        return { ok: true };
-      }
-
-      function applyJudgeAreaOutcome(game, actor, state, trick, reason, judgementCard) {
-        var outcome = evaluateDelayedTrick(trick, judgementCard);
-        if (outcome.skipPlay) {
-          state.flags.skipPlay = true;
-          log(game, actorName(game, actor) + '【乐不思蜀】判定失败，跳过出牌阶段。');
-        }
-        if (outcome.skipDraw) {
-          state.flags.skipDraw = true;
-          log(game, actorName(game, actor) + '【兵粮寸断】判定失败，跳过摸牌阶段。');
-        }
-        if (trick.type === 'shandian' && outcome.hit) {
-          damage(game, actor, outcome.damage, null, '【闪电】');
-        } else if (trick.type === 'shandian' && outcome.moveToNext) {
-          // v7 PR-12: gltjk card__scroll.md 注 — "若其下家不是此【闪电】的
-          // 合法目标，则将对应的实体牌置入其下家的下家的判定区，以此类推。
-          // 若所有角色都不是此【闪电】的合法目标，则将对应的实体牌置入其
-          // 判定区。" 在 1v1 中只有 2 名角色：下家=对手；下家的下家=自己。
-          // PR-6 已定义 "判定区里有同名延时锦囊的角色 = 非合法目标"。
-          var foeActor = opponent(actor);
-          var foeState = game[foeActor];
-          var foeAlreadyShandian = (foeState.judgeArea || []).some(function (j) {
-            return j && j.type === 'shandian';
-          });
-          if (foeAlreadyShandian) {
-            // 对手已有 闪电 → 非合法目标 → 全部不合法 → 回到自己
-            putCard(game, trick, { zone: 'judgeArea', actor: actor });
-            log(game, '【闪电】移动失败（对手判定区已有同名牌），留在' + actorName(game, actor) + '的判定区。');
-          } else {
-            putCard(game, trick, { zone: 'judgeArea', actor: foeActor });
-            log(game, '【闪电】移至' + actorName(game, foeActor) + '的判定区。');
-          }
-        }
-        resolveJudgementCard(game, actor, state, reason, judgementCard);
-        if (outcome.discardTrick) discardCard(game, trick);
-      }
+      var JudgeAreaRuntime = createJudgeAreaRuntime({
+        skillRegistry: skillRegistry,
+        reshuffleIfNeeded: reshuffleIfNeeded,
+        takeCard: takeCard,
+        putCard: putCard,
+        discardCard: discardCard,
+        log: log,
+        actorName: actorName,
+        evaluateDelayedTrick: evaluateDelayedTrick,
+        damage: function (g, a, n, s, r, c, nature, opts) { return damage(g, a, n, s, r, c, nature, opts); },
+        opponent: opponent
+      });
+      var judge = JudgeAreaRuntime.judge;
+      var resolveJudgementCard = JudgeAreaRuntime.resolveJudgementCard;
+      var judgementReasonFor = JudgeAreaRuntime.judgementReasonFor;
+      var processJudgeArea = JudgeAreaRuntime.processJudgeArea;
+      var applyJudgeAreaOutcome = JudgeAreaRuntime.applyJudgeAreaOutcome;
 
       function getPendingChoice(game) {
         return (game && game.pendingChoice) || null;
@@ -3129,12 +2999,35 @@
           if (huogongChoice.usableCostIds.indexOf(options.huogongCostCardId) < 0) return fail('请选择与展示牌同花色的手牌。');
         }
         card = removeCardFromHand(self, cardId);
+        return playCardWithRegisteredHandler(game, actor, card, options, self);
+      }
 
-        if (isShaCard(card)) return playSha(game, actor, card);
+      var PLAY_HANDLERS = {};
+      function registerPlayHandler(key, handler) {
+        PLAY_HANDLERS[key] = handler;
+      }
 
-        if (card.family === 'equipment') return equipCard(game, actor, card);
+      function playHandlerKey(card) {
+        if (isShaCard(card)) return 'sha';
+        if (card && card.family === 'equipment') return 'equipment';
+        if (card && card.family === 'delayed') return 'delayed';
+        return (card && card.type) || 'default';
+      }
 
-        if (card.family === 'delayed') {
+      function playCardWithRegisteredHandler(game, actor, card, options, self) {
+        var handler = PLAY_HANDLERS[playHandlerKey(card)] || PLAY_HANDLERS.default;
+        return handler(game, actor, card, options || {}, self);
+      }
+
+      function playShaCardHandler(game, actor, card, options, self) {
+        return playSha(game, actor, card);
+      }
+
+      function playEquipmentCardHandler(game, actor, card, options, self) {
+        return equipCard(game, actor, card);
+      }
+
+      function playDelayedCardHandler(game, actor, card, options, self) {
           // H1: 延时锦囊放置前开无懈窗口 (gltjk card__scroll.md — 无懈可击可在
           // 锦囊「对一个目标生效前」抵消; 延时锦囊于放置时即指定目标)。
           // 乐不思蜀/兵粮寸断 → 对方判定区; 闪电 → 自己判定区。无懈响应者恒为
@@ -3143,9 +3036,9 @@
           return checkWuxieAndContinue(game, opponent(actor), '【' + card.name + '】', 'delayed-place', {
             actor: actor, card: card, options: options, delayedSide: delayedSide
           });
-        }
+      }
 
-        if (card.type === 'tao') {
+      function playTaoCardHandler(game, actor, card, options, self) {
           // v7 PR-1: 目标"包括你在内的一名已受伤的角色"。options.taoTarget
           // 可指定 'player' / 'enemy'；未指定时默认为发动者，若发动者满血而对手
           // 受伤则回退到对手（保持 canPlayCard 已放行的合法性）。
@@ -3168,9 +3061,9 @@
           taoTargetState.hp = Math.min(taoTargetState.maxHp, taoTargetState.hp + taoHeal);
           log(game, actorName(game, actor) + '使用【桃】' + (taoTargetActor === actor ? '' : '对' + actorName(game, taoTargetActor)) + '，回复 ' + taoHeal + ' 点体力。');
           return success('回复体力。');
-        }
+      }
 
-        if (card.type === 'jiu') {
+      function playJiuCardHandler(game, actor, card, options, self) {
           // v7 PR-8: 标记已用 + shaBonus = 1（不累加，spec "下一张【杀】"
           // 即下一次结算 +1，不是叠加多次酒）
           discardCard(game, card);
@@ -3179,9 +3072,9 @@
           self.shaBonus = 1;
           log(game, actorName(game, actor) + '饮下【酒】，本回合下一张【杀】伤害 +1。');
           return success('下一张杀伤害提升。');
-        }
+      }
 
-        if (card.type === 'wuzhong') {
+      function playWuzhongCardHandler(game, actor, card, options, self) {
           // v7 PR-16: gltjk card__scroll.md 无中生有 (1V1/界限突破/国-标):
           //   "使用目标: 包括你在内的一名角色"。options.wuzhongTarget 可指定
           //   'player' / 'enemy'; 未指定时默认 = actor。
@@ -3197,45 +3090,47 @@
           return checkWuxieAndContinue(game, opponent(actor), '【无中生有】', 'wuzhong', {
             actor: actor, card: card, options: options, wzTargetActor: wzTargetActor
           });
-        }
+      }
 
-        if (card.type === 'juedou') {
+      function playJuedouCardHandler(game, actor, card, options, self) {
           // v10 V5: 走无懈链框架. WUXIE_CONTINUATIONS['juedou'] 注册在 trick 区下方.
           return checkWuxieAndContinue(game, opponent(actor), '【决斗】', 'juedou', {
             actor: actor, card: card, options: options
           });
-        }
-        // H1: 南蛮入侵 / 万箭齐发 在 1v1 中只有 1 名目标 (对方), 单个无懈窗口
+      }
+
+      // H1: 南蛮入侵 / 万箭齐发 在 1v1 中只有 1 名目标 (对方), 单个无懈窗口
         // 即与官方一致。无懈窗口在 playAOE (响应 / 伤害) 之前。
-        if (card.type === 'nanman') {
+      function playNanmanCardHandler(game, actor, card, options, self) {
           return checkWuxieAndContinue(game, opponent(actor), '【南蛮入侵】', 'nanman', {
             actor: actor, card: card, options: options
           });
-        }
-        if (card.type === 'wanjian') {
+      }
+
+      function playWanjianCardHandler(game, actor, card, options, self) {
           return checkWuxieAndContinue(game, opponent(actor), '【万箭齐发】', 'wanjian', {
             actor: actor, card: card, options: options
           });
-        }
+      }
 
-        if (card.type === 'guohe') {
+      function playGuoheCardHandler(game, actor, card, options, self) {
           // v7 PR-9: 1V1 变体两选项 — 装备区一张 / 看手并弃一张。
           // v10 V5: 走无懈链框架.
           discardCard(game, card);
           return checkWuxieAndContinue(game, opponent(actor), '【过河拆桥】', 'guohe', {
             actor: actor, card: card, options: options
           });
-        }
+      }
 
-        if (card.type === 'shunshou') {
+      function playShunshouCardHandler(game, actor, card, options, self) {
           // v10 V5: 走无懈链框架.
           discardCard(game, card);
           return checkWuxieAndContinue(game, opponent(actor), '【顺手牵羊】', 'shunshou', {
             actor: actor, card: card, options: options
           });
-        }
+      }
 
-        if (card.type === 'taoyuan') {
+      function playTaoyuanCardHandler(game, actor, card, options, self) {
           discardCard(game, card);
           // v7 PR-2 + H1b: gltjk card__scroll.md "对未受伤的角色无效"; 多角色
           // 结算顺序从发动者起逆时针 = [actor, opponent]。H1b: 每名受伤目标各
@@ -3249,9 +3144,9 @@
           return advanceTaoyuanTargets(game, {
             actor: actor, card: card, options: options, targets: taoyuanTargets, idx: 0
           });
-        }
+      }
 
-        if (card.type === 'wugu') {
+      function playWuguCardHandler(game, actor, card, options, self) {
           // v7 PR-7: gltjk card__scroll.md 五谷丰登 —
           //   "执行动作：当此牌指定目标后，你亮出牌堆顶的 X 张牌（X 为目标数）。"
           //   "作用效果：目标角色获得这些牌中（剩余）的一张牌。"
@@ -3279,17 +3174,17 @@
           log(game, actorName(game, actor) + '使用【五谷丰登】，亮出 ' + wuguPool.map(function (c) { return '【' + c.name + '】'; }).join(' / ') + '。');
           // 多角色结算顺序原则：从当前回合角色起按逆时针 → 1v1 即 [actor, opponent(actor)]
           return finishTrickUse(game, actor, card, processWuguPick(game, actor, card, wuguPool, [actor, opponent(actor)], 0, options), options);
-        }
+      }
 
-        if (card.type === 'huogong') {
+      function playHuogongCardHandler(game, actor, card, options, self) {
           // v10 V5: 走无懈链框架. 后续 huogong 流程移到 WUXIE_CONTINUATIONS['huogong'].
           discardCard(game, card);
           return checkWuxieAndContinue(game, opponent(actor), '【火攻】', 'huogong', {
             actor: actor, card: card, options: options
           });
-        }
+      }
 
-        if (card.type === 'tiesuo') {
+      function playTiesuoCardHandler(game, actor, card, options, self) {
           discardCard(game, card);
           if (options.mode === 'recast') {
             log(game, actorName(game, actor) + '重铸【铁索连环】，摸一张牌。');
@@ -3305,9 +3200,9 @@
             log(game, actorName(game, actor) + '使用【铁索连环】，' + actorName(game, side) + (game[side].chained ? '横置。' : '重置。'));
           });
           return finishTrickUse(game, actor, card, success('铁索连环结算完成。'), options);
-        }
+      }
 
-        if (card.type === 'jiedao') {
+      function playJiedaoCardHandler(game, actor, card, options, self) {
           // v7 PR-5: gltjk card__scroll.md 注 — 须做两次合法性检测.
           // 第一次已在 canPlayCard 检过; 这里做第二次 (在 jiedao 继续逻辑里).
           // v10 V5: 走无懈链框架.
@@ -3315,11 +3210,30 @@
           return checkWuxieAndContinue(game, opponent(actor), '【借刀杀人】', 'jiedao', {
             actor: actor, card: card, options: options
           });
-        }
+      }
 
+      function playDefaultCardHandler(game, actor, card, options, self) {
         discardCard(game, card);
         return success('卡牌已使用。');
       }
+
+      registerPlayHandler('sha', playShaCardHandler);
+      registerPlayHandler('equipment', playEquipmentCardHandler);
+      registerPlayHandler('delayed', playDelayedCardHandler);
+      registerPlayHandler('tao', playTaoCardHandler);
+      registerPlayHandler('jiu', playJiuCardHandler);
+      registerPlayHandler('wuzhong', playWuzhongCardHandler);
+      registerPlayHandler('juedou', playJuedouCardHandler);
+      registerPlayHandler('nanman', playNanmanCardHandler);
+      registerPlayHandler('wanjian', playWanjianCardHandler);
+      registerPlayHandler('guohe', playGuoheCardHandler);
+      registerPlayHandler('shunshou', playShunshouCardHandler);
+      registerPlayHandler('taoyuan', playTaoyuanCardHandler);
+      registerPlayHandler('wugu', playWuguCardHandler);
+      registerPlayHandler('huogong', playHuogongCardHandler);
+      registerPlayHandler('tiesuo', playTiesuoCardHandler);
+      registerPlayHandler('jiedao', playJiedaoCardHandler);
+      registerPlayHandler('default', playDefaultCardHandler);
 
       // v11 B1 第五步: 各锦囊 continuation / 桃园五谷逐目标推进 / 火攻结算
       // 已随框架迁入 ./tricks.js (见下方 TricksRuntime 装配)。
