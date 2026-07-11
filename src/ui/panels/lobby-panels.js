@@ -8,6 +8,56 @@
         return String(order[hero.pack] || 9) + '-' + hero.camp + '-' + hero.name;
       }
 
+      var SKILL_TRIGGER_LABELS = {
+        playPhase: '出牌阶段',
+        drawPhase: '摸牌阶段',
+        preparePhase: '准备阶段',
+        discardPhase: '弃牌阶段',
+        turnEnd: '结束阶段',
+        damageAfter: '受伤后',
+        beforeJudgement: '判定前',
+        afterJudgement: '判定后',
+        cardUse: '使用牌',
+        cardConvert: '转化',
+        targetValidation: '目标合法性',
+        passive: '被动'
+      };
+      var SKILL_FREQUENCY_LABELS = {
+        oncePerTurn: '每回合一次',
+        unlimited: '无限制',
+        passiveAlways: '锁定'
+      };
+
+      function formatSkillCost(cost) {
+        if (!cost || cost.type === 'none') return '';
+        var n = cost.count === 'any' ? '若干' : cost.count;
+        switch (cost.type) {
+          case 'discardOwn': return '弃' + n + '张牌';
+          case 'giveHand':   return '交' + n + '张手牌';
+          case 'playHand':   return '打出' + n + '张手牌';
+          case 'loseHp':     return '失去 ' + cost.count + ' 体力';
+          case 'reduceDraw': return '少摸' + n + '张';
+          case 'judgement':  return '判定';
+          default:           return '';
+        }
+      }
+
+      function formatSkillTooltip(skill, statusText) {
+        var parts = [];
+        if (skill.desc) parts.push(skill.desc);
+        var tags = [];
+        var triggerLabel = SKILL_TRIGGER_LABELS[skill.trigger];
+        var freqLabel = SKILL_FREQUENCY_LABELS[skill.frequency];
+        var costLabel = formatSkillCost(skill.cost);
+        if (skill.mandatory) tags.push('锁定技');
+        if (triggerLabel) tags.push('时机：' + triggerLabel);
+        if (freqLabel) tags.push('频率：' + freqLabel);
+        if (costLabel) tags.push('消耗：' + costLabel);
+        if (tags.length) parts.push(tags.join('　'));
+        if (statusText) parts.push(statusText);
+        return parts.join('｜');
+      }
+
       export function createLobbyPanels(deps) {
         var Engine = deps.Engine;
         var escapeHtml = deps.escapeHtml;
@@ -83,10 +133,68 @@
           updateHeroPickChrome(state);
         }
 
+        function skillButtonHtml(skill, state, game, enemyThinking) {
+          var isActiveSkill = Engine.ACTIVE_SKILL_IDS.indexOf(skill.id) >= 0;
+          var active = game.turn === 'player' && game.phase === 'play' && !enemyThinking && !game.winner && isActiveSkill && skill.status === 'implemented';
+          if (skill.id === 'zhiheng' && state.flags && state.flags.zhihengUsed) active = false;
+          if (skill.id === 'fanjian' && state.flags && state.flags.fanjianUsed) active = false;
+          if (skill.id === 'guanxing' && state.flags && state.flags.guanxingUsed) active = false;
+          if ((skill.id === 'rende' || skill.id === 'fanjian') && !state.hand.length) active = false;
+          if (skill.id === 'kurou' && state.hp <= 0) active = false;
+          var statusClass = skill.status ? ' skill-status-' + skill.status : '';
+          var statusText = skill.statusText || (skill.status === 'todo' ? '未实现' : '');
+          var label = skill.name + (skill.status === 'todo' ? '·未实现' : '');
+          var title = formatSkillTooltip(skill, statusText);
+          var dataAttrs = '';
+          if (skill.id === 'luoyi' && skill.status === 'implemented') {
+            var luoyiPref = state.skillPreferences && state.skillPreferences.luoyi;
+            var luoyiDeclined = luoyiPref === 'decline';
+            active = !enemyThinking && !game.winner && game.turn === 'player';
+            label = skill.name + '·' + (luoyiDeclined ? '本回合跳过' : '自动发动');
+            title = formatSkillTooltip(skill, statusText) + '｜点击切换本回合是否发动';
+            dataAttrs = ' data-skill-toggle="luoyi"';
+            if (luoyiDeclined) statusClass += ' skill-toggle-off';
+          } else if (skill.id === 'tieqi' && skill.status === 'implemented') {
+            var tieqiPref = state.skillPreferences && state.skillPreferences.tieqi;
+            var tieqiDeclined = tieqiPref === 'decline';
+            active = !enemyThinking && !game.winner && game.turn === 'player';
+            label = skill.name + '·' + (tieqiDeclined ? '不发动' : '自动发动');
+            title = formatSkillTooltip(skill, statusText) + '｜点击切换本【杀】是否触发铁骑判定';
+            dataAttrs = ' data-skill-toggle="tieqi"';
+            if (tieqiDeclined) statusClass += ' skill-toggle-off';
+          } else if (skill.id === 'yiji' && skill.status === 'implemented') {
+            var yijiPref = state.skillPreferences && state.skillPreferences.yiji;
+            var yijiAsk = yijiPref === 'ask';
+            active = !enemyThinking && !game.winner && game.turn === 'player';
+            label = skill.name + '·' + (yijiAsk ? '手动分配' : '全部留己');
+            title = formatSkillTooltip(skill, statusText) + '｜点击切换：摸完后是否弹出分配面板';
+            dataAttrs = ' data-skill-toggle="yiji"';
+            if (yijiAsk) statusClass += ' skill-toggle-on';
+          } else if (skill.id === 'tuxi' && skill.status === 'implemented') {
+            var tuxiPref = state.skillPreferences && state.skillPreferences.tuxi;
+            var tuxiDeclined = tuxiPref === 'decline';
+            active = !enemyThinking && !game.winner && game.turn === 'player';
+            label = skill.name + '·' + (tuxiDeclined ? '不发动' : '自动发动');
+            title = formatSkillTooltip(skill, statusText) + '｜点击切换本回合摸牌阶段是否发动';
+            dataAttrs = ' data-skill-toggle="tuxi"';
+            if (tuxiDeclined) statusClass += ' skill-toggle-off';
+          }
+          return '<button class="mini-card skill-button' + statusClass + '" data-skill-id="' + escapeHtml(skill.id) + '"' + dataAttrs + ' ' + (active ? '' : 'disabled') + ' title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
+        }
+
+        function renderPlayerSkillBar(ctx) {
+          if (!els.playerSkillBar) return;
+          var state = ctx.state;
+          els.playerSkillBar.innerHTML = (state.skills || []).map(function (skill) {
+            return skillButtonHtml(skill, state, ctx.game, ctx.enemyThinking);
+          }).join('') || '<span class="mini-card">无技能</span>';
+        }
+
         return {
           heroPackLabel: heroPackLabel,
           heroSortKey: heroSortKey,
           fillHeroSelect: fillHeroSelect,
-          renderHeroPickGrid: renderHeroPickGrid
+          renderHeroPickGrid: renderHeroPickGrid,
+          renderPlayerSkillBar: renderPlayerSkillBar
         };
       }

@@ -17,6 +17,7 @@ const html = [
   fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8'),
+  fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/data/cards.js'), 'utf8'),
 ].join('\n');
 
@@ -68,6 +69,8 @@ test('unimplemented skills are visible but explicitly disabled as todo, not sile
 
 test('player skill bar uses the engine active-skill list instead of hard-coding only Zhiheng and Kurou', () => {
   assert.match(html, /Engine\.ACTIVE_SKILL_IDS\.indexOf\(skill\.id\) >= 0/, 'UI should ask engine active skill metadata');
+  assert.match(html, /function renderPlayerSkillBar\(ctx\)/, 'lobby panel should own player skill bar rendering');
+  assert.match(html, /lobbyPanels\.renderPlayerSkillBar/, 'dom adapter should delegate player skill bar rendering to lobbyPanels');
   assert.doesNotMatch(html, /skill\.id === 'zhiheng' \|\| skill\.id === 'kurou'/, 'UI must not only enable Zhiheng and Kurou');
   assert.match(html, /function enterCardSkillMode\(skillId\)/, 'UI should use a generic card-select skill mode');
   assert.match(html, /function confirmCardSkill\(\)/, 'UI should confirm card-select skills generically');

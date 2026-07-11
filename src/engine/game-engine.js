@@ -3019,12 +3019,15 @@
         return handler(game, actor, card, options || {}, self);
       }
 
-      function playCardLegacyDispatch(game, actor, card, options, self) {
-        if (isShaCard(card)) return playSha(game, actor, card);
+      function playShaCardHandler(game, actor, card, options, self) {
+        return playSha(game, actor, card);
+      }
 
-        if (card.family === 'equipment') return equipCard(game, actor, card);
+      function playEquipmentCardHandler(game, actor, card, options, self) {
+        return equipCard(game, actor, card);
+      }
 
-        if (card.family === 'delayed') {
+      function playDelayedCardHandler(game, actor, card, options, self) {
           // H1: 延时锦囊放置前开无懈窗口 (gltjk card__scroll.md — 无懈可击可在
           // 锦囊「对一个目标生效前」抵消; 延时锦囊于放置时即指定目标)。
           // 乐不思蜀/兵粮寸断 → 对方判定区; 闪电 → 自己判定区。无懈响应者恒为
@@ -3033,9 +3036,9 @@
           return checkWuxieAndContinue(game, opponent(actor), '【' + card.name + '】', 'delayed-place', {
             actor: actor, card: card, options: options, delayedSide: delayedSide
           });
-        }
+      }
 
-        if (card.type === 'tao') {
+      function playTaoCardHandler(game, actor, card, options, self) {
           // v7 PR-1: 目标"包括你在内的一名已受伤的角色"。options.taoTarget
           // 可指定 'player' / 'enemy'；未指定时默认为发动者，若发动者满血而对手
           // 受伤则回退到对手（保持 canPlayCard 已放行的合法性）。
@@ -3058,9 +3061,9 @@
           taoTargetState.hp = Math.min(taoTargetState.maxHp, taoTargetState.hp + taoHeal);
           log(game, actorName(game, actor) + '使用【桃】' + (taoTargetActor === actor ? '' : '对' + actorName(game, taoTargetActor)) + '，回复 ' + taoHeal + ' 点体力。');
           return success('回复体力。');
-        }
+      }
 
-        if (card.type === 'jiu') {
+      function playJiuCardHandler(game, actor, card, options, self) {
           // v7 PR-8: 标记已用 + shaBonus = 1（不累加，spec "下一张【杀】"
           // 即下一次结算 +1，不是叠加多次酒）
           discardCard(game, card);
@@ -3069,9 +3072,9 @@
           self.shaBonus = 1;
           log(game, actorName(game, actor) + '饮下【酒】，本回合下一张【杀】伤害 +1。');
           return success('下一张杀伤害提升。');
-        }
+      }
 
-        if (card.type === 'wuzhong') {
+      function playWuzhongCardHandler(game, actor, card, options, self) {
           // v7 PR-16: gltjk card__scroll.md 无中生有 (1V1/界限突破/国-标):
           //   "使用目标: 包括你在内的一名角色"。options.wuzhongTarget 可指定
           //   'player' / 'enemy'; 未指定时默认 = actor。
@@ -3087,45 +3090,47 @@
           return checkWuxieAndContinue(game, opponent(actor), '【无中生有】', 'wuzhong', {
             actor: actor, card: card, options: options, wzTargetActor: wzTargetActor
           });
-        }
+      }
 
-        if (card.type === 'juedou') {
+      function playJuedouCardHandler(game, actor, card, options, self) {
           // v10 V5: 走无懈链框架. WUXIE_CONTINUATIONS['juedou'] 注册在 trick 区下方.
           return checkWuxieAndContinue(game, opponent(actor), '【决斗】', 'juedou', {
             actor: actor, card: card, options: options
           });
-        }
-        // H1: 南蛮入侵 / 万箭齐发 在 1v1 中只有 1 名目标 (对方), 单个无懈窗口
+      }
+
+      // H1: 南蛮入侵 / 万箭齐发 在 1v1 中只有 1 名目标 (对方), 单个无懈窗口
         // 即与官方一致。无懈窗口在 playAOE (响应 / 伤害) 之前。
-        if (card.type === 'nanman') {
+      function playNanmanCardHandler(game, actor, card, options, self) {
           return checkWuxieAndContinue(game, opponent(actor), '【南蛮入侵】', 'nanman', {
             actor: actor, card: card, options: options
           });
-        }
-        if (card.type === 'wanjian') {
+      }
+
+      function playWanjianCardHandler(game, actor, card, options, self) {
           return checkWuxieAndContinue(game, opponent(actor), '【万箭齐发】', 'wanjian', {
             actor: actor, card: card, options: options
           });
-        }
+      }
 
-        if (card.type === 'guohe') {
+      function playGuoheCardHandler(game, actor, card, options, self) {
           // v7 PR-9: 1V1 变体两选项 — 装备区一张 / 看手并弃一张。
           // v10 V5: 走无懈链框架.
           discardCard(game, card);
           return checkWuxieAndContinue(game, opponent(actor), '【过河拆桥】', 'guohe', {
             actor: actor, card: card, options: options
           });
-        }
+      }
 
-        if (card.type === 'shunshou') {
+      function playShunshouCardHandler(game, actor, card, options, self) {
           // v10 V5: 走无懈链框架.
           discardCard(game, card);
           return checkWuxieAndContinue(game, opponent(actor), '【顺手牵羊】', 'shunshou', {
             actor: actor, card: card, options: options
           });
-        }
+      }
 
-        if (card.type === 'taoyuan') {
+      function playTaoyuanCardHandler(game, actor, card, options, self) {
           discardCard(game, card);
           // v7 PR-2 + H1b: gltjk card__scroll.md "对未受伤的角色无效"; 多角色
           // 结算顺序从发动者起逆时针 = [actor, opponent]。H1b: 每名受伤目标各
@@ -3139,9 +3144,9 @@
           return advanceTaoyuanTargets(game, {
             actor: actor, card: card, options: options, targets: taoyuanTargets, idx: 0
           });
-        }
+      }
 
-        if (card.type === 'wugu') {
+      function playWuguCardHandler(game, actor, card, options, self) {
           // v7 PR-7: gltjk card__scroll.md 五谷丰登 —
           //   "执行动作：当此牌指定目标后，你亮出牌堆顶的 X 张牌（X 为目标数）。"
           //   "作用效果：目标角色获得这些牌中（剩余）的一张牌。"
@@ -3169,17 +3174,17 @@
           log(game, actorName(game, actor) + '使用【五谷丰登】，亮出 ' + wuguPool.map(function (c) { return '【' + c.name + '】'; }).join(' / ') + '。');
           // 多角色结算顺序原则：从当前回合角色起按逆时针 → 1v1 即 [actor, opponent(actor)]
           return finishTrickUse(game, actor, card, processWuguPick(game, actor, card, wuguPool, [actor, opponent(actor)], 0, options), options);
-        }
+      }
 
-        if (card.type === 'huogong') {
+      function playHuogongCardHandler(game, actor, card, options, self) {
           // v10 V5: 走无懈链框架. 后续 huogong 流程移到 WUXIE_CONTINUATIONS['huogong'].
           discardCard(game, card);
           return checkWuxieAndContinue(game, opponent(actor), '【火攻】', 'huogong', {
             actor: actor, card: card, options: options
           });
-        }
+      }
 
-        if (card.type === 'tiesuo') {
+      function playTiesuoCardHandler(game, actor, card, options, self) {
           discardCard(game, card);
           if (options.mode === 'recast') {
             log(game, actorName(game, actor) + '重铸【铁索连环】，摸一张牌。');
@@ -3195,9 +3200,9 @@
             log(game, actorName(game, actor) + '使用【铁索连环】，' + actorName(game, side) + (game[side].chained ? '横置。' : '重置。'));
           });
           return finishTrickUse(game, actor, card, success('铁索连环结算完成。'), options);
-        }
+      }
 
-        if (card.type === 'jiedao') {
+      function playJiedaoCardHandler(game, actor, card, options, self) {
           // v7 PR-5: gltjk card__scroll.md 注 — 须做两次合法性检测.
           // 第一次已在 canPlayCard 检过; 这里做第二次 (在 jiedao 继续逻辑里).
           // v10 V5: 走无懈链框架.
@@ -3205,15 +3210,30 @@
           return checkWuxieAndContinue(game, opponent(actor), '【借刀杀人】', 'jiedao', {
             actor: actor, card: card, options: options
           });
-        }
+      }
 
+      function playDefaultCardHandler(game, actor, card, options, self) {
         discardCard(game, card);
         return success('卡牌已使用。');
       }
 
-      ['sha', 'equipment', 'delayed', 'tao', 'jiu', 'wuzhong', 'juedou', 'nanman', 'wanjian', 'guohe', 'shunshou', 'taoyuan', 'wugu', 'huogong', 'tiesuo', 'jiedao', 'default'].forEach(function (key) {
-        registerPlayHandler(key, playCardLegacyDispatch);
-      });
+      registerPlayHandler('sha', playShaCardHandler);
+      registerPlayHandler('equipment', playEquipmentCardHandler);
+      registerPlayHandler('delayed', playDelayedCardHandler);
+      registerPlayHandler('tao', playTaoCardHandler);
+      registerPlayHandler('jiu', playJiuCardHandler);
+      registerPlayHandler('wuzhong', playWuzhongCardHandler);
+      registerPlayHandler('juedou', playJuedouCardHandler);
+      registerPlayHandler('nanman', playNanmanCardHandler);
+      registerPlayHandler('wanjian', playWanjianCardHandler);
+      registerPlayHandler('guohe', playGuoheCardHandler);
+      registerPlayHandler('shunshou', playShunshouCardHandler);
+      registerPlayHandler('taoyuan', playTaoyuanCardHandler);
+      registerPlayHandler('wugu', playWuguCardHandler);
+      registerPlayHandler('huogong', playHuogongCardHandler);
+      registerPlayHandler('tiesuo', playTiesuoCardHandler);
+      registerPlayHandler('jiedao', playJiedaoCardHandler);
+      registerPlayHandler('default', playDefaultCardHandler);
 
       // v11 B1 第五步: 各锦囊 continuation / 桃园五谷逐目标推进 / 火攻结算
       // 已随框架迁入 ./tricks.js (见下方 TricksRuntime 装配)。
