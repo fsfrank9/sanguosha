@@ -2,7 +2,7 @@
 
 纯 HTML/CSS/JavaScript 实现的三国杀 1v1。原生 ES 模块 + GitHub Pages 静态托管:`src/` 就是浏览器加载的源码本身,根 `index.html` 是手写的模块入口——没有打包步骤、没有 npm 运行时依赖。
 
-**当前版本 `v12-F`**:在 v11 收官基础上完成结构减重第二轮。技能注册、判定区结算、playCard 分发入口、大厅/选将 UI 面板继续从主文件拆出;40 个已实现技能(8 个主动)和 71 名武将行为保持 1v1 零回归。牌移动统一走 `moveCard` 原语并由全局牌数守恒断言护航;AI 具备转化 lookahead 与无懈/闪响应期望值决策。
+**当前版本 `v12 修复批`**:对 v12 F/G/H 三个批次(PR #152/#154/#156/#157)做规则合规与状态如实化修复——据守补上翻面跳回合机制、烈弓/狂骨按官方条件修正、神速与红颜的伪实现按"宁缺毋滥"撤下、风包 spec 从标准包 fixture 分离为独立包、座次工具 off-by-one 修复。43 个已实现技能(8 个主动)和 71 名武将;1v1 行为有测试护航。牌移动统一走 `moveCard` 原语并由全局牌数守恒断言护航;AI 具备转化 lookahead 与无懈/闪响应期望值决策。
 
 ## 运行
 
@@ -61,7 +61,7 @@ docs/
 ## 内容现状
 
 - 武将 71 名 / 技能条目 128 条 / 唯一技能 ID 123 个。
-- 已接入引擎逻辑的技能 40 个(主动/交互 8 个:制衡、苦肉、仁德、反间、观星、青囊、洛神、结姻);未实现技能在 UI 中明确标记,不会"看起来有但触发不了"。标准包在 1v1 语境已封顶(余下激将/护驾/离间为多人专属,流离/同疾以 reserved hook 待多人激活)。
+- 已接入引擎逻辑的技能 43 个(主动/交互 8 个:制衡、苦肉、仁德、反间、观星、青囊、洛神、结姻;风包首批:据守、烈弓、狂骨);未实现技能在 UI 中明确标记,不会"看起来有但触发不了"。标准包在 1v1 语境已封顶(余下激将/护驾/离间为多人专属,流离/同疾以 reserved hook 待多人激活);风包的神速/红颜/天香待专门框架(阶段跳过选择、花色视同层、伤害转移)后接入。
 - 标准 + 军争核心牌组 39 张牌全部数据驱动;濒死/判定/响应窗口/无懈链/铁索传导等结算对照 `official-skill-cache/gltjk-sanguosha-rules` 官方规则集。
 - 技能逐项的引擎接入说明见 [`docs/history.md`](docs/history.md)。
 
@@ -83,18 +83,20 @@ docs/
 
 ## 下一阶段(v12)
 
-路线图见 [`docs/plans/2026-07-05-sanguosha-v12-roadmap.md`](docs/plans/2026-07-05-sanguosha-v12-roadmap.md),当前 **H 多人模式骨架已完成**;后续按依赖排序继续推进:
+路线图见 [`docs/plans/2026-07-05-sanguosha-v12-roadmap.md`](docs/plans/2026-07-05-sanguosha-v12-roadmap.md)。**如实进度**(修复批核对后):
 
-1. **I AI 进阶**:两步 lookahead、可见信息计数建模、多人目标评估。
-
-已完成: F 结构减重、G 扩展包技能、H 多人模式骨架(座次抽象、距离环、显式目标、3 人身份胜负;1v1 回归保持)。
+1. **F 结构减重:部分完成** — 技能注册表、判定区结算、PLAY_HANDLERS 分发、大厅面板已拆出;但技能 trigger 函数群本体仍在主文件,game-engine ≈4000 行 / dom-adapter ≈1400 行,尚未达到 ≤2200/≤1200 的验收线。
+2. **G 扩展包技能:首批 3 个落地**(据守/烈弓/狂骨,经修复批对齐官方规则);G0 风包 spec 独立 fixture 就位(5 将 6 技,官方页面爬取与 gid 核对待补);神速/红颜/天香待实现。
+3. **H 多人模式:引擎侧最小骨架** — 座次工具、距离环、濒死救援座次队列、【杀】显式目标、3 人身份胜负判定;响应链多人化、其余牌类目标选择、多座 UI、身份技激活均未开始。
+4. **I AI 进阶:未开始**。
 
 ## 官方资料对照与缓存
 
 官网资料分两层,避免重复拉取、也避免在公开仓库提交大段官网原文:
 
-- `tests/fixtures/official_standard_skills.json`:官网标准包武将/技能名紧凑 fixture(校验 catalog 一致性)。
+- `tests/fixtures/official_standard_skills.json`:官网标准包武将/技能名紧凑 fixture(校验 catalog 一致性,恒 27 将)。
 - `tests/fixtures/official_standard_skill_specs.json`:可提交的结构化实现规格(来源 URL + `sourceTextRef` 摘要,不含原文)。
+- `tests/fixtures/official_wind_skills.json` / `official_wind_skill_specs.json`:风包独立 fixture(pack='风',5 将 6 技,含 `implementationStatus` 如实标记;gid 为临时编号、官方页面爬取待补,见文件内 `gidPolicy`/`rawCachePolicy`)。
 - `.cache/sanguosha-official/`:本地原文缓存,已 gitignore 不入库。
 
 继续实现技能时按 cache-first 流程:先读本地缓存与已提交 specs,缓存缺失/过期才重新请求官网。

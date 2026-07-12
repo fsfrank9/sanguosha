@@ -37,7 +37,8 @@ test('v9 PR-E25: 引擎注册 shan-response kind (v10 V3 后走 RESPONSE_KIND_RE
 });
 
 test('v9 PR-E25: 引擎 continueShaAfterCixiong — 玩家是杀目标 + shanResponse=ask 时暂停 (v10 V3 后走 requestPlayerResponse)', () => {
-  const fn = engine.match(/function continueShaAfterCixiong\(game, actor, card, amount\)\s*\{[\s\S]*?\n\s{6}\}/);
+  // v12 H 骨架: 显式 targetActor 参数 (替代 arguments[n] 偷传)
+  const fn = engine.match(/function continueShaAfterCixiong\(game, actor, card, amount, targetActor\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /targetActor\s*===\s*'player'/);
   assert.match(fn[0], /skillPreferences\.shanResponse\s*===\s*'ask'/);
@@ -48,7 +49,7 @@ test('v9 PR-E25: 引擎 continueShaAfterCixiong — 玩家是杀目标 + shanRes
 
 test('v9 PR-E25: 引擎含 resolveShanResponseChoice + resolveShaAfterResponse + hasShanResponseAvailable', () => {
   assert.match(engine, /function resolveShanResponseChoice\(game, pending, decision\)/);
-  assert.match(engine, /function resolveShaAfterResponse\(game, actor, card, amount, dodged\)/);
+  assert.match(engine, /function resolveShaAfterResponse\(game, actor, card, amount, dodged, targetActor\)/);
   assert.match(engine, /function hasShanResponseAvailable\(state\)/);
 });
 

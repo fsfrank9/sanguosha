@@ -94,7 +94,9 @@
     var idx = seats.indexOf(actor);
     if (idx < 0) return seats.slice();
     var ordered = [];
-    for (var step = includeSelf ? 0 : 1; step < seats.length + (includeSelf ? 0 : 1); step += 1) {
+    // v12 修复: 循环上界恒为 seats.length — 此前 includeSelf=false 时上界
+    // 为 seats.length+1, 最后一步 (idx+len)%len 绕回 actor 自己 (off-by-one)。
+    for (var step = includeSelf ? 0 : 1; step < seats.length; step += 1) {
       ordered.push(seats[(idx + step) % seats.length]);
     }
     return ordered;

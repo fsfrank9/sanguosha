@@ -174,7 +174,7 @@ test('game engine resolves trick distance checks through 1V1-spec-compliant path
 test('game engine dispatches Kongcheng through onCardTarget hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const canPlayStart = source.indexOf('function canPlayCard(game, actor, card)');
-  const canPlayEnd = source.indexOf('function playSha(game, actor, card)', canPlayStart);
+  const canPlayEnd = source.indexOf('function playSha(game, actor, card, options)', canPlayStart);
   const playShaStart = canPlayEnd;
   const playShaEnd = source.indexOf('function playDuel(game, actor, card)', playShaStart);
   assert.ok(canPlayStart >= 0 && canPlayEnd > canPlayStart, 'canPlayCard source should be extractable');
@@ -210,7 +210,7 @@ test('game engine dispatches Qianxun through onCardTarget hook seam', () => {
 
 test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const playShaStart = source.indexOf('function playSha(game, actor, card)');
+  const playShaStart = source.indexOf('function playSha(game, actor, card, options)');
   const playShaEnd = source.indexOf('function playDuel(game, actor, card)', playShaStart);
   assert.ok(playShaStart >= 0 && playShaEnd > playShaStart, 'playSha source should be extractable');
   const playShaSource = source.slice(playShaStart, playShaEnd);

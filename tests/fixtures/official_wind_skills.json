@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "indexUrl": "https://www.sanguosha.com/hero",
+    "method": "风包条目由官方实体版规则文本人工转写; 官方索引页爬取与 gid 核对待补。",
+    "gidPolicy": "provisional-local: gid 216-220 为本地临时编号 (顺接标准包缓存 214-215), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。"
+  },
+  "pack": "风",
+  "includeFullSkillText": false,
+  "heroes": [
+    {
+      "gid": 216,
+      "name": "夏侯渊",
+      "skills": [
+        "神速"
+      ]
+    },
+    {
+      "gid": 217,
+      "name": "曹仁",
+      "skills": [
+        "据守"
+      ]
+    },
+    {
+      "gid": 218,
+      "name": "黄忠",
+      "skills": [
+        "烈弓"
+      ]
+    },
+    {
+      "gid": 219,
+      "name": "魏延",
+      "skills": [
+        "狂骨"
+      ]
+    },
+    {
+      "gid": 220,
+      "name": "小乔",
+      "skills": [
+        "天香",
+        "红颜"
+      ]
+    }
+  ]
+}

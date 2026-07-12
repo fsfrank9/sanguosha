@@ -239,46 +239,6 @@
         "妄尊",
         "同疾"
       ]
-    },
-    {
-      "gid": 216,
-      "name": "夏侯渊",
-      "detailUrl": "https://www.sanguosha.com/hero",
-      "skills": [
-        "神速"
-      ]
-    },
-    {
-      "gid": 217,
-      "name": "曹仁",
-      "detailUrl": "https://www.sanguosha.com/hero",
-      "skills": [
-        "据守"
-      ]
-    },
-    {
-      "gid": 218,
-      "name": "黄忠",
-      "detailUrl": "https://www.sanguosha.com/hero",
-      "skills": [
-        "烈弓"
-      ]
-    },
-    {
-      "gid": 219,
-      "name": "魏延",
-      "detailUrl": "https://www.sanguosha.com/hero",
-      "skills": [
-        "狂骨"
-      ]
-    },
-    {
-      "gid": 220,
-      "name": "小乔",
-      "detailUrl": "https://www.sanguosha.com/hero",
-      "skills": [
-        "红颜"
-      ]
     }
   ]
 }

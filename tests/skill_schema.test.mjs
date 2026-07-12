@@ -19,30 +19,41 @@ function test(name, fn) {
   console.log(`✓ ${name}`);
 }
 
-const cache = readJson(
+// v12 G0 (修复批): 四方一致性审计按 pack 合并加载 — 风包条目从标准包
+// fixture 分离为独立文件后, cache/specs 两侧都要覆盖全部已接入的包。
+const CACHE_PATHS = [
   'official-skill-cache/sanguosha-standard/official_standard_skill_cache.json',
-);
-const specs = readJson('tests/fixtures/official_standard_skill_specs.json');
+  'official-skill-cache/sanguosha-wind/official_wind_skill_cache.json',
+];
+const SPECS_PATHS = [
+  'tests/fixtures/official_standard_skill_specs.json',
+  'tests/fixtures/official_wind_skill_specs.json',
+];
 
-function indexByLocalId(doc, specKey) {
+function indexByLocalId(docs, specKey) {
   const map = new Map();
-  for (const hero of doc.heroes || []) {
-    for (const skill of hero.skills || []) {
-      if (!skill.localSkillId) continue;
-      map.set(skill.localSkillId, {
-        heroLocalId: hero.localHeroId,
-        heroName: hero.name,
-        skillName: skill.name,
-        sourceTextRef: skill.sourceTextRef,
-        spec: skill[specKey],
-      });
+  for (const doc of docs) {
+    for (const hero of doc.heroes || []) {
+      for (const skill of hero.skills || []) {
+        if (!skill.localSkillId) continue;
+        if (map.has(skill.localSkillId)) {
+          throw new Error(`duplicate localSkillId across pack fixtures: ${skill.localSkillId}`);
+        }
+        map.set(skill.localSkillId, {
+          heroLocalId: hero.localHeroId,
+          heroName: hero.name,
+          skillName: skill.name,
+          sourceTextRef: skill.sourceTextRef,
+          spec: skill[specKey],
+        });
+      }
     }
   }
   return map;
 }
 
-const cacheById = indexByLocalId(cache, 'implementationSpec');
-const specsById = indexByLocalId(specs, 'spec');
+const cacheById = indexByLocalId(CACHE_PATHS.map(readJson), 'implementationSpec');
+const specsById = indexByLocalId(SPECS_PATHS.map(readJson), 'spec');
 
 const VALID_TRIGGERS = new Set([
   'playPhase',
@@ -77,6 +88,8 @@ const VALID_COST_TYPES = new Set([
   'loseHp',
   'reduceDraw',
   'judgement',
+  // v12 G1 (修复批): 据守的成本是将武将牌翻面 (跳过自己的下个回合)
+  'turnOver',
 ]);
 
 test('every implemented skill has structured metadata with valid tag values', () => {

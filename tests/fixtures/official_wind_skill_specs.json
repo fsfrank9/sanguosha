@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "indexUrl": "https://www.sanguosha.com/hero",
+    "rawCachePath": ".cache/sanguosha-official/official_wind_skill_texts.json",
+    "rawCachePolicy": "cache-first: keep official prose only in the gitignored local cache; regenerate this public spec fixture from cache and fetch official pages only when the cache is missing or stale. 风包爬取待补: 当前条目由风包官方实体规则文本人工转写生成, sourceTextRef/sourceTextSha256 为该转写文本的 sha256, 首次爬取官方页面时必须复核。",
+    "gidPolicy": "provisional-local: gid 216-220 为本地临时编号 (顺接标准包缓存 214-215), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。"
+  },
+  "pack": "风",
+  "includeFullSkillText": false,
+  "containsImplementationSpecs": true,
+  "heroes": [
+    {
+      "gid": 216,
+      "name": "夏侯渊",
+      "localHeroId": "xiahouyuan",
+      "skills": [
+        {
+          "name": "神速",
+          "localSkillId": "shensu",
+          "implementationStatus": "pending",
+          "sourceTextRef": "e1d93a03fefd",
+          "spec": {
+            "summary": "回合内可跳过指定阶段，每跳过一项视为使用一张无距离限制的【杀】。",
+            "timing": "自己回合的判定阶段开始前声明，可选择一至两项。",
+            "condition": "选项一（跳过判定阶段和摸牌阶段）无附加条件；选项二需装备区有牌可弃。",
+            "cost": "跳过判定阶段和摸牌阶段（选项一）；跳过出牌阶段并弃置一张装备牌（选项二）。",
+            "effect": "每选择一项，视为使用一张无距离限制的【杀】，不占出牌阶段【杀】的使用次数。",
+            "frequency": "每回合每个选项至多一次。",
+            "engineHooks": [
+              "planned.phaseSkipChoice",
+              "planned.virtualShaNoDistance"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 217,
+      "name": "曹仁",
+      "localHeroId": "caoren",
+      "skills": [
+        {
+          "name": "据守",
+          "localSkillId": "jushou",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "11be3f248aef",
+          "spec": {
+            "summary": "结束阶段可摸三张牌，代价是将武将牌翻面并跳过自己的下个回合。",
+            "timing": "结束阶段开始时。",
+            "condition": "可选发动；发动即执行完整效果。",
+            "cost": "将武将牌翻面：轮到被翻面角色的回合时翻回正面并跳过该回合。",
+            "effect": "摸三张牌，然后将武将牌翻面。",
+            "frequency": "每个结束阶段限一次。",
+            "engineHooks": [
+              "onTurnEnd",
+              "startTurn.turnedOverSkip",
+              "drawCards"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 218,
+      "name": "黄忠",
+      "localHeroId": "huangzhong",
+      "skills": [
+        {
+          "name": "烈弓",
+          "localSkillId": "liegong",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "c48d624bb54f",
+          "spec": {
+            "summary": "出牌阶段用【杀】指定目标后，满足手牌阈值条件可令其不能出【闪】。",
+            "timing": "于出牌阶段内使用【杀】指定一个目标后。",
+            "condition": "目标手牌数不小于你的体力值，或不大于你的攻击范围（含武器修正）。",
+            "cost": "无额外成本，可选发动。",
+            "effect": "该目标不能使用【闪】响应此【杀】。",
+            "frequency": "每次满足条件的【杀】均可发动。",
+            "engineHooks": [
+              "onNeedResponse",
+              "responseLocked",
+              "weaponRange"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 219,
+      "name": "魏延",
+      "localHeroId": "weiyan",
+      "skills": [
+        {
+          "name": "狂骨",
+          "localSkillId": "kuanggu",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "eb62fbb21352",
+          "spec": {
+            "summary": "锁定技：对距离1以内的角色每造成1点伤害即回复1点体力。",
+            "timing": "对距离1以内的一名角色造成的伤害结算完成后。",
+            "condition": "锁定技强制发动；伤害目标与你的距离不大于1。",
+            "cost": "无成本。",
+            "effect": "每造成1点伤害回复1点体力，不超过体力上限。",
+            "frequency": "锁定技，每次符合条件的伤害均触发。",
+            "engineHooks": [
+              "onDamageAfter",
+              "distanceBetween",
+              "recoverHp"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 220,
+      "name": "小乔",
+      "localHeroId": "xiaoqiao",
+      "skills": [
+        {
+          "name": "天香",
+          "localSkillId": "tianxiang",
+          "implementationStatus": "pending",
+          "sourceTextRef": "c5bc5863c64d",
+          "spec": {
+            "summary": "受到伤害时可弃红桃手牌，将伤害转移给攻击范围内一名角色并令其补牌。",
+            "timing": "当你受到伤害时。",
+            "condition": "有红桃手牌，且你的攻击范围内存在其他角色。",
+            "cost": "弃置一张红桃手牌。",
+            "effect": "将此伤害转移给你攻击范围内的一名其他角色，然后其摸等同于其已损失体力值数量的牌。",
+            "frequency": "每次受到伤害均可发动。",
+            "engineHooks": [
+              "planned.damageTransfer",
+              "planned.redHeartDiscardCost"
+            ]
+          }
+        },
+        {
+          "name": "红颜",
+          "localSkillId": "hongyan",
+          "implementationStatus": "pending",
+          "sourceTextRef": "a7b1eafbfdf3",
+          "spec": {
+            "summary": "锁定技：你的黑桃牌一律按红桃花色结算。",
+            "timing": "持续生效的花色视同层，覆盖手牌、装备与判定牌结算。",
+            "condition": "锁定技，无发动条件。",
+            "cost": "无成本。",
+            "effect": "你的黑桃牌视为红桃牌：如八卦判定必为红色、闪电判定永不命中你。",
+            "frequency": "锁定技持续生效。",
+            "engineHooks": [
+              "planned.suitViewLayer",
+              "planned.judgementSuitOverride"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -81,7 +81,6 @@
         triggerJushouTurnEnd: triggerJushouTurnEnd,
         triggerKuangguDamageAfter: triggerKuangguDamageAfter,
         triggerLiegongNeedResponse: triggerLiegongNeedResponse,
-        triggerShensuActiveSkill: triggerShensuActiveSkill,
         triggerLongdanCardAs: triggerLongdanCardAs,
         triggerWushengCardAs: triggerWushengCardAs,
         triggerQingguoCardAs: triggerQingguoCardAs,
@@ -134,7 +133,10 @@
       function triggerTongjiCardTarget(context) {
         var game = context.game;
         if (!context.card || !isShaCard(context.card)) return null;
-        var others = ['player', 'enemy'].filter(function (a) {
+        // v12 H 骨架修复: reserved hook 改为按座次环扫描 — 此前硬编码
+        // ['player','enemy'], 3 人局根本扫不到第三席, "多人激活后自动生效"
+        // 的承诺落空。1v1 时 seatList 恒等旧值, 行为不变。
+        var others = seatList(game).filter(function (a) {
           return a !== context.actor && a !== context.targetActor;
         });
         for (var i = 0; i < others.length; i += 1) {
@@ -644,11 +646,11 @@
         return runGanglieJudgement(game, targetActor, sourceActor);
       }
 
-      // v11 C7 (批次 31): 耀武 (华雄) — 锁定技。gltjk skill cache:
-      //   "当你受到红色【杀】造成的伤害后, 伤害来源选择一项:
-      //    回复 1 点体力, 或摸一张牌。"
-      // 选择权在伤害来源: AI/auto 来源按 受伤→回血 否则→摸牌; 玩家来源
-      // 经 pendingChoice 'yaowu-reward' 面板二选一 (体力满时只能摸牌)。
+      // v12 G1 (修复批): 据守 (曹仁·风) — gltjk wind spec: "结束阶段开始时,
+      // 你可以摸三张牌, 然后将你的武将牌翻面"。翻面由 startTurn 消费: 轮到
+      // 武将牌被翻面的角色时翻回正面并跳过该回合。此前实现只置 turnedOver
+      // 标记而引擎无任何消费点 — 摸三张零代价, 修复补上跳过回合机制。
+      // 默认自动发动, skillPreferences.jushou='decline' 可关 (妄尊同款)。
       function triggerJushouTurnEnd(context) {
         var game = context.game;
         var actor = context.actor;
@@ -661,45 +663,58 @@
         }
         drawCards(game, actor, 3);
         state.turnedOver = !state.turnedOver;
-        log(game, actorName(game, actor) + '发动【据守】，摸三张牌并' + (state.turnedOver ? '翻面。' : '翻回正面。'));
+        log(game, actorName(game, actor) + '发动【据守】，摸三张牌并将武将牌' + (state.turnedOver ? '翻面。' : '翻回正面。'));
         return { triggeredJushou: true };
       }
 
+      // v12 G1 (修复批): 狂骨 (魏延·风) — 锁定技: "当你对距离 1 以内的一名
+      // 角色造成 1 点伤害后, 你回复 1 点体力"。修复两处规则偏差: 补距离 ≤1
+      // 前置判定 (此前无距离约束), 回复量按伤害点数逐点计 (此前恒 +1)。
+      // 锁定技不设 pref 开关。1v1 中"击杀后不回复"边界不可达 (目标死亡即
+      // gameover, finishDamageAfter 不再派发 hooks), 不建模。
       function triggerKuangguDamageAfter(context) {
         var game = context.game;
         var sourceActor = context.sourceActor;
+        var targetActor = context.targetActor;
         var source = game[sourceActor];
-        if (!source || !hasSkill(source, 'kuanggu') || source.hp >= source.maxHp || game.phase === 'gameover') return null;
-        source.hp = Math.min(source.maxHp, source.hp + 1);
-        log(game, actorName(game, sourceActor) + '发动【狂骨】，造成伤害后回复 1 点体力。');
+        if (!source || !hasSkill(source, 'kuanggu') || game.phase === 'gameover') return null;
+        if (distanceBetween(game, sourceActor, targetActor) > 1) return null;
+        var heal = Math.min(source.maxHp - source.hp, context.amount || 0);
+        if (heal <= 0) return null;
+        source.hp += heal;
+        log(game, actorName(game, sourceActor) + '的【狂骨】发动，回复 ' + heal + ' 点体力。');
         return { triggeredKuanggu: true };
       }
 
+      // v12 G1 (修复批): 烈弓 (黄忠·风) — "当你于出牌阶段内使用【杀】指定一个
+      // 目标后, 若该角色的手牌数不小于你的体力值或不大于你的攻击范围, 你可以
+      // 令其不能使用【闪】响应此【杀】"。修复三处: 攻击范围改用 weaponRange
+      // (此前读不存在的 state.attackRange, 恒 undefined → 该分支永不触发);
+      // 限定"自己回合内使用的【杀】" (借刀强制出杀不在自己出牌阶段, 不触发);
+      // 补 isShaCard 守卫防未来非杀响应场景误触发。铁骑同款 pref:
+      // skillPreferences.liegong='decline' 跳过。
       function triggerLiegongNeedResponse(game, actor, targetActor, responseType, triggeringCard) {
         var source = game[actor];
         var target = game[targetActor];
-        if (responseType !== 'shan' || !source || !target || !hasSkill(source, 'liegong')) return null;
-        var targetHand = (target.hand || []).length;
-        if (targetHand >= source.hp || targetHand <= source.attackRange) {
-          log(game, actorName(game, actor) + '发动【烈弓】，' + actorName(game, targetActor) + '不能打出【闪】。');
-          return { responseLocked: true };
+        if (responseType !== 'shan' || !isShaCard(triggeringCard)) return null;
+        if (!source || !target || !hasSkill(source, 'liegong')) return null;
+        if (game.turn !== actor) return null;
+        var pref = source.skillPreferences && source.skillPreferences.liegong;
+        if (pref === 'decline') {
+          log(game, actorName(game, actor) + '选择不发动【烈弓】。');
+          return null;
         }
-        return null;
+        var targetHand = (target.hand || []).length;
+        if (targetHand < source.hp && targetHand > weaponRange(source)) return null;
+        log(game, actorName(game, actor) + '发动【烈弓】，' + actorName(game, targetActor) + '不能使用【闪】响应此【杀】。');
+        return { responseLocked: true };
       }
 
-      function triggerShensuActiveSkill(context) {
-        if (context.skillId !== 'shensu') return null;
-        var game = context.game;
-        var actor = context.actor;
-        var self = context.state;
-        if (!self || !hasSkill(self, 'shensu')) return null;
-        if (self.flags.shensuUsed) return fail('【神速】每回合限一次。');
-        var card = { id: 'virtual-shensu-' + actor + '-' + game.turn, name: '杀', type: 'sha', suit: 'spade', color: 'black', virtual: true };
-        self.flags.shensuUsed = true;
-        log(game, actorName(game, actor) + '发动【神速】，视为对' + actorName(game, opponent(actor)) + '使用一张【杀】。');
-        return playSha(game, actor, card, 1);
-      }
-
+      // v11 C7 (批次 31): 耀武 (华雄) — 锁定技。gltjk skill cache:
+      //   "当你受到红色【杀】造成的伤害后, 伤害来源选择一项:
+      //    回复 1 点体力, 或摸一张牌。"
+      // 选择权在伤害来源: AI/auto 来源按 受伤→回血 否则→摸牌; 玩家来源
+      // 经 pendingChoice 'yaowu-reward' 面板二选一 (体力满时只能摸牌)。
       function triggerYaowuDamageAfter(context) {
         var game = context.game;
         var targetActor = context.targetActor;
@@ -1070,9 +1085,8 @@
         var targetActor = context.targetActor;
         var sourceActor = context.sourceActor;
         var candidates = [];
-        // 1v1 中 game 只有 player / enemy 两个 actor — 框架性遍历, 多人模式
-        // 时只需扩展 game.actors 列表即可生效
-        ['player', 'enemy'].forEach(function (a) {
+        // v12 H 骨架修复: 按 game.seats 座次环遍历 (1v1 恒等旧值)。
+        seatList(game).forEach(function (a) {
           if (a === targetActor) return;
           if (a === sourceActor) return;  // spec 限定: 须为源的杀合法目标; 源对自己永远非法
           if (!game[a]) return;
@@ -2460,8 +2474,8 @@
         });
       }
 
-      function playSha(game, actor, card) {
-        var options = arguments[3] || {};
+      function playSha(game, actor, card, options) {
+        options = options || {};
         var self = game[actor];
         var targetActor = normalizeSingleTarget(game, actor, options);
         var target = game[targetActor];
@@ -2559,9 +2573,9 @@
         return 1;
       }
 
-      function continueShaAfterCixiong(game, actor, card, amount) {
+      function continueShaAfterCixiong(game, actor, card, amount, targetActor) {
         var self = game[actor];
-        var targetActor = arguments[4] || opponent(actor);
+        targetActor = targetActor || opponent(actor);
         var target = game[targetActor];
         var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
 
@@ -2748,9 +2762,9 @@
 
       // v9 PR-E25: 【杀】响应窗口结束后的结算 (贯石/青龙/伤害). 从原
       // continueShaAfterCixiong 拆出, 供同步路径 + shan-response 暂停恢复共用.
-      function resolveShaAfterResponse(game, actor, card, amount, dodged) {
+      function resolveShaAfterResponse(game, actor, card, amount, dodged, targetActor) {
         var self = game[actor];
-        var targetActor = arguments[5] || opponent(actor);
+        targetActor = targetActor || opponent(actor);
         var target = game[targetActor];
         if (dodged) {
           if (hasEquipmentEffect(self, 'guanshiForceHit')) {
@@ -3346,6 +3360,14 @@
         if (pendingGuard) return pendingGuard;
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         if (!game[actor]) return fail('未知角色。');
+        // v12 G1 (修复批): 翻面 (据守) — 轮到武将牌被翻面的角色的回合时,
+        // 将其翻回正面并跳过此回合, 回合直接传给座次环上的下一名角色。
+        // 递归安全: 本次已翻回正面, 座次环一圈内必然终止。
+        if (game[actor].turnedOver) {
+          game[actor].turnedOver = false;
+          log(game, actorName(game, actor) + '的武将牌翻回正面，跳过此回合。');
+          return startTurn(game, nextSeat(game, actor));
+        }
         game.turn = actor;
         var state = game[actor];
         resetActorTurnState(state);
