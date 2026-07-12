@@ -98,8 +98,10 @@
           pending = saved.pending;
           startIdx = saved.idx;
         } else {
-          state.flags.skipPlay = false;
-          state.flags.skipDraw = false;
+          // v12 G2 修复: 此处原有 skipPlay/skipDraw 复位与 resetActorTurnState
+          // 的回合开始复位冗余, 且会清掉准备阶段 (神速选项二) 刚设置的
+          // skipPlay — 神速"仅选项二"因此失效。回合级复位职责归 phases.js,
+          // 判定阶段只负责让 乐不思蜀/兵粮 的 outcome 重新置位。
           if (!state.judgeArea) state.judgeArea = [];
           // 整批取出判定区待结算牌 (在途), 逐张结算后 discardCard / 移动。
           pending = state.judgeArea.splice(0);

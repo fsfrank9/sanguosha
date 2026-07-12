@@ -151,6 +151,11 @@
           'wuguPickPanel', 'wuguPickHint', 'wuguPickChoices',
           // v8 hotfix-2: 洛神 (luoshen-continue) 面板 — 准备阶段连续判定决定
           'luoshenPromptPanel', 'luoshenPromptHint', 'luoshenContinueBtn', 'luoshenStopBtn',
+          // v12 G2: 神速 (shensu-options) 面板 — 准备阶段至多两项 + 选项二/
+          // 一+二 的装备候选弃置子步骤 (鬼道复用鬼才面板, 无需新 id — 见下方
+          // guicaiPromptPanel 注释)
+          'shensuOptionsPanel', 'shensuOptionsHint', 'shensuDeclineBtn', 'shensuOptionOneBtn',
+          'shensuOptionTwoBtn', 'shensuBothBtn', 'shensuEquipCandidates', 'shensuConfirmEquipBtn',
           // v11 C7 (批次 31): 耀武 (yaowu-reward) 面板 — 伤害来源奖励二选一
           'yaowuRewardPanel', 'yaowuRewardHint', 'yaowuRecoverBtn', 'yaowuDrawBtn',
           // v9 PR-E25/E26: 闪响应面板 — 被【杀】时玩家选用哪张牌当闪 (V4: 万箭/银月复用)
@@ -841,7 +846,14 @@
         { panelId: 'jiedaoDecisionPanel',   confirmBtnId: 'jiedaoDecisionFireBtn',  cancelBtnId: 'jiedaoDecisionDeclineBtn' },
         { panelId: 'yijiPromptPanel',       confirmBtnId: 'yijiConfirmBtn',         cancelBtnId: 'yijiKeepAllBtn' },
         { panelId: 'qilinPickPanel',        confirmBtnId: null,                     cancelBtnId: 'qilinDeclineBtn' },
+        // v12 G2: guicaiPromptPanel 同时承载 'guicai-replace' 与 'guidao-replace'
+        // 两个 kind (鬼道复用鬼才面板 DOM, 见 prompt-panels.js) — 一条 dispatch
+        // 记录按 panelId 命中, 对两个 kind 同样生效, 无需重复注册。
         { panelId: 'guicaiPromptPanel',     confirmBtnId: null,                     cancelBtnId: 'guicaiDeclineBtn' },
+        // v12 G2: 神速 — 四动作全部由面板自身按钮处理 (不发动/仅一 直接
+        // resolve; 仅二/一+二 先进子步骤选装备, 专属确认按钮提交), 共享
+        // Cancel 沿用"不发动"作为安全退出 (随时合法, 引擎当空选处理)。
+        { panelId: 'shensuOptionsPanel',    confirmBtnId: null,                     cancelBtnId: 'shensuDeclineBtn' },
         { panelId: 'huogongModePanel',      confirmBtnId: null,                     cancelBtnId: 'huogongCancelBtn' },
         { panelId: 'tiesuoModePanel',       confirmBtnId: null,                     cancelBtnId: 'tiesuoCancelBtn' },
         { panelId: 'conversionModePanel',   confirmBtnId: null,                     cancelBtnId: 'conversionCancelBtn' },

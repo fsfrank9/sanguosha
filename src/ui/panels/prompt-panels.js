@@ -19,12 +19,23 @@
     var yijiGiveSelection = [];
     var ganglieSelectedIds = [];
     var guanshiDiscardSelection = [];
+    // v12 G2: 神速 面板本地态 — shensuOptionMode 记录用户点了"选项二"还是
+    // "一+二" (null = 尚未进入装备弃置子步骤); shensuEquipCardId 记录已选中
+    // 的装备候选。两者随 guanshi 惯例落在本模块闭包, 面板隐藏/kind 不匹配时复位。
+    var shensuOptionMode = null;
+    var shensuEquipCardId = null;
 
     function renderPromptPanels(kind, pending) {
       var game = getGame();
     if (els.guicaiPromptPanel) {
-      if (kind === 'guicai-replace' && pending.actor === 'player') {
+      // v12 G2: 鬼道 (张角) 与 鬼才 (司马懿) 机制同构 (判定牌生效前打出/选
+      // 手牌替换, 差异只在候选是否限黑色 — 候选由引擎侧过滤好), 复用同一
+      // 面板 DOM + 事件绑定, 仅提示文案按 kind 切换技能名与动作措辞。
+      if ((kind === 'guicai-replace' || kind === 'guidao-replace') && pending.actor === 'player') {
         els.guicaiPromptPanel.hidden = false;
+        var isGuidao = kind === 'guidao-replace';
+        var skillLabel = isGuidao ? '鬼道' : '鬼才';
+        var actionLabel = isGuidao ? '打出一张黑色牌替换' : '选择手牌替换';
         if (els.guicaiPromptHint) {
           // v6.1: surface whose judgement is being replaced — when 司马懿
           // replaces opponent's judgement, the holder ≠ judgement actor.
@@ -32,9 +43,9 @@
             ? '对方'
             : '你';
           els.guicaiPromptHint.textContent =
-            '鬼才：' + whoseJudge + '的判定牌【' + pending.judgementCard.name + '】' + suitLabel(pending.judgementCard.suit) +
+            skillLabel + '：' + whoseJudge + '的判定牌【' + pending.judgementCard.name + '】' + suitLabel(pending.judgementCard.suit) +
             ' ' + (pending.judgementCard.rank || '') +
-            '（' + (pending.reason || '判定') + '）— 选择手牌替换或跳过';
+            '（' + (pending.reason || '判定') + '）— ' + actionLabel + '，或跳过';
         }
         if (els.guicaiOriginalCard) {
           els.guicaiOriginalCard.innerHTML =
@@ -387,6 +398,49 @@
         els.luoshenPromptPanel.hidden = true;
       }
     }
+    // v12 G2: 神速 (夏侯渊) — 准备阶段开始前声明至多两项。四个按钮常驻:
+    // 不发动/仅一/仅二/一+二; 二与一+二 需 canOptionTwo (有装备可弃) 才可点,
+    // 点击后进入"选装备"子步骤 (本模块局部态), 选中候选后专属确认按钮才可
+    // 点亮 — 未选装备禁止提交, 与 guanshi 弃两张牌的"选够才能确认"惯例一致。
+    if (els.shensuOptionsPanel) {
+      if (kind === 'shensu-options' && pending.actor === 'player') {
+        els.shensuOptionsPanel.hidden = false;
+        // 候选集变化 (新一轮 prompt) 或选项二不可用时, 复位子步骤本地态。
+        if (!pending.canOptionTwo) shensuOptionMode = null;
+        if (shensuEquipCardId && !(pending.equipCandidates || []).some(function (c) { return c.id === shensuEquipCardId; })) {
+          shensuEquipCardId = null;
+        }
+        if (els.shensuOptionsHint) {
+          els.shensuOptionsHint.textContent =
+            '【神速】可选择至多两项：选项一——跳过判定阶段和摸牌阶段；' +
+            '选项二——跳过出牌阶段并弃置一张装备牌。每选一项，视为使用一张' +
+            '无距离限制的【杀】。' +
+            (pending.canOptionTwo ? '' : '（没有装备牌可弃，选项二不可用）');
+        }
+        if (els.shensuOptionTwoBtn) els.shensuOptionTwoBtn.disabled = !pending.canOptionTwo;
+        if (els.shensuBothBtn) els.shensuBothBtn.disabled = !pending.canOptionTwo;
+        if (els.shensuEquipCandidates) {
+          els.shensuEquipCandidates.innerHTML = shensuOptionMode
+            ? (pending.equipCandidates || []).map(function (card) {
+                return promptCardChoice(card, {
+                  dataAttrs: { shensuEquipId: card.id },
+                  title: '选这张作为要弃置的装备牌',
+                  selected: shensuEquipCardId === card.id,
+                  extraClass: 'shensu-equip-candidate'
+                });
+              }).join('') || '<span class="mini-card">没有可弃置的装备牌</span>'
+            : '';
+        }
+        if (els.shensuConfirmEquipBtn) {
+          els.shensuConfirmEquipBtn.hidden = !shensuOptionMode;
+          els.shensuConfirmEquipBtn.disabled = !shensuEquipCardId;
+        }
+      } else {
+        els.shensuOptionsPanel.hidden = true;
+        shensuOptionMode = null;
+        shensuEquipCardId = null;
+      }
+    }
     // v11 C7 (批次 31): 耀武 (yaowu-reward) — 玩家作为伤害来源二选一;
     // 体力满时回复不可选 (resolver 同步校验)。
     if (els.yaowuRewardPanel) {
@@ -608,6 +662,52 @@
     });
     if (els.luoshenStopBtn) els.luoshenStopBtn.addEventListener('click', function () {
       var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    // v12 G2: 神速 四个动作按钮。"不发动"/"仅选项一" 无需装备成本, 直接
+    // resolve; "仅选项二"/"一+二" 先进入本地"选装备"子步骤 (记录 mode),
+    // 装备候选点击只切换选中态, 专属确认按钮凑齐后才真正 resolve — 未选
+    // 装备/未进子步骤时确认按钮 hidden/disabled (渲染侧已处理)。
+    if (els.shensuDeclineBtn) els.shensuDeclineBtn.addEventListener('click', function () {
+      shensuOptionMode = null;
+      shensuEquipCardId = null;
+      var result = Engine.resolvePendingChoice(getGame(), { options: [] });
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.shensuOptionOneBtn) els.shensuOptionOneBtn.addEventListener('click', function () {
+      shensuOptionMode = null;
+      shensuEquipCardId = null;
+      var result = Engine.resolvePendingChoice(getGame(), { options: [1] });
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.shensuOptionTwoBtn) els.shensuOptionTwoBtn.addEventListener('click', function () {
+      if (els.shensuOptionTwoBtn.disabled) return;
+      shensuOptionMode = 'two';
+      shensuEquipCardId = null;
+      render();
+    });
+    if (els.shensuBothBtn) els.shensuBothBtn.addEventListener('click', function () {
+      if (els.shensuBothBtn.disabled) return;
+      shensuOptionMode = 'both';
+      shensuEquipCardId = null;
+      render();
+    });
+    if (els.shensuEquipCandidates) els.shensuEquipCandidates.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-shensu-equip-id]');
+      if (!btn) return;
+      shensuEquipCardId = btn.getAttribute('data-shensu-equip-id');
+      render();
+    });
+    if (els.shensuConfirmEquipBtn) els.shensuConfirmEquipBtn.addEventListener('click', function () {
+      if (!shensuOptionMode || !shensuEquipCardId) return;
+      var options = shensuOptionMode === 'both' ? [1, 2] : [2];
+      var equipCardId = shensuEquipCardId;
+      shensuOptionMode = null;
+      shensuEquipCardId = null;
+      var result = Engine.resolvePendingChoice(getGame(), { options: options, equipCardId: equipCardId });
       if (!result.ok) renderLog();
       render();
     });
