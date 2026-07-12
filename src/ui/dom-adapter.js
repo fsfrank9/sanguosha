@@ -3,6 +3,7 @@
       import { createPromptPanels } from './panels/prompt-panels.js';
       import { createModePanels } from './panels/mode-panels.js';
       import { createLobbyPanels } from './panels/lobby-panels.js';
+      import { createBoardPanels } from './panels/board-panels.js';
 
       var Engine = SanguoshaEngine;
       var game = null;
@@ -34,6 +35,15 @@
         els: els,
         Engine: Engine,
         escapeHtml: escapeHtml
+      });
+      // v12 F6: 战场渲染域装配 — 稳定依赖注入, 可变状态经 uiView() 按次传入
+      var boardPanels = createBoardPanels({
+        els: els,
+        Engine: Engine,
+        escapeHtml: escapeHtml,
+        lobbyPanels: lobbyPanels,
+        cardSkillConfig: cardSkillConfig,
+        firstVisibleDispatch: _firstVisibleDispatch
       });
 
       // v11 B2: 响应类面板装配 — els 为原地填充的稳定引用; render/renderLog/
@@ -175,22 +185,6 @@
         els.log = els.battleLog;
       }
 
-      function hpMarkup(state) {
-        var html = '';
-        for (var i = 0; i < state.maxHp; i += 1) {
-          html += '<span class="heart' + (i >= state.hp ? ' empty' : '') + '">♥</span>';
-        }
-        html += '<span class="badge">' + state.hp + ' / ' + state.maxHp + '</span>';
-        return html;
-      }
-
-      function miniBacks(count) {
-        if (!count) return '<span class="mini-card">无手牌</span>';
-        var html = '';
-        for (var i = 0; i < count; i += 1) html += '<span class="mini-card">牌</span>';
-        return html;
-      }
-
       function escapeHtml(text) {
         return String(text)
           .replace(/&/g, '&amp;')
@@ -198,129 +192,6 @@
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#039;');
-      }
-
-      function renderHero(actor) {
-        var state = game[actor];
-        els[actor + 'Name'].textContent = state.name;
-        els[actor + 'Camp'].textContent = state.camp + ' · ' + state.title;
-        els[actor + 'Quote'].textContent = state.quote;
-        els[actor + 'Hp'].innerHTML = hpMarkup(state);
-        els[actor + 'HandCount'].textContent = state.hand.length;
-        els[actor + 'Hero'].setAttribute('data-camp', state.camp);
-        els[actor + 'Hero'].classList.toggle('is-chained', !!state.chained);
-        // v9 PR-E4: 主公徽章 — 由 game.roles[actor] === '主公' 决定显隐.
-        // v9 PR-E14: 反贼徽章 — 同样由 game.roles[actor] === '反贼' 决定显隐.
-        //   用户反馈: 之前只显主公不显反贼, 信息不对称.
-        var role = game && game.roles && game.roles[actor];
-        var lordBadge = els[actor + 'LordBadge'];
-        if (lordBadge) lordBadge.hidden = role !== '主公';
-        var rebelBadge = els[actor + 'RebelBadge'];
-        if (rebelBadge) rebelBadge.hidden = role !== '反贼';
-        if (els[actor + 'Ribbon']) els[actor + 'Ribbon'].textContent = state.camp;
-        if (actor === 'player') {
-          lobbyPanels.renderPlayerSkillBar({
-            state: state,
-            game: game,
-            enemyThinking: enemyThinking
-          });
-        }
-      }
-
-      function playerCardAction(card) {
-        var normal = Engine.canPlayCard(game, 'player', card);
-        // v11 C4 (批次 28): 转化候选泛化 — 杀/乐不思蜀/过河拆桥 统一探测,
-        // 面板据 conversions 动态列按钮; 唯一候选时直接按该 asType 转化。
-        var conversions = Engine.listCardConversions(game, 'player', card);
-        if (normal.ok && conversions.length) {
-          return { mode: 'choice', playable: { ok: true, message: '可按原牌使用，也可发动技能转化使用。' }, normal: normal, conversions: conversions };
-        }
-        if (normal.ok) return { mode: 'normal', playable: normal };
-        if (conversions.length === 1 && conversions[0].asType === 'sha') {
-          return { mode: 'asSha', playable: conversions[0].playable };
-        }
-        if (conversions.length === 1) {
-          return { mode: 'convert', playable: conversions[0].playable, asType: conversions[0].asType };
-        }
-        if (conversions.length > 1) {
-          return { mode: 'choice', playable: { ok: true, message: '选择要发动的转化技能。' }, conversions: conversions };
-        }
-        return { mode: 'blocked', playable: normal };
-      }
-
-      function activeCardSkillConfig() {
-        return cardSkillConfig(skillSelectMode);
-      }
-
-      function cardButton(card) {
-        var disabled = game.turn !== 'player' || game.phase === 'gameover' || enemyThinking;
-        var discardMode = game.turn === 'player' && game.phase === 'discard' && Engine.needsDiscard(game, 'player') && !enemyThinking;
-        var cardSkill = game.turn === 'player' && game.phase === 'play' && !enemyThinking ? activeCardSkillConfig() : null;
-        // v9 PR-E16: play-confirm 选中态 (selectedHandCardId) 也走 .discard-selected
-        // class 高亮 (复用现有样式, 避免新增 CSS).
-        var selected = selectedDiscardIds.indexOf(card.id) >= 0 ||
-                       selectedSkillCardIds.indexOf(card.id) >= 0 ||
-                       (selectedHandCardId === card.id);
-        var action = playerCardAction(card);
-        var playable = discardMode || cardSkill ? { ok: true, message: cardSkill ? cardSkill.cardHint : '选择这张牌作为弃牌' } : action.playable;
-        if (!discardMode && !cardSkill && !playable.ok) disabled = true;
-        return [
-          '<button class="card ', card.group, selected ? ' discard-selected' : '', '" data-card-id="', escapeHtml(card.id), '" ', disabled ? 'disabled' : '', ' title="', escapeHtml(playable.message), '">',
-          // v8 PR-0: 牌面右上角 花色 + 点数
-          suitRankBadge(card),
-          '<div class="card-name">【', escapeHtml(card.name), '】</div>',
-          '<div class="card-type">', escapeHtml(card.label), '</div>',
-          '<div class="card-desc">', escapeHtml(card.desc), '</div>',
-          '<div class="card-symbol">', escapeHtml(card.symbol), '</div>',
-          '</button>'
-        ].join('');
-      }
-
-      function renderHand() {
-        if (!game.player.hand.length) {
-          els.playerHand.innerHTML = '<div class="empty-hand">你没有手牌了。结束回合等待摸牌吧。</div>';
-          return;
-        }
-        els.playerHand.innerHTML = game.player.hand.map(cardButton).join('');
-      }
-
-      function renderPhaseTrack() {
-        if (!els.phaseTrack) return;
-        Array.from(els.phaseTrack.querySelectorAll('[data-phase]')).forEach(function (step) {
-          step.classList.toggle('active', step.getAttribute('data-phase') === game.phase);
-        });
-      }
-
-      function scrollLogToBottom() {
-        if (!els.log) return;
-        var doScroll = function () {
-          els.log.scrollTop = els.log.scrollHeight;
-          if (els.log.lastElementChild) {
-            els.log.lastElementChild.scrollIntoView({ block: 'end', inline: 'nearest' });
-          }
-        };
-        if (window.requestAnimationFrame) window.requestAnimationFrame(doScroll);
-        else doScroll();
-      }
-
-      function renderLog() {
-        els.log.innerHTML = game.log.slice(-36).map(function (entry) {
-          return '<div class="log-entry">' + escapeHtml(entry) + '</div>';
-        }).join('');
-        scrollLogToBottom();
-        renderLogOverlay();
-      }
-
-      // v9 PR-E2: 中央日志 overlay — 渲染最近 6 条到大字 overlay.
-      // 包含"阶段"或"回合"关键词的条目用 phase 高亮色 (浅金).
-      function renderLogOverlay() {
-        if (!els.logOverlay || !game) return;
-        var recent = game.log.slice(-6);
-        els.logOverlay.innerHTML = recent.map(function (entry) {
-          var isPhase = /阶段|回合开始|回合结束/.test(entry);
-          var cls = 'log-overlay__entry' + (isPhase ? ' log-overlay__entry--phase' : '');
-          return '<div class="' + cls + '">' + escapeHtml(entry) + '</div>';
-        }).join('');
       }
 
       // v9 PR-E5: 侧抽屉 + 退出确认 modal 显隐工具.
@@ -333,143 +204,28 @@
       function openExitConfirm() { if (els.exitConfirmModal) els.exitConfirmModal.hidden = false; }
       function closeExitConfirm() { if (els.exitConfirmModal) els.exitConfirmModal.hidden = true; }
 
-      function stateStatusMarkup(actor, base) {
-        var chained = game && game[actor] && game[actor].chained;
-        return escapeHtml(base) + (chained ? ' <span class="badge chain-status">铁索横置</span>' : '');
+      // v12 F6: 渲染域 (英雄区/手牌/日志/状态栏/阶段条/装备判定区) 迁往
+      // ./panels/board-panels.js — 可变状态经 uiView() 按次传入 (F4 房规),
+      // pendingChoice 面板路由与 staged 高亮涉及 adapter 闭包写操作, 留驻。
+      function uiView() {
+        return {
+          game: game,
+          enemyThinking: enemyThinking,
+          selectedDiscardIds: selectedDiscardIds,
+          selectedHandCardId: selectedHandCardId,
+          skillSelectMode: skillSelectMode,
+          selectedSkillCardIds: selectedSkillCardIds,
+          stagedModalChoice: stagedModalChoice
+        };
       }
-
-      function renderStatus() {
-        var isGameOver = game.phase === 'gameover';
-        var isPlayerTurn = game.turn === 'player';
-        var discardNeeded = isPlayerTurn && game.phase === 'discard' && Engine.needsDiscard(game, 'player');
-        var title = '';
-        var text = '';
-
-        if (isGameOver) {
-          title = game.winner === 'player' ? '胜利！' : '败北……';
-          text = game.winner === 'player' ? '你平定了这场乱世对决。点击“新开一局”再战。' : '电脑赢下了这一局。调整出牌顺序再来一次。';
-        } else if (discardNeeded) {
-          title = '弃牌阶段';
-          text = '你的手牌超过体力上限。点选需要弃置的牌，然后确认弃牌。';
-        } else if (isPlayerTurn) {
-          title = game.phase === 'finish' ? '结束阶段' : '你的回合';
-          text = game.player.usedSha ? '你本回合已经出过【杀】，可以使用锦囊/桃，或结束回合。' : '点击手牌出牌。建议先用【无中生有】或【酒】，再寻找进攻机会。';
-        } else {
-          title = enemyThinking ? '电脑思考中' : '电脑回合';
-          text = '电脑会按准备、判定、摸牌、出牌、弃牌、结束阶段自动行动。';
-        }
-
-        els.statusTitle.textContent = title;
-        els.statusText.textContent = text;
-        var deckText = '牌堆 ' + game.deck.length + ' · 弃牌 ' + game.discard.length;
-        els.deckInfo.textContent = deckText;
-        // v9 PR-E15: 用户反馈数字应在 "武将技能卡最右边往上一点".
-        if (els.playerSkillDeckInfo) els.playerSkillDeckInfo.textContent = deckText;
-        if (els.handDiscardBtn) {
-          els.handDiscardBtn.disabled = !isPlayerTurn || isGameOver || enemyThinking;
-          els.handDiscardBtn.textContent = game.phase === 'play' ? '结束出牌' : '结束回合';
-        }
-        // v9 PR-E16: hand-confirm / hand-cancel 启用条件
-        // confirm: 有 visible modal 注册 / 有 selectedHandCardId / 弃牌阶段已选够
-        // cancel: 有 visible modal 注册 / 有 selectedHandCardId / 弃牌阶段已选
-        var pendingDispatch = _firstVisibleDispatch();
-        var canConfirm = false;
-        var canCancel = false;
-        if (stagedModalChoice) {
-          // v9 PR-E23: 二级面板已 stage 一个候选 → 确认 提交, 取消 撤销.
-          canConfirm = true;
-          canCancel = true;
-        } else if (pendingDispatch) {
-          canConfirm = !!(pendingDispatch.confirmBtnId && els[pendingDispatch.confirmBtnId] &&
-                          !els[pendingDispatch.confirmBtnId].hidden && !els[pendingDispatch.confirmBtnId].disabled);
-          canCancel = !!(pendingDispatch.cancelBtnId && els[pendingDispatch.cancelBtnId] &&
-                         !els[pendingDispatch.cancelBtnId].hidden && !els[pendingDispatch.cancelBtnId].disabled);
-        } else if (isPlayerTurn && !isGameOver && !enemyThinking) {
-          if (discardNeeded) {
-            canConfirm = selectedDiscardIds.length >= Engine.getDiscardCount(game, 'player');
-            canCancel = selectedDiscardIds.length > 0;
-          } else {
-            canConfirm = !!selectedHandCardId;
-            canCancel = !!selectedHandCardId;
-          }
-        }
-        if (els.handConfirmBtn) els.handConfirmBtn.disabled = !canConfirm;
-        if (els.handCancelBtn) els.handCancelBtn.disabled = !canCancel;
-        els.handHint.textContent = discardNeeded ? ('弃牌：已选 ' + selectedDiscardIds.length + ' / ' + Engine.getDiscardCount(game, 'player')) : (isPlayerTurn && !isGameOver ? (selectedHandCardId ? '已选, 点"确认"使用' : '点击卡牌选中, 再按"确认"') : '等待回合');
-        if (els.confirmDiscardBtn) {
-          els.confirmDiscardBtn.hidden = !discardNeeded;
-          els.confirmDiscardBtn.disabled = !discardNeeded || selectedDiscardIds.length < Engine.getDiscardCount(game, 'player');
-        }
-        els.playerState.innerHTML = stateStatusMarkup('player', isGameOver ? (game.winner === 'player' ? '胜利' : '败北') : (isPlayerTurn ? '行动' : '等待'));
-        els.enemyState.innerHTML = stateStatusMarkup('enemy', isGameOver ? (game.winner === 'enemy' ? '胜利' : '败北') : (!isPlayerTurn ? '行动' : '等待'));
-        // v9 PR-E14: 之前默认显示 "电脑" / "玩家" 是冗余信息 (1v1 位置一目了然),
-        // 而且 turn-badge 在 hero-head 右侧与右上 lord/rebel-badge 重叠造成文字
-        // 被遮挡. 改成: 仅 "当前回合" 时显示, 其余 hidden.
-        var playerTurnActive = isPlayerTurn && !isGameOver;
-        var enemyTurnActive = !isPlayerTurn && !isGameOver;
-        els.playerTurnBadge.textContent = playerTurnActive ? '当前回合' : '';
-        els.playerTurnBadge.hidden = !playerTurnActive;
-        els.enemyTurnBadge.textContent = enemyTurnActive ? '当前回合' : '';
-        els.enemyTurnBadge.hidden = !enemyTurnActive;
-      }
-
-      function zoneCards(cards, emptyText) {
-        if (!cards || !cards.length) return '<span class="mini-card">' + escapeHtml(emptyText) + '</span>';
-        // v8 PR-0: 装备区 / 判定区 等公开区域 → 显示 花色 + 点数 (suit-class 颜色)
-        return cards.map(function (card) {
-          var suit = suitLabel(card.suit);
-          var rank = card.rank ? String(card.rank).toUpperCase() : '';
-          var meta = (suit || rank)
-            ? ' <span class="mini-card-suit ' + suitColorClass(card.suit) + '">'
-              + escapeHtml(suit) + (suit && rank ? ' ' : '') + escapeHtml(rank) + '</span>'
-            : '';
-          return '<span class="mini-card">' + escapeHtml(card.name) + meta + '</span>';
-        }).join('');
-      }
-
-      function equipmentCards(equipment) {
-        var cards = [];
-        ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
-          if (equipment && equipment[slot]) cards.push(equipment[slot]);
-        });
-        return zoneCards(cards, '未装备');
-      }
-
-      // v6.1: player-side equipment rendered as clickable buttons when in
-      // a skill select mode that accepts equipment cards (currently 制衡).
-      function playerEquipmentForZhiheng(equipment) {
-        var cards = [];
-        ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
-          if (equipment && equipment[slot]) cards.push(equipment[slot]);
-        });
-        if (!cards.length) return '<span class="mini-card">未装备</span>';
-        return cards.map(function (card) {
-          var selected = selectedSkillCardIds.indexOf(card.id) >= 0;
-          return '<button class="mini-card zhiheng-equip-pick' + (selected ? ' selected' : '') +
-            '" data-card-id="' + escapeHtml(card.id) + '" title="点击切换是否弃置（含装备）">' +
-            escapeHtml(card.name) + (selected ? ' ✓' : '') + '</button>';
-        }).join('');
-      }
-
-      function renderZones() {
-        if (els.playerEquipmentArea) {
-          els.playerEquipmentArea.innerHTML = skillSelectMode === 'zhiheng'
-            ? playerEquipmentForZhiheng(game.player.equipment)
-            : equipmentCards(game.player.equipment);
-        }
-        if (els.enemyEquipmentArea) els.enemyEquipmentArea.innerHTML = equipmentCards(game.enemy.equipment);
-        if (els.playerJudgeArea) els.playerJudgeArea.innerHTML = zoneCards(game.player.judgeArea, '空');
-        if (els.enemyJudgeArea) els.enemyJudgeArea.innerHTML = zoneCards(game.enemy.judgeArea, '空');
-      }
-
+      function renderLog() { boardPanels.renderLog(uiView()); }
+      function suitLabel(suit) { return boardPanels.suitLabel(suit); }
+      function suitRankBadge(card) { return boardPanels.suitRankBadge(card); }
+      function suitColorClass(suit) { return boardPanels.suitColorClass(suit); }
+      function activeCardSkillConfig() { return boardPanels.activeCardSkillConfig(uiView()); }
+      function playerCardAction(card) { return boardPanels.playerCardAction(uiView(), card); }
       function render() {
-        renderHero('player');
-        renderHero('enemy');
-        renderHand();
-        renderLog();
-        renderStatus();
-        renderPhaseTrack();
-        renderZones();
+        boardPanels.renderBoard(uiView());
         renderPendingChoice();
         // v9 PR-E24: pendingChoice 已消失 (响应面板关闭) → 清掉 stale 的 staged.
         if (stagedModalChoice && stagedModalChoice.kind === 'pending' &&
@@ -478,7 +234,6 @@
         }
         // v9 PR-E24: renderPendingChoice 每次重建候选 DOM, 重新套用 staged 高亮.
         _reapplyStagedHighlight();
-        els.enemyHandBacks.innerHTML = miniBacks(game.enemy.hand.length);
       }
 
       // v9 PR-E24: render 重建 pending 面板候选后, 据 stagedModalChoice.selector
@@ -487,31 +242,6 @@
         if (stagedModalChoice && stagedModalChoice.selector) {
           _highlightStaged(document.querySelector(stagedModalChoice.selector));
         }
-      }
-
-      function suitLabel(suit) {
-        return { spade: '♠', heart: '♥', club: '♣', diamond: '♦' }[suit] || suit || '';
-      }
-
-      // v8 PR-0: 牌面 花色 + 点数 可视化。spec 中所有牌都有 suit/rank/color，
-      // 玩家做"火攻同花色弃"、"倾国黑色当闪"、"武圣红色当杀"等决策必须能看到。
-      // 红 (heart/diamond) 用红色，黑 (spade/club) 用浅色；rank 用大写。
-      function suitColorClass(suit) {
-        return (suit === 'heart' || suit === 'diamond') ? 'suit-red' : 'suit-black';
-      }
-
-      // v9 PR-E3: corner 重构为列式 (rank 在上, suit 在下), 输出嵌套 span
-      // 让 CSS 能分别控制 size / spacing. 兼容旧 .card-corner / .suit-red
-      // / .suit-black class 选择器, 子 span 加 __rank / __suit 修饰.
-      function suitRankBadge(card) {
-        if (!card || (!card.suit && !card.rank)) return '';
-        var suit = suitLabel(card.suit);
-        var rank = card.rank ? String(card.rank).toUpperCase() : '';
-        var rankSpan = rank ? '<span class="card-corner__rank">' + escapeHtml(rank) + '</span>' : '';
-        var suitSpan = suit ? '<span class="card-corner__suit">' + escapeHtml(suit) + '</span>' : '';
-        return '<span class="card-corner ' + suitColorClass(card.suit) + '">'
-          + rankSpan + suitSpan
-          + '</span>';
       }
 
       // v8 PR-A1: 通用 pendingChoice 牌按钮 — 所有面板都用统一模板。

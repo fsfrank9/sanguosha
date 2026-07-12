@@ -21,6 +21,9 @@ const REQUIRED_FILES = [
   'src/engine/damage-dying.js',
   'src/engine/response.js',
   'src/engine/tricks.js',
+  'src/engine/sha-flow.js',
+  'src/engine/skills.js',
+  'src/engine/judge-area.js',
   'src/engine/equipment.js',
   'src/engine/ai.js',
   'src/engine/game-engine.js',
@@ -28,6 +31,8 @@ const REQUIRED_FILES = [
   'src/ui/panels/response-panels.js',
   'src/ui/panels/prompt-panels.js',
   'src/ui/panels/mode-panels.js',
+  'src/ui/panels/lobby-panels.js',
+  'src/ui/panels/board-panels.js',
 ];
 
 const MODULE_ENTRY_REQUIREMENTS = [

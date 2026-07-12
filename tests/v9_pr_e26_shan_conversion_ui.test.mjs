@@ -9,7 +9,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // adapter 源为主文件 + 面板模块拼接 (渲染/文案类断言两处皆可命中)。
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8');
-const engine = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+// v12 F5: 杀链/锦囊结算域拆分至 sha-flow.js / tricks.js — 牌结算域源码按域拼接
+const engine = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/engine/sha-flow.js'), 'utf8');
 
 const tests = [];
 function test(name, fn) { tests.push([name, fn]); }

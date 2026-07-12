@@ -12,6 +12,8 @@ const root = path.resolve(import.meta.dirname, '..');
 const html = [
   fs.readFileSync(path.join(root, 'index.html'), 'utf8'),
   loadAllStyles(),
+  // v12 F6: 战场渲染域迁往 panels/board-panels.js — 拼接一并纳入。
+  fs.readFileSync(path.join(root, 'src/ui/panels/board-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8'),
   // v11 B2: 面板已拆往 src/ui/panels/, 拼接一并纳入。
   fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8'),

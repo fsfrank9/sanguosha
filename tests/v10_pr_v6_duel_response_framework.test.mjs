@@ -7,7 +7,10 @@ import { fileURLToPath } from 'node:url';
 import { Engine } from './helpers/load-engine.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+// v12 F5: 杀链/锦囊结算域拆分至 sha-flow.js / tricks.js — 牌结算域源码按域拼接
+const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/engine/sha-flow.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/engine/tricks.js'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
