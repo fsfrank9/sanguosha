@@ -207,7 +207,8 @@ test('game engine dispatches Qianxun through onCardTarget hook seam', () => {
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qianxun['"]/, 'Qianxun should be registered with SkillRuntime.registerSkill');
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qianxun['"][\s\S]*?onCardTarget\s*:/, 'Qianxun should register an onCardTarget hook');
   assert.match(skillsSource, /triggerQianxunCardTarget\(context\)/, 'Qianxun hook should delegate target-protection logic to an isolated helper');
-  assert.match(canPlaySource, /cardTargetProtection\(game, actor, opponent\(actor\), card\)/, 'canPlayCard should use shared target protection for Qianxun-protected cards');
+  // v12 H1: 保护检查泛化为逐座席 ∃-检查 (seat 变量), 仍走共享 onCardTarget 缝
+  assert.match(canPlaySource, /cardTargetProtection\(game, actor, seat, card\)/, 'canPlayCard should use shared target protection for Qianxun-protected cards');
   assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"]qianxun['"]/, 'canPlayCard should not directly hard-code Qianxun detection');
   assert.doesNotMatch(playCardSource, /hasSkill\([^)]*['"]qianxun['"]/, 'playCard should not directly hard-code Qianxun detection');
 });

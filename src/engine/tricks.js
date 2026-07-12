@@ -336,7 +336,7 @@
         return finishTrickUse(game, ctx.actor, ctx.card, success('目标没有武器，借刀杀人无效果。'), ctx.options);
       }
       return finishTrickUse(game, ctx.actor, ctx.card,
-        resolveJiedaoDecision(game, ctx.actor, jdTargetActor, ctx.card, ctx.options), ctx.options);
+        resolveJiedaoDecision(game, ctx.actor, jdTargetActor, ctx.card, ctx.options, ctx.victimActor), ctx.options);
     });
 
     // H1: 新增 4 个无懈延续 — 无中生有 / 南蛮入侵 / 万箭齐发 / 延时锦囊放置。
@@ -646,27 +646,30 @@
       }
 
       // v7 PR-5: 借刀杀人 — 两次合法性检测中的第二次（An 决定是否用杀时）。
-      // 在 1v1 中 An = opponent，Bn = source。 流程:
-      //   1) 若 opponent 手牌没 杀 → 强制交武器 (transferWeaponToSource);
-      //   2) 若 opponent 有 杀 但当下 source 已经不是合法目标（spec 第二次检测
+      // 在 1v1 中 An = opponent，Bn = source。v12 H1: Bn 经 victimActor 显式
+      // 传入 (缺省 sourceActor, 1v1 行为不变)。流程:
+      //   1) 若 An 手牌没 杀 → 强制交武器 (transferWeaponToSource);
+      //   2) 若 An 有 杀 但当下 Bn 已经不是合法目标（spec 第二次检测
       //      —— 比如 借刀 期间双方距离改变 / 装备改变） → 交武器;
-      //   3) opponent 决定 use / decline；'auto'(AI 默认) = 直接 use；
+      //   3) An 决定 use / decline；'auto'(AI 默认) = 直接 use；
       //      'ask' (player 默认) = pendingChoice 'jiedao-decision'.
-      function resolveJiedaoDecision(game, sourceActor, opponentActor, jiedaoCard, options) {
+      function resolveJiedaoDecision(game, sourceActor, opponentActor, jiedaoCard, options, victimActor) {
         var opponentState = game[opponentActor];
+        var jdVictim = victimActor || sourceActor;
         if (!opponentState || !opponentState.equipment.weapon) {
           return success('【借刀杀人】无效果（目标无武器）。');
         }
         var hasSha = opponentState.hand.some(function (c) {
           return c && (c.type === 'sha' || c.type === 'fire_sha' || c.type === 'thunder_sha');
         });
-        var canHit = canReachWithSha(game, opponentActor, sourceActor)
-          && !cardTargetProtection(game, opponentActor, sourceActor, { type: 'sha', color: 'black', name: '杀' }, '杀');
+        var canHit = game[jdVictim] && game[jdVictim].hp > 0
+          && canReachWithSha(game, opponentActor, jdVictim)
+          && !cardTargetProtection(game, opponentActor, jdVictim, { type: 'sha', color: 'black', name: '杀' }, '杀');
         if (!hasSha || !canHit) {
           if (!hasSha) {
             log(game, actorName(game, opponentActor) + '没有【杀】可用，交出武器。');
           } else {
-            log(game, actorName(game, opponentActor) + '无法对' + actorName(game, sourceActor) + '使用【杀】，交出武器。');
+            log(game, actorName(game, opponentActor) + '无法对' + actorName(game, jdVictim) + '使用【杀】，交出武器。');
           }
           return transferWeaponJiedao(game, sourceActor, opponentActor);
         }
@@ -677,15 +680,16 @@
           setPendingChoice(game, {
             kind: 'jiedao-decision',
             actor: opponentActor,
-            sourceActor: sourceActor
+            sourceActor: sourceActor,
+            victimActor: jdVictim
           });
           return success('【借刀杀人】等待目标决定…');
         }
         // 'auto' → fire sha.
-        return jiedaoFireOpponentSha(game, sourceActor, opponentActor);
+        return jiedaoFireOpponentSha(game, sourceActor, opponentActor, jdVictim);
       }
 
-      function jiedaoFireOpponentSha(game, sourceActor, opponentActor) {
+      function jiedaoFireOpponentSha(game, sourceActor, opponentActor, victimActor) {
         var opponentState = game[opponentActor];
         var borrowedSha = removeFirstCardOfType(opponentState, 'sha')
           || removeFirstCardOfType(opponentState, 'fire_sha')
@@ -694,7 +698,9 @@
           return transferWeaponJiedao(game, sourceActor, opponentActor);
         }
         log(game, actorName(game, opponentActor) + '被【借刀杀人】驱使使用【' + borrowedSha.name + '】。');
-        var shaResult = playSha(game, opponentActor, borrowedSha);
+        // v12 H1: 显式受害目标 (缺省 sourceActor — 1v1 中 playSha 的
+        // defaultHostileTarget 本就落在使用者身上, 行为一致)。
+        var shaResult = playSha(game, opponentActor, borrowedSha, { target: victimActor || sourceActor });
         if (!shaResult || !shaResult.ok) {
           // Second legality check failed at playSha entry (target protection / distance
           // changed since canPlayCard). Return sha to opponent's hand and transfer weapon.
@@ -713,7 +719,7 @@
           log(game, actorName(game, opponentActor) + '选择不出【杀】，交出武器。');
           return transferWeaponJiedao(game, sourceActor, opponentActor);
         }
-        return jiedaoFireOpponentSha(game, sourceActor, opponentActor);
+        return jiedaoFireOpponentSha(game, sourceActor, opponentActor, pending.victimActor);
       }
 
       // v12 H2: 无双需求量按"决斗的另一方"判定 — 显式传入 demanderActor
@@ -877,6 +883,14 @@
             aoe.idx += 1;
             continue;
           }
+          // v12 H1: 座席级目标保护 (谦逊类 onCardTarget) — 被保护座席跳过。
+          // 现有钩子均不覆盖南蛮/万箭 (行为不变), 为同疾等 3p 技能预留。
+          var aoeProtection = cardTargetProtection(game, aoe.sourceActor, targetActor, aoe.card);
+          if (aoeProtection) {
+            log(game, aoeProtection.message);
+            aoe.idx += 1;
+            continue;
+          }
           // v10 V4: 万箭齐发 (responseType='shan') + 玩家为目标 + shanResponse=ask +
           // 有闪可响应 → 暂停, 让玩家自选闪 / 不出. 引擎默认仍走自动响应.
           if (responseType === 'shan' && targetActor === 'player') {
@@ -981,13 +995,15 @@
         return picked;
       }
 
-      function getHuogongChoice(game, actor) {
+      // v12 H1: 可选 targetActor — UI/预校验按显式目标预览; 缺省 1v1 对手。
+      function getHuogongChoice(game, actor, targetActor) {
+        var hgTarget = targetActor || opponent(actor);
         var self = game && game[actor];
-        var target = game && game[opponent(actor)];
+        var target = game && game[hgTarget];
         if (!self || !target || !target.hand || !target.hand.length) {
           return { ok: false, revealedCard: null, usableCostIds: [], unusableCostIds: [], usableCards: [], unusableCards: [], message: '目标没有手牌。' };
         }
-        var revealed = peekHuogongReveal(game, opponent(actor));
+        var revealed = peekHuogongReveal(game, hgTarget);
         if (!revealed) {
           return { ok: false, pendingTargetChoice: true, revealedCard: null, usableCostIds: [], unusableCostIds: [], usableCards: [], unusableCards: [], message: '等待目标选择展示牌。' };
         }

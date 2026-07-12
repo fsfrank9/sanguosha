@@ -40,6 +40,7 @@
       var aliveSeats = StateRuntime.aliveSeats;
       var nextSeat = StateRuntime.nextSeat;
       var seatsFrom = StateRuntime.seatsFrom;
+      var resolveSeatOption = StateRuntime.resolveSeatOption;
       var hasSkill = StateRuntime.hasSkill;
       var canUseUnlimitedSha = StateRuntime.canUseUnlimitedSha;
       var weaponRange = StateRuntime.weaponRange;
@@ -1038,20 +1039,28 @@
         if (game.phase !== 'play') return fail('当前不是出牌阶段。');
         var self = game[actor];
         if (card.type === 'shan' || card.type === 'wuxie') return fail('【' + card.name + '】只能用于响应，本版会自动打出。');
-        var targetProtection = cardTargetProtection(game, actor, opponent(actor), card);
-        if (targetProtection) return fail(targetProtection.message);
-        // v7 PR-10/11: 1V1 顺手牵羊 / 兵粮寸断 都已取消距离限制
-        //   顺手 (1V1): 目标 "有牌的对手"，无距离限制 — PR-10 已生效
-        //   兵粮 (1V1): 目标 "对手"，无距离限制 — PR-11 已生效
-        // 至此 1V1 标准包内已无距离限制的锦囊牌。
+        // v12 H1: 目标保护检查泛化为 ∃-无保护座席 — 全部其他座席均被
+        // "不能成为目标"类技能 (谦逊/空城/同疾) 保护时才拒绝, 以首个保护
+        // 原因回话 (1v1 单候选 → 与旧版逐字一致)。
+        var otherSeats = aliveSeats(game).filter(function (seat) { return seat !== actor; });
+        var protectionBlock = null;
+        var unprotectedSeats = otherSeats.filter(function (seat) {
+          var prot = cardTargetProtection(game, actor, seat, card);
+          if (prot && !protectionBlock) protectionBlock = prot;
+          return !prot;
+        });
+        if (otherSeats.length && !unprotectedSeats.length && protectionBlock) return fail(protectionBlock.message);
+        // v7 PR-10/11: 1V1 顺手牵羊 / 兵粮寸断 都已取消距离限制 — v12 H3:
+        // 该变体仅限 duel 模式; identity3 恢复官方距离 ≤1 (trickDistanceLimited)。
         if (isShaCard(card) && !legalTargetsForCard(game, actor, card).some(function (seat) { return seat !== actor; })) return fail('距离不足，当前武器范围无法使用【杀】。');
         if (isShaCard(card) && self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
         if (card.type === 'tao') {
           // v7 PR-1: gltjk 基本牌·桃 使用方法Ⅰ —— 使用目标"包括你在内的一名已受伤的角色"。
-          // 在 1v1 中，任一方受伤即可出【桃】；若双方满血则无合法目标。
-          var taoSelfWounded = self.hp < self.maxHp;
-          var taoFoeWounded = game[opponent(actor)].hp < game[opponent(actor)].maxHp;
-          if (!taoSelfWounded && !taoFoeWounded) return fail('体力已满，不能使用【桃】。');
+          // v12 H1: 任一存活座席受伤即可出【桃】；全员满血则无合法目标。
+          var taoAnyWounded = aliveSeats(game).some(function (seat) {
+            return game[seat].hp < game[seat].maxHp;
+          });
+          if (!taoAnyWounded) return fail('体力已满，不能使用【桃】。');
         }
         if (card.type === 'jiu') {
           // v7 PR-8: gltjk 基本牌·酒 使用方法Ⅰ —— "出牌阶段。每回合限一次。"
@@ -1062,64 +1071,150 @@
             return fail('本回合已经使用过【酒】。');
           }
         }
-        if ((card.type === 'guohe' || card.type === 'shunshou') && !hasAnyTargetableCard(game[opponent(actor)])) {
+        if ((card.type === 'guohe' || card.type === 'shunshou')
+            && !otherSeats.some(function (seat) { return hasAnyTargetableCard(game[seat]); })) {
           return fail('对方没有可操作的牌。');
         }
         // v7 PR-9: gltjk card__scroll.md 过河拆桥 (1V1) — "你选择一项：
         // 1.弃置目标角色的装备区里的一张牌；2.观看目标角色的手牌并弃置其中一张牌。"
-        // 1V1 变体不允许选判定区；若对手只有判定区有牌而无手牌/装备 → 无合法行动，拒绝。
+        // 1V1 变体不允许选判定区；若目标只有判定区有牌而无手牌/装备 → 无合法行动，拒绝。
         if (card.type === 'guohe') {
-          var guoheFoe = game[opponent(actor)];
-          var guoheHasHand = (guoheFoe.hand || []).length > 0;
-          var guoheHasEquip = equipmentList(guoheFoe).length > 0;
-          if (!guoheHasHand && !guoheHasEquip) {
+          var guoheAnyPickable = otherSeats.some(function (seat) {
+            return (game[seat].hand || []).length > 0 || equipmentList(game[seat]).length > 0;
+          });
+          if (!guoheAnyPickable) {
             return fail('1V1【过河拆桥】只能弃对手装备区或手牌；对方两者皆空。');
           }
         }
+        // v12 H3: identity3 顺手牵羊距离 ≤1 — 有牌座席均在距离外时拒绝。
+        if (card.type === 'shunshou' && trickDistanceLimited(game)
+            && !legalTargetsForCard(game, actor, card).length) {
+          return fail('距离不足，无法使用【顺手牵羊】。');
+        }
         // v7 PR-6: gltjk flow__condition.md 共同合法性: "判定区里有延时类锦囊
-        // 牌的角色不是使用同名延时类锦囊牌的合法目标"。乐 / 兵 → opponent；
-        // 闪电 → self。
+        // 牌的角色不是使用同名延时类锦囊牌的合法目标"。乐 / 兵 → 其他座席；
+        // 闪电 → self。v12 H1: ∃-合法目标化 (identity3 兵粮另受距离 ≤1 约束)。
         if (card.family === 'delayed') {
-          var delayedTargetActor = card.type === 'shandian' ? actor : opponent(actor);
-          var delayedTargetState = game[delayedTargetActor];
-          var alreadyHas = (delayedTargetState.judgeArea || []).some(function (judge) {
-            return judge && judge.type === card.type;
-          });
-          if (alreadyHas) {
-            return fail(actorName(game, delayedTargetActor) + '的判定区已有【' + card.name + '】，不能再放置同名延时锦囊。');
+          var delayedCandidates = legalTargetsForCard(game, actor, card);
+          if (!delayedCandidates.length) {
+            if (card.type === 'bingliang' && trickDistanceLimited(game)
+                && otherSeats.some(function (seat) {
+                  return !(game[seat].judgeArea || []).some(function (judge) { return judge && judge.type === card.type; });
+                })) {
+              return fail('距离不足，无法使用【兵粮寸断】。');
+            }
+            var delayedDefault = card.type === 'shandian' ? actor : (otherSeats[0] || actor);
+            return fail(actorName(game, delayedDefault) + '的判定区已有【' + card.name + '】，不能再放置同名延时锦囊。');
           }
         }
         if (card.type === 'jiedao') {
           // v7 PR-5: gltjk card__scroll.md 注 — 借刀杀人 两次合法性检测，
-          // 第一次在 "选择 An 为目标的同时选择 Bn"。1v1 中 An = opponent，
-          // Bn = source 本人。
-          // canPlayCard 阶段（第一次合法性检测）做以下保守检查：
-          //   1) An 装备区有武器；
-          //   2) An 的武器范围覆盖 Bn (canReachWithSha)；
-          //   3) Bn 不被 onCardTarget 钩子拒绝（如【谦逊】等"不能成为目标"
-          //      的技能）。
-          // 装备效果（仁王盾屏蔽黑杀 / 藤甲屏蔽普通杀）等属于"对该牌无效"
-          // 而非"非合法目标"，且不知道 An 的具体 杀 颜色 / 属性，因此放
-          // 到 resolveJiedaoDecision 的第二次合法性检测中按实际 杀 牌再判。
-          var jiedaoOpp = game[opponent(actor)];
-          if (!jiedaoOpp.equipment.weapon) return fail('目标没有武器，无法发动【借刀杀人】。');
-          if (!canReachWithSha(game, opponent(actor), actor)) {
+          // 第一次在 "选择 An 为目标的同时选择 Bn"。v12 H1: An = 任一有武器
+          // 座席 (缺省 1v1 对手)，Bn = An 攻击范围内可指定座席 (缺省使用者)。
+          // canPlayCard 阶段（第一次合法性检测）做 ∃-检查 (1v1 信息逐字不变):
+          //   1) ∃ An 装备区有武器；2) ∃ An 武器范围覆盖某 Bn；
+          //   3) 该 Bn 不被 onCardTarget 钩子拒绝（如【谦逊】等）。
+          // 装备效果（仁王盾/藤甲）属于"对该牌无效"而非"非合法目标"，且不知
+          // An 的具体 杀 颜色，放到 resolveJiedaoDecision 第二次检测中再判。
+          var jiedaoHolders = otherSeats.filter(function (seat) {
+            return game[seat].equipment && game[seat].equipment.weapon;
+          });
+          if (!jiedaoHolders.length) return fail('目标没有武器，无法发动【借刀杀人】。');
+          var jiedaoReachable = jiedaoHolders.filter(function (holder) {
+            return aliveSeats(game).some(function (victim) {
+              return victim !== holder && canReachWithSha(game, holder, victim);
+            });
+          });
+          if (!jiedaoReachable.length) {
             return fail('目标武器范围内没有合法的【杀】目标，无法发动【借刀杀人】。');
           }
-          var jiedaoProtection = cardTargetProtection(game, opponent(actor), actor, { type: 'sha', name: '杀' }, '杀');
-          if (jiedaoProtection) {
+          var jiedaoUsable = jiedaoReachable.filter(function (holder) {
+            return jiedaoVictimCandidates(game, holder).length > 0;
+          });
+          if (!jiedaoUsable.length) {
             return fail('目标无法对你使用【杀】，无法发动【借刀杀人】。');
           }
         }
         return success('可以使用。');
       }
 
+      // v12 H3: 距离规则模式开关 — identity3 恢复官方 顺手牵羊/兵粮寸断
+      // 距离 ≤1; duel (1v1) 保持 v7 变体无距离限制 (既有行为/测试不变)。
+      function trickDistanceLimited(game) {
+        return !!(game && game.mode === 'identity3');
+      }
+
+      // v12 H1: 借刀杀人 Bn (受害者) 候选 — 在武器持有者攻击范围内且不被
+      // "不能成为目标"类技能保护的其他座席; 1v1 恒为 [使用者本人]。
+      function jiedaoVictimCandidates(game, holderSeat) {
+        return aliveSeats(game).filter(function (victim) {
+          if (victim === holderSeat) return false;
+          return canReachWithSha(game, holderSeat, victim)
+            && !cardTargetProtection(game, holderSeat, victim, { type: 'sha', name: '杀' }, '杀');
+        });
+      }
+
+      // v12 H1: 全牌类座席级合法目标矩阵 — canPlayCard 的 ∃-目标检查与
+      // playCard 显式 options.target 校验共用。"可指定但可能无效果" (火攻
+      // 空手牌目标等) 沿用 1v1 变体语义, 不在此处收紧。
+      function isLegalCardTarget(game, actor, card, seat) {
+        if (!card || !game[seat]) return false;
+        var seatState = game[seat];
+        if (typeof seatState.hp !== 'number' || seatState.hp <= 0) return false;
+        if (seat === actor) {
+          // 自指: 桃 (已受伤) / 无中生有 / 闪电 (判定区无同名)
+          if (card.type === 'tao') return seatState.hp < seatState.maxHp;
+          if (card.type === 'wuzhong') return true;
+          if (card.type === 'shandian') {
+            return !(seatState.judgeArea || []).some(function (judge) { return judge && judge.type === 'shandian'; });
+          }
+          return false;
+        }
+        if (isShaCard(card)) return canReachWithSha(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
+        if (card.type === 'tao') return seatState.hp < seatState.maxHp;
+        if (card.type === 'wuzhong') return true;
+        if (card.type === 'shandian') return false; // 闪电只对自己使用
+        if (card.type === 'lebusishu' || card.type === 'bingliang') {
+          if ((seatState.judgeArea || []).some(function (judge) { return judge && judge.type === card.type; })) return false;
+          if (card.type === 'bingliang' && trickDistanceLimited(game) && distanceBetween(game, actor, seat) > 1) return false;
+          return !cardTargetProtection(game, actor, seat, card);
+        }
+        if (card.type === 'guohe') {
+          if (!(seatState.hand || []).length && !equipmentList(seatState).length) return false;
+          return !cardTargetProtection(game, actor, seat, card);
+        }
+        if (card.type === 'shunshou') {
+          if (!hasAnyTargetableCard(seatState)) return false;
+          if (trickDistanceLimited(game) && distanceBetween(game, actor, seat) > 1) return false;
+          return !cardTargetProtection(game, actor, seat, card);
+        }
+        if (card.type === 'jiedao') {
+          if (!seatState.equipment || !seatState.equipment.weapon) return false;
+          if (cardTargetProtection(game, actor, seat, card)) return false;
+          return jiedaoVictimCandidates(game, seat).length > 0;
+        }
+        // 决斗/火攻等: 任意其他存活座席 (受目标保护约束)
+        return !cardTargetProtection(game, actor, seat, card);
+      }
+
       function legalTargetsForCard(game, actor, card) {
         return aliveSeats(game).filter(function (seat) {
-          if (seat === actor) return card && (card.type === 'tao' || card.type === 'wuzhong');
-          if (isShaCard(card)) return canReachWithSha(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
-          return true;
+          return isLegalCardTarget(game, actor, card, seat);
         });
+      }
+
+      // v12 H1: 单目标锦囊 playCard 时的目标解析 — options.target 显式指定
+      // (须为矩阵合法目标, 否则返回 null 由调用方拒绝且牌不离手); 缺省回退
+      // 1v1 对手, 对手非法时取首个合法座席 (canPlayCard 已保证存在)。
+      function resolveTrickTargetActor(game, actor, card, options) {
+        var requested = options && (options.target || (options.targets && options.targets[0]));
+        if (requested) {
+          var seat = resolveSeatOption(game, requested);
+          if (!seat || seat === actor || !isLegalCardTarget(game, actor, card, seat)) return null;
+          return seat;
+        }
+        var candidates = legalTargetsForCard(game, actor, card).filter(function (seat) { return seat !== actor; });
+        return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : (candidates[0] || null);
       }
 
       // v11 C1: 救援 — 主公技/锁定。其他吴势力角色对主公孙权使用【桃】
@@ -1155,16 +1250,18 @@
         var card = self.hand.find(function (item) { return item.id === cardId; });
         var playable = canPlayCard(game, actor, card);
         if (!playable.ok) return playable;
+        // v12 H1: 区域/成本预校验对齐显式目标 (缺省 1v1 对手)。
         if (card && (card.type === 'guohe' || card.type === 'shunshou') && (options.targetZone || options.targetCardId)) {
-          var requestedZone = options.targetZone || defaultTargetZone(game[opponent(actor)]);
-          var targetChoices = getTargetZoneCards(game, opponent(actor), requestedZone);
+          var zoneTargetActor = resolveTrickTargetActor(game, actor, card, options) || opponent(actor);
+          var requestedZone = options.targetZone || defaultTargetZone(game[zoneTargetActor]);
+          var targetChoices = getTargetZoneCards(game, zoneTargetActor, requestedZone);
           if (!targetChoices.length) return fail('目标区域没有可操作的牌。');
           if (options.targetCardId && !targetChoices.some(function (entry) { return entry.card.id === options.targetCardId; })) {
             return fail('指定的目标牌不存在。');
           }
         }
         if (card && card.type === 'huogong' && options.huogongCostCardId) {
-          var huogongChoice = getHuogongChoice(game, actor);
+          var huogongChoice = getHuogongChoice(game, actor, resolveTrickTargetActor(game, actor, card, options));
           if (!huogongChoice.ok) return fail(huogongChoice.message);
           if (huogongChoice.usableCostIds.indexOf(options.huogongCostCardId) < 0) return fail('请选择与展示牌同花色的手牌。');
         }
@@ -1200,29 +1297,44 @@
       function playDelayedCardHandler(game, actor, card, options, self) {
           // H1: 延时锦囊放置前开无懈窗口 (gltjk card__scroll.md — 无懈可击可在
           // 锦囊「对一个目标生效前」抵消; 延时锦囊于放置时即指定目标)。
-          // 乐不思蜀/兵粮寸断 → 对方判定区; 闪电 → 自己判定区。无懈响应者恒为
-          // 非来源方 (opponent(actor))。
-          var delayedSide = (card.type === 'shandian') ? actor : opponent(actor);
-          return checkWuxieAndContinue(game, opponent(actor), '【' + card.name + '】', 'delayed-place', {
+          // v12 H1: 乐/兵 经 options.target 显式指定 (缺省 1v1 对手); 闪电恒
+          // 对自己。无懈首询者 = 目标 (队列自动跳过来源, 1v1 恒为对方)。
+          var delayedSide;
+          if (card.type === 'shandian') {
+            delayedSide = actor;
+          } else {
+            delayedSide = resolveTrickTargetActor(game, actor, card, options);
+            if (!delayedSide) {
+              putCard(game, card, { zone: 'hand', actor: actor });
+              return fail('无效的【' + card.name + '】目标。');
+            }
+          }
+          return checkWuxieAndContinue(game, delayedSide, '【' + card.name + '】', 'delayed-place', {
             actor: actor, card: card, options: options, delayedSide: delayedSide
           });
       }
 
       function playTaoCardHandler(game, actor, card, options, self) {
-          // v7 PR-1: 目标"包括你在内的一名已受伤的角色"。options.taoTarget
-          // 可指定 'player' / 'enemy'；未指定时默认为发动者，若发动者满血而对手
-          // 受伤则回退到对手（保持 canPlayCard 已放行的合法性）。
-          var requestedTaoTarget = options.taoTarget;
+          // v7 PR-1: 目标"包括你在内的一名已受伤的角色"。options.taoTarget /
+          // options.target 可指定任意座席 (v12 H1: resolveSeatOption 校验);
+          // 未指定时默认为发动者，若发动者满血则回退到首个受伤座席
+          // (1v1 即对手, 保持 canPlayCard 已放行的合法性)。
+          var requestedTaoTarget = resolveSeatOption(game, options.taoTarget || options.target);
           var taoTargetActor;
-          if (requestedTaoTarget === 'player' || requestedTaoTarget === 'enemy') {
+          if (requestedTaoTarget) {
             taoTargetActor = requestedTaoTarget;
           } else if (self.hp < self.maxHp) {
             taoTargetActor = actor;
           } else {
-            taoTargetActor = opponent(actor);
+            taoTargetActor = aliveSeats(game).filter(function (seat) {
+              return seat !== actor && game[seat].hp < game[seat].maxHp;
+            })[0] || opponent(actor);
           }
           var taoTargetState = game[taoTargetActor];
           if (!taoTargetState || taoTargetState.hp >= taoTargetState.maxHp) {
+            // v12 H1 修复: 拒绝时把牌放回手牌 (此前 playCard 已摘牌, 直接
+            // fail 会让实体牌凭空消失 — 守恒红线)。
+            putCard(game, card, { zone: 'hand', actor: actor });
             return fail('目标体力已满，不能使用【桃】。');
           }
           discardCard(game, card);
@@ -1246,26 +1358,29 @@
 
       function playWuzhongCardHandler(game, actor, card, options, self) {
           // v7 PR-16: gltjk card__scroll.md 无中生有 (1V1/界限突破/国-标):
-          //   "使用目标: 包括你在内的一名角色"。options.wuzhongTarget 可指定
-          //   'player' / 'enemy'; 未指定时默认 = actor。
-          // H1: 摸牌前开无懈窗口 (对方可抵消)。
+          //   "使用目标: 包括你在内的一名角色"。options.wuzhongTarget /
+          //   options.target 可指定任意座席 (v12 H1: resolveSeatOption 校验,
+          //   无效值静默回退 actor — 与旧字面量白名单行为一致); 缺省 = actor。
+          // H1: 摸牌前开无懈窗口。v12 H2: 首询者 = 目标 (队列跳过来源)。
           discardCard(game, card);
-          var wzTargetActor = (options.wuzhongTarget === 'player' || options.wuzhongTarget === 'enemy')
-            ? options.wuzhongTarget
-            : actor;
-          if (!game[wzTargetActor]) {
-            return fail('无效的【无中生有】目标。');
-          }
+          var wzTargetActor = resolveSeatOption(game, options.wuzhongTarget || options.target) || actor;
           log(game, actorName(game, actor) + '使用【无中生有】' + (wzTargetActor === actor ? '' : '令' + actorName(game, wzTargetActor)) + '。');
-          return checkWuxieAndContinue(game, opponent(actor), '【无中生有】', 'wuzhong', {
+          var wzResponder = wzTargetActor === actor ? opponent(actor) : wzTargetActor;
+          return checkWuxieAndContinue(game, wzResponder, '【无中生有】', 'wuzhong', {
             actor: actor, card: card, options: options, wzTargetActor: wzTargetActor
           });
       }
 
       function playJuedouCardHandler(game, actor, card, options, self) {
           // v10 V5: 走无懈链框架. WUXIE_CONTINUATIONS['juedou'] 注册在 trick 区下方.
-          return checkWuxieAndContinue(game, opponent(actor), '【决斗】', 'juedou', {
-            actor: actor, card: card, options: options
+          // v12 H1: options.target 显式目标 (缺省 1v1 对手), 无懈首询者 = 目标。
+          var duelTargetActor = resolveTrickTargetActor(game, actor, card, options);
+          if (!duelTargetActor) {
+            putCard(game, card, { zone: 'hand', actor: actor });
+            return fail('无效的【决斗】目标。');
+          }
+          return checkWuxieAndContinue(game, duelTargetActor, '【决斗】', 'juedou', {
+            actor: actor, card: card, options: options, targetActor: duelTargetActor
           });
       }
 
@@ -1285,18 +1400,29 @@
 
       function playGuoheCardHandler(game, actor, card, options, self) {
           // v7 PR-9: 1V1 变体两选项 — 装备区一张 / 看手并弃一张。
-          // v10 V5: 走无懈链框架.
+          // v10 V5: 走无懈链框架. v12 H1: options.target 显式目标。
+          var ghTargetActor = resolveTrickTargetActor(game, actor, card, options);
+          if (!ghTargetActor) {
+            putCard(game, card, { zone: 'hand', actor: actor });
+            return fail('无效的【过河拆桥】目标。');
+          }
           discardCard(game, card);
-          return checkWuxieAndContinue(game, opponent(actor), '【过河拆桥】', 'guohe', {
-            actor: actor, card: card, options: options
+          return checkWuxieAndContinue(game, ghTargetActor, '【过河拆桥】', 'guohe', {
+            actor: actor, card: card, options: options, targetActor: ghTargetActor
           });
       }
 
       function playShunshouCardHandler(game, actor, card, options, self) {
-          // v10 V5: 走无懈链框架.
+          // v10 V5: 走无懈链框架. v12 H1: options.target 显式目标
+          // (identity3 距离 ≤1 经 isLegalCardTarget 约束)。
+          var ssTargetActor = resolveTrickTargetActor(game, actor, card, options);
+          if (!ssTargetActor) {
+            putCard(game, card, { zone: 'hand', actor: actor });
+            return fail('无效的【顺手牵羊】目标。');
+          }
           discardCard(game, card);
-          return checkWuxieAndContinue(game, opponent(actor), '【顺手牵羊】', 'shunshou', {
-            actor: actor, card: card, options: options
+          return checkWuxieAndContinue(game, ssTargetActor, '【顺手牵羊】', 'shunshou', {
+            actor: actor, card: card, options: options, targetActor: ssTargetActor
           });
       }
 
@@ -1351,9 +1477,15 @@
 
       function playHuogongCardHandler(game, actor, card, options, self) {
           // v10 V5: 走无懈链框架. 后续 huogong 流程移到 WUXIE_CONTINUATIONS['huogong'].
+          // v12 H1: options.target 显式目标。
+          var hgTargetActor = resolveTrickTargetActor(game, actor, card, options);
+          if (!hgTargetActor) {
+            putCard(game, card, { zone: 'hand', actor: actor });
+            return fail('无效的【火攻】目标。');
+          }
           discardCard(game, card);
-          return checkWuxieAndContinue(game, opponent(actor), '【火攻】', 'huogong', {
-            actor: actor, card: card, options: options
+          return checkWuxieAndContinue(game, hgTargetActor, '【火攻】', 'huogong', {
+            actor: actor, card: card, options: options, targetActor: hgTargetActor
           });
       }
 
@@ -1364,8 +1496,9 @@
             drawCards(game, actor, 1);
             return success('铁索连环重铸完成。');
           }
+          // v12 H1: 目标座席经 resolveSeatOption 校验 (任意存活座席, 至多 2 名)。
           var targets = Array.from(options.targets || [opponent(actor)]).filter(function (side, index, array) {
-            return (side === 'player' || side === 'enemy') && array.indexOf(side) === index;
+            return resolveSeatOption(game, side) && game[side].hp > 0 && array.indexOf(side) === index;
           }).slice(0, 2);
           if (!targets.length) return fail('请选择要横置或重置的角色。');
           targets.forEach(function (side) {
@@ -1378,10 +1511,24 @@
       function playJiedaoCardHandler(game, actor, card, options, self) {
           // v7 PR-5: gltjk card__scroll.md 注 — 须做两次合法性检测.
           // 第一次已在 canPlayCard 检过; 这里做第二次 (在 jiedao 继续逻辑里).
-          // v10 V5: 走无懈链框架.
+          // v10 V5: 走无懈链框架. v12 H1: An = options.target (缺省 1v1 对手),
+          // Bn = options.jiedaoVictim (缺省使用者本人, 与 1v1 旧行为一致)。
+          var holderActor = resolveTrickTargetActor(game, actor, card, options);
+          if (!holderActor) {
+            putCard(game, card, { zone: 'hand', actor: actor });
+            return fail('无效的【借刀杀人】目标。');
+          }
+          var victimActor = resolveSeatOption(game, options.jiedaoVictim) || actor;
+          if (victimActor === holderActor || !game[victimActor] || game[victimActor].hp <= 0
+              || !canReachWithSha(game, holderActor, victimActor)
+              || cardTargetProtection(game, holderActor, victimActor, { type: 'sha', name: '杀' }, '杀')) {
+            putCard(game, card, { zone: 'hand', actor: actor });
+            return fail('无效的【借刀杀人】受害目标。');
+          }
           discardCard(game, card);
-          return checkWuxieAndContinue(game, opponent(actor), '【借刀杀人】', 'jiedao', {
-            actor: actor, card: card, options: options
+          return checkWuxieAndContinue(game, holderActor, '【借刀杀人】', 'jiedao', {
+            actor: actor, card: card, options: options,
+            targetActor: holderActor, victimActor: victimActor
           });
       }
 

@@ -77,8 +77,10 @@ test('v10 V5: resolveWuxieResponseChoice — cardId / use / 默认 decline 三�
 // ───── 引擎: 5 trick 重构走 checkWuxieAndContinue ──────────────────────
 
 test('v10 V5: 5 个 trick 调用 checkWuxieAndContinue (而非旧 consumeWuxie 单调用)', () => {
+  // v12 H1: 首询者从固定 opponent(actor) 泛化为显式目标座席变量
+  // (duelTargetActor/ghTargetActor/... — 缺省仍回退 1v1 对手)。
   ['juedou', 'guohe', 'shunshou', 'huogong', 'jiedao'].forEach(function (trick) {
-    const re = new RegExp("checkWuxieAndContinue\\(game,\\s*opponent\\(actor\\),\\s*['【】一-鿿·]+,\\s*'" + trick + "'");
+    const re = new RegExp("checkWuxieAndContinue\\(game,\\s*[A-Za-z]+Actor,\\s*['【】一-鿿·]+,\\s*'" + trick + "'");
     assert.match(engineSrc, re, trick + ': 应走 checkWuxieAndContinue');
   });
 });
