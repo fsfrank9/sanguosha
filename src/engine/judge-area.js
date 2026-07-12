@@ -120,6 +120,15 @@
           startIdx = 0;
         }
         for (var i = startIdx; i < pending.length; i += 1) {
+          // v12 H5: 该角色已在判定结算中阵亡 (闪电, 身份场对局继续) —
+          // 剩余在途延时锦囊直接置入弃牌堆, 不再为亡者结算。
+          if (game[actor].hp <= 0) {
+            for (var deadRest = i; deadRest < pending.length; deadRest += 1) {
+              discardCard(game, pending[deadRest]);
+            }
+            if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
+            return { ok: true };
+          }
           var trick = pending[i];
           var reason = judgementReasonFor(trick);
           var judgementCard = reason ? judge(game, actor, reason, { pausable: true }) : null;

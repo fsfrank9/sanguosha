@@ -209,6 +209,14 @@
         leiji:    { trigger: 'cardUse',           frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onShanUsed'] },
         guidao:   { trigger: 'beforeJudgement',   frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onJudgementBeforeResolve'] },
         buqu:     { trigger: 'dyingEnter',        frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDyingEnter'] },
+        // v12 H7: 主公技/多人技 (身份场激活; 1v1 无同势力队友/凑不齐目标 → no-op)。
+        // 激将: 主动 (出牌阶段求杀) + 响应 (决斗/南蛮需打出杀时求助);
+        // 护驾: 纯响应 (杀/万箭需打出闪时求助); 黄天: 全场型 (给牌者发动);
+        // 离间: 出牌阶段限一次, 弃一张牌令两名男性角色虚拟决斗。
+        jijiang:  { trigger: 'playPhase',         frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onActiveSkill', 'advanceDuelChain', 'advanceAOETargets'], lord: true },
+        hujia:    { trigger: 'needResponse',      frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['resolveShaResponse', 'advanceAOETargets'], lord: true },
+        huangtian:{ trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'giveHand',   count: 1 },     hooks: ['onActiveSkill'], lord: true },
+        lijian:   { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onActiveSkill'] },
       };
 
       for (var _heroId in HERO_CATALOG) {

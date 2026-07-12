@@ -232,7 +232,7 @@
         {
           "name": "黄天",
           "localSkillId": "huangtian",
-          "implementationStatus": "pending",
+          "implementationStatus": "implemented",
           "sourceTextRef": "30f12509ddc5",
           "spec": {
             "summary": "主公技：其他群势力角色可在其出牌阶段将【闪】或【闪电】交给你。",

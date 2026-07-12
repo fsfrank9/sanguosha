@@ -28,6 +28,8 @@
     var isArmorIgnoredBySha = deps.isArmorIgnoredBySha;
     // v11 C1 (批次 25): 救援 — 吴势力对濒死主公用桃回复量 +1 (由引擎注入)
     var taoRecoverBonus = deps.taoRecoverBonus;
+    // v12 H5: 身份场死亡奖惩 (击杀反贼摸三张)
+    var drawCards = deps.drawCards;
 
     function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts) {
       if (game.phase === 'gameover') return false;
@@ -293,6 +295,7 @@
       }
       // All responders exhausted, no save → die. H5: 身份场按阵营判胜，1v1 保持对手获胜。
       log(game, actorName(game, dyingActor) + '没有人救援，死亡。');
+      var killerActor = saved.source;
       var winner = determineWinner(game, dyingActor);
       if (winner) {
         game.phase = 'gameover';
@@ -300,10 +303,57 @@
         log(game, (winner === 'lordSide' ? '主忠方' : winner === 'rebelSide' ? '反贼方' : actorName(game, winner)) + '获胜！');
       }
       game.pauseState.dying = null;
+      // v12 H5: 对局继续 (身份场非终局死亡) → 阵亡结算 (弃置所有牌 + 奖惩)。
+      if (!winner && game.phase !== 'gameover') {
+        settleDeath(game, dyingActor, killerActor);
+      }
       // M1: 角色死亡 → 跳过其 "受到伤害后" hooks (finishDamageAfter 内部按
       // gameover/存活判断), 但仍要把来源牌移入弃牌堆保持牌守恒。
       flushDeferredDamageAfter(game);
       return { died: true };
+    }
+
+    // v12 H5: 身份场死亡结算 (仅对局继续时; 1v1 死亡即终局不进此路径) —
+    // 官方: 武将阵亡弃置其所有区域内的牌; 奖惩: 任何角色击杀反贼 →
+    // 摸三张牌; 主公击杀忠臣 → 弃置所有手牌与装备。闪电等无来源死亡无奖惩。
+    function settleDeath(game, deadActor, killerActor) {
+      var deadState = game[deadActor];
+      if (!deadState) return;
+      var roles = game.roles || {};
+      log(game, actorName(game, deadActor) + '阵亡（' + (roles[deadActor] || '未知身份') + '），弃置其所有牌。');
+      discardAllZones(game, deadActor);
+      deadState.chained = false;
+      deadState.flags = {};
+      var killer = killerActor && killerActor !== deadActor && game[killerActor] ? killerActor : null;
+      if (killer && roles[deadActor] === '反贼' && game[killer].hp > 0) {
+        log(game, actorName(game, killer) + '击杀反贼，摸三张牌。');
+        drawCards(game, killer, 3);
+      }
+      if (killer && roles[deadActor] === '忠臣' && roles[killer] === '主公' && game[killer].hp > 0) {
+        log(game, actorName(game, killer) + '误杀忠臣，弃置所有手牌与装备。');
+        var killerState = game[killer];
+        (killerState.hand || []).splice(0).forEach(function (punished) { discardCard(game, punished); });
+        ['weapon', 'armor', 'horsePlus', 'horseMinus'].forEach(function (slot) {
+          var equip = killerState.equipment && killerState.equipment[slot];
+          if (equip) {
+            discardCard(game, takeCard(game, equip, { zone: 'equipment', actor: killer, slot: slot }));
+          }
+        });
+      }
+    }
+
+    function discardAllZones(game, seatActor) {
+      var state = game[seatActor];
+      if (!state) return;
+      (state.hand || []).splice(0).forEach(function (c) { discardCard(game, c); });
+      ['weapon', 'armor', 'horsePlus', 'horseMinus'].forEach(function (slot) {
+        var equip = state.equipment && state.equipment[slot];
+        if (equip) {
+          discardCard(game, takeCard(game, equip, { zone: 'equipment', actor: seatActor, slot: slot }));
+        }
+      });
+      (state.judgeArea || []).splice(0).forEach(function (c) { discardCard(game, c); });
+      (state.chuang || []).splice(0).forEach(function (c) { discardCard(game, c); });
     }
 
     function determineWinner(game, deadActor) {
@@ -358,10 +408,15 @@
       }
       // 'auto':
       //   - 救自己优先：dying = self → 用 桃 优先 (桃便宜, 酒 Method II 次, 急救 最后)
-      //   - 救他人 (含 华佗 急救): 1v1 AI 默认不救对手, 但若 jijiu 可用 +
-      //     dying = 对手, 华佗 AI 仍然不救 (与原 v8 PR-A2 行为一致 — AI
-      //     不主动救敌). 玩家走 ask 路径.
+      //   - 救他人: 1v1 AI 默认不救对手 (v8 PR-A2 行为不变 — 1v1 无同阵营
+      //     他人)。v12 H5: 身份场 AI 用【桃】救同阵营濒死者 (忠救主等);
+      //     无身份信息 / 敌对 → 照旧不救。玩家走 ask 路径。
       if (responder !== dyingActor) {
+        var sameSide = StateRuntime.sideOf(game, responder) !== null
+          && !StateRuntime.isHostileSeat(game, responder, dyingActor);
+        if (sameSide && taoCards.length) {
+          return executeDyingRescue(game, responder, dyingActor, 'tao', taoCards[0].id);
+        }
         log(game, actorName(game, responder) + '选择不救援。');
         return { skipped: true };
       }

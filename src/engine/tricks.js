@@ -52,6 +52,9 @@
     var randomHandIndex = deps.randomHandIndex;
     var removeFirstCardOfType = deps.removeFirstCardOfType;
     var playSha = deps.playSha;
+    // v12 H7: 主公技·激将/护驾 求助 (决斗需杀 / AOE 需杀·闪)
+    var tryLordAidSync = deps.tryLordAidSync;
+    var lordAidPlayerCanAid = deps.lordAidPlayerCanAid;
 
     // v10 V5: 无懈可击 链式响应 框架.
     //   每张锦囊触发 wuxie 检查, 依次询问可响应者, 直至全员放弃或无牌.
@@ -745,7 +748,8 @@
           currentResponder: targetActor || opponent(actor),
           reason: '【决斗】',
           // L2: 保留决斗牌引用 — 奸雄可获得"造成伤害的牌" (决斗/南蛮/万箭/火攻)
-          card: card
+          // v12 H7: 离间的虚拟决斗无实体 — 伤害不携带来源牌 (奸雄无可获得)
+          card: card && card.virtual ? null : card
         };
         return advanceDuelChain(game);
       }
@@ -790,6 +794,29 @@
         var duelNeeded = duelShaRequired(game, responder, duelOtherParty(chain, responder));
         var duelPaid = 0;
         while (duelPaid < duelNeeded && consumeResponse(game, responder, 'sha', chain.reason)) {
+          duelPaid += 1;
+        }
+        if (duelPaid === duelNeeded) {
+          chain.currentResponder = duelOtherParty(chain, responder);
+          return advanceDuelChain(game);
+        }
+        // v12 H7: 激将 — AI 主公打不齐【杀】时求助蜀势力座席: 玩家可代打 →
+        // 挂起询问 (链保留, resolver 收尾); AI 座席 → 同步接力。
+        if (lordAidPlayerCanAid && lordAidPlayerCanAid(game, responder, 'jijiang')) {
+          chain.aidPaid = duelPaid;
+          chain.aidNeeded = duelNeeded;
+          return requestPlayerResponse(game, {
+            kind: 'jijiang-aid',
+            actor: 'player',
+            pauseKey: 'duelChain',
+            source: chain,
+            options: listShaResponseOptions(game.player),
+            meta: { lordActor: responder, reason: chain.reason, aidSkill: 'jijiang' },
+            logMessage: '等待' + actorName(game, 'player') + '决定是否响应【激将】代打【杀】。',
+            statusMessage: '等待玩家护主响应。'
+          });
+        }
+        while (duelPaid < duelNeeded && tryLordAidSync && tryLordAidSync(game, responder, 'jijiang', chain.reason)) {
           duelPaid += 1;
         }
         if (duelPaid === duelNeeded) {
@@ -841,8 +868,21 @@
           chain.currentResponder = duelFoe;
           return advanceDuelChain(game);
         }
-        // 玩家放弃出杀 → 受 1 伤
+        // 玩家放弃出杀 → v12 H7: 玩家为主公时先求助蜀势力 AI 座席 (激将);
+        // 无人代打或非主公 → 受 1 伤
         log(game, actorName(game, 'player') + '选择不打出【杀】响应' + chain.reason + '。');
+        if (tryLordAidSync) {
+          var aidNeeded = duelShaRequired(game, 'player', duelFoe);
+          var aidPaid = 0;
+          while (aidPaid < aidNeeded && tryLordAidSync(game, 'player', 'jijiang', chain.reason)) {
+            aidPaid += 1;
+          }
+          if (aidPaid === aidNeeded) {
+            chain.shaRemaining = null;
+            chain.currentResponder = duelFoe;
+            return advanceDuelChain(game);
+          }
+        }
         game.pauseState.duelChain = null;
         damage(game, 'player', 1, duelFoe, chain.reason, chain.card);
         return success('决斗结算完成。');
@@ -923,10 +963,30 @@
             //      (【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦)
             log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
           } else {
-            damage(game, targetActor, 1, aoe.sourceActor, '【' + title + '】', aoe.card);
-            // 濒死救援等选择挂起 → 保留 aoe 队列, 选择排空后续跑剩余座席
-            if (game.pendingChoice) {
-              return success('【' + title + '】等待濒死结算…');
+            // v12 H7: 激将/护驾 — 主公座席打不出所需牌时求助同势力:
+            // AI 主公 + 玩家可代打 → 挂起询问; 其余 → AI 座席同步接力。
+            var aoeAidSkill = responseType === 'sha' ? 'jijiang' : 'hujia';
+            if (targetActor !== 'player' && lordAidPlayerCanAid
+                && lordAidPlayerCanAid(game, targetActor, aoeAidSkill)) {
+              return requestPlayerResponse(game, {
+                kind: aoeAidSkill + '-aid',
+                actor: 'player',
+                pauseKey: 'lordAidAOE',
+                source: { lordActor: targetActor, title: title, responseType: responseType, sourceActor: aoe.sourceActor, card: aoe.card },
+                options: responseType === 'sha' ? listShaResponseOptions(game.player) : listShanResponseOptions(game.player),
+                meta: { lordActor: targetActor, sourceName: title, aidSkill: aoeAidSkill },
+                logMessage: '等待' + actorName(game, 'player') + '决定是否响应【' + (aoeAidSkill === 'jijiang' ? '激将' : '护驾') + '】。',
+                statusMessage: '等待玩家护主响应。'
+              });
+            }
+            if (tryLordAidSync && tryLordAidSync(game, targetActor, aoeAidSkill, '【' + title + '】')) {
+              log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
+            } else {
+              damage(game, targetActor, 1, aoe.sourceActor, '【' + title + '】', aoe.card);
+              // 濒死救援等选择挂起 → 保留 aoe 队列, 选择排空后续跑剩余座席
+              if (game.pendingChoice) {
+                return success('【' + title + '】等待濒死结算…');
+              }
             }
           }
         }
@@ -955,6 +1015,10 @@
         }
         // H2: 玩家未以【闪】化解 (放弃 / 无闪 / 指定牌无效) → 八卦阵 红判定可化解。
         if (!dodged && tryBaguaDodge(game, 'player', false)) {
+          dodged = true;
+        }
+        // v12 H7: 玩家为主公时求助魏势力 AI 座席代打【闪】(护驾)。
+        if (!dodged && tryLordAidSync && tryLordAidSync(game, 'player', 'hujia', '【' + title + '】')) {
           dodged = true;
         }
         if (dodged) {

@@ -113,6 +113,31 @@
     return normalizeSeats(game).indexOf(value) >= 0 && game[value] ? value : null;
   }
 
+  // v12 H5: 身份阵营 — 主公/忠臣 同阵营 (lordSide), 反贼 同阵营 (rebelSide),
+  // 内奸 (renegade) 与所有人互为敌对。roles/roleSides 缺失 (手搓局面) 时
+  // 返回 null, 调用方按"所有非己座席敌对"处理 (1v1 兼容)。
+  function sideOf(game, seat) {
+    if (!game || !game.roles || !game.roleSides) return null;
+    var role = game.roles[seat];
+    return (role && game.roleSides[role]) || null;
+  }
+
+  function isHostileSeat(game, actor, seat) {
+    if (seat === actor) return false;
+    var actorSide = sideOf(game, actor);
+    var seatSide = sideOf(game, seat);
+    if (!actorSide || !seatSide) return true; // 无身份信息 → 敌对 (1v1 兼容)
+    if (actorSide === 'renegade' || seatSide === 'renegade') return true;
+    return actorSide !== seatSide;
+  }
+
+  // 敌对存活座席; 全场无敌对 (理论不出现) 时回退所有其他存活座席。
+  function hostileSeats(game, actor) {
+    var hostile = aliveSeats(game).filter(function (seat) { return isHostileSeat(game, actor, seat); });
+    if (hostile.length) return hostile;
+    return aliveSeats(game).filter(function (seat) { return seat !== actor; });
+  }
+
   function hasSkill(state, skillId) {
     return !!(state.skills || []).some(function (skill) { return skill.id === skillId; });
   }
@@ -202,6 +227,9 @@
     nextSeat: nextSeat,
     seatsFrom: seatsFrom,
     resolveSeatOption: resolveSeatOption,
+    sideOf: sideOf,
+    isHostileSeat: isHostileSeat,
+    hostileSeats: hostileSeats,
     opponent: opponent,
     hasSkill: hasSkill,
     canUseUnlimitedSha: canUseUnlimitedSha,

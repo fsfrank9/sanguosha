@@ -357,7 +357,9 @@
         applyEquipmentDamageModifiers: function (g, ctx) { return applyEquipmentDamageModifiers(g, ctx); },
         // v11 C1: 救援 — 濒死路径同样适用 (桃/急救视为桃)。
         taoRecoverBonus: function (g, u, t) { return taoRecoverBonus(g, u, t); },
-        isArmorIgnoredBySha: function (g, a, c) { return isArmorIgnoredBySha(g, a, c); }
+        isArmorIgnoredBySha: function (g, a, c) { return isArmorIgnoredBySha(g, a, c); },
+        // v12 H5: 身份场死亡结算 — 击杀反贼摸三张 (奖惩) 需要摸牌能力
+        drawCards: function (g, a, n) { return drawCards(g, a, n); }
       });
       var damage = DamageDyingRuntime.damage;
       var enterDying = DamageDyingRuntime.enterDying;
@@ -630,7 +632,10 @@
         hasShaResponseAvailable: hasShaResponseAvailable,
         randomHandIndex: randomHandIndex,
         removeFirstCardOfType: removeFirstCardOfType,
-        aiShouldUseWuxie: function (g, r, ch) { return aiShouldUseWuxie(g, r, ch); }
+        aiShouldUseWuxie: function (g, r, ch) { return aiShouldUseWuxie(g, r, ch); },
+        // v12 H7: 主公技·激将/护驾 求助 (决斗需杀 / AOE 需杀·闪; 函数声明提升)
+        tryLordAidSync: tryLordAidSync,
+        lordAidPlayerCanAid: lordAidPlayerCanAid
       });
       var registerWuxieContinuation = TricksRuntime.registerWuxieContinuation;
       var listWuxieOptions = TricksRuntime.listWuxieOptions;
@@ -640,6 +645,7 @@
       var advanceDuelChain = TricksRuntime.advanceDuelChain;
       var resolveDuelResponseChoice = TricksRuntime.resolveDuelResponseChoice;
       var playAOE = TricksRuntime.playAOE;
+      var advanceAOETargets = TricksRuntime.advanceAOETargets;
       var resolveWanjianResponseChoice = TricksRuntime.resolveWanjianResponseChoice;
       var peekHuogongReveal = TricksRuntime.peekHuogongReveal;
       var getHuogongChoice = TricksRuntime.getHuogongChoice;
@@ -724,7 +730,10 @@
         scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); },
         equipmentList: equipmentList,
         removeFirstCardOfType: removeFirstCardOfType,
-        shanOptionForCard: shanOptionForCard
+        shanOptionForCard: shanOptionForCard,
+        // v12 H7: 主公技·护驾 求助 (杀需闪; 函数声明提升)
+        tryLordAidSync: tryLordAidSync,
+        lordAidPlayerCanAid: lordAidPlayerCanAid
       });
       var playSha = ShaFlowRuntime.playSha;
       var continueShaAfterCixiong = ShaFlowRuntime.continueShaAfterCixiong;
@@ -811,6 +820,8 @@
         seatList: seatList,
         isShaType: isShaType,
         isShaCard: isShaCard,
+        // v12 H7: 离间 — 虚拟决斗走无懈链 (tricks 域已装配, 直接引用)
+        checkWuxieAndContinue: checkWuxieAndContinue,
         log: log,
         fail: fail,
         success: success,
@@ -899,6 +910,178 @@
       registerResponseKind('luoshen-continue', resolveLuoshenContinueChoice);
       // v11 C7 (批次 31): 耀武 — 伤害来源的奖励二选一
       registerResponseKind('yaowu-reward', resolveYaowuRewardChoice);
+
+      // ───── v12 H7: 主公技·激将/护驾 求助框架 ─────
+      // 主公需要打出【杀】(激将, 蜀) / 【闪】(护驾, 魏) 而自身打不出时,
+      // 依座次询问其他同势力座席代打。AI 代打者按阵营立场同步决定
+      // (tryLordAidSync); 玩家代打者由调用点挂起询问 (lordAidPlayerCanAid
+      // 判定 + 'jijiang-aid'/'hujia-aid' pendingChoice)。1v1 中主公没有
+      // 同势力队友 (对手必敌对), 全部路径为 no-op — 行为零回归。
+      var LORD_AID_SPECS = {
+        jijiang: { camp: '蜀', type: 'sha', label: '激将' },
+        hujia: { camp: '魏', type: 'shan', label: '护驾' }
+      };
+
+      function lordAidEnabled(game, lordActor, skillId) {
+        var spec = LORD_AID_SPECS[skillId];
+        var lordState = game[lordActor];
+        return !!(spec && lordState && lordState.hp > 0 && hasSkill(lordState, skillId)
+          && game.roles && game.roles[lordActor] === '主公'
+          && !(lordState.skillPreferences && lordState.skillPreferences[skillId] === 'decline'));
+      }
+
+      // 可代打座席: 同势力 + 存活 + 与主公同阵营 (身份信息缺失不代打)。
+      function lordAidAiderSeats(game, lordActor, skillId) {
+        var spec = LORD_AID_SPECS[skillId];
+        return seatsFrom(game, lordActor, false).filter(function (seat) {
+          var state = game[seat];
+          return state && state.hp > 0 && state.camp === spec.camp
+            && StateRuntime.sideOf(game, seat) !== null
+            && !StateRuntime.isHostileSeat(game, seat, lordActor);
+        });
+      }
+
+      // 同步路径: AI 座席依座次代为"打出" (经 consumeResponse, 支持武圣/
+      // 龙胆等转化)。玩家座席跳过 — 不擅动玩家手牌, 由挂起询问路径处理。
+      function tryLordAidSync(game, lordActor, skillId, reason) {
+        if (!lordAidEnabled(game, lordActor, skillId)) return false;
+        var spec = LORD_AID_SPECS[skillId];
+        var aiders = lordAidAiderSeats(game, lordActor, skillId);
+        for (var aidIdx = 0; aidIdx < aiders.length; aidIdx += 1) {
+          var aider = aiders[aidIdx];
+          if (aider === 'player') continue;
+          if (consumeResponse(game, aider, spec.type, reason + '（' + spec.label + '）')) {
+            log(game, actorName(game, aider) + '响应【' + spec.label + '】，代'
+              + actorName(game, lordActor) + '打出' + (spec.type === 'sha' ? '【杀】' : '【闪】') + '。');
+            return true;
+          }
+        }
+        return false;
+      }
+
+      // 玩家是否应被挂起询问代打 (AI 主公 + 玩家为可代打者 + 有牌可代)。
+      function lordAidPlayerCanAid(game, lordActor, skillId) {
+        if (lordActor === 'player' || !lordAidEnabled(game, lordActor, skillId)) return false;
+        var spec = LORD_AID_SPECS[skillId];
+        if (lordAidAiderSeats(game, lordActor, skillId).indexOf('player') < 0) return false;
+        var player = game.player;
+        if (player.skillPreferences && player.skillPreferences[skillId + 'Aid'] === 'decline') return false;
+        return spec.type === 'sha' ? hasShaResponseAvailable(player) : hasShanResponseAvailable(player);
+      }
+
+      // v12 H7: 激将 — 玩家决定是否代 AI 主公打出【杀】。挂起来源:
+      // pauseState.lordAidAOE (南蛮逐席) / pauseState.duelChain (决斗)。
+      // 拒绝后 AI 同势力座席接力; 仍不足按原路径受伤。
+      function resolveJijiangAidChoice(game, pending, decision) {
+        var lordActor = pending.lordActor;
+        var wantsAid = !!(decision && (decision.cardId || decision.use));
+        var aoeSaved = game.pauseState && game.pauseState.lordAidAOE;
+        if (aoeSaved) {
+          game.pauseState.lordAidAOE = null;
+          var aoePaid = false;
+          if (wantsAid) {
+            aoePaid = consumeResponse(game, 'player', 'sha', '【' + aoeSaved.title + '】（激将）', decision.cardId || null);
+            if (aoePaid) log(game, actorName(game, 'player') + '响应【激将】，代' + actorName(game, lordActor) + '打出【杀】。');
+          }
+          if (!aoePaid) aoePaid = tryLordAidSync(game, lordActor, 'jijiang', '【' + aoeSaved.title + '】');
+          if (aoePaid) {
+            log(game, actorName(game, lordActor) + '成功化解【' + aoeSaved.title + '】。');
+          } else {
+            damage(game, lordActor, 1, aoeSaved.sourceActor, '【' + aoeSaved.title + '】', aoeSaved.card);
+          }
+          if (game.pauseState.aoe && !game.pendingChoice && game.phase !== 'gameover') {
+            return advanceAOETargets(game);
+          }
+          if (game.pauseState.aoe && game.phase === 'gameover') game.pauseState.aoe = null;
+          return success('【' + aoeSaved.title + '】响应完成。');
+        }
+        var chain = game.pauseState && game.pauseState.duelChain;
+        if (!chain) return fail('找不到【激将】的挂起来源。');
+        var duelFoeOfLord = lordActor === chain.starterActor ? chain.targetActor : chain.starterActor;
+        var paid = false;
+        if (wantsAid) {
+          paid = consumeResponse(game, 'player', 'sha', chain.reason + '（激将）', decision.cardId || null);
+          if (paid) {
+            log(game, actorName(game, 'player') + '响应【激将】，代' + actorName(game, lordActor) + '打出【杀】。');
+            chain.aidPaid += 1;
+          }
+        }
+        if (!paid) {
+          while (chain.aidPaid < chain.aidNeeded && tryLordAidSync(game, lordActor, 'jijiang', chain.reason)) {
+            chain.aidPaid += 1;
+          }
+        }
+        if (chain.aidPaid >= chain.aidNeeded) {
+          chain.aidPaid = null;
+          chain.aidNeeded = null;
+          chain.currentResponder = duelFoeOfLord;
+          return advanceDuelChain(game);
+        }
+        // 无双第二张: 玩家刚代打一张且仍有杀可代 → 再次询问
+        if (paid && hasShaResponseAvailable(game.player)) {
+          return requestPlayerResponse(game, {
+            kind: 'jijiang-aid',
+            actor: 'player',
+            pauseKey: 'duelChain',
+            source: chain,
+            options: listShaResponseOptions(game.player),
+            meta: { lordActor: lordActor, reason: chain.reason, aidSkill: 'jijiang' },
+            logMessage: '等待' + actorName(game, 'player') + '决定是否再代打一张【杀】（无双）。',
+            statusMessage: '等待玩家护主响应。'
+          });
+        }
+        if (chain.aidNeeded > 1) {
+          log(game, '【无双】锁定：' + actorName(game, lordActor) + '未能凑齐两张【杀】。');
+        }
+        chain.aidPaid = null;
+        chain.aidNeeded = null;
+        game.pauseState.duelChain = null;
+        damage(game, lordActor, 1, duelFoeOfLord, chain.reason, chain.card);
+        return success('决斗结算完成。');
+      }
+
+      // v12 H7: 护驾 — 玩家决定是否代 AI 主公打出【闪】。挂起来源:
+      // pauseState.lordAidAOE (万箭逐席) / pauseState.shaResponse (杀需闪)。
+      function resolveHujiaAidChoice(game, pending, decision) {
+        var lordActor = pending.lordActor;
+        var wantsAid = !!(decision && (decision.cardId || decision.use));
+        var aoeSaved = game.pauseState && game.pauseState.lordAidAOE;
+        if (aoeSaved) {
+          game.pauseState.lordAidAOE = null;
+          var aoePaid = false;
+          if (wantsAid) {
+            aoePaid = consumeResponse(game, 'player', 'shan', '【' + aoeSaved.title + '】（护驾）', decision.cardId || null);
+            if (aoePaid) log(game, actorName(game, 'player') + '响应【护驾】，代' + actorName(game, lordActor) + '打出【闪】。');
+          }
+          if (!aoePaid) aoePaid = tryLordAidSync(game, lordActor, 'hujia', '【' + aoeSaved.title + '】');
+          if (aoePaid) {
+            log(game, actorName(game, lordActor) + '成功化解【' + aoeSaved.title + '】。');
+          } else {
+            damage(game, lordActor, 1, aoeSaved.sourceActor, '【' + aoeSaved.title + '】', aoeSaved.card);
+          }
+          if (game.pauseState.aoe && !game.pendingChoice && game.phase !== 'gameover') {
+            return advanceAOETargets(game);
+          }
+          if (game.pauseState.aoe && game.phase === 'gameover') game.pauseState.aoe = null;
+          return success('【' + aoeSaved.title + '】响应完成。');
+        }
+        var saved = game.pauseState && game.pauseState.shaResponse;
+        if (!saved) return fail('找不到【护驾】的挂起来源。');
+        game.pauseState.shaResponse = null;
+        var remaining = saved.shanRemaining || 1;
+        if (wantsAid && consumeResponse(game, 'player', 'shan', '【杀】（护驾）', decision.cardId || null)) {
+          log(game, actorName(game, 'player') + '响应【护驾】，代' + actorName(game, lordActor) + '打出【闪】。');
+          remaining -= 1;
+        }
+        // 剩余需求 (无双第二张等) 由 AI 同势力座席接力; 玩家只询问一次。
+        while (remaining > 0 && tryLordAidSync(game, lordActor, 'hujia', '【杀】')) {
+          remaining -= 1;
+        }
+        return resolveShaAfterResponse(game, saved.actor, saved.card, saved.amount, remaining <= 0, saved.targetActor);
+      }
+
+      registerResponseKind('jijiang-aid', resolveJijiangAidChoice);
+      registerResponseKind('hujia-aid', resolveHujiaAidChoice);
 
       function newGame(options) {
         options = options || {};
@@ -1206,6 +1389,8 @@
       // v12 H1: 单目标锦囊 playCard 时的目标解析 — options.target 显式指定
       // (须为矩阵合法目标, 否则返回 null 由调用方拒绝且牌不离手); 缺省回退
       // 1v1 对手, 对手非法时取首个合法座席 (canPlayCard 已保证存在)。
+      // v12 H5: 缺省池先取敌对座席 (阵营感知, AI 缺省目标不误伤友方);
+      // 1v1 双方异阵营, 池恒为 [对手], 行为不变。
       function resolveTrickTargetActor(game, actor, card, options) {
         var requested = options && (options.target || (options.targets && options.targets[0]));
         if (requested) {
@@ -1214,7 +1399,11 @@
           return seat;
         }
         var candidates = legalTargetsForCard(game, actor, card).filter(function (seat) { return seat !== actor; });
-        return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : (candidates[0] || null);
+        var hostileCandidates = candidates.filter(function (seat) {
+          return StateRuntime.isHostileSeat(game, actor, seat);
+        });
+        var pool = hostileCandidates.length ? hostileCandidates : candidates;
+        return pool.indexOf(opponent(actor)) >= 0 ? opponent(actor) : (pool[0] || null);
       }
 
       // v11 C1: 救援 — 主公技/锁定。其他吴势力角色对主公孙权使用【桃】
@@ -1566,6 +1755,12 @@
         // v12 G1 (修复批): 翻面 (据守) — 轮到武将牌被翻面的角色的回合时,
         // 将其翻回正面并跳过此回合, 回合直接传给座次环上的下一名角色。
         // 递归安全: 本次已翻回正面, 座次环一圈内必然终止。
+        // v12 H5: 阵亡座席不再拥有回合 — 直接传给座次环下一名存活角色。
+        if (game[actor].hp <= 0) {
+          var nextAliveActor = nextSeat(game, actor);
+          if (!nextAliveActor || nextAliveActor === actor) return fail('没有存活角色可开始回合。');
+          return startTurn(game, nextAliveActor);
+        }
         if (game[actor].turnedOver) {
           game[actor].turnedOver = false;
           log(game, actorName(game, actor) + '的武将牌翻回正面，跳过此回合。');
@@ -1600,15 +1795,18 @@
         // 主公的场景 (袁术自任主公时 +1 牌/-1 上限自净, 不建模); 默认自动,
         // skillPreferences.wangzun='decline' 可关。放在观星/洛神之前, 避免
         // 其 pendingChoice 挂起时被跳过。
-        var wangzunHolderActor = opponent(actor);
-        var wangzunHolder = game[wangzunHolderActor];
-        if (wangzunHolder && hasSkill(wangzunHolder, 'wangzun')
-            && game.roles && game.roles[actor] === '主公'
-            && !(wangzunHolder.skillPreferences && wangzunHolder.skillPreferences.wangzun === 'decline')) {
-          log(game, actorName(game, wangzunHolderActor) + '发动【妄尊】，摸一张牌，' + actorName(game, actor) + '本回合手牌上限 -1。');
-          drawCards(game, wangzunHolderActor, 1);
-          state.handLimitDelta = (state.handLimitDelta || 0) - 1;
-        }
+        // v12 H5: 妄尊持有者从 opponent() 二元假设泛化为座次环扫描
+        // (1v1 恒为对手, 行为不变; 多席时每名持有者各自触发)。
+        seatsFrom(game, actor, false).forEach(function (wangzunHolderActor) {
+          var wangzunHolder = game[wangzunHolderActor];
+          if (wangzunHolder && wangzunHolder.hp > 0 && hasSkill(wangzunHolder, 'wangzun')
+              && game.roles && game.roles[actor] === '主公'
+              && !(wangzunHolder.skillPreferences && wangzunHolder.skillPreferences.wangzun === 'decline')) {
+            log(game, actorName(game, wangzunHolderActor) + '发动【妄尊】，摸一张牌，' + actorName(game, actor) + '本回合手牌上限 -1。');
+            drawCards(game, wangzunHolderActor, 1);
+            state.handLimitDelta = (state.handLimitDelta || 0) - 1;
+          }
+        });
         if (hasSkill(state, 'guanxing') && !state.flags.guanxingUsed && game.deck.length > 0) {
           var pref = (state.skillPreferences && state.skillPreferences.guanxing) || null;
           if (pref === 'decline') {
@@ -1651,6 +1849,8 @@
       }
 
       function continueTurnAfterPreparePhase(game, actor) {
+        // v12 H5: 回合角色已在准备阶段阵亡 (身份场对局继续) → 回合立即终止。
+        if (game[actor] && game[actor].hp <= 0) return completeTurn(game, actor);
         setPhase(game, actor, 'judge');
         // v12 G2: 神速 选项一 — 跳过判定阶段 (判定区牌保留, 下回合照常结算)。
         if (game[actor].flags && game[actor].flags.skipJudge) {
@@ -1668,6 +1868,8 @@
 
       function continueTurnAfterJudgeArea(game, actor) {
         var state = game[actor];
+        // v12 H5: 回合角色已在判定阶段阵亡 (闪电, 身份场对局继续) → 回合终止。
+        if (state && state.hp <= 0) return completeTurn(game, actor);
         setPhase(game, actor, 'draw');
         log(game, actorName(game, actor) + '的摸牌阶段。');
         if (!state.flags.skipDraw) {
@@ -1800,6 +2002,11 @@
       }
 
       function completeTurn(game, ending) {
+        // v12 H5: 阵亡角色的回合终止 — 不再触发其回合结束时机 (闭月/据守等)。
+        if (game[ending] && game[ending].hp <= 0) {
+          log(game, actorName(game, ending) + '的回合因阵亡终止。');
+          return startTurn(game, nextSeat(game, ending));
+        }
         SkillRuntime.runHook(skillRegistry, 'onTurnEnd', {
           game: game,
           actor: ending
@@ -1993,6 +2200,20 @@
         return list;
       }
 
+      // v12 H7: 全场型主公技 — 技能在主公身上, 但由其他座席发动 (黄天:
+      // 其他群势力交牌)。useSkill 的持有校验对这类技能放宽为"场上存在
+      // 持有该技能的主公", 发动资格由技能 handler 自行校验。
+      var LORD_WIDE_SKILLS = { huangtian: true };
+
+      function lordWideSkillAvailable(game, skillId) {
+        if (!LORD_WIDE_SKILLS[skillId]) return false;
+        return seatList(game).some(function (seat) {
+          var seatState = game[seat];
+          return seatState && seatState.hp > 0 && hasSkill(seatState, skillId)
+            && game.roles && game.roles[seat] === '主公';
+        });
+      }
+
       function useSkill(game, actor, skillId, cardIds, options) {
         var pendingGuard = pendingChoiceGuard(game);
         if (pendingGuard) return pendingGuard;
@@ -2000,7 +2221,7 @@
         cardIds = cardIds || [];
         options = options || {};
         if (!self) return fail('未知角色。');
-        if (!hasSkill(self, skillId)) return fail('没有这个技能。');
+        if (!hasSkill(self, skillId) && !lordWideSkillAvailable(game, skillId)) return fail('没有这个技能。');
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         if (game.turn !== actor) return fail('还没有轮到你行动。');
         if (PLAY_PHASE_ACTIVE_SKILLS[skillId] && game.phase !== 'play') return fail('主动技能只能在出牌阶段发动。');
