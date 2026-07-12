@@ -24,7 +24,13 @@ function test(name, fn) { tests.push([name, fn]); }
 // ───── 引擎: producer 走 V3 框架 ─────────────────────────────────────
 
 test('v10 V4: playAOE shan 路径走 requestPlayerResponse(kind:wanjian-response, pauseKey:wanjianResponse)', () => {
-  const fn = engineSrc.match(/function playAOE\(game, actor, card, responseType, title\)\s*\{[\s\S]*?\n {6}\}/);
+  // v12 H2: AOE 逐座席化 — playAOE 建队列 (pauseState.aoe) 并委派
+  // advanceAOETargets; 玩家 ask 暂停分支随结算循环迁入后者, 断言跟随。
+  const entry = engineSrc.match(/function playAOE\(game, actor, card, responseType, title\)\s*\{[\s\S]*?\n {6}\}/);
+  assert.ok(entry);
+  assert.match(entry[0], /game\.pauseState\.aoe\s*=\s*\{/);
+  assert.match(entry[0], /return advanceAOETargets\(game\)/);
+  const fn = engineSrc.match(/function advanceAOETargets\(game\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /requestPlayerResponse\(game,\s*\{/);
   assert.match(fn[0], /kind:\s*'wanjian-response'/);

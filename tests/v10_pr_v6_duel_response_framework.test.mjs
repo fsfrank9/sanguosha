@@ -44,9 +44,11 @@ test('v10 V6: findResponseCard 接受 preferredCardId for sha (与 shan 对称)'
 // ───── 引擎: 链状态机 ────────────────────────────────────────────────
 
 test('v10 V6: playDuel 重构走 advanceDuelChain (不再含同步 while 循环)', () => {
-  const fn = engineSrc.match(/function playDuel\(game, actor, card\)\s*\{[\s\S]*?\n {6}\}/);
+  // v12 H2: playDuel 增 targetActor 显式目标参数 (未传回退 opponent(actor))
+  const fn = engineSrc.match(/function playDuel\(game, actor, card, targetActor\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /game\.pauseState\.duelChain/);
+  assert.match(fn[0], /targetActor\s*\|\|\s*opponent\(actor\)/, '目标缺省回退 1v1 对手');
   assert.match(fn[0], /advanceDuelChain\(game\)/);
   assert.doesNotMatch(fn[0], /while\s*\(/, '旧 sync while 循环应已删');
 });
@@ -65,10 +67,12 @@ test('v10 V6: advanceDuelChain — AI / 默认 走 consumeResponse 自动 + 切�
   const fn = engineSrc.match(/function advanceDuelChain\(game\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /consumeResponse\(game,\s*responder,\s*'sha'/);
-  assert.match(fn[0], /chain\.currentResponder\s*=\s*opponent\(responder\)/);
+  // v12 H2: 决斗限定 starter/target 两方 — 切换/伤害来源经 duelOtherParty
+  // (双座席时即 opponent, 语义不变)。
+  assert.match(fn[0], /chain\.currentResponder\s*=\s*duelOtherParty\(chain,\s*responder\)/);
   assert.match(fn[0], /return advanceDuelChain\(game\)/, '尾递归');
   // 无杀 → damage + clear chain
-  assert.match(fn[0], /damage\(game,\s*loser,\s*1,\s*opponent\(loser\)/);
+  assert.match(fn[0], /damage\(game,\s*loser,\s*1,\s*duelOtherParty\(chain,\s*loser\)/);
 });
 
 test('v10 V6: resolveDuelResponseChoice 注册到 RESPONSE_KIND_RESOLVERS', () => {

@@ -8,6 +8,8 @@
         var seatList = deps.seatList;
         var isShaType = deps.isShaType;
         var isShaCard = deps.isShaCard;
+        // v12 H7: 离间 — 虚拟决斗走无懈链
+        var checkWuxieAndContinue = deps.checkWuxieAndContinue;
         var log = deps.log;
         var fail = deps.fail;
         var success = deps.success;
@@ -962,7 +964,8 @@
         var cardIds = context.cardIds || [];
         if (!self || !hasSkill(self, 'jieyin')) return null;
         if (self.flags.jieyinUsed) return fail('【结姻】每回合限一次。');
-        var targetActor = opponent(actor);
+        // v12 H5: 目标经 context.targetActor (options.target 校验后缺省对手)
+        var targetActor = context.targetActor || opponent(actor);
         var target = game[targetActor];
         if (!target || target.gender !== 'male') return fail('【结姻】需要一名男性角色为目标。');
         if (target.hp >= target.maxHp) return fail('目标未受伤，不能发动【结姻】。');
@@ -1962,6 +1965,140 @@
         }
       });
 
+        // ───── v12 H7: 主公技 / 多人技 ─────
+        // 激将 (主公刘备) — 主动时机: 出牌阶段令蜀势力 AI 座席交出【杀】,
+        // 视为主公使用 (占出牌阶段次数, 距离/合法性以主公计)。响应时机
+        // (决斗/南蛮需打出杀) 在 tricks 域经 tryLordAidSync 接入。
+        // 主动路径仅人类主公可触达 (AI 主公不主动发动, 见 ai 域注释),
+        // 代打者恒为 AI 座席 → 同步扫描, 无需挂起。
+        function triggerJijiangActiveSkill(context) {
+          if (context.skillId !== 'jijiang') return null;
+          var game = context.game;
+          var actor = context.actor;
+          var self = context.state;
+          if (!self || !hasSkill(self, 'jijiang')) return null;
+          if (!game.roles || game.roles[actor] !== '主公') return fail('【激将】是主公技，须为主公才能发动。');
+          if (self.usedSha && !StateRuntime.canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
+          var target = StateRuntime.resolveSeatOption(game, context.options && context.options.target);
+          if (!target || target === actor) return fail('请为【激将】指定一名目标角色。');
+          if (!game[target] || game[target].hp <= 0) return fail('目标已阵亡。');
+          // 依座次向蜀势力同阵营 AI 座席借【杀】
+          var jjAiders = StateRuntime.seatsFrom(game, actor, false).filter(function (seat) {
+            var st = game[seat];
+            return st && st.hp > 0 && seat !== 'player' && st.camp === '蜀'
+              && StateRuntime.sideOf(game, seat) !== null
+              && !StateRuntime.isHostileSeat(game, seat, actor);
+          });
+          for (var jj = 0; jj < jjAiders.length; jj += 1) {
+            var aiderState = game[jjAiders[jj]];
+            var shaCard = firstMatchingCard(aiderState, function (c) { return isShaType(c.type); });
+            if (!shaCard) continue;
+            removeCardFromHand(aiderState, shaCard.id);
+            log(game, actorName(game, jjAiders[jj]) + '响应【激将】，交出【' + shaCard.name + '】由' + actorName(game, actor) + '使用。');
+            var shaResult = playSha(game, actor, shaCard, { target: target });
+            if (!shaResult || !shaResult.ok) {
+              // 二次合法性失败 (距离/保护) → 牌归还代打者
+              putCard(game, shaCard, { zone: 'hand', actor: jjAiders[jj] });
+              return shaResult || fail('【激将】的【杀】不再合法。');
+            }
+            return shaResult;
+          }
+          return fail('没有蜀势力角色响应【激将】。');
+        }
+
+        // 黄天 (主公张角) — 其他群势力角色于其出牌阶段限一次, 将一张【闪】
+        // 或【闪电】交给主公张角。发动者是"给牌者" (useSkill 经 LORD_WIDE
+        // 网关放行无此技能的给牌者)。
+        function triggerHuangtianActiveSkill(context) {
+          if (context.skillId !== 'huangtian') return null;
+          var game = context.game;
+          var actor = context.actor;
+          var self = context.state;
+          var cardIds = context.cardIds || [];
+          var htLord = null;
+          StateRuntime.seatList(game).forEach(function (seat) {
+            if (htLord) return;
+            var st = game[seat];
+            if (st && st.hp > 0 && seat !== actor && hasSkill(st, 'huangtian')
+                && game.roles && game.roles[seat] === '主公') {
+              htLord = seat;
+            }
+          });
+          if (!htLord) return fail('场上没有可响应【黄天】的主公张角。');
+          if (self.camp !== '群') return fail('只有群势力角色可以发动【黄天】。');
+          if (StateRuntime.isHostileSeat(game, actor, htLord)) return fail('敌对阵营不会响应【黄天】。');
+          if (self.flags.huangtianUsed) return fail('【黄天】每回合限一次。');
+          if (cardIds.length !== 1) return fail('请选择一张【闪】或【闪电】交给主公。');
+          var giveCard = (self.hand || []).find(function (c) { return c.id === cardIds[0]; });
+          if (!giveCard) return fail('选择的手牌不存在。');
+          if (giveCard.type !== 'shan' && giveCard.type !== 'shandian') {
+            return fail('【黄天】只能交出【闪】或【闪电】。');
+          }
+          removeCardFromHand(self, cardIds[0]);
+          putCard(game, giveCard, { zone: 'hand', actor: htLord });
+          self.flags.huangtianUsed = true;
+          log(game, actorName(game, actor) + '发动【黄天】，将【' + giveCard.name + '】交给' + actorName(game, htLord) + '。');
+          return success('黄天完成。');
+        }
+
+        // 离间 (貂蝉) — 出牌阶段限一次: 弃置一张手牌, 令一名男性角色视为对
+        // 另一名男性角色使用【决斗】(虚拟牌, 可被无懈; 无实体, 奸雄无可得)。
+        function triggerLijianActiveSkill(context) {
+          if (context.skillId !== 'lijian') return null;
+          var game = context.game;
+          var actor = context.actor;
+          var self = context.state;
+          var cardIds = context.cardIds || [];
+          if (!self || !hasSkill(self, 'lijian')) return null;
+          if (self.flags.lijianUsed) return fail('【离间】每回合限一次。');
+          if (cardIds.length !== 1) return fail('请弃置一张手牌发动【离间】。');
+          var targets = (context.options && context.options.targets) || [];
+          var seatA = StateRuntime.resolveSeatOption(game, targets[0]);
+          var seatB = StateRuntime.resolveSeatOption(game, targets[1]);
+          if (!seatA || !seatB || seatA === seatB || seatA === actor || seatB === actor) {
+            return fail('请选择两名其他男性角色。');
+          }
+          if (game[seatA].hp <= 0 || game[seatB].hp <= 0) return fail('目标已阵亡。');
+          if (game[seatA].gender !== 'male' || game[seatB].gender !== 'male') {
+            return fail('【离间】只能指定男性角色。');
+          }
+          var lijianCost = removeCardFromHand(self, cardIds[0]);
+          if (!lijianCost) return fail('选择的手牌不存在。');
+          discardCard(game, lijianCost);
+          self.flags.lijianUsed = true;
+          log(game, actorName(game, actor) + '发动【离间】，弃置【' + lijianCost.name + '】，令'
+            + actorName(game, seatA) + '视为对' + actorName(game, seatB) + '使用【决斗】。');
+          var lijianJuedou = {
+            id: 'lijian-juedou-' + lijianCost.id,
+            virtual: true,
+            physicalCards: [],
+            type: 'juedou',
+            name: '决斗',
+            family: 'trick',
+            suit: null,
+            rank: null,
+            color: null
+          };
+          return checkWuxieAndContinue(game, seatB, '【离间】（决斗）', 'juedou', {
+            actor: seatA, card: lijianJuedou, options: {}, targetActor: seatB
+          });
+        }
+
+        SkillRuntime.registerSkill(skillRegistry, 'jijiang', {
+        onActiveSkill: function (context) {
+          return triggerJijiangActiveSkill(context);
+        }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'huangtian', {
+        onActiveSkill: function (context) {
+          return triggerHuangtianActiveSkill(context);
+        }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'lijian', {
+        onActiveSkill: function (context) {
+          return triggerLijianActiveSkill(context);
+        }
+      });
 
         // v12 F1: 引擎流程仍需直调的技能域函数面 (回绑为引擎内同名 var)
         return {
@@ -1990,6 +2127,10 @@
         fanjian: true,
         qingnang: true,
           // v11 C6 (批次 30): 结姻
-        jieyin: true
+        jieyin: true,
+        // v12 H7: 主公技/多人技 (激将主动·黄天给牌·离间 — 均限出牌阶段)
+        jijiang: true,
+        huangtian: true,
+        lijian: true
       };
 

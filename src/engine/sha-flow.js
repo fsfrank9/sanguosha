@@ -47,6 +47,9 @@
     var equipmentList = deps.equipmentList;
     var removeFirstCardOfType = deps.removeFirstCardOfType;
     var shanOptionForCard = deps.shanOptionForCard;
+    // v12 H7: 主公技·护驾 求助 (杀需闪)
+    var tryLordAidSync = deps.tryLordAidSync;
+    var lordAidPlayerCanAid = deps.lordAidPlayerCanAid;
 
       function isArmorIgnoredBySha(game, sourceActor, card) {
         var source = game[sourceActor];
@@ -68,14 +71,18 @@
       }
 
       function defaultHostileTarget(game, actor) {
-        var candidates = aliveSeats(game).filter(function (seat) { return seat !== actor; });
+        // v12 H5: 阵营感知 — 缺省目标只落在敌对座席上 (1v1 双方异阵营,
+        // 候选恒为 [对手], 行为不变); 无身份信息时视所有非己座席为敌对。
+        var candidates = StateRuntime.hostileSeats(game, actor);
         return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : candidates[0];
       }
 
       function normalizeSingleTarget(game, actor, options) {
+        // v12 H1: 显式目标经座席校验 — 无效值返回 null, 由 playSha 优雅拒绝
+        // (与旧版 game[garbage] === undefined 的拒绝路径行为一致)。
         var requested = options && (options.target || (options.targets && options.targets[0]));
-        var targetActor = requested || defaultHostileTarget(game, actor);
-        return targetActor;
+        if (requested) return StateRuntime.resolveSeatOption(game, requested);
+        return defaultHostileTarget(game, actor);
       }
 
       function playSha(game, actor, card, options) {
@@ -229,6 +236,23 @@
             if (targetActor !== 'player' && tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
             if (consumeResponse(game, targetActor, 'shan', '【杀】')) continue;
             if (targetActor === 'player' && tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
+            // v12 H7: 护驾 — 主公自身打不出【闪】时求助魏势力座席:
+            // AI 主公 + 玩家可代打 → 挂起询问 (resolver 收尾杀结算);
+            // 其余 → AI 座席同步接力。
+            if (targetActor !== 'player' && lordAidPlayerCanAid
+                && lordAidPlayerCanAid(game, targetActor, 'hujia')) {
+              return requestPlayerResponse(game, {
+                kind: 'hujia-aid',
+                actor: 'player',
+                pauseKey: 'shaResponse',
+                source: { actor: actor, targetActor: targetActor, card: card, amount: amount, shanRemaining: shanNeeded - shanIndex, lordAid: true },
+                options: listShanResponseOptions(game.player),
+                meta: { lordActor: targetActor, sourceActor: actor, shaName: card.name },
+                logMessage: '等待' + actorName(game, 'player') + '决定是否响应【护驾】代打【闪】。',
+                statusMessage: '等待玩家护主响应。'
+              });
+            }
+            if (tryLordAidSync && tryLordAidSync(game, targetActor, 'hujia', '【杀】')) continue;
             dodged = false;
             break;
           }
@@ -429,6 +453,10 @@
           }
           // 无第二张可出 → 尝试八卦顶上, 否则未抵消。
           dodged = tryBaguaDodge(game, 'player', isArmorIgnoredBySha(game, actor, card));
+        }
+        // v12 H7: 玩家为主公且未抵消 → 求助魏势力 AI 座席代打【闪】(护驾)。
+        if (!dodged && tryLordAidSync && tryLordAidSync(game, 'player', 'hujia', '【杀】')) {
+          dodged = true;
         }
         return resolveShaAfterResponse(game, actor, card, amount, dodged, saved.targetActor);
       }

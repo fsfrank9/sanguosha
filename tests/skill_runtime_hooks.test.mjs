@@ -207,7 +207,8 @@ test('game engine dispatches Qianxun through onCardTarget hook seam', () => {
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qianxun['"]/, 'Qianxun should be registered with SkillRuntime.registerSkill');
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]qianxun['"][\s\S]*?onCardTarget\s*:/, 'Qianxun should register an onCardTarget hook');
   assert.match(skillsSource, /triggerQianxunCardTarget\(context\)/, 'Qianxun hook should delegate target-protection logic to an isolated helper');
-  assert.match(canPlaySource, /cardTargetProtection\(game, actor, opponent\(actor\), card\)/, 'canPlayCard should use shared target protection for Qianxun-protected cards');
+  // v12 H1: 保护检查泛化为逐座席 ∃-检查 (seat 变量), 仍走共享 onCardTarget 缝
+  assert.match(canPlaySource, /cardTargetProtection\(game, actor, seat, card\)/, 'canPlayCard should use shared target protection for Qianxun-protected cards');
   assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"]qianxun['"]/, 'canPlayCard should not directly hard-code Qianxun detection');
   assert.doesNotMatch(playCardSource, /hasSkill\([^)]*['"]qianxun['"]/, 'playCard should not directly hard-code Qianxun detection');
 });
@@ -344,7 +345,9 @@ test('game engine dispatches implemented active skills through onActiveSkill hoo
   assert.match(skillsSource, /triggerRendeActiveSkill\(context\)/, 'Rende active hook should delegate to an isolated helper');
   assert.match(skillsSource, /triggerFanjianActiveSkill\(context\)/, 'Fanjian active hook should delegate to an isolated helper');
   assert.match(skillsSource, /triggerGuanxingActiveSkill\(context\)/, 'Guanxing active hook should delegate to an isolated helper');
-  assert.match(useSkillSource, /var activeSkillContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*self[\s\S]*targetActor:\s*opponent\(actor\)[\s\S]*skillId:\s*skillId[\s\S]*cardIds:\s*cardIds[\s\S]*options:\s*options[\s\S]*\}/, 'useSkill should build a complete active-skill context');
+  // v12 H5: targetActor 从固定 opponent(actor) 泛化为 options.target 座席
+  // 校验后回退对手 (多席 AI 反间/结姻 目标一致性)。
+  assert.match(useSkillSource, /var activeSkillContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*self[\s\S]*targetActor:\s*resolveSeatOption\(game,\s*options\.target\)\s*\|\|\s*opponent\(actor\)[\s\S]*skillId:\s*skillId[\s\S]*cardIds:\s*cardIds[\s\S]*options:\s*options[\s\S]*\}/, 'useSkill should build a complete active-skill context');
   assert.match(useSkillSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onActiveSkill['"]\s*,\s*activeSkillContext\s*\)/, 'useSkill should dispatch active skills through onActiveSkill');
   assert.match(useSkillSource, /selectActiveSkillResult\(\s*activeSkillResults\s*,\s*skillId\s*\)/, 'useSkill should select the matching active skill hook result');
   assert.doesNotMatch(useSkillSource, /skillId\s*={2,3}\s*['"](?:zhiheng|kurou|rende|fanjian|guanxing)['"]/, 'useSkill should no longer directly branch on implemented active skill IDs');

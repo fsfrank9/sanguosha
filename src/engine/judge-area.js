@@ -120,6 +120,15 @@
           startIdx = 0;
         }
         for (var i = startIdx; i < pending.length; i += 1) {
+          // v12 H5: 该角色已在判定结算中阵亡 (闪电, 身份场对局继续) —
+          // 剩余在途延时锦囊直接置入弃牌堆, 不再为亡者结算。
+          if (game[actor].hp <= 0) {
+            for (var deadRest = i; deadRest < pending.length; deadRest += 1) {
+              discardCard(game, pending[deadRest]);
+            }
+            if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
+            return { ok: true };
+          }
           var trick = pending[i];
           var reason = judgementReasonFor(trick);
           var judgementCard = reason ? judge(game, actor, reason, { pausable: true }) : null;
@@ -138,6 +147,12 @@
           }
           applyJudgeAreaOutcome(game, actor, state, trick, reason, judgementCard);
           if (game.phase === 'gameover') {
+            // v12 H5 修复: 判定结算致终局时, 剩余在途延时锦囊 (已从判定区
+            // 整批取出) 一并入弃牌堆 — 否则从所有区域凭空消失 (守恒破坏,
+            // 叠放多张延时锦囊 + 首张致死场景)。
+            for (var overRest = i + 1; overRest < pending.length; overRest += 1) {
+              discardCard(game, pending[overRest]);
+            }
             if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
             return { ok: true };
           }
@@ -176,20 +191,29 @@
           // v7 PR-12: gltjk card__scroll.md 注 — "若其下家不是此【闪电】的
           // 合法目标，则将对应的实体牌置入其下家的下家的判定区，以此类推。
           // 若所有角色都不是此【闪电】的合法目标，则将对应的实体牌置入其
-          // 判定区。" 在 1v1 中只有 2 名角色：下家=对手；下家的下家=自己。
-          // PR-6 已定义 "判定区里有同名延时锦囊的角色 = 非合法目标"。
-          var foeActor = opponent(actor);
-          var foeState = game[foeActor];
-          var foeAlreadyShandian = (foeState.judgeArea || []).some(function (j) {
-            return j && j.type === 'shandian';
-          });
-          if (foeAlreadyShandian) {
-            // 对手已有 闪电 → 非合法目标 → 全部不合法 → 回到自己
+          // 判定区。" PR-6 已定义 "判定区里有同名延时锦囊的角色 = 非合法目标"。
+          // v12 H2: 泛化为座次环扫描 — 自下家起顺时针找首个合法存活座席;
+          // 全部不合法 → 回到自己 (此刻闪电在途, 自己判定区必无同名)。
+          // 1v1 恒为 [对手] 单元素扫描, 行为不变。
+          var shandianMoved = false;
+          var shandianRing = StateRuntime.seatsFrom(game, actor, false);
+          for (var ringIdx = 0; ringIdx < shandianRing.length; ringIdx += 1) {
+            var candActor = shandianRing[ringIdx];
+            var candState = game[candActor];
+            if (!candState || candState.hp <= 0) continue;
+            var candAlreadyShandian = (candState.judgeArea || []).some(function (j) {
+              return j && j.type === 'shandian';
+            });
+            if (candAlreadyShandian) continue;
+            putCard(game, trick, { zone: 'judgeArea', actor: candActor });
+            log(game, '【闪电】移至' + actorName(game, candActor) + '的判定区。');
+            shandianMoved = true;
+            break;
+          }
+          if (!shandianMoved) {
+            // 后续座席均非合法目标 → 回到自己
             putCard(game, trick, { zone: 'judgeArea', actor: actor });
             log(game, '【闪电】移动失败（对手判定区已有同名牌），留在' + actorName(game, actor) + '的判定区。');
-          } else {
-            putCard(game, trick, { zone: 'judgeArea', actor: foeActor });
-            log(game, '【闪电】移至' + actorName(game, foeActor) + '的判定区。');
           }
         }
         resolveJudgementCard(game, actor, state, reason, judgementCard);

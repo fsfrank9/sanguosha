@@ -28,6 +28,8 @@
     var discardSelected = deps.discardSelected;
     var needsDiscard = deps.needsDiscard;
     var getDiscardCount = deps.getDiscardCount;
+    // v12 H5: 座席级合法目标矩阵 (出杀目标挑选)
+    var legalTargetsForCard = deps.legalTargetsForCard;
     var getHuogongChoice = deps.getHuogongChoice;
     // v11 C5 (批次 29): 锦囊类转化候选枚举 (与 UI 转化面板同源)
     var listCardConversions = deps.listCardConversions;
@@ -93,12 +95,40 @@
     //   拆/顺     — 有装备要护 或 手牌拮据 (<=2) 时才无懈
     //   乐/兵粮   — 乐: 手牌有阵容才护回合; 兵粮: 手牌拮据才护摸牌
     //   闪电/无中/借刀/桃园与五谷的 denial 窗口 — 保持旧行为 (恒用)
+    // v12 H5: 无懈立场 — 该锦囊当前净状态下"将结算的效果"落在谁身上, 决定
+    // responder 是否有动机抵消。受害型锦囊: 结算伤友方 → 想无懈; 受益型
+    // (无中/桃园/五谷): 结算利敌方 → 想无懈。wuxied=true 时净状态反转
+    // (打出无懈会恢复结算)。1v1 双席下与旧行为逐步一致 (受害者想消、
+    // 来源反消), 多席下阻止 AI 抵消友方的锦囊/增益。
+    function aiWuxieStance(game, responder, chain) {
+      var ctx = chain.ctx || {};
+      var trick = chain.trickName;
+      var beneficial = null; // 受益座席 (增益型)
+      var victim = null;     // 受害座席 (打击型)
+      if (trick === 'wuzhong') beneficial = ctx.wzTargetActor || ctx.actor;
+      else if (trick === 'taoyuan-target') beneficial = ctx.targets && ctx.targets[ctx.idx];
+      else if (trick === 'wugu-target') beneficial = ctx.order && ctx.order[ctx.idx];
+      else if (trick === 'delayed-place' && ctx.card && ctx.card.type === 'shandian') victim = null; // 闪电落点漂移, 保持旧启发
+      else victim = ctx.targetActor || ctx.delayedSide || opponent(ctx.actor);
+      var interested;
+      if (beneficial) {
+        interested = StateRuntime.isHostileSeat(game, responder, beneficial); // 敌方受益 → 想消
+      } else if (victim) {
+        interested = victim === responder || !StateRuntime.isHostileSeat(game, responder, victim); // 友方受害 → 想消
+      } else {
+        interested = true; // 未建模 (闪电等) → 保持旧行为
+      }
+      // 净抵消态下动机反转: 想消的人已如愿 (不再出), 不想消的人想反无懈。
+      return chain.wuxied ? !interested : interested;
+    }
+
     function aiShouldUseWuxie(game, responder, chain) {
       if (!game || !chain) return true;
       var self = game[responder];
       if (!self) return true;
       if (self.skillPreferences && self.skillPreferences.wuxiePolicy === 'always') return true;
-      if (chain.wuxied) return true; // 反无懈: 保卫自己已投入的锦囊
+      if (!aiWuxieStance(game, responder, chain)) return false; // v12 H5: 立场不符不出
+      if (chain.wuxied) return true; // 反无懈: 保卫己方已投入的锦囊
       var opp = game[opponent(responder)];
       var trick = chain.trickName;
       var handCount = (self.hand || []).length;
@@ -124,11 +154,31 @@
       return true; // 无中/借刀/桃园与五谷 denial 窗口/未建模锦囊 → 保持旧行为
     }
 
+    // v12 H5: AI 启发式评估的"对手"从 opponent() 二元假设改为阵营敌对
+    // 主目标 (1v1 恒为对手; 多席取首个敌对存活座席)。
+    function aiPrimaryFoe(game, actor) {
+      var candidates = StateRuntime.hostileSeats(game, actor);
+      return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : (candidates[0] || opponent(actor));
+    }
+
+    // v12 H5: AI 单目标牌的目标座席 — 合法目标矩阵 ∩ 敌对座席 (1v1 恒为
+    // 对手)。canPlayCard 的 ∃-目标语义包含友方座席 (玩家可显式指定), AI
+    // 必须另行确认存在"可达且敌对"的目标; 与引擎 resolveTrickTargetActor
+    // 的缺省池同构 (对手优先), 供出杀候选门与火攻预览/出牌保持同一目标。
+    function aiShaTargetSeat(game, actor, card) {
+      if (!legalTargetsForCard) return opponent(actor);
+      var candidates = legalTargetsForCard(game, actor, card).filter(function (seat) {
+        return StateRuntime.isHostileSeat(game, actor, seat);
+      });
+      if (!candidates.length) return null;
+      return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : candidates[0];
+    }
+
     // v8 PR-D1: 出牌/锦囊 score 精细化。对 桃 / 杀 / 决斗 / 锦囊 都按
     // 双方资源 + 自身受伤情况 给梯度分数, 替代原 v6 的 binary heuristic.
     function scoreCardForAI(game, actor, card) {
       var self = game[actor];
-      var target = game[opponent(actor)];
+      var target = game[aiPrimaryFoe(game, actor)];
 
       // 桃: hp 缺口梯度。critical (hp=1) > 多伤 > 轻伤; 满血给负分阻止 AI 用。
       if (card.type === 'tao') {
@@ -336,14 +386,18 @@
       self.hand.forEach(function (card) {
         // Original-card use.
         if (canPlayCard(game, actor, card).ok) {
-          // v8 PR-D3: 用 lookahead 综合分; sim 失败回退到 scoreCardForAI
-          var normalScore = aiScoreCardWithLookahead(game, actor, card, 'normal');
-          if (normalScore > 0) candidates.push({ card: card, mode: 'normal', score: normalScore });
+          // v12 H5: 杀类另行确认存在可达敌对目标 (∃-目标语义含友方座席)
+          if (!isShaType(card.type) || aiShaTargetSeat(game, actor, card)) {
+            // v8 PR-D3: 用 lookahead 综合分; sim 失败回退到 scoreCardForAI
+            var normalScore = aiScoreCardWithLookahead(game, actor, card, 'normal');
+            if (normalScore > 0) candidates.push({ card: card, mode: 'normal', score: normalScore });
+          }
         }
         // As-Sha conversion (武圣 / 龙胆). Skip cards that are already
         // 杀 — no conversion needed.
         if (!isShaType(card.type)) {
-          if (canPlayCardAs(game, actor, card, 'sha').ok) {
+          if (canPlayCardAs(game, actor, card, 'sha').ok
+              && aiShaTargetSeat(game, actor, { type: 'sha', name: '杀', color: card.color, suit: card.suit })) {
             var asScore = aiScoreCardWithLookahead(game, actor, card, 'asSha');
             if (asScore > 0) candidates.push({ card: card, mode: 'asSha', score: asScore });
           }
@@ -371,7 +425,8 @@
       var self = game[actor];
       if (!self) return null;
       self.flags = self.flags || {};
-      var target = game[opponent(actor)];
+      var primaryFoeSeat = aiPrimaryFoe(game, actor);
+      var target = game[primaryFoeSeat];
 
       // 观星: free information; fire once per turn whenever deck has cards.
       if (hasSkill(self, 'guanxing') && !self.flags.guanxingUsed && game.deck.length > 0) {
@@ -420,7 +475,8 @@
         var jieyinCandidates = self.hand
           .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
           .sort(function (a, b) { return a.score - b.score; });
-        return { skillId: 'jieyin', cardIds: [jieyinCandidates[0].card.id, jieyinCandidates[1].card.id] };
+        // v12 H5: 显式目标座席 (评估与执行同一目标, 多席不误指友方)
+        return { skillId: 'jieyin', cardIds: [jieyinCandidates[0].card.id, jieyinCandidates[1].card.id], options: { target: primaryFoeSeat } };
       }
 
       // 青囊: heal whenever 自身 is wounded and 有手牌可弃。优先自救；
@@ -430,6 +486,47 @@
           .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
           .sort(function (a, b) { return a.score - b.score; });
         return { skillId: 'qingnang', cardIds: [qingnangCandidates[0].card.id], options: { target: actor } };
+      }
+
+      // v12 H7: 离间 (貂蝉) — 场上有两名敌对男性时弃最低分牌挑起决斗。
+      if (hasSkill(self, 'lijian') && !self.flags.lijianUsed && self.hand.length > 1) {
+        var lijianMales = StateRuntime.hostileSeats(game, actor).filter(function (seat) {
+          return game[seat] && game[seat].hp > 0 && game[seat].gender === 'male';
+        });
+        if (lijianMales.length >= 2) {
+          var lijianCost = self.hand
+            .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
+            .sort(function (a, b) { return a.score - b.score; })[0];
+          // 杀多者先手 (targets[0] 视为使用决斗者), 杀少者先响应易败
+          var lijianPair = lijianMales.slice(0, 2).sort(function (a, b) {
+            return aiEstimateShaCount(game[b]) - aiEstimateShaCount(game[a]);
+          });
+          return { skillId: 'lijian', cardIds: [lijianCost.card.id], options: { targets: lijianPair } };
+        }
+      }
+
+      // v12 H7: 黄天 — 群势力 AI 在自己出牌阶段把多余【闪】交给同阵营主公张角。
+      if (game.mode === 'identity3' && self.camp === '群' && !self.flags.huangtianUsed) {
+        var htLordSeat = null;
+        StateRuntime.seatList(game).forEach(function (seat) {
+          if (htLordSeat || seat === actor) return;
+          var st = game[seat];
+          if (st && st.hp > 0 && hasSkill(st, 'huangtian')
+              && game.roles && game.roles[seat] === '主公'
+              && !StateRuntime.isHostileSeat(game, actor, seat)) {
+            htLordSeat = seat;
+          }
+        });
+        if (htLordSeat) {
+          var spareShans = self.hand.filter(function (c) { return c.type === 'shan'; });
+          var spareShandian = self.hand.find(function (c) { return c.type === 'shandian'; });
+          if (spareShans.length >= 2) {
+            return { skillId: 'huangtian', cardIds: [spareShans[0].id] };
+          }
+          if (spareShandian) {
+            return { skillId: 'huangtian', cardIds: [spareShandian.id] };
+          }
+        }
       }
 
       // 反间: opportunistic chip damage. The opponent guesses a suit
@@ -449,7 +546,8 @@
           // score card if every hand card is a spade.
           var nonSpade = fanjianCandidates.find(function (item) { return item.card.suit !== 'spade'; });
           var picked = nonSpade || fanjianCandidates[0];
-          return { skillId: 'fanjian', cardIds: [picked.card.id] };
+          // v12 H5: 显式目标座席 (评估与执行同一目标, 多席不误指友方)
+          return { skillId: 'fanjian', cardIds: [picked.card.id], options: { target: primaryFoeSeat } };
         }
       }
 
@@ -496,16 +594,28 @@
         cardResult = playCardAs(game, actor, card.id, choice.asType);
       } else {
         var cardOptions;
-        if (card.type === 'tiesuo') cardOptions = { mode: 'chain', targets: [opponent(actor)] };
+        // v12 H5: 铁索缺省横置敌对座席 (至多 2 名); 1v1 恒为 [对手]。
+        if (card.type === 'tiesuo') cardOptions = { mode: 'chain', targets: StateRuntime.hostileSeats(game, actor).slice(0, 2) };
+        // v12 H5: 杀显式目标 — playSha 缺省目标不做距离校验 (信息由显式
+        // 指定承担), AI 传入自己确认过"可达且敌对"的座席。
+        if (isShaType(card.type)) {
+          var aiShaSeat = aiShaTargetSeat(game, actor, card);
+          if (aiShaSeat) cardOptions = { target: aiShaSeat };
+        }
         if (card.type === 'huogong') {
-          var fireChoice = getHuogongChoice(game, actor);
+          // v12 H5 修复: 预览与实际出牌须对同一目标 — 此前预览走
+          // getHuogongChoice 内部的 opponent() 回退 (多席下 ally 的
+          // "对手"是友方玩家), 而 playCard 结算却落在敌对座席, 花色
+          // 成本按错误目标预挑 → 结算拒绝, runAITurn 整体失败。
+          var huogongSeat = aiShaTargetSeat(game, actor, card) || opponent(actor);
+          var fireChoice = getHuogongChoice(game, actor, huogongSeat);
           if (fireChoice.ok && fireChoice.usableCostIds.length) {
-            cardOptions = { huogongCostCardId: fireChoice.usableCostIds[0] };
+            cardOptions = { target: huogongSeat, huogongCostCardId: fireChoice.usableCostIds[0] };
           } else if (fireChoice.pendingTargetChoice) {
             // L1: 目标 (玩家, ask) 展示牌未定 — 展示后引擎自动弃同花色
-            cardOptions = {};
+            cardOptions = { target: huogongSeat };
           } else {
-            cardOptions = { declineHuogong: true };
+            cardOptions = { target: huogongSeat, declineHuogong: true };
           }
         }
         cardResult = playCard(game, actor, card.id, cardOptions);
@@ -531,6 +641,12 @@
       if (!game || !game[actor]) return fail('未知角色。');
       maxActions = maxActions || 12;
       if (game.phase === 'gameover') return fail('游戏已经结束。');
+      // v12 H5: 阵亡座席 — 若回合还挂在其名下 (死于自己回合中) 则终结该
+      // 回合 (endTurn 内部经 completeTurn 走阵亡终止路径), 否则直接拒绝。
+      if (game[actor].hp <= 0) {
+        if (game.turn === actor && !game.pendingChoice) return endTurn(game);
+        return fail('该角色已阵亡。');
+      }
 
       // v12 G2 修复: 仅当回合不属于该 actor 时才开新回合。此前 phase 不在
       // prepare/judge/draw 也会重启 — 但 endTurn 内部已自动 startTurn 下一

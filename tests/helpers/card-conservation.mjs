@@ -12,6 +12,12 @@
 
 export const EQUIP_SLOTS = ['weapon', 'armor', 'horseMinus', 'horsePlus'];
 
+// v12 H: 多座席对局 (identity3) 普查覆盖全部座席; 无 seats 的旧局面回退 1v1。
+function censusSeats(game) {
+  if (game && Array.isArray(game.seats) && game.seats.length) return game.seats;
+  return ['player', 'enemy'];
+}
+
 function isCardLike(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   if (value.id === undefined || typeof value.type !== 'string') return false;
@@ -55,7 +61,7 @@ export function collectCardCensus(game) {
 
   for (const card of game.deck || []) registerZoneCard(card, 'deck');
   for (const card of game.discard || []) registerZoneCard(card, 'discard');
-  for (const actor of ['player', 'enemy']) {
+  for (const actor of censusSeats(game)) {
     const state = game[actor];
     if (!state) continue;
     for (const card of state.hand || []) registerZoneCard(card, `${actor}.hand`);
@@ -94,7 +100,7 @@ export function collectCardCensus(game) {
 // card_conservation.test.mjs 的旧版 countAllCards 语义一致。
 export function countAllCards(game) {
   let total = (game.deck || []).length + (game.discard || []).length;
-  for (const actor of ['player', 'enemy']) {
+  for (const actor of censusSeats(game)) {
     const state = game[actor];
     if (!state) continue;
     total += (state.hand || []).length;

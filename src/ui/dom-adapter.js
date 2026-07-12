@@ -4,10 +4,15 @@
       import { createModePanels } from './panels/mode-panels.js';
       import { createLobbyPanels } from './panels/lobby-panels.js';
       import { createBoardPanels } from './panels/board-panels.js';
+      import { createLordAidPanels } from './panels/lord-aid-panels.js';
 
       var Engine = SanguoshaEngine;
       var game = null;
       var enemyThinking = false;
+      // v12 H6: 大厅对战模式 — 'duel' (1v1, 默认) / 'identity3' (3人身份场)。
+      // 由 setup 屏的模式按钮切换; newGame() 据此决定 Engine.newGame 的
+      // seats/roles 入参。默认 'duel' 保证不点新按钮时旧 1v1 流程零改动。
+      var matchMode = 'duel';
       var selectedDiscardIds = [];
       // v9 PR-E16: play 阶段选-后-确认 模式. 点 hand-card 仅 set 此 id +
       // 高亮; #handConfirmBtn 触发后才真正 usePlayerCard. discard / skill /
@@ -108,6 +113,22 @@
           render();
         }
       });
+      // v12 H6/H7: 激将/护驾 求助响应面板装配 — ctx 语义同 responsePanels
+      // (独立面板承载, 不复用 duelResponse/shanResponse 的既有断言表面)。
+      var lordAidPanels = createLordAidPanels({
+        els: els,
+        Engine: Engine,
+        getGame: function () { return game; },
+        render: function () { render(); },
+        renderLog: function () { renderLog(); },
+        escapeHtml: function (text) { return escapeHtml(text); },
+        suitLabel: function (suit) { return suitLabel(suit); },
+        actorDisplayName: function (actor) { return actorDisplayName(actor); },
+        stage: function (payload, selector) {
+          stagedModalChoice = { kind: 'pending', payload: payload, selector: selector };
+          render();
+        }
+      });
 
       function $(id) {
         return document.getElementById(id);
@@ -173,6 +194,19 @@
           // game.roles[actor] 切换 hidden.
           // v9 PR-E14: 反贼徽章 — 同位置绿圆 "反". 与 lord-badge 互斥显示.
           'playerLordBadge', 'enemyLordBadge', 'playerRebelBadge', 'enemyRebelBadge',
+          // v12 H6: 忠臣徽章 (三席都缓存, 目前固定预设下只有 ally 会显示)。
+          'playerLoyalistBadge', 'enemyLoyalistBadge', 'allyLoyalistBadge',
+          // v12 H6: 3人身份场第三席 (ally) — 座次布局 + 大厅模式/第三席选将。
+          'allyZone', 'allyHero', 'allyName', 'allyCamp', 'allyQuote', 'allyHp',
+          'allyHandCount', 'allyState', 'allyTurnBadge', 'allyRibbon',
+          'allyEquipmentArea', 'allyJudgeArea', 'allyHandBacks',
+          'allyLordBadge', 'allyRebelBadge',
+          'matchModePanel', 'modeDuelBtn', 'modeIdentity3Btn',
+          'allyHeroPickRow', 'allyHeroSelect',
+          // v12 H6: identity3 单目标牌/主动技 座席点选模式面板。
+          'seatTargetModePanel', 'seatTargetModeHint', 'seatTargetCancelBtn',
+          // v12 H6/H7: 激将/护驾 求助响应面板。
+          'lordAidPanel', 'lordAidHint', 'lordAidChoices', 'lordAidDeclineBtn',
           // v9 PR-E5: 侧抽屉菜单 + 退出确认 modal
           'sideDrawer', 'drawerExitBtn', 'drawerRestartBtn', 'drawerHelpBtn', 'drawerCloseBtn',
           'exitConfirmModal', 'exitConfirmBackdrop', 'exitConfirmYesBtn', 'exitConfirmNoBtn',
@@ -220,7 +254,10 @@
           selectedHandCardId: selectedHandCardId,
           skillSelectMode: skillSelectMode,
           selectedSkillCardIds: selectedSkillCardIds,
-          stagedModalChoice: stagedModalChoice
+          stagedModalChoice: stagedModalChoice,
+          // v12 H6: identity3 座席点选模式下的合法目标座席数组 (null = 未在
+          // 点选中, 1v1 恒 null) — board-panels renderHero 据此加高亮 class.
+          seatTargetLegalSeats: modePanels.activeSeatPickerLegalSeats()
         };
       }
       function renderLog() { boardPanels.renderLog(uiView()); }
@@ -299,6 +336,8 @@
         promptPanels.render(kind, pending);
         // v11 B2: 无懈/决斗/闪族响应面板渲染已迁往 ./panels/response-panels.js。
         responsePanels.render(kind, pending);
+        // v12 H6/H7: 激将/护驾 求助响应面板渲染。
+        lordAidPanels.render(kind, pending);
       }
 
       // v8 PR-A2: actorDisplayName — 与 actorName 类似，但只用 hero name
@@ -382,6 +421,31 @@
             startHint: '结姻：弃 2 张手牌, 与受伤的男性对手各回复 1 点体力 (每回合限一次)',
             selectedHint: function (count) { return '结姻：已选 ' + count + ' / 2 张'; },
             emptyMessage: '请选择两张手牌发动【结姻】。'
+          },
+          // v12 H6/H7: 黄天 (张角主公技, 由其他群势力座席发动) — 交 1 张
+          // 【闪】/【闪电】。按钮仅在 identity3 + 自己是群势力 + 场上有主公
+          // 张角时由 lobbyPanels.renderPlayerSkillBar 注入 (见该文件注释)；
+          // 复用本通用选牌框架, 无需目标 (useSkill 内部按场上主公自动结算)。
+          huangtian: {
+            name: '黄天',
+            min: 1,
+            max: 1,
+            cardHint: '选择这张【闪】或【闪电】交给主公张角',
+            startHint: '黄天：选择一张【闪】或【闪电】交给主公张角 (每回合限一次)',
+            selectedHint: function (count) { return '黄天：已选 ' + count + ' / 1 张'; },
+            emptyMessage: '请选择一张【闪】或【闪电】发动【黄天】。'
+          },
+          // v12 H6/H7: 离间 (貂蝉) — 弃 1 张成本牌; 目标 (两名男性角色) 在
+          // confirmCardSkill 里对 lijian 特判, 弃牌确认后转入座席点选
+          // (modePanels.startLijianTargetPicker), 而非本框架直接 useSkill。
+          lijian: {
+            name: '离间',
+            min: 1,
+            max: 1,
+            cardHint: '选择这张牌弃置发动【离间】',
+            startHint: '离间：选择一张手牌弃置, 随后依次选两名男性角色目标 (每回合限一次)',
+            selectedHint: function (count) { return '离间：已选 ' + count + ' / 1 张'; },
+            emptyMessage: '请选择一张手牌发动【离间】。'
           }
         };
         return configs[skillId] || null;
@@ -426,6 +490,22 @@
           return;
         }
         var cardIds = config.max === 1 ? selectedSkillCardIds.slice(0, 1) : selectedSkillCardIds;
+        // v12 H6/H7: 离间 (lijian) 需先弃 1 张成本牌, 再依次选两名男性角色
+        // 目标 — 成本牌确认后不立即 useSkill, 转入座席点选 (与卡牌目标点选
+        // 共用骨架)。identity3 下若凑不出两名合法男性目标 (1v1 恒如此),
+        // startLijianTargetPicker 返回 false, 回退旧的直调路径 (会因目标
+        // 不足报错, 与改动前行为一致)。
+        if (skillSelectMode === 'lijian') {
+          exitSkillSelectMode();
+          if (modePanels.startLijianTargetPicker(cardIds)) {
+            render();
+            return;
+          }
+          var lijianResult = Engine.useSkill(game, 'player', 'lijian', cardIds, {});
+          if (!lijianResult.ok) game.log.push(lijianResult.message);
+          render();
+          return;
+        }
         var enemyHpBefore = game.enemy.hp;
         var result = Engine.useSkill(game, 'player', skillSelectMode, cardIds, config.options || {});
         exitSkillSelectMode();
@@ -438,6 +518,13 @@
 
       function resolveNormalPlayerCard(cardId) {
         if (!game) return;
+        // v12 H6: identity3 单目标牌 (杀/决斗/拆/顺/火攻/乐/兵/借刀/桃/无中)
+        // → 座席点选模式 (选中场上高亮座席后再结算), 取代 1v1 的"点牌即出"。
+        // 1v1 (game.mode !== 'identity3') 或非单目标牌类型时 tryEnterSeatTargetMode
+        // 直接返回 false, 落回下方既有路径 (零改动)。
+        if (game.mode === 'identity3' && game.phase === 'play' && modePanels.tryEnterSeatTargetMode(cardId)) {
+          return;
+        }
         var clickedCard = findPlayerCard(cardId);
         if (clickedCard && clickedCard.type === 'tiesuo' && game.phase === 'play') {
           hideTargetZonePanel();
@@ -577,6 +664,14 @@
           render();
           return;
         }
+        // v12 H6/H7: 激将 (刘备主公技) — identity3 下进入座席点选模式 (选一
+        // 名目标角色, 令蜀势力角色代出【杀】)。1v1 (或 identity3 但同势力候选
+        // 为空) 时 tryEnterJijiangTargetMode 返回 false, 落回下方通用直调
+        // 路径 (与改动前行为一致 — 因缺目标而 fail, 不崩溃)。
+        if (skillId === 'jijiang' && modePanels.tryEnterJijiangTargetMode()) {
+          render();
+          return;
+        }
         hideGuanxingPanel();
         var cardIds = [];
         var playerHpBefore = game.player.hp;
@@ -588,7 +683,13 @@
       }
 
       function enemyStep() {
-        if (!game || game.phase === 'gameover' || game.turn !== 'enemy') {
+        // v12 H6: AI 座席泛化 — 硬编码 'enemy' → game.turn (identity3 座次环
+        // enemy→ally→player, 非玩家座席均由本函数逐动作驱动; 1v1 恒 'enemy',
+        // 行为逐字不变)。函数名/setTimeout(enemyStep, ...) 调用点保持原样
+        // (守护测试锁定了 enemyStep 必须逐动作调 aiTakeAction, 不得整回合
+        // 批量结算)。
+        var actor = game && game.turn;
+        if (!game || game.phase === 'gameover' || actor === 'player') {
           enemyThinking = false;
           render();
           return;
@@ -602,14 +703,14 @@
           return;
         }
         var playerHpBefore = game.player.hp;
-        var enemyHpBefore = game.enemy.hp;
+        var actorHpBefore = game[actor].hp;
 
         if (game.phase === 'play') {
-          var action = Engine.aiTakeAction(game, 'enemy');
+          var action = Engine.aiTakeAction(game, actor);
           if (game.player.hp < playerHpBefore) flashHero('player');
-          if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
+          if (game[actor].hp < actorHpBefore) flashHero(actor);
           render();
-          if (action.ok && action.action !== 'none' && game.turn === 'enemy' && game.phase === 'play') {
+          if (action.ok && action.action !== 'none' && game.turn === actor && game.phase === 'play') {
             // v9 PR-E22: 出牌阶段实质动作 — 慢节奏让玩家看清
             window.setTimeout(enemyStep, enemyActionDelay);
             return;
@@ -621,9 +722,9 @@
         }
 
         if (game.phase === 'discard') {
-          if (Engine.needsDiscard(game, 'enemy')) {
-            var need = Engine.getDiscardCount(game, 'enemy');
-            Engine.discardSelected(game, 'enemy', game.enemy.hand.slice(0, need).map(function (card) { return card.id; }));
+          if (Engine.needsDiscard(game, actor)) {
+            var need = Engine.getDiscardCount(game, actor);
+            Engine.discardSelected(game, actor, game[actor].hand.slice(0, need).map(function (card) { return card.id; }));
           }
           Engine.advancePhase(game);
           render();
@@ -635,6 +736,11 @@
           Engine.endTurn(game);
           enemyThinking = false;
           render();
+          // v12 H6: identity3 座次环 — 结束本座席回合后, 若下一回合仍是 AI
+          // 座席 (enemy→ally 或 ally→enemy, 视座次表), 继续驱动直到轮到
+          // 玩家/游戏结束; maybeStartEnemyTurn 内部已判 game.turn !== 'player'
+          // + !enemyThinking, 1v1 中下一回合恒 'player' 故此调用天然 no-op。
+          maybeStartEnemyTurn();
           return;
         }
 
@@ -644,7 +750,9 @@
       }
 
       function maybeStartEnemyTurn() {
-        if (game && game.turn === 'enemy' && game.phase !== 'gameover' && !enemyThinking) {
+        // v12 H6: game.turn === 'enemy' → !== 'player' (泛化到 identity3 的
+        // 任意非玩家座席, 1v1 中 !== 'player' 与 === 'enemy' 完全等价)。
+        if (game && game.turn !== 'player' && game.phase !== 'gameover' && !enemyThinking) {
           enemyThinking = true;
           render();
           window.setTimeout(enemyStep, enemyPhaseDelay);
@@ -657,8 +765,37 @@
         var currentEnemy = els.enemyHeroSelect.value || 'caocao';
         lobbyPanels.fillHeroSelect(els.playerHeroSelect, currentPlayer, 'liubei');
         lobbyPanels.fillHeroSelect(els.enemyHeroSelect, currentEnemy, 'caocao');
+        // v12 H6: 第三席 (忠臣) 武将下拉 — 只在 identity3 模式显示, 但选项
+        // 常驻填充 (切模式时无需重填); 默认关羽 (与双方默认 liubei/caocao
+        // 均不同名)。
+        if (els.allyHeroSelect) {
+          var currentAlly = els.allyHeroSelect.value || 'guanyu';
+          lobbyPanels.fillHeroSelect(els.allyHeroSelect, currentAlly, 'guanyu');
+        }
         ensureDistinctHeroes('player');
         renderHeroPickGrid();
+      }
+
+      // v12 H6: 对战模式切换 — 'duel' (默认, 旧 1v1 流程逐字不变) /
+      // 'identity3' (3人身份场)。identity3 下: 显示第三席武将下拉; 隐藏
+      // 身份判定区 (身份为固定预设 我=主公/敌=反贼/第三席=忠臣, 不可重抽,
+      // 由 Engine.newGame 的 seats 预设自动分配)。
+      function setMatchMode(mode) {
+        matchMode = mode === 'identity3' ? 'identity3' : 'duel';
+        var identity3 = matchMode === 'identity3';
+        if (els.modeDuelBtn) els.modeDuelBtn.classList.toggle('is-active', !identity3);
+        if (els.modeIdentity3Btn) els.modeIdentity3Btn.classList.toggle('is-active', identity3);
+        if (els.allyHeroPickRow) els.allyHeroPickRow.hidden = !identity3;
+        if (els.roleDraftPanel) els.roleDraftPanel.hidden = identity3;
+        // identity3 身份固定: 我方恒主公 (座次预设首位) — 选将顺序照旧
+        // 玩家先选; duel 模式回到随机身份的既有状态 (不重掷, 保留当前)。
+        if (identity3) {
+          playerRole = '主公';
+          enemyRole = '反贼';
+          updateDraftUI();
+          resetPickSequence();
+          renderHeroPickGrid();
+        }
       }
 
       // v9 PR-E11: 顺序选将 — 主公 先选, 反贼 后选, 不可返回. 状态:
@@ -805,7 +942,31 @@
         ensureDistinctHeroes('player');
         var playerHero = els.playerHeroSelect ? els.playerHeroSelect.value : 'liubei';
         var enemyHero = els.enemyHeroSelect ? els.enemyHeroSelect.value : 'caocao';
-        game = Engine.newGame({ seed: Date.now(), playerHero: playerHero, enemyHero: enemyHero, playerRole: playerRole, enemyRole: enemyRole, startWithFirstTurn: true });
+        if (matchMode === 'identity3') {
+          // v12 H6: 3人身份场 — seats 座次预设 (我=主公/敌=反贼/第三席=忠臣),
+          // 第三席武将取下拉值; 与前两席同名时取第一个不冲突的选项 (三席
+          // 武将互异, 与 1v1 "不能同名对战" 同一约束)。
+          var allyHero = els.allyHeroSelect ? els.allyHeroSelect.value : 'guanyu';
+          if ((allyHero === playerHero || allyHero === enemyHero) && els.allyHeroSelect) {
+            var allyFallback = Array.from(els.allyHeroSelect.options).find(function (option) {
+              return option.value && option.value !== playerHero && option.value !== enemyHero;
+            });
+            if (allyFallback) {
+              els.allyHeroSelect.value = allyFallback.value;
+              allyHero = allyFallback.value;
+            }
+          }
+          game = Engine.newGame({
+            seed: Date.now(),
+            seats: ['player', 'enemy', 'ally'],
+            playerHero: playerHero,
+            enemyHero: enemyHero,
+            allyHero: allyHero,
+            startWithFirstTurn: true
+          });
+        } else {
+          game = Engine.newGame({ seed: Date.now(), playerHero: playerHero, enemyHero: enemyHero, playerRole: playerRole, enemyRole: enemyRole, startWithFirstTurn: true });
+        }
         // v9 PR-E25: 开启玩家手动【闪】响应 — 被【杀】/万箭/银月时由玩家决定出不出闪
         // v10 V5: 同时开启玩家手动【无懈可击】响应 — 锦囊 targeting 玩家时弹.
         // (引擎默认无 pref → 自动响应; UI 对局显式开启 ask 模式.)
@@ -869,7 +1030,12 @@
         { panelId: 'cixiongChoosePanel',    confirmBtnId: null,                     cancelBtnId: 'cixiongChooseDrawBtn' },
         // 审计二轮 PR-8: 贯石斧 (可弃可不发动) + 火攻展示 (必选, stage 提交)
         { panelId: 'guanshiDiscardPanel',   confirmBtnId: 'guanshiConfirmBtn',      cancelBtnId: 'guanshiDeclineBtn' },
-        { panelId: 'huogongShowPanel',      confirmBtnId: null,                     cancelBtnId: null }
+        { panelId: 'huogongShowPanel',      confirmBtnId: null,                     cancelBtnId: null },
+        // v12 H6: identity3 单目标牌/主动技 座席点选模式 (无 confirm 语义 —
+        // 点合法座席直接生效; 取消按钮退出)。
+        { panelId: 'seatTargetModePanel',   confirmBtnId: null,                     cancelBtnId: 'seatTargetCancelBtn' },
+        // v12 H6/H7: 激将/护驾 求助响应面板 (候选两步化, 与 shanResponsePanel 同构)。
+        { panelId: 'lordAidPanel',          confirmBtnId: null,                     cancelBtnId: 'lordAidDeclineBtn' }
       ];
 
       function _firstVisibleDispatch() {
@@ -1058,6 +1224,11 @@
         promptPanels.bind();
         // v11 B2: 闪/无懈/决斗响应面板事件绑定已迁往 ./panels/response-panels.js。
         responsePanels.bind();
+        // v12 H6/H7: 激将/护驾 求助响应面板 (候选 stage 两步 + 不响应)。
+        lordAidPanels.bind();
+        // v12 H6: 对战模式切换按钮 — duel / identity3。
+        if (els.modeDuelBtn) els.modeDuelBtn.addEventListener('click', function () { setMatchMode('duel'); });
+        if (els.modeIdentity3Btn) els.modeIdentity3Btn.addEventListener('click', function () { setMatchMode('identity3'); });
         // v9 PR-E9: 选将网格 — card click → 设当前 pick side 的 hero.
         // (tab 在非当前 side 时 hidden, 不可点; 不再绑 click.)
         if (els.heroPickGrid) els.heroPickGrid.addEventListener('click', function (event) {

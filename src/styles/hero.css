@@ -155,9 +155,43 @@
       background: radial-gradient(circle at 35% 25%, #5fc77e, #1f7a3a 72%);
     }
 
+    /* v12 H6: 忠臣徽章 — 3人身份场第三席身份标签。独立规则块 (而非并入上方
+       .lord-badge/.rebel-badge 共享选择器) 是刻意的: 守护测试用严格正则锁定
+       了 ".lord-badge,\n.rebel-badge {" 那一组共享块的选择器列表, 并入会破坏
+       v9 PR-E4/E14 的既有断言; 复制同一套定位/尺寸属性, 仅 background 不同。 */
+    .loyalist-badge {
+      position: absolute;
+      z-index: 3;
+      top: 6px;
+      left: 6px;
+      width: 26px;
+      height: 26px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 2px solid #fff4d0;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 1;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .45);
+      pointer-events: none;
+      user-select: none;
+      background: radial-gradient(circle at 35% 25%, #ffd873, #a3760f 72%);
+    }
+
     .lord-badge[hidden],
-    .rebel-badge[hidden] {
+    .rebel-badge[hidden],
+    .loyalist-badge[hidden] {
       display: none !important;
+    }
+
+    /* v12 H6: identity3 单目标牌/主动技 座席点选模式 — 合法目标座席的英雄卡
+       高亮, 沿用 .hero.is-chained 的金色描边惯例 (box-shadow 环, 非新视觉). */
+    .hero.is-target-selectable {
+      cursor: pointer;
+      box-shadow: 0 0 0 3px var(--gold), 0 20px 60px var(--shadow), inset 0 1px rgba(255, 255, 255, .08);
     }
 
     .damage-float {

@@ -78,6 +78,8 @@ const VALID_TRIGGERS = new Set([
   'damageTaken',
   // v12 G2: 不屈触发时机 — "当你处于濒死状态时"
   'dyingEnter',
+  // v12 H7: 护驾触发时机 — "当你需要使用或打出【闪】时" (响应求助)
+  'needResponse',
 ]);
 const VALID_FREQUENCIES = new Set([
   'oncePerTurn',

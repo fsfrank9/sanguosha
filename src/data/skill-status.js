@@ -36,14 +36,24 @@
         'jushou', 'liegong', 'kuanggu',
         // v12 G2 (风包第二批): 神速 (阶段跳过框架) / 红颜 (花色视同层) /
         // 天香 (伤害转移) / 雷击+鬼道 (张角) / 不屈 (周泰, 濒死"创"区)。
-        // 黄天 (张角主公技) 随 H 身份场激活; 蛊惑 (于吉) 为多人质疑机制,
-        // 按"宁缺毋滥"均暂不接入 — spec 已入风包 fixture 如实标注。
-        'shensu', 'hongyan', 'tianxiang', 'leiji', 'guidao', 'buqu'
+        // 蛊惑 (于吉) 为多人质疑机制, 按"宁缺毋滥"暂不接入 —
+        // spec 已入风包 fixture 如实标注。
+        'shensu', 'hongyan', 'tianxiang', 'leiji', 'guidao', 'buqu',
+        // v12 H7 (身份场激活批): 主公技/多人技 —
+        //   jijiang   刘备主公技  蜀势力代出【杀】(主动 + 决斗/南蛮响应求助)
+        //   hujia     曹操主公技  魏势力代出【闪】(杀/万箭响应求助)
+        //   huangtian 张角主公技  其他群势力交给张角【闪】/【闪电】
+        //   lijian    貂蝉        弃一张牌令两名男性角色虚拟【决斗】
+        // 1v1 中主公无同势力队友 / 离间凑不齐两名其他男性 → 全部 no-op,
+        // 行为零回归; identity3 起激活。
+        'jijiang', 'hujia', 'huangtian', 'lijian'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,
       // 不占技能按钮.
       // v11 C6: jieyin 为出牌阶段主动技 (占技能按钮, 选 2 张手牌)。
-      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin'];
+      // v12 H7: jijiang (主公主动求杀) / huangtian (群势力给牌, 全场型) /
+      // lijian (弃牌挑决斗) 为出牌阶段主动技; hujia 纯响应型不占按钮。
+      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin', 'jijiang', 'huangtian', 'lijian'];
 
       export { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS };

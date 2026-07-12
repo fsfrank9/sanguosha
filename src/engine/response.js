@@ -13,6 +13,8 @@
     var fail = deps.fail;
     var processJudgeArea = deps.processJudgeArea;
     var continueTurnAfterJudgeArea = deps.continueTurnAfterJudgeArea;
+    // v12 H2: AOE 逐座席队列续跑 (tricks 域后置装配, 包装注入)
+    var resumeAOETargets = deps.resumeAOETargets;
 
     // v10 V3: 玩家响应窗口框架 — 统一暂停/恢复 API.
     //
@@ -89,6 +91,12 @@
         game.pauseState.prepareResume = null;
         if (game.phase === 'gameover') return success('游戏结束。');
         return continueTurnAfterPreparePhase(game, savedPrepare.actor);
+      }
+      // v12 H2: AOE (南蛮/万箭) 逐座席结算中某座席濒死暂停 → 救援选择排空后
+      // 续跑队列剩余座席 (advanceAOETargets 完成后自清 pauseState.aoe)。
+      var savedAOE = game.pauseState && game.pauseState.aoe;
+      if (savedAOE && resumeAOETargets) {
+        return resumeAOETargets(game);
       }
       var savedJudge = game.pauseState && game.pauseState.judgeArea;
       if (!savedJudge || !savedJudge.outcomeApplied) return null;

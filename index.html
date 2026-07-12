@@ -123,6 +123,16 @@
           <span>一级界面 · 选择武将</span>
           <span class="badge">双方英雄池一致，不能同名对战</span>
         </div>
+        <!-- v12 H6: 对战模式选择 — 1v1 单挑 / 3人身份场。默认 1v1 (与旧版
+             行为逐字一致); 切到 3人身份场后显示第三席 (ally) 武将下拉,
+             且身份判定区隐藏 (identity3 身份为固定预设: 我方=主公 / 对方=
+             反贼 / 第三席=忠臣, 不支持随机指定, 随 Engine.newGame 座次预设
+             自动分配)。 -->
+        <div class="match-mode-panel" id="matchModePanel">
+          <span class="badge">对战模式</span>
+          <button type="button" class="btn small is-active" id="modeDuelBtn" data-match-mode="duel">1v1 单挑</button>
+          <button type="button" class="btn small" id="modeIdentity3Btn" data-match-mode="identity3">3人身份场</button>
+        </div>
         <div class="role-draft-panel" id="roleDraftPanel">
           <span class="badge">身份判定</span>
           <span class="badge" id="playerRoleBadge">我方：待定</span>
@@ -158,6 +168,11 @@
           <label class="setup-side">我方武将 <select id="playerHeroSelect"></select></label>
           <label class="setup-side">敌方武将 <select id="enemyHeroSelect"></select></label>
         </div>
+        <!-- v12 H6: 第三席 (ally) 武将下拉 — 仅 3人身份场显示 (默认 hidden,
+             1v1 零回归); 身份固定为忠臣, 随 newGame seats 预设自动分配。 -->
+        <div class="hero-select-panel setup-grid" id="allyHeroPickRow" hidden>
+          <label class="setup-side">第三席（忠臣）武将 <select id="allyHeroSelect"></select></label>
+        </div>
         <!-- v9 PR-E11: 顺序选将完成后自动进入游戏 (handleHeroPickCardClick
              pickStep>=2 → newGame). 此 fallback 按钮 hidden, 仅留绑定. -->
         <button class="btn primary" id="startGameBtn" hidden>进入二级游戏界面</button>
@@ -178,6 +193,7 @@
           <div class="hero-aura"></div>
           <span class="lord-badge" id="enemyLordBadge" hidden aria-label="主公">主</span>
           <span class="rebel-badge" id="enemyRebelBadge" hidden aria-label="反贼">反</span>
+          <span class="loyalist-badge" id="enemyLoyalistBadge" hidden aria-label="忠臣">忠</span>
           <div class="camp-ribbon" id="enemyRibbon">魏</div>
           <div class="hero-head">
             <div>
@@ -199,6 +215,44 @@
           <div class="equipment-area" id="enemyEquipmentArea"><span class="mini-card">未装备</span></div>
           <div class="panel-title" style="margin-top:12px">敌方手牌</div>
           <div class="small-card-row" id="enemyHandBacks"></div>
+        </div>
+      </section>
+
+      <!-- v12 H6: 3人身份场第三席 (ally) — 默认 hidden (1v1 零回归), JS 在
+           identity3 对局中据 game.ally 存在与否显隐。列模板复用 opponent-zone
+           结构 (判定区 | 英雄 | 装备区), 不新造视觉语言。 -->
+      <section class="ally-zone" id="allyZone" hidden>
+        <div class="zone-panel">
+          <div class="zone-title">队友判定区 <span class="badge">延时锦囊</span></div>
+          <div class="judge-area" id="allyJudgeArea"><span class="mini-card">空</span></div>
+        </div>
+
+        <article class="hero ally" id="allyHero" data-camp="蜀">
+          <div class="hero-aura"></div>
+          <span class="lord-badge" id="allyLordBadge" hidden aria-label="主公">主</span>
+          <span class="rebel-badge" id="allyRebelBadge" hidden aria-label="反贼">反</span>
+          <span class="loyalist-badge" id="allyLoyalistBadge" hidden aria-label="忠臣">忠</span>
+          <div class="camp-ribbon" id="allyRibbon">蜀</div>
+          <div class="hero-head">
+            <div>
+              <div class="hero-name" id="allyName">诸葛亮</div>
+              <span class="badge" id="allyCamp">蜀 · 卧龙</span>
+            </div>
+            <span class="badge" id="allyTurnBadge">队友</span>
+          </div>
+          <p class="quote" id="allyQuote"></p>
+          <div class="hp-row" id="allyHp"></div>
+          <div class="stat-grid">
+            <div class="stat"><small>手牌</small><strong id="allyHandCount">0</strong></div>
+            <div class="stat"><small>状态</small><strong id="allyState">待机</strong></div>
+          </div>
+        </article>
+
+        <div class="zone-panel">
+          <div class="zone-title">队友装备区 <span class="badge">武器 / 防具 / 坐骑</span></div>
+          <div class="equipment-area" id="allyEquipmentArea"><span class="mini-card">未装备</span></div>
+          <div class="panel-title" style="margin-top:12px">队友手牌</div>
+          <div class="small-card-row" id="allyHandBacks"></div>
         </div>
       </section>
 
@@ -272,6 +326,7 @@
           <div class="hero-aura"></div>
           <span class="lord-badge" id="playerLordBadge" hidden aria-label="主公">主</span>
           <span class="rebel-badge" id="playerRebelBadge" hidden aria-label="反贼">反</span>
+          <span class="loyalist-badge" id="playerLoyalistBadge" hidden aria-label="忠臣">忠</span>
           <div class="camp-ribbon" id="playerRibbon">蜀</div>
           <div class="hero-head">
             <div>
@@ -337,6 +392,16 @@
           </div>
           <div class="target-card-choices pending-prompt-panel__choices" id="targetCardChoices" aria-live="polite">
             <span class="mini-card">先选择一个区域，再点具体目标牌</span>
+          </div>
+        </div>
+        <!-- v12 H6: identity3 单目标牌/主动技 座席点选模式 — 选中手牌 (杀/
+             决斗/拆/顺/火攻/乐/兵/借刀/桃/无中) 或激将/离间等主动技后, 场上
+             合法座席英雄卡加 .is-target-selectable 高亮, 点击对应英雄卡完成
+             目标指定 (无独立候选列表, 仅提示 + 取消)。 -->
+        <div class="seat-target-mode-panel pending-prompt-panel" id="seatTargetModePanel" hidden>
+          <span class="pending-prompt-panel__hint" id="seatTargetModeHint">选择目标：点击场上高亮的角色</span>
+          <div class="pending-prompt-panel__actions">
+            <button class="btn small" id="seatTargetCancelBtn">取消</button>
           </div>
         </div>
         <!-- v10 V7: 升级为 pending-prompt-panel 卷轴风. -->
@@ -533,6 +598,17 @@
           <div class="duel-response-choices pending-prompt-panel__choices" id="duelResponseChoices" aria-live="polite"></div>
           <div class="duel-response-actions pending-prompt-panel__actions">
             <button class="btn small" id="duelResponseDeclineBtn">不出【杀】</button>
+          </div>
+        </div>
+        <!-- v12 H6/H7: 激将 (jijiang-aid, 代打【杀】) / 护驾 (hujia-aid, 代打
+             【闪】) 求助响应面板 — AI 主公打不出所需牌时向玩家 (同势力座席)
+             求助。两个 kind 复用同一 DOM (与鬼道复用鬼才面板同例)，文案按
+             kind 动态切换；1v1 中主公没有同势力队友，全部路径为 no-op。 -->
+        <div class="lord-aid-panel pending-prompt-panel" id="lordAidPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="lordAidHint">主公发动求助，是否代打？</span>
+          <div class="lord-aid-choices pending-prompt-panel__choices" id="lordAidChoices" aria-live="polite"></div>
+          <div class="lord-aid-actions pending-prompt-panel__actions">
+            <button class="btn small" id="lordAidDeclineBtn">不响应</button>
           </div>
         </div>
     </section>

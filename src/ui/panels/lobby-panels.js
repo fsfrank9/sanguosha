@@ -182,10 +182,29 @@
           return '<button class="mini-card skill-button' + statusClass + '" data-skill-id="' + escapeHtml(skill.id) + '"' + dataAttrs + ' ' + (active ? '' : 'disabled') + ' title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
         }
 
+        // v12 H6: 黄天 (张角主公技) — 技能挂在张角身上, 但由其他群势力座席
+        // 发动 (LORD_WIDE_SKILLS 网关, 见 game-engine.js useSkill)。发动者
+        // 自己的 state.skills 里没有这条, 正常按 state.skills 渲染永远不会
+        // 出现按钮, 需要额外判定后注入合成技能项。条件: identity3 + 玩家是
+        // 群势力 + 场上存在另一名持有 huangtian 的主公。
+        function huangtianButtonAvailable(game, state) {
+          if (!game || game.mode !== 'identity3' || !state || state.camp !== '群' || !Engine.seatList) return false;
+          return Engine.seatList(game).some(function (seat) {
+            var seatState = game[seat];
+            return seatState && seatState !== state && seatState.hp > 0
+              && game.roles && game.roles[seat] === '主公'
+              && (seatState.skills || []).some(function (sk) { return sk && sk.id === 'huangtian'; });
+          });
+        }
+
         function renderPlayerSkillBar(ctx) {
           if (!els.playerSkillBar) return;
           var state = ctx.state;
-          els.playerSkillBar.innerHTML = (state.skills || []).map(function (skill) {
+          var skillList = (state.skills || []).slice();
+          if (huangtianButtonAvailable(ctx.game, state)) {
+            skillList.push({ id: 'huangtian', name: '黄天', desc: '主公技：可将一张【闪】或【闪电】交给主公张角（每回合限一次）。', lord: true, status: 'implemented' });
+          }
+          els.playerSkillBar.innerHTML = skillList.map(function (skill) {
             return skillButtonHtml(skill, state, ctx.game, ctx.enemyThinking);
           }).join('') || '<span class="mini-card">无技能</span>';
         }
