@@ -82,6 +82,9 @@
         options = options || {};
         var self = game[actor];
         var targetActor = normalizeSingleTarget(game, actor, options);
+        // v12 G2 修复: 场上无存活对手时 defaultHostileTarget 返回 undefined —
+        // 优雅拒绝而非 game[undefined] 崩溃 (防御深层重入/收官竞态)。
+        if (!targetActor || !game[targetActor]) return fail('没有合法的【杀】目标。');
         var target = game[targetActor];
         var targetProtection = cardTargetProtection(game, actor, targetActor, card, '杀');
         if (targetProtection) return fail(targetProtection.message);

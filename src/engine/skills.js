@@ -1465,7 +1465,9 @@
           // 换杀期望值普遍为负, 不启用)。虚拟杀若为玩家开出闪响应窗口,
           // 挂 prepareResume 交由选择排空后续跑回合。
           var foe = opponent(actor);
-          if (game[foe] && game[foe].hp <= 1) {
+          // v12 G2 修复: hp <= 1 会把已死 (hp 0) 对手也算进来 — 收紧为恰好
+          // 1 血 (存活) 才抢斩。
+          if (game[foe] && game[foe].hp === 1) {
             applyShensuOption(game, actor, 1);
             if (game.pendingChoice) {
               if (!game.pauseState) game.pauseState = {};
