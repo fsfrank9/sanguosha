@@ -8,6 +8,7 @@
       import { createDamageDyingRuntime } from './damage-dying.js';
       import { createResponseRuntime } from './response.js';
       import { createTricksRuntime } from './tricks.js';
+      import { createShaFlowRuntime } from './sha-flow.js';
       import { createEquipmentRuntime } from './equipment.js';
       import { createJudgeAreaRuntime } from './judge-area.js';
       import { installStandardSkillHandlers, PLAY_PHASE_ACTIVE_SKILLS } from './skills.js';
@@ -119,11 +120,6 @@
         var state = game[actor];
         if (!state || !state.skillPreferences) return null;
         return state.skillPreferences[skillId] || null;
-      }
-
-      function isArmorIgnoredBySha(game, sourceActor, card) {
-        var source = game[sourceActor];
-        return !!(source && isShaCard(card) && hasEquipmentEffect(source, 'ignoreArmorOnSha'));
       }
 
       function log(game, text) {
@@ -290,224 +286,6 @@
       // v11 B1: 装备穿/卸/失去时机与武器特效 (麒麟/寒冰/雌雄) 已迁往
       // ./equipment.js (见下方 EquipmentRuntime 装配)。
 
-      // v7 PR-9: 过河拆桥 1V1 — gltjk card__scroll.md：
-      //   "你选择一项：1.弃置目标角色的装备区里的一张牌；2.观看目标角色的手牌
-      //    并弃置其中一张牌。"
-      // 调用方可通过 options.targetZone ('equipment' | 'hand') 直接指定（向后
-      // 兼容老 UI）；'judge' 在 1V1 不合法。无显式选择时按 skillPreferences.guohe
-      // (auto / ask / decline) 决定 — auto = 装备优先 → 手牌；ask = pendingChoice
-      // 'guohe-1v1-pick' 暴露对手装备列表 + 手牌内容（spec: 选项 2 是 "观看
-      // 目标角色的手牌并弃置其中一张"）。
-      function resolveGuohe1v1(game, sourceActor, targetActor, options) {
-        var target = game[targetActor];
-        if (!target) return fail('未知角色。');
-        var requestedZone = options && options.targetZone;
-        if (requestedZone === 'judge') {
-          return fail('1V1【过河拆桥】不能弃置判定区。');
-        }
-        if (requestedZone === 'equipment' || requestedZone === 'hand') {
-          return executeGuohe1v1Pick(game, sourceActor, targetActor, requestedZone, options && options.targetCardId);
-        }
-        var sourceState = game[sourceActor];
-        var pref = (sourceState && sourceState.skillPreferences && sourceState.skillPreferences.guohe)
-          || (sourceActor === 'player' ? 'ask' : 'auto');
-        if (pref === 'decline') {
-          // spec 没说可放弃，但保留这个 toggle 以便测试 / future 扩展
-          log(game, actorName(game, sourceActor) + '放弃【过河拆桥】结算。');
-          return success('过河拆桥已取消。');
-        }
-        if (pref === 'ask') {
-          setPendingChoice(game, {
-            kind: 'guohe-1v1-pick',
-            actor: sourceActor,
-            target: targetActor,
-            equipment: equipmentList(target).map(function (e) {
-              return { slot: e.slot, cardId: e.card.id, name: e.card.name, suit: e.card.suit, rank: e.card.rank };
-            }),
-            hand: target.hand.map(function (c) {
-              return { cardId: c.id, name: c.name, suit: c.suit, color: c.color, rank: c.rank };
-            })
-          });
-          return success('【过河拆桥】等待发动者选择…');
-        }
-        // v8 PR-D2: 'auto' → 装备优先, 按 slot 影响排 (weapon > armor >
-        // horsePlus > horseMinus). 武器影响进攻最大, 防具次之, 马最末.
-        // 无装备时弃手牌, 手牌为空才完全无效。手牌信息对 source 是隐藏的,
-        // 所以 hand[0] 随机选可接受。
-        var equips = equipmentList(target);
-        if (equips.length) {
-          var slotPriority = { weapon: 1, armor: 2, horsePlus: 3, horseMinus: 4 };
-          var sortedEquips = equips.slice().sort(function (a, b) {
-            return (slotPriority[a.slot] || 9) - (slotPriority[b.slot] || 9);
-          });
-          return executeGuohe1v1Pick(game, sourceActor, targetActor, 'equipment', sortedEquips[0].card.id);
-        }
-        if (target.hand.length) {
-          return executeGuohe1v1Pick(game, sourceActor, targetActor, 'hand', target.hand[0].id);
-        }
-        return success('过河拆桥无效果（对方两区均空）。');
-      }
-
-      function executeGuohe1v1Pick(game, sourceActor, targetActor, zone, cardId) {
-        var info = removeTargetZoneCard(game, targetActor, zone, cardId);
-        if (!info || !info.card) {
-          return fail('指定牌不存在或已被移除。');
-        }
-        discardCard(game, info.card);
-        log(game, actorName(game, sourceActor) + '使用【过河拆桥】，弃置了' + actorName(game, targetActor) + (zone === 'equipment' ? '装备区' : '手牌') + '的【' + info.card.name + '】。');
-        return success('弃置对方一张牌。');
-      }
-
-      function resolveGuohe1v1PickChoice(game, pending, decision) {
-        var sourceActor = pending.actor;
-        var targetActor = pending.target;
-        var zone = decision && decision.zone;
-        var cardId = decision && decision.cardId;
-        if (zone !== 'equipment' && zone !== 'hand') {
-          setPendingChoice(game, pending);
-          return fail('请选择 equipment 或 hand。');
-        }
-        if (!cardId) {
-          setPendingChoice(game, pending);
-          return fail('请通过 cardId 指定具体牌。');
-        }
-        var result = executeGuohe1v1Pick(game, sourceActor, targetActor, zone, cardId);
-        if (!result.ok) {
-          setPendingChoice(game, pending);
-          return result;
-        }
-        return result;
-      }
-
-      // v7 PR-7: 五谷丰登 — 顺序选牌循环。每个 picker：pool 仅余 1 张时强制
-      // 取走（无可选项）；多张时按 skillPreferences.wugu 决定 auto/ask。
-      // 暂停时 pauseState.wugu 保存 sourceActor / wuguCard / pool / order /
-      // idx / options，由 resolveWuguPickChoice 续算。
-      function processWuguPick(game, sourceActor, wuguCard, pool, order, idx, options) {
-        // H1b-2: 逐目标无懈驱动 — 每名 picker 选牌前先开无懈窗口 (无懈只抵消
-        // 「对一个目标」的效果, 五谷有 2 名目标各自可被无懈)。具体逻辑见
-        // advanceWuguTargets / wuguPickForCurrent (定义在无懈续延区附近)。
-        return advanceWuguTargets(game, {
-          sourceActor: sourceActor,
-          wuguCardId: wuguCard && wuguCard.id,
-          pool: pool,
-          order: order,
-          idx: idx,
-          options: options
-        });
-      }
-
-      function resolveWuguPickChoice(game, pending, decision) {
-        var saved = game.pauseState && game.pauseState.wugu;
-        if (!saved) return fail('找不到【五谷丰登】的暂停状态。');
-        var picker = pending.actor;
-        var cardId = decision && decision.cardId;
-        if (!cardId) {
-          setPendingChoice(game, pending);
-          return fail('请从亮出的牌中选择一张（用 cardId 指定）。');
-        }
-        var pool = saved.pool;
-        var poolIdx = pool.findIndex(function (c) { return c.id === cardId; });
-        if (poolIdx < 0) {
-          setPendingChoice(game, pending);
-          return fail('该牌不在【五谷丰登】的亮出池中。');
-        }
-        var picked = pool.splice(poolIdx, 1)[0];  // pool 是在途池, 不是区域
-        putCard(game, picked, { zone: 'hand', actor: picker });
-        log(game, actorName(game, picker) + '从【五谷丰登】选择获得【' + picked.name + '】。');
-        // H1b-2: 该 picker 选完 → idx+1 回到逐目标驱动 (下一名先开无懈窗口),
-        // pool 引用沿用 (累计 splice)。
-        game.pauseState.wugu = null;
-        return advanceWuguTargets(game, {
-          sourceActor: saved.sourceActor,
-          wuguCardId: saved.wuguCardId,
-          pool: pool,
-          order: saved.order,
-          idx: saved.idx + 1,
-          options: saved.options
-        });
-      }
-
-      // v7 PR-5: 借刀杀人 — 两次合法性检测中的第二次（An 决定是否用杀时）。
-      // 在 1v1 中 An = opponent，Bn = source。 流程:
-      //   1) 若 opponent 手牌没 杀 → 强制交武器 (transferWeaponToSource);
-      //   2) 若 opponent 有 杀 但当下 source 已经不是合法目标（spec 第二次检测
-      //      —— 比如 借刀 期间双方距离改变 / 装备改变） → 交武器;
-      //   3) opponent 决定 use / decline；'auto'(AI 默认) = 直接 use；
-      //      'ask' (player 默认) = pendingChoice 'jiedao-decision'.
-      function resolveJiedaoDecision(game, sourceActor, opponentActor, jiedaoCard, options) {
-        var opponentState = game[opponentActor];
-        if (!opponentState || !opponentState.equipment.weapon) {
-          return success('【借刀杀人】无效果（目标无武器）。');
-        }
-        var hasSha = opponentState.hand.some(function (c) {
-          return c && (c.type === 'sha' || c.type === 'fire_sha' || c.type === 'thunder_sha');
-        });
-        var canHit = canReachWithSha(game, opponentActor, sourceActor)
-          && !cardTargetProtection(game, opponentActor, sourceActor, { type: 'sha', color: 'black', name: '杀' }, '杀');
-        if (!hasSha || !canHit) {
-          if (!hasSha) {
-            log(game, actorName(game, opponentActor) + '没有【杀】可用，交出武器。');
-          } else {
-            log(game, actorName(game, opponentActor) + '无法对' + actorName(game, sourceActor) + '使用【杀】，交出武器。');
-          }
-          return transferWeaponJiedao(game, sourceActor, opponentActor);
-        }
-        var pref = (opponentState.skillPreferences && opponentState.skillPreferences.jiedao)
-          || (opponentActor === 'player' ? 'ask' : 'auto');
-        if (pref === 'comply') pref = 'auto'; // synonym
-        if (pref === 'ask') {
-          setPendingChoice(game, {
-            kind: 'jiedao-decision',
-            actor: opponentActor,
-            sourceActor: sourceActor
-          });
-          return success('【借刀杀人】等待目标决定…');
-        }
-        // 'auto' → fire sha.
-        return jiedaoFireOpponentSha(game, sourceActor, opponentActor);
-      }
-
-      function jiedaoFireOpponentSha(game, sourceActor, opponentActor) {
-        var opponentState = game[opponentActor];
-        var borrowedSha = removeFirstCardOfType(opponentState, 'sha')
-          || removeFirstCardOfType(opponentState, 'fire_sha')
-          || removeFirstCardOfType(opponentState, 'thunder_sha');
-        if (!borrowedSha) {
-          return transferWeaponJiedao(game, sourceActor, opponentActor);
-        }
-        log(game, actorName(game, opponentActor) + '被【借刀杀人】驱使使用【' + borrowedSha.name + '】。');
-        var shaResult = playSha(game, opponentActor, borrowedSha);
-        if (!shaResult || !shaResult.ok) {
-          // Second legality check failed at playSha entry (target protection / distance
-          // changed since canPlayCard). Return sha to opponent's hand and transfer weapon.
-          putCard(game, borrowedSha, { zone: 'hand', actor: opponentActor });
-          log(game, '【杀】不再合法（second legality check）；交出武器。');
-          return transferWeaponJiedao(game, sourceActor, opponentActor);
-        }
-        return shaResult;
-      }
-
-      function transferWeaponJiedao(game, sourceActor, opponentActor) {
-        var opponentState = game[opponentActor];
-        var weapon = opponentState.equipment && opponentState.equipment.weapon;
-        if (!weapon) return success('【借刀杀人】无效果（目标无武器）。');
-        moveCard(game, weapon, { zone: 'equipment', actor: opponentActor, slot: 'weapon' }, { zone: 'hand', actor: sourceActor });
-        log(game, actorName(game, sourceActor) + '因【借刀杀人】获得【' + weapon.name + '】，置入手牌。');
-        return success('借刀杀人获得武器。');
-      }
-
-      function resolveJiedaoDecisionChoice(game, pending, decision) {
-        var sourceActor = pending.sourceActor;
-        var opponentActor = pending.actor;
-        if (!game[sourceActor] || !game[opponentActor]) return fail('未知角色。');
-        if (decision && (decision.decline || decision.fire === false)) {
-          log(game, actorName(game, opponentActor) + '选择不出【杀】，交出武器。');
-          return transferWeaponJiedao(game, sourceActor, opponentActor);
-        }
-        return jiedaoFireOpponentSha(game, sourceActor, opponentActor);
-      }
-
       function resumePlayShaAfterCixiong(game) {
         if (game.pauseState && game.pauseState.playSha) {
           var saved = game.pauseState.playSha;
@@ -574,7 +352,7 @@
         applyEquipmentDamageModifiers: function (g, ctx) { return applyEquipmentDamageModifiers(g, ctx); },
         // v11 C1: 救援 — 濒死路径同样适用 (桃/急救视为桃)。
         taoRecoverBonus: function (g, u, t) { return taoRecoverBonus(g, u, t); },
-        isArmorIgnoredBySha: isArmorIgnoredBySha
+        isArmorIgnoredBySha: function (g, a, c) { return isArmorIgnoredBySha(g, a, c); }
       });
       var damage = DamageDyingRuntime.damage;
       var enterDying = DamageDyingRuntime.enterDying;
@@ -609,20 +387,6 @@
         if (hasSkill(state, 'longdan') && isShaCard(card)) return { via: '龙胆' };
         if (hasSkill(state, 'qingguo') && card.color === 'black') return { via: '倾国' };
         return null;
-      }
-
-      // v9 PR-E26: 枚举玩家所有可作【闪】响应的手牌 (真闪 + 转化候选), 供
-      // shan-response 面板列出让玩家选用哪张. 引擎返回数据, UI 负责格式化.
-      function listShanResponseOptions(state) {
-        var opts = [];
-        (state.hand || []).forEach(function (card) {
-          if (!card) return;
-          var opt = shanOptionForCard(state, card.id);
-          if (opt) {
-            opts.push({ cardId: card.id, via: opt.via, name: card.name, suit: card.suit, rank: card.rank });
-          }
-        });
-        return opts;
       }
 
       // v10 V6: 判定一张牌能否当【杀】响应 — 真【杀】 / 龙胆(闪→杀) /
@@ -837,12 +601,50 @@
         resolveJiedaoDecision: function (g, s, o, c, op) { return resolveJiedaoDecision(g, s, o, c, op); },
         scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); },
         // v11 D1 (批次 33): AI 无懈期望值 — ai 域后置装配, 包装注入
+        // v12 F5: 锦囊结算函数迁入所需能力 — 杀链域后置装配, 经闭包晚绑定
+        tryBaguaDodge: function (g, t, i) { return tryBaguaDodge(g, t, i); },
+        isArmorIgnoredBySha: function (g, a, c) { return isArmorIgnoredBySha(g, a, c); },
+        listShanResponseOptions: function (st) { return listShanResponseOptions(st); },
+        hasShanResponseAvailable: function (st) { return hasShanResponseAvailable(st); },
+        playSha: function (g, a, c, o) { return playSha(g, a, c, o); },
+        shaOptionForCard: shaOptionForCard,
+        listShaResponseOptions: listShaResponseOptions,
+        findResponseCard: findResponseCard,
+        consumeResponse: consumeResponse,
+        cardTargetProtection: cardTargetProtection,
+        getTargetZoneCards: getTargetZoneCards,
+        removeOwnCardFromAnyZone: removeOwnCardFromAnyZone,
+        moveCard: moveCard,
+        takeCard: takeCard,
+        equipmentList: equipmentList,
+        hasSkill: hasSkill,
+        canReachWithSha: canReachWithSha,
+        hasEquipmentEffect: hasEquipmentEffect,
+        hasShaResponseAvailable: hasShaResponseAvailable,
+        randomHandIndex: randomHandIndex,
+        removeFirstCardOfType: removeFirstCardOfType,
         aiShouldUseWuxie: function (g, r, ch) { return aiShouldUseWuxie(g, r, ch); }
       });
       var registerWuxieContinuation = TricksRuntime.registerWuxieContinuation;
       var listWuxieOptions = TricksRuntime.listWuxieOptions;
       var hasWuxieResponseAvailable = TricksRuntime.hasWuxieResponseAvailable;
       var checkWuxieAndContinue = TricksRuntime.checkWuxieAndContinue;
+      var playDuel = TricksRuntime.playDuel;
+      var advanceDuelChain = TricksRuntime.advanceDuelChain;
+      var resolveDuelResponseChoice = TricksRuntime.resolveDuelResponseChoice;
+      var playAOE = TricksRuntime.playAOE;
+      var resolveWanjianResponseChoice = TricksRuntime.resolveWanjianResponseChoice;
+      var peekHuogongReveal = TricksRuntime.peekHuogongReveal;
+      var getHuogongChoice = TricksRuntime.getHuogongChoice;
+      var resolveJiedaoDecision = TricksRuntime.resolveJiedaoDecision;
+      var resolveJiedaoDecisionChoice = TricksRuntime.resolveJiedaoDecisionChoice;
+      var jiedaoFireOpponentSha = TricksRuntime.jiedaoFireOpponentSha;
+      var resolveGuohe1v1 = TricksRuntime.resolveGuohe1v1;
+      var resolveGuohe1v1PickChoice = TricksRuntime.resolveGuohe1v1PickChoice;
+      var resolveWuguPickChoice = TricksRuntime.resolveWuguPickChoice;
+      var processWuguPick = TricksRuntime.processWuguPick;
+      var finishWugu = TricksRuntime.finishWugu;
+      var duelShaRequired = TricksRuntime.duelShaRequired;
       var advanceWuxieChain = TricksRuntime.advanceWuxieChain;
       var settleWuxieChain = TricksRuntime.settleWuxieChain;
       var advanceTaoyuanTargets = TricksRuntime.advanceTaoyuanTargets;
@@ -884,6 +686,53 @@
       var resolveCixiongChoose = EquipmentRuntime.resolveCixiongChoose;
       var triggerYinyueQiang = EquipmentRuntime.triggerYinyueQiang;
       var resolveYinyueResponseChoice = EquipmentRuntime.resolveYinyueResponseChoice;
+      // v12 F5: 杀结算链域 (playSha → 闪响应 → 八卦/贯石/雌雄 收尾) 整体迁往
+      // ./sha-flow.js。装配于 equipment 回绑之后; scoreCardForAI 晚绑定包装
+      // (AIRuntime 后置), 其余 deps 此时均已就绪。直调面回绑同名 var,
+      // registerResponseKind 注册行与 PLAY_HANDLERS/导出表零文本改动。
+      var ShaFlowRuntime = createShaFlowRuntime({
+        log: log,
+        fail: fail,
+        success: success,
+        damage: damage,
+        discardCard: discardCard,
+        drawCards: drawCards,
+        moveCard: moveCard,
+        removeCardFromHand: removeCardFromHand,
+        removeOwnCardFromAnyZone: removeOwnCardFromAnyZone,
+        consumeResponse: consumeResponse,
+        findResponseCard: findResponseCard,
+        requestPlayerResponse: requestPlayerResponse,
+        setPendingChoice: setPendingChoice,
+        cardTargetProtection: cardTargetProtection,
+        applyCixiongOnDesignate: applyCixiongOnDesignate,
+        applyWeaponHitEffects: applyWeaponHitEffects,
+        restoreZhuqueIdentity: restoreZhuqueIdentity,
+        physicalCardOf: physicalCardOf,
+        markHandOrigin: markHandOrigin,
+        // judge-area 域在杀链之后装配 — 经闭包晚绑定 (八卦/贯石判定运行时才用)
+        judge: function (g, a, r, o) { return judge(g, a, r, o); },
+        resolveJudgementCard: function (g, a, st, r, c) { return resolveJudgementCard(g, a, st, r, c); },
+        skillRegistry: skillRegistry,
+        scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); },
+        equipmentList: equipmentList,
+        removeFirstCardOfType: removeFirstCardOfType,
+        shanOptionForCard: shanOptionForCard
+      });
+      var playSha = ShaFlowRuntime.playSha;
+      var continueShaAfterCixiong = ShaFlowRuntime.continueShaAfterCixiong;
+      var resolveShaAfterResponse = ShaFlowRuntime.resolveShaAfterResponse;
+      var tryBaguaDodge = ShaFlowRuntime.tryBaguaDodge;
+      var listShanResponseOptions = ShaFlowRuntime.listShanResponseOptions;
+      var hasShanResponseAvailable = ShaFlowRuntime.hasShanResponseAvailable;
+      var shanRequiredAgainstSha = ShaFlowRuntime.shanRequiredAgainstSha;
+      var isArmorIgnoredBySha = ShaFlowRuntime.isArmorIgnoredBySha;
+      var resolveShanResponseChoice = ShaFlowRuntime.resolveShanResponseChoice;
+      var resolveGuanshiDiscardChoice = ShaFlowRuntime.resolveGuanshiDiscardChoice;
+      var applyGuanshiForcedHit = ShaFlowRuntime.applyGuanshiForcedHit;
+      var defaultHostileTarget = ShaFlowRuntime.defaultHostileTarget;
+      var normalizeSingleTarget = ShaFlowRuntime.normalizeSingleTarget;
+
 
       // v11 B1: 银月枪触发与响应已迁往 ./equipment.js (见 EquipmentRuntime 装配)。
 
@@ -1240,109 +1089,12 @@
         return success('可以使用。');
       }
 
-      function defaultHostileTarget(game, actor) {
-        var candidates = aliveSeats(game).filter(function (seat) { return seat !== actor; });
-        return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : candidates[0];
-      }
-
-      function normalizeSingleTarget(game, actor, options) {
-        var requested = options && (options.target || (options.targets && options.targets[0]));
-        var targetActor = requested || defaultHostileTarget(game, actor);
-        return targetActor;
-      }
-
       function legalTargetsForCard(game, actor, card) {
         return aliveSeats(game).filter(function (seat) {
           if (seat === actor) return card && (card.type === 'tao' || card.type === 'wuzhong');
           if (isShaCard(card)) return canReachWithSha(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
           return true;
         });
-      }
-
-      function playSha(game, actor, card, options) {
-        options = options || {};
-        var self = game[actor];
-        var targetActor = normalizeSingleTarget(game, actor, options);
-        var target = game[targetActor];
-        var targetProtection = cardTargetProtection(game, actor, targetActor, card, '杀');
-        if (targetProtection) return fail(targetProtection.message);
-        if (!canReachWithSha(game, actor, targetActor)) return fail('距离不足，当前武器范围无法使用【杀】。');
-        self.usedSha = true;
-        self.usedOrRespondedSha = true;
-        var amount = 1 + (self.shaBonus || 0);
-        self.shaBonus = 0;
-        // v8 PR-B3: 朱雀羽扇 — gltjk card__equipment.md "你可以将一张普通
-        // 【杀】当火【杀】使用; 你可以将视为使用【杀】改为视为使用火【杀】"。
-        // 现处理: 装备朱雀 + 普通杀 (card.type === 'sha') 且
-        // skillPreferences.zhuque !== 'decline' → 转化为 火杀 (mutate type
-        // 让 damage() 走 fire nature 路径)。已是 fire_sha / thunder_sha 不
-        // 重复转。card-as 虚拟杀 (zhangba / wusheng / longdan 等的 virtual)
-        // 也走此路径因为它们 card.type === 'sha'。
-        if (hasEquipmentEffect(self, 'zhuqueShaToFire') && card.type === 'sha'
-            && (!self.skillPreferences || self.skillPreferences.zhuque !== 'decline')) {
-          // M1: 朱雀转火杀是「本次使用」的视为效果, 不应永久改写物理牌身份。
-          // 记录转化前 type/name, 由 discardCard 在该牌离场时还原; 否则该【杀】
-          // 弃置 → 洗回牌堆后会变成永久【火杀】, 污染牌堆。虚拟杀 (武圣/龙胆/
-          // 丈八 的 wrapper) 走 physicalCard, wrapper 被丢弃, 不受影响。
-          card.zhuqueOriginalType = card.type;
-          card.zhuqueOriginalName = card.name;
-          card.type = 'fire_sha';
-          card.name = '火杀';
-          log(game, actorName(game, actor) + '发动【朱雀羽扇】，将【杀】转化为【火杀】。');
-        }
-        log(game, actorName(game, actor) + '对' + actorName(game, targetActor) + '使用【' + card.name + '】。');
-
-        // v7 PR-15: gltjk card__equipment.md 方天画戟 — "若你使用的【杀】是
-        // 最后的手牌，你使用此【杀】的额外目标数上限+2"。1v1 中只有一名对手
-        // (额定 1 + 额外 0)，即便额外目标数上限+2 也无人可选；本 PR 仅做触发
-        // 记录 (log + flags.fangtianBonus) 作为多人模式 / future trick 的占位。
-        // 判定: sha 已从手牌移除，hand.length === 0 即上一刻该 sha 是最后一张。
-        // 每次 playSha 进入时先清旧标记，避免上次结算残留。
-        self.flags = self.flags || {};
-        self.flags.fangtianBonus = false;
-        if (hasEquipmentEffect(self, 'fangtianLastHandBonus') && self.hand.length === 0) {
-          self.flags.fangtianBonus = true;
-          log(game, '【方天画戟】触发：' + actorName(game, actor) + '使用最后一张手牌【杀】，额外目标数上限 +2 (1v1 中无额外可选目标)。');
-        }
-
-        // v7 PR-4: 雌雄双股剑 fires at "指定目标后" (gltjk flow__use.md step 5).
-        // 在响应窗口之前结算；若需要 source/target 的 pendingChoice，则把
-        // sha 的剩余状态保存到 pauseState.playSha，由 resolveCixiong* 完成
-        // 后调用 continueShaAfterCixiong 接着 渲染 仁王/闪/八卦/贯石/青龙/伤害.
-        var cixiongResult = applyCixiongOnDesignate(game, actor, targetActor);
-        if (cixiongResult && cixiongResult.paused) {
-          if (!game.pauseState) game.pauseState = {};
-          game.pauseState.playSha = { actor: actor, targetActor: targetActor, card: card, amount: amount };
-          return success('【雌雄双股剑】结算中…');
-        }
-
-        // v8 PR-C2: 流离 (大乔) — 杀指定目标后 触发 hook (1v1 中目标候选恒空,
-        // 实际为 no-op; 多人模式扩展点)
-        SkillRuntime.runHook(skillRegistry, 'onShaTargeted', {
-          game: game,
-          sourceActor: actor,
-          targetActor: targetActor,
-          target: game[targetActor],
-          card: card
-        });
-
-        return continueShaAfterCixiong(game, actor, card, amount, targetActor);
-      }
-
-      // v9 PR-E25/E26: 非消耗式探测 — 玩家是否有【闪】可作响应 (真闪 + 转化候选).
-      function hasShanResponseAvailable(state) {
-        if (!state) return false;
-        return listShanResponseOptions(state).length > 0;
-      }
-
-      // v11 C1: 无双 — 锁定技。吕布的【杀】需目标依次两张【闪】; 决斗中
-      // 吕布的对手每轮需依次打出两张【杀】。
-      function shanRequiredAgainstSha(game, sourceActor) {
-        return hasSkill(game[sourceActor], 'wushuang') ? 2 : 1;
-      }
-
-      function duelShaRequired(game, responder) {
-        return hasSkill(game[opponent(responder)], 'wushuang') ? 2 : 1;
       }
 
       // v11 C1: 救援 — 主公技/锁定。其他吴势力角色对主公孙权使用【桃】
@@ -1358,513 +1110,16 @@
         return 1;
       }
 
-      function continueShaAfterCixiong(game, actor, card, amount, targetActor) {
-        var self = game[actor];
-        targetActor = targetActor || opponent(actor);
-        var target = game[targetActor];
-        var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
-
-        if (!ignoreArmor && card.color === 'black' && hasEquipmentEffect(target, 'blockBlackSha')) {
-          log(game, actorName(game, targetActor) + '的【仁王盾】抵消了黑色【杀】。');
-          discardCard(game, card);
-          return success('仁王盾抵消。');
-        }
-
-        var responseContext = {
-          game: game,
-          actor: actor,
-          targetActor: targetActor,
-          responseType: 'shan',
-          reason: '【杀】',
-          card: card,
-          responseLocked: false
-        };
-        var responseResults = SkillRuntime.runHook(skillRegistry, 'onNeedResponse', responseContext);
-        for (var responseIndex = 0; responseIndex < responseResults.length; responseIndex += 1) {
-          if (responseResults[responseIndex].result && responseResults[responseIndex].result.responseLocked) {
-            responseContext.responseLocked = true;
-          }
-        }
-
-        // v9 PR-E25: 玩家是【杀】目标 + skillPreferences.shanResponse==='ask' +
-        //   有【闪】可响应 → 暂停, 把"出不出闪"的决策交给玩家. 引擎默认 (无该
-        //   pref) 仍走自动响应, 保证旧测试同步行为不变.
-        // v10 V3: 走 requestPlayerResponse 框架 — pauseState.shaResponse + pendingChoice
-        // 的设置统一. resolve 在 RESPONSE_KIND_RESOLVERS['shan-response'] 注册.
-        if (targetActor === 'player' && !responseContext.responseLocked
-            && target.skillPreferences && target.skillPreferences.shanResponse === 'ask'
-            && hasShanResponseAvailable(target)) {
-          return requestPlayerResponse(game, {
-            kind: 'shan-response',
-            actor: 'player',
-            pauseKey: 'shaResponse',
-            // v11 C1: 无双 → shanRemaining=2, 首张闪后再开第二个响应窗口。
-            source: { actor: actor, targetActor: targetActor, card: card, amount: amount, shanRemaining: shanRequiredAgainstSha(game, actor) },
-            // v9 PR-E26: 列出所有可作【闪】的牌 (真闪 + 龙胆/倾国 转化), 玩家自选.
-            options: listShanResponseOptions(target),
-            meta: { sourceActor: actor, shaName: card.name },
-            logMessage: '等待' + actorName(game, 'player') + '决定是否打出【闪】。',
-            statusMessage: '等待玩家响应【杀】。'
-          });
-        }
-
-        var dodged = false;
-        if (!responseContext.responseLocked) {
-          // v11 C1: 无双 — 需依次两张【闪】(每一张都可由八卦判定替代)。
-          var shanNeeded = shanRequiredAgainstSha(game, actor);
-          if (shanNeeded > 1) {
-            log(game, '【无双】锁定：' + actorName(game, targetActor) + '需依次使用两张【闪】。');
-          }
-          dodged = true;
-          for (var shanIndex = 0; shanIndex < shanNeeded; shanIndex += 1) {
-            // v11 D2 (批次 34): AI 座席每张需求先试八卦判定 (免费闪机会),
-            // 判定失败仍可出真闪; 玩家 auto 座席保持旧顺序 (真闪优先)。
-            if (targetActor !== 'player' && tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
-            if (consumeResponse(game, targetActor, 'shan', '【杀】')) continue;
-            if (targetActor === 'player' && tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
-            dodged = false;
-            break;
-          }
-        }
-        return resolveShaAfterResponse(game, actor, card, amount, dodged, targetActor);
-      }
-
-      // H2: 八卦阵 — 需要打出【闪】时 (响应【杀】或【万箭齐发】) 若目标装备
-      // 八卦且未被无视, 进行判定; 红色视为打出【闪】。返回是否因此闪避; 无
-      // 八卦 / 被无视 → 返回 false 且无副作用。统一【杀】与【万箭齐发】两类
-      // 需闪场景, 此前【万箭齐发】缺失此兜底 (有八卦无闪的目标必中)。
-      function tryBaguaDodge(game, targetActor, ignoreArmor) {
-        var target = game[targetActor];
-        if (!target || !hasEquipmentEffect(target, 'baguaShanJudge') || ignoreArmor) return false;
-        var baguaJudge = judge(game, targetActor, '【八卦阵】');
-        var dodged = false;
-        if (baguaJudge && baguaJudge.color === 'red') {
-          log(game, actorName(game, targetActor) + '的【八卦阵】判定为红色，视为打出【闪】。');
-          dodged = true;
-        }
-        resolveJudgementCard(game, targetActor, target, '【八卦阵】', baguaJudge);
-        return dodged;
-      }
-
-      // M7 (审计二轮): 贯石斧 — spec "你可以弃置两张牌, 令此【杀】依然生效":
-      //   (a) "可以" → skillPreferences.guanshi 提供 decline / ask 开关
-      //       (此前无条件强制发动, 可能弃掉玩家的桃/无懈);
-      //   (b) "两张牌" 含装备区牌 (此前只取手牌最旧两张);
-      //   (c) ask 档 (默认 auto, 避免 UI 无对应面板时卡死) 经 pendingChoice
-      //       'guanshi-discard' 让玩家自选两张或放弃。
-      // 返回 result 表示贯石流程接管 (强制命中或暂停); null 表示不发动,
-      // 回到正常闪避收尾。
-      function applyGuanshiForcedHit(game, actor, targetActor, card, amount) {
-        var self = game[actor];
-        var handIds = (self.hand || []).map(function (c) { return c.id; });
-        var equipEntries = equipmentList(self);
-        if (handIds.length + equipEntries.length < 2) return null;
-        var pref = (self.skillPreferences && self.skillPreferences.guanshi) || 'auto';
-        if (pref === 'decline') {
-          log(game, actorName(game, actor) + '选择不发动【贯石斧】。');
-          return null;
-        }
-        if (pref === 'ask') {
-          if (!game.pauseState) game.pauseState = {};
-          game.pauseState.guanshi = { actor: actor, targetActor: targetActor, card: card, amount: amount };
-          setPendingChoice(game, {
-            kind: 'guanshi-discard',
-            actor: actor,
-            handIds: handIds,
-            equipment: equipEntries.map(function (e) {
-              return { slot: e.slot, cardId: e.card.id, name: e.card.name };
-            })
-          });
-          return success('等待' + actorName(game, actor) + '决定是否发动【贯石斧】。');
-        }
-        // v11 D2 (批次 34): AI 座席期望值门 — 两张牌换 1 点强制伤害, 只在
-        // 斩杀压力 (目标血线 <= 伤害+1) 或手牌充裕 (>=4, 成本可承受) 时
-        // 划算; 玩家 auto 座席保持旧行为 (无条件发动)。
-        if (actor !== 'player') {
-          var guanshiTarget = game[targetActor];
-          var killPressure = guanshiTarget && guanshiTarget.hp <= amount + 1;
-          if (!killPressure && handIds.length < 4) {
-            log(game, actorName(game, actor) + '保留手牌，不发动【贯石斧】。');
-            return null;
-          }
-        }
-        // auto: 弃 AI 评分最低的两张手牌; 手牌不足两张时用装备补足
-        // (坐骑 > 防具 > 武器, 尽量保留战力)。
-        var scoredHand = (self.hand || []).slice()
-          .map(function (c) { return { card: c, score: scoreCardForAI(game, actor, c) }; })
-          .sort(function (a, b) { return a.score - b.score; });
-        var costIds = scoredHand.slice(0, 2).map(function (e) { return e.card.id; });
-        if (costIds.length < 2) {
-          var slotOrder = { horsePlus: 1, horseMinus: 2, armor: 3, weapon: 4 };
-          var sortedEquips = equipEntries.slice().sort(function (a, b) {
-            return (slotOrder[a.slot] || 9) - (slotOrder[b.slot] || 9);
-          });
-          for (var si = 0; si < sortedEquips.length && costIds.length < 2; si += 1) {
-            costIds.push(sortedEquips[si].card.id);
-          }
-        }
-        return executeGuanshiForcedHit(game, actor, targetActor, card, amount, costIds);
-      }
-
-      function executeGuanshiForcedHit(game, actor, targetActor, card, amount, costIds) {
-        var self = game[actor];
-        var discardedNames = [];
-        for (var i = 0; i < costIds.length; i += 1) {
-          var costCard = removeOwnCardFromAnyZone(self, costIds[i], game);
-          if (costCard) {
-            discardCard(game, costCard);
-            discardedNames.push(costCard.name);
-          }
-        }
-        log(game, actorName(game, actor) + '发动【贯石斧】，弃置【' + discardedNames.join('】、【') + '】令【杀】强制命中。');
-        if (damage(game, targetActor, amount, actor, '【' + card.name + '】', card)) applyWeaponHitEffects(game, actor, targetActor);
-        return success('贯石斧强制命中。');
-      }
-
-      function resolveGuanshiDiscardChoice(game, pending, decision) {
-        var saved = game.pauseState && game.pauseState.guanshi;
-        if (!saved) return fail('找不到【贯石斧】的暂停状态。');
-        var actor = pending.actor;
-        if (decision && decision.decline) {
-          game.pauseState.guanshi = null;
-          log(game, actorName(game, actor) + '选择不发动【贯石斧】。');
-          log(game, actorName(game, saved.targetActor) + '闪避成功，没有受到伤害。');
-          discardCard(game, saved.card);
-          return success('目标闪避。');
-        }
-        var ids = (decision && decision.cardIds) || [];
-        var allowed = pending.handIds.concat(pending.equipment.map(function (e) { return e.cardId; }));
-        var unique = ids.filter(function (id, idx) { return ids.indexOf(id) === idx && allowed.indexOf(id) >= 0; });
-        if (unique.length !== 2) {
-          setPendingChoice(game, pending);
-          return fail('请选择两张要弃置的牌（手牌或装备），或 decline 放弃。');
-        }
-        game.pauseState.guanshi = null;
-        return executeGuanshiForcedHit(game, actor, saved.targetActor, saved.card, saved.amount, unique);
-      }
-
       registerResponseKind('guanshi-discard', resolveGuanshiDiscardChoice);
-
-      // v9 PR-E25: 【杀】响应窗口结束后的结算 (贯石/青龙/伤害). 从原
-      // continueShaAfterCixiong 拆出, 供同步路径 + shan-response 暂停恢复共用.
-      function resolveShaAfterResponse(game, actor, card, amount, dodged, targetActor) {
-        var self = game[actor];
-        targetActor = targetActor || opponent(actor);
-        var target = game[targetActor];
-        if (dodged) {
-          if (hasEquipmentEffect(self, 'guanshiForceHit')) {
-            var guanshiResult = applyGuanshiForcedHit(game, actor, targetActor, card, amount);
-            if (guanshiResult) return guanshiResult;
-          }
-          if (hasEquipmentEffect(self, 'qinglongChase')) {
-            var follow = removeFirstCardOfType(self, 'sha');
-            if (follow) {
-              log(game, actorName(game, actor) + '发动【青龙偃月刀】，继续使用一张【杀】。');
-              discardCard(game, card);
-              return playSha(game, actor, follow);
-            }
-          }
-          log(game, actorName(game, targetActor) + '闪避成功，没有受到伤害。');
-          discardCard(game, card);
-          return success('目标闪避。');
-        }
-
-        if (damage(game, targetActor, amount, actor, '【' + card.name + '】', card)) applyWeaponHitEffects(game, actor, targetActor);
-        return success(target.name + '受到攻击。');
-      }
-
-      // v9 PR-E25/E26: 玩家解决【闪】响应 pendingChoice.
-      //   decision.cardId — 指定用哪张牌当【闪】 (真闪 / 龙胆 / 倾国转化)
-      //   decision.use    — true 时不指定 cardId, 引擎自动取第一张 (兼容旧调用)
-      //   都没有 → 不出【闪】.
-      function resolveShanResponseChoice(game, pending, decision) {
-        var saved = game.pauseState && game.pauseState.shaResponse;
-        if (!saved) return fail('找不到【杀】响应的暂停状态。');
-        game.pauseState.shaResponse = null;
-        var actor = saved.actor;
-        var card = saved.card;
-        var amount = saved.amount;
-        var target = game.player;
-        var d = decision || {};
-        var shanRemaining = saved.shanRemaining || 1;
-        var dodged = false;
-        if (d.cardId) {
-          dodged = consumeResponse(game, 'player', 'shan', '【杀】', d.cardId);
-          if (!dodged) log(game, actorName(game, 'player') + '指定的牌无法当【闪】。');
-        } else if (d.use) {
-          dodged = consumeResponse(game, 'player', 'shan', '【杀】');
-          if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
-        } else {
-          log(game, actorName(game, 'player') + '选择不打出【闪】。');
-          // v11 C1: 放弃出闪 → 剩余每一张需求都须由八卦判定顶上才算抵消。
-          dodged = true;
-          for (var baguaIndex = 0; baguaIndex < shanRemaining; baguaIndex += 1) {
-            if (!tryBaguaDodge(game, 'player', isArmorIgnoredBySha(game, actor, card))) {
-              dodged = false;
-              break;
-            }
-          }
-          shanRemaining = 1; // 已按剩余需求整体判定完毕
-        }
-        // v11 C1: 无双 — 首张闪成功且仍有剩余需求 → 再开一个响应窗口。
-        if (dodged && shanRemaining > 1) {
-          if (hasShanResponseAvailable(game.player)) {
-            return requestPlayerResponse(game, {
-              kind: 'shan-response',
-              actor: 'player',
-              pauseKey: 'shaResponse',
-              source: { actor: actor, targetActor: saved.targetActor, card: card, amount: amount, shanRemaining: shanRemaining - 1 },
-              options: listShanResponseOptions(game.player),
-              meta: { sourceActor: actor, shaName: card.name },
-              logMessage: '【无双】：' + actorName(game, 'player') + '需再使用一张【闪】。',
-              statusMessage: '等待玩家响应【杀】(无双第二张)。'
-            });
-          }
-          // 无第二张可出 → 尝试八卦顶上, 否则未抵消。
-          dodged = tryBaguaDodge(game, 'player', isArmorIgnoredBySha(game, actor, card));
-        }
-        return resolveShaAfterResponse(game, actor, card, amount, dodged, saved.targetActor);
-      }
 
       // v10 V3: 注册到 response framework. UI 通过 resolvePendingChoice 或
       // resolveResponseChoice 调过来时, 此 fn 拿 pauseState.shaResponse + decision
       // 决定 dodged, 再走 resolveShaAfterResponse 共享后续结算.
       registerResponseKind('shan-response', resolveShanResponseChoice);
 
-      // v10 V6: 决斗 链状态机 — playDuel 启动, advanceDuelChain 推进.
-      //   pauseState.duelChain = { starterActor, currentResponder, reason }
-      //   每轮: currentResponder 出杀; 出不出 → 切换; 出不了 → 受 1 伤, 链结束.
-      //   玩家 (skillPreferences.shaDuelResponse='ask' + 有杀响应选项) 暂停;
-      //   AI / 默认 走 consumeResponse 自动消耗 (有 sha / 转化即用).
-      function playDuel(game, actor, card) {
-        discardCard(game, card);
-        log(game, actorName(game, actor) + '发起【决斗】。');
-        if (!game.pauseState) game.pauseState = {};
-        game.pauseState.duelChain = {
-          starterActor: actor,
-          currentResponder: opponent(actor),
-          reason: '【决斗】',
-          // L2: 保留决斗牌引用 — 奸雄可获得"造成伤害的牌" (决斗/南蛮/万箭/火攻)
-          card: card
-        };
-        return advanceDuelChain(game);
-      }
-
-      function advanceDuelChain(game) {
-        var chain = game.pauseState && game.pauseState.duelChain;
-        if (!chain) return fail('决斗链状态丢失。');
-        if (game.phase === 'gameover') {
-          game.pauseState.duelChain = null;
-          return success('决斗结算完成。');
-        }
-        var responder = chain.currentResponder;
-        var state = game[responder];
-        var hasSha = hasShaResponseAvailable(state);
-
-        // 玩家 ask + 有杀响应 → 暂停
-        if (responder === 'player'
-            && state.skillPreferences && state.skillPreferences.shaDuelResponse === 'ask'
-            && hasSha) {
-          return requestPlayerResponse(game, {
-            kind: 'sha-duel-response',
-            actor: 'player',
-            pauseKey: 'duelChain',
-            source: chain,
-            options: listShaResponseOptions(state),
-            meta: {
-              reason: chain.reason,
-              starterActor: chain.starterActor
-            },
-            logMessage: '等待' + actorName(game, 'player') + '决定是否打出【杀】响应' + chain.reason + '。',
-            statusMessage: '等待玩家响应【决斗】。'
-          });
-        }
-
-        // 非玩家 ask 路径: AI / 默认 — 走原 consumeResponse 自动消耗
-        // v11 C1: 无双 — 对手为吕布时每轮需依次打出两张【杀】。
-        var duelNeeded = duelShaRequired(game, responder);
-        var duelPaid = 0;
-        while (duelPaid < duelNeeded && consumeResponse(game, responder, 'sha', chain.reason)) {
-          duelPaid += 1;
-        }
-        if (duelPaid === duelNeeded) {
-          chain.currentResponder = opponent(responder);
-          return advanceDuelChain(game);
-        }
-        if (duelNeeded > 1) {
-          log(game, '【无双】锁定：' + actorName(game, responder) + '未能打出两张【杀】。');
-        }
-        // 无杀 → 受 1 伤, 链结束
-        var loser = responder;
-        game.pauseState.duelChain = null;
-        damage(game, loser, 1, opponent(loser), chain.reason, chain.card);
-        return success('决斗结算完成。');
-      }
-
-      // resolver — 玩家 sha-duel-response pendingChoice 决定.
-      function resolveDuelResponseChoice(game, pending, decision) {
-        var chain = game.pauseState && game.pauseState.duelChain;
-        if (!chain) return fail('找不到决斗响应的暂停状态。');
-
-        if (decision.cardId || decision.use) {
-          var consumed = consumeResponse(game, 'player', 'sha', chain.reason, decision.cardId || null);
-          if (!consumed) {
-            // 罕见: 指定的 cardId 无效或库中此牌已不可用 → 视为放弃
-            log(game, actorName(game, 'player') + '没有可打出的【杀】。');
-            var ploser = 'player';
-            game.pauseState.duelChain = null;
-            damage(game, ploser, 1, opponent(ploser), chain.reason, chain.card);
-            return success('决斗结算完成。');
-          }
-          // v11 C1: 无双 — 玩家每轮需依次两张【杀】; 首张后剩余 >0 则再询问。
-          if (chain.shaRemaining === undefined || chain.shaRemaining === null) {
-            chain.shaRemaining = duelShaRequired(game, 'player');
-          }
-          chain.shaRemaining -= 1;
-          if (chain.shaRemaining > 0) {
-            if (hasShaResponseAvailable(game.player)) {
-              log(game, '【无双】：' + actorName(game, 'player') + '需再打出一张【杀】。');
-              return advanceDuelChain(game);
-            }
-            log(game, '【无双】锁定：' + actorName(game, 'player') + '无法打出第二张【杀】。');
-            game.pauseState.duelChain = null;
-            damage(game, 'player', 1, opponent('player'), chain.reason, chain.card);
-            return success('决斗结算完成。');
-          }
-          chain.shaRemaining = null;
-          chain.currentResponder = opponent('player');
-          return advanceDuelChain(game);
-        }
-        // 玩家放弃出杀 → 受 1 伤
-        log(game, actorName(game, 'player') + '选择不打出【杀】响应' + chain.reason + '。');
-        game.pauseState.duelChain = null;
-        damage(game, 'player', 1, opponent('player'), chain.reason, chain.card);
-        return success('决斗结算完成。');
-      }
-
       registerResponseKind('sha-duel-response', resolveDuelResponseChoice);
 
-      function playAOE(game, actor, card, responseType, title) {
-        var targetActor = opponent(actor);
-        discardCard(game, card);
-        log(game, actorName(game, actor) + '使用【' + title + '】。');
-        // v10 V4: 万箭齐发 (responseType='shan') + 玩家为目标 + shanResponse=ask +
-        // 有闪可响应 → 暂停, 让玩家自选闪 / 不出. 引擎默认仍走自动响应.
-        if (responseType === 'shan' && targetActor === 'player') {
-          var aoeTarget = game.player;
-          if (aoeTarget.skillPreferences && aoeTarget.skillPreferences.shanResponse === 'ask'
-              && hasShanResponseAvailable(aoeTarget)) {
-            return requestPlayerResponse(game, {
-              kind: 'wanjian-response',
-              actor: 'player',
-              pauseKey: 'wanjianResponse',
-              source: { sourceActor: actor, title: title, card: card },
-              options: listShanResponseOptions(aoeTarget),
-              meta: { sourceActor: actor, sourceName: title },
-              logMessage: '等待' + actorName(game, 'player') + '决定是否打出【闪】响应【' + title + '】。',
-              statusMessage: '等待玩家响应【' + title + '】。'
-            });
-          }
-        }
-        // v11 D2 (批次 34): AI 座席先试八卦判定 (免费闪机会), 成功则省下
-        // 真闪应对后续威胁; 玩家 auto 座席保持旧顺序 (真闪优先)。
-        if (responseType === 'shan' && targetActor !== 'player'
-            && tryBaguaDodge(game, targetActor, false)) {
-          log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
-        } else if (consumeResponse(game, targetActor, responseType, '【' + title + '】')) {
-          log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
-        } else if (responseType === 'shan' && targetActor === 'player' && tryBaguaDodge(game, targetActor, false)) {
-          // H2: 【万箭齐发】需打出【闪】, 八卦阵 红判定可化解。
-          //      (【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦)
-          log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
-        } else {
-          // L2: 传 card — 奸雄可获得造成伤害的南蛮/万箭实体牌
-          damage(game, targetActor, 1, actor, '【' + title + '】', card);
-        }
-        return success(title + '结算完成。');
-      }
-
-      // v10 V4: 万箭齐发 闪响应 — 玩家 decision 决定 化解 / damage(1).
-      // saved.sourceActor 是万箭来源, saved.title 是显示文案.
-      function resolveWanjianResponseChoice(game, pending, decision) {
-        var saved = game.pauseState && game.pauseState.wanjianResponse;
-        if (!saved) return fail('找不到【万箭齐发】响应的暂停状态。');
-        game.pauseState.wanjianResponse = null;
-        var sourceActor = saved.sourceActor;
-        var title = saved.title || '万箭齐发';
-        var dodged = false;
-        if (decision.cardId) {
-          dodged = consumeResponse(game, 'player', 'shan', '【' + title + '】', decision.cardId);
-          if (!dodged) log(game, actorName(game, 'player') + '指定的牌无法当【闪】。');
-        } else if (decision.use) {
-          dodged = consumeResponse(game, 'player', 'shan', '【' + title + '】');
-          if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
-        } else {
-          log(game, actorName(game, 'player') + '选择不打出【闪】响应【' + title + '】。');
-        }
-        // H2: 玩家未以【闪】化解 (放弃 / 无闪 / 指定牌无效) → 八卦阵 红判定可化解。
-        if (!dodged && tryBaguaDodge(game, 'player', false)) {
-          dodged = true;
-        }
-        if (dodged) {
-          log(game, actorName(game, 'player') + '成功化解【' + title + '】。');
-        } else {
-          damage(game, 'player', 1, sourceActor, '【' + title + '】', saved.card);
-        }
-        return success(title + '响应完成。');
-      }
-
       registerResponseKind('wanjian-response', resolveWanjianResponseChoice);
-
-      // L1 (审计二轮): 火攻 "目标展示一张手牌" 是目标的选择, 此前恒取
-      // hand[0] (确定性泄露 + 目标无选择权)。现在: AI / 'auto' (默认) 目标用
-      // 游戏 RNG 随机挑一张并缓存 (pauseState.huogongReveal), 同一次结算内
-      // getHuogongChoice 预览 / playCard 校验 / 结算三处一致; 玩家目标可设
-      // skillPreferences.huogongShow='ask' 经 pendingChoice 'huogong-show'
-      // 自选 (默认 auto, 避免 UI 无对应面板时卡死)。
-      function peekHuogongReveal(game, targetActor) {
-        var targetState = game[targetActor];
-        if (!targetState || !targetState.hand || !targetState.hand.length) return null;
-        if (!game.pauseState) game.pauseState = {};
-        var cached = game.pauseState.huogongReveal;
-        if (cached && cached.targetActor === targetActor) {
-          var cachedCard = targetState.hand.find(function (c) { return c.id === cached.cardId; });
-          if (cachedCard) return cachedCard;
-        }
-        var pref = (targetState.skillPreferences && targetState.skillPreferences.huogongShow) || 'auto';
-        if (targetActor === 'player' && pref === 'ask') return null;
-        var picked = targetState.hand[randomHandIndex(game, targetState)];
-        game.pauseState.huogongReveal = { targetActor: targetActor, cardId: picked.id };
-        return picked;
-      }
-
-      function getHuogongChoice(game, actor) {
-        var self = game && game[actor];
-        var target = game && game[opponent(actor)];
-        if (!self || !target || !target.hand || !target.hand.length) {
-          return { ok: false, revealedCard: null, usableCostIds: [], unusableCostIds: [], usableCards: [], unusableCards: [], message: '目标没有手牌。' };
-        }
-        var revealed = peekHuogongReveal(game, opponent(actor));
-        if (!revealed) {
-          return { ok: false, pendingTargetChoice: true, revealedCard: null, usableCostIds: [], unusableCostIds: [], usableCards: [], unusableCards: [], message: '等待目标选择展示牌。' };
-        }
-        var usableCards = [];
-        var unusableCards = [];
-        self.hand.forEach(function (card) {
-          if (card.type === 'huogong') return;
-          if (card.suit === revealed.suit) usableCards.push(card);
-          else unusableCards.push(card);
-        });
-        return {
-          ok: true,
-          revealedCard: revealed,
-          revealedSuit: revealed.suit,
-          usableCards: usableCards,
-          unusableCards: unusableCards,
-          usableCostIds: usableCards.map(function (card) { return card.id; }),
-          unusableCostIds: unusableCards.map(function (card) { return card.id; })
-        };
-      }
 
       function playCard(game, actor, cardId, options) {
         var pendingGuard = pendingChoiceGuard(game);
@@ -2127,18 +1382,6 @@
 
       // v11 B1 第五步: 各锦囊 continuation / 桃园五谷逐目标推进 / 火攻结算
       // 已随框架迁入 ./tricks.js (见下方 TricksRuntime 装配)。
-
-      // 全部目标处理完 → 剩余亮出牌进弃牌堆。
-      function finishWugu(game, ctx) {
-        if (ctx.pool.length) {
-          ctx.pool.forEach(function (rem) {
-            discardCard(game, rem);
-            log(game, '【五谷丰登】剩余【' + rem.name + '】置入弃牌堆。');
-          });
-          ctx.pool.length = 0;
-        }
-        return success('五谷丰登结算完成。');
-      }
 
       function startTurn(game, actor) {
         var pendingGuard = pendingChoiceGuard(game);

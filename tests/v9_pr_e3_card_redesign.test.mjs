@@ -9,7 +9,9 @@ import { loadAllStyles } from './helpers/load-styles.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
 const css = loadAllStyles();
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v12 F6: 战场渲染域迁往 panels/board-panels.js — adapter 源按域拼接
+const adapter = fs.readFileSync(path.join(root, 'src/ui/panels/board-panels.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const cards = fs.readFileSync(path.join(stylesDir, 'cards.css'), 'utf8');
 
 const tests = [];

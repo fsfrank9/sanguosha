@@ -2,7 +2,7 @@
 
 纯 HTML/CSS/JavaScript 实现的三国杀 1v1。原生 ES 模块 + GitHub Pages 静态托管:`src/` 就是浏览器加载的源码本身,根 `index.html` 是手写的模块入口——没有打包步骤、没有 npm 运行时依赖。
 
-**当前版本 `v12-F1 收尾`**:技能域整体迁往 `skills.js`——33 个触发器 + 20 个技能 resolver/辅助共 1338 行 verbatim 迁移,game-engine 从 4009 行收敛到 2698 行,引擎经 deps 注入原语、SkillDomain 面回绑直调函数。承接 v12 修复批(修复 codex 批次的规则违规与虚报:据守翻面、烈弓/狂骨官方条件、神速/红颜撤下、风包 fixture 分包)。43 个已实现技能(8 个主动)和 71 名武将;1v1 行为有测试护航。牌移动统一走 `moveCard` 原语并由全局牌数守恒断言护航;AI 具备转化 lookahead 与无懈/闪响应期望值决策。
+**当前版本 `v12-F 收官`**:结构减重第二轮全部达线——F1 技能域整体迁往 `skills.js`(53 函数 1338 行),F5 牌结算链拆分(杀链 → 新 `sha-flow.js`,决斗/AOE/火攻/借刀/过河/五谷结算迁入 `tricks.js` 兑现其既定计划),F6 战场渲染域迁往 `panels/board-panels.js`。**game-engine 1941 行(验收 ≤2200 ✓),dom-adapter 1135 行(验收 ≤1200 ✓)**。43 个已实现技能(8 个主动)和 71 名武将;1v1 行为有测试护航。牌移动统一走 `moveCard` 原语并由全局牌数守恒断言护航;AI 具备转化 lookahead 与无懈/闪响应期望值决策。
 
 ## 运行
 
@@ -42,11 +42,11 @@ index.html            手写模块入口(无内联逻辑)
 src/
   main.js             两行 side-effect import
   engine/             游戏引擎:game-engine.js 装配主体 + 域模块
-                      (skills / judge-area / damage-dying / response / tricks / equipment / ai)
+                      (skills / sha-flow / tricks / judge-area / damage-dying / response / equipment / ai)
                       + runtime seam(card/state/skill/judgement/phases)
   ui/
     dom-adapter.js    DOM 适配层(渲染框架 + 面板注册表)
-    panels/           面板模块(lobby / response / prompt / mode 四簇)
+    panels/           面板模块(lobby / board / response / prompt / mode 五簇)
   data/               武将/技能/牌的结构化 catalog 与元数据
   styles/             CSS(main.css 为 @import 入口)
 tests/                行为测试 + 架构守护测试(零依赖直跑)
@@ -85,7 +85,7 @@ docs/
 
 路线图见 [`docs/plans/2026-07-05-sanguosha-v12-roadmap.md`](docs/plans/2026-07-05-sanguosha-v12-roadmap.md)。**如实进度**(修复批核对后):
 
-1. **F 结构减重:F1-F4 拆分项全部完成** — 技能域(注册表 + 53 个函数本体)、判定区、PLAY_HANDLERS 分发、大厅面板均已拆出;game-engine 2698 行 / dom-adapter 1405 行。原验收线 ≤2200/≤1200 因低估非技能域体量未达,是追加"牌结算链/渲染域"拆分批冲线还是修订验收线,待决策(见路线图 F 节)。
+1. **F 结构减重:收官,验收线双达标** — F1 技能域、F2 判定区、F3 PLAY_HANDLERS、F4 大厅面板、F5 牌结算链(杀链 sha-flow.js + 锦囊结算入 tricks.js)、F6 战场渲染域(board-panels.js)全部拆出;game-engine 1941 行(≤2200 ✓)/ dom-adapter 1135 行(≤1200 ✓)。
 2. **G 扩展包技能:首批 3 个落地**(据守/烈弓/狂骨,经修复批对齐官方规则);G0 风包 spec 独立 fixture 就位(5 将 6 技,官方页面爬取与 gid 核对待补);神速/红颜/天香待实现。
 3. **H 多人模式:引擎侧最小骨架** — 座次工具、距离环、濒死救援座次队列、【杀】显式目标、3 人身份胜负判定;响应链多人化、其余牌类目标选择、多座 UI、身份技激活均未开始。
 4. **I AI 进阶:未开始**。

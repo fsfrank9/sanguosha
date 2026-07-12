@@ -5,7 +5,9 @@ import { Engine } from './helpers/load-engine.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const heroesSrc = fs.readFileSync(path.join(root, 'src/data/heroes.js'), 'utf8');
-const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+// v12 F5: 杀链/锦囊结算域拆分至 sha-flow.js / tricks.js — 牌结算域源码按域拼接
+const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/engine/sha-flow.js'), 'utf8');
 const skillsSrc = fs.readFileSync(path.join(root, 'src/engine/skills.js'), 'utf8');
 
 function makeDaqiaoGame() {

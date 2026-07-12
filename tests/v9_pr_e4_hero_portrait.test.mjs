@@ -9,7 +9,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
 const css = loadAllStyles();
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v12 F6: 战场渲染域迁往 panels/board-panels.js — adapter 源按域拼接
+const adapter = fs.readFileSync(path.join(root, 'src/ui/panels/board-panels.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const heroCss = fs.readFileSync(path.join(stylesDir, 'hero.css'), 'utf8');
 const controlsCss = fs.readFileSync(path.join(stylesDir, 'controls.css'), 'utf8');
 

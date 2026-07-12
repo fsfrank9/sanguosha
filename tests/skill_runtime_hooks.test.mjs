@@ -5,6 +5,8 @@ import { SkillRuntime } from './helpers/load-engine.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const skillsSource = fs.readFileSync(path.join(root, 'src/engine/skills.js'), 'utf8');
+// v12 F5: 杀链域拆分 — playSha 链切片改读 sha-flow.js
+const shaFlowSource = fs.readFileSync(path.join(root, 'src/engine/sha-flow.js'), 'utf8');
 assert.ok(SkillRuntime, 'ES module should export SkillRuntime');
 
 function test(name, fn) {
@@ -113,7 +115,7 @@ test('game engine dispatches Jizhi through onCardUse hook seam', () => {
 test('game engine dispatches Yingzi through onDrawPhase hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const drawStart = source.indexOf('function performDrawPhase(game, actor)');
-  const drawEnd = source.indexOf('function isArmorIgnoredBySha(game, sourceActor, card)', drawStart);
+  const drawEnd = source.indexOf('function setSkillPreference', drawStart);
   assert.ok(drawStart >= 0 && drawEnd > drawStart, 'performDrawPhase source should be extractable');
   const performDrawPhaseSource = source.slice(drawStart, drawEnd);
 
@@ -126,7 +128,7 @@ test('game engine dispatches Yingzi through onDrawPhase hook seam', () => {
 test('game engine dispatches Tuxi through onDrawPhase hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const drawStart = source.indexOf('function performDrawPhase(game, actor)');
-  const drawEnd = source.indexOf('function isArmorIgnoredBySha(game, sourceActor, card)', drawStart);
+  const drawEnd = source.indexOf('function setSkillPreference', drawStart);
   assert.ok(drawStart >= 0 && drawEnd > drawStart, 'performDrawPhase source should be extractable');
   const performDrawPhaseSource = source.slice(drawStart, drawEnd);
 
@@ -164,7 +166,7 @@ test('game engine resolves trick distance checks through 1V1-spec-compliant path
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const canPlayStart = source.indexOf('function canPlayCard(game, actor, card)');
   // v12 F1: tieqi 迁往 skills.js — canPlayCard 切片终点改为其后继函数
-  const canPlayEnd = source.indexOf('function defaultHostileTarget', canPlayStart);
+  const canPlayEnd = source.indexOf('function legalTargetsForCard', canPlayStart);
   assert.ok(canPlayStart >= 0 && canPlayEnd > canPlayStart, 'canPlayCard source should be extractable');
   const canPlaySource = source.slice(canPlayStart, canPlayEnd);
 
@@ -175,13 +177,13 @@ test('game engine resolves trick distance checks through 1V1-spec-compliant path
 test('game engine dispatches Kongcheng through onCardTarget hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const canPlayStart = source.indexOf('function canPlayCard(game, actor, card)');
-  const canPlayEnd = source.indexOf('function playSha(game, actor, card, options)', canPlayStart);
-  const playShaStart = canPlayEnd;
-  const playShaEnd = source.indexOf('function playDuel(game, actor, card)', playShaStart);
+  const canPlayEnd = source.indexOf('function legalTargetsForCard', canPlayStart);
+  const playShaStart = shaFlowSource.indexOf('function playSha(game, actor, card, options)');
+  const playShaEnd = shaFlowSource.length;
   assert.ok(canPlayStart >= 0 && canPlayEnd > canPlayStart, 'canPlayCard source should be extractable');
   assert.ok(playShaStart >= 0 && playShaEnd > playShaStart, 'playSha source should be extractable');
   const canPlaySource = source.slice(canPlayStart, canPlayEnd);
-  const playShaSource = source.slice(playShaStart, playShaEnd);
+  const playShaSource = shaFlowSource.slice(playShaStart, playShaEnd);
 
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]kongcheng['"]/, 'Kongcheng should be registered with SkillRuntime.registerSkill');
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]kongcheng['"][\s\S]*?onCardTarget\s*:/, 'Kongcheng should register an onCardTarget hook');
@@ -194,7 +196,7 @@ test('game engine dispatches Qianxun through onCardTarget hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const canPlayStart = source.indexOf('function canPlayCard(game, actor, card)');
   // v12 F1: tieqi 迁往 skills.js — canPlayCard 切片终点改为其后继函数
-  const canPlayEnd = source.indexOf('function defaultHostileTarget', canPlayStart);
+  const canPlayEnd = source.indexOf('function legalTargetsForCard', canPlayStart);
   const playCardStart = source.indexOf('function playCard(game, actor, cardId, options)');
   const playCardEnd = source.indexOf('function startTurn(game, actor)', playCardStart);
   assert.ok(canPlayStart >= 0 && canPlayEnd > canPlayStart, 'canPlayCard source should be extractable');
@@ -212,10 +214,10 @@ test('game engine dispatches Qianxun through onCardTarget hook seam', () => {
 
 test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
-  const playShaStart = source.indexOf('function playSha(game, actor, card, options)');
-  const playShaEnd = source.indexOf('function playDuel(game, actor, card)', playShaStart);
+  const playShaStart = shaFlowSource.indexOf('function playSha(game, actor, card, options)');
+  const playShaEnd = shaFlowSource.length;
   assert.ok(playShaStart >= 0 && playShaEnd > playShaStart, 'playSha source should be extractable');
-  const playShaSource = source.slice(playShaStart, playShaEnd);
+  const playShaSource = shaFlowSource.slice(playShaStart, playShaEnd);
 
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tieqi['"]/, 'Tieqi should be registered with SkillRuntime.registerSkill');
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tieqi['"][\s\S]*?onNeedResponse\s*:/, 'Tieqi should register an onNeedResponse hook');
@@ -401,7 +403,7 @@ test('game engine dispatches Luoyi through draw and damage-modifier hook seams',
   const phaseSource = fs.readFileSync(path.join(root, 'src/engine/phases.js'), 'utf8');
   const drawStart = source.indexOf('function performDrawPhase(game, actor)');
   const drawHelperStart = source.indexOf('function triggerLuoyiDrawPhase(context)', drawStart);
-  const drawEnd = drawHelperStart >= 0 ? drawHelperStart : source.indexOf('function isArmorIgnoredBySha(game, sourceActor, card)', drawStart);
+  const drawEnd = drawHelperStart >= 0 ? drawHelperStart : source.indexOf('function setSkillPreference', drawStart);
   // v11 B1: damage 域已迁往 damage-dying.js, 切片改读该模块 (到文件尾)。
   const damageModule = fs.readFileSync(path.join(root, 'src/engine/damage-dying.js'), 'utf8');
   const damageStart = damageModule.indexOf('function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts)');

@@ -8,7 +8,10 @@ import { fileURLToPath } from 'node:url';
 import { Engine } from './helpers/load-engine.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+// v12 F5: 杀链/锦囊结算域拆分至 sha-flow.js / tricks.js — 牌结算域源码按域拼接
+const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/engine/sha-flow.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/engine/tricks.js'), 'utf8');
 // v11 B1: 响应窗口框架 (请求/队列/注册表/分发) 已迁往 response.js — 框架函数
 // 形状断言改读该模块 (工厂内缩进 4 空格); 调用点/resolver 注册断言仍读引擎。
 const responseSrc = fs.readFileSync(path.join(root, 'src/engine/response.js'), 'utf8');

@@ -7,7 +7,10 @@ import { fileURLToPath } from 'node:url';
 import { Engine } from './helpers/load-engine.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+// v12 F5: 杀链/锦囊结算域拆分至 sha-flow.js / tricks.js — 牌结算域源码按域拼接
+const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/engine/sha-flow.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/engine/tricks.js'), 'utf8');
 // v11 B1: 银月枪触发/响应已迁往 equipment.js (工厂内缩进 4 空格, 自注册)。
 const equipmentSrc = fs.readFileSync(path.join(root, 'src/engine/equipment.js'), 'utf8');
 // v11 B2: 闪/无懈/决斗响应面板已迁往 src/ui/panels/response-panels.js,

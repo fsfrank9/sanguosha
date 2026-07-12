@@ -5,7 +5,9 @@ import { loadAllStyles } from './helpers/load-styles.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const cssSource = loadAllStyles();
-const adapterSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+// v12 F6: 战场渲染域迁往 panels/board-panels.js — adapter 源按域拼接
+const adapterSource = fs.readFileSync(path.join(root, 'src/ui/panels/board-panels.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 
 function test(name, fn) {
   try {

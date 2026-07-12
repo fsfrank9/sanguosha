@@ -13,7 +13,9 @@ import { loadAllStyles } from './helpers/load-styles.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const css = loadAllStyles();
 // v11 B2: 目标区域/火攻成本面板已迁往 mode-panels.js, 源拼接。
-const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
+// v12 F6: 战场渲染域迁往 panels/board-panels.js — adapter 源按域拼接
+const adapter = fs.readFileSync(path.join(root, 'src/ui/panels/board-panels.js'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8');
 
 const tests = [];
@@ -72,7 +74,7 @@ test('v9 PR-E23: _handCancel 撤销 stagedModalChoice (面板保持打开)', () 
 test('v9 PR-E23: renderStatus — stagedModalChoice 存在时 confirm/cancel 按钮启用', () => {
   const fn = adapter.match(/function renderStatus\(\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /if\s*\(stagedModalChoice\)\s*\{[\s\S]*?canConfirm\s*=\s*true/);
+  assert.match(fn[0], /if\s*\(view\.stagedModalChoice\)\s*\{[\s\S]*?canConfirm\s*=\s*true/);
 });
 
 test('v9 PR-E23: _highlightStaged 工具函数 — 切候选 .is-staged 高亮', () => {

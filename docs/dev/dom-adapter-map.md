@@ -3,6 +3,15 @@
 > v10 V1 输出 — 纯文档. 不动代码.
 > 对应文件: `src/ui/dom-adapter.js` (2409 行, 单 IIFE module).
 > 目的: 给 v10 V2 (清债) / V3 (响应框架) / V8 (dispatch 注册表补全) 提供切分依据.
+>
+> **v12 F6 勘误 (2026-07-12)**: 本图为 v10 时代快照, 行号已过时。拆分现状:
+> 大厅/选将 → `panels/lobby-panels.js` (F4); 响应/提示/模式面板 →
+> `panels/{response,prompt,mode}-panels.js` (v11 B2); **战场渲染域**
+> (renderHero/renderHand/renderStatus/renderZones/日志/花色徽章工具 等
+> 20 函数) → `panels/board-panels.js` (F6, 可变状态经 uiView() 按次传入)。
+> 主文件现 ≈1135 行, 只余: els 装配 / 事件绑定 / 出牌与技能流程 /
+> pendingChoice 面板路由 (renderPendingChoice) / staged 高亮 / enemyStep
+> 回合驱动 / uiView 与委托 shim。§10 的拆分建议至此全部落地或被取代。
 
 ---
 
