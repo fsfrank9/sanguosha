@@ -147,6 +147,12 @@
           }
           applyJudgeAreaOutcome(game, actor, state, trick, reason, judgementCard);
           if (game.phase === 'gameover') {
+            // v12 H5 修复: 判定结算致终局时, 剩余在途延时锦囊 (已从判定区
+            // 整批取出) 一并入弃牌堆 — 否则从所有区域凭空消失 (守恒破坏,
+            // 叠放多张延时锦囊 + 首张致死场景)。
+            for (var overRest = i + 1; overRest < pending.length; overRest += 1) {
+              discardCard(game, pending[overRest]);
+            }
             if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
             return { ok: true };
           }

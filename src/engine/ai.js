@@ -161,9 +161,10 @@
       return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : (candidates[0] || opponent(actor));
     }
 
-    // v12 H5: AI 出杀目标 — 合法目标矩阵 ∩ 敌对座席 (1v1 恒为对手)。
-    // canPlayCard 的 ∃-目标语义包含友方座席 (玩家可显式指定), AI 必须
-    // 另行确认存在"可达且敌对"的目标, 否则不出杀 / 不转化。
+    // v12 H5: AI 单目标牌的目标座席 — 合法目标矩阵 ∩ 敌对座席 (1v1 恒为
+    // 对手)。canPlayCard 的 ∃-目标语义包含友方座席 (玩家可显式指定), AI
+    // 必须另行确认存在"可达且敌对"的目标; 与引擎 resolveTrickTargetActor
+    // 的缺省池同构 (对手优先), 供出杀候选门与火攻预览/出牌保持同一目标。
     function aiShaTargetSeat(game, actor, card) {
       if (!legalTargetsForCard) return opponent(actor);
       var candidates = legalTargetsForCard(game, actor, card).filter(function (seat) {
@@ -602,14 +603,19 @@
           if (aiShaSeat) cardOptions = { target: aiShaSeat };
         }
         if (card.type === 'huogong') {
-          var fireChoice = getHuogongChoice(game, actor);
+          // v12 H5 修复: 预览与实际出牌须对同一目标 — 此前预览走
+          // getHuogongChoice 内部的 opponent() 回退 (多席下 ally 的
+          // "对手"是友方玩家), 而 playCard 结算却落在敌对座席, 花色
+          // 成本按错误目标预挑 → 结算拒绝, runAITurn 整体失败。
+          var huogongSeat = aiShaTargetSeat(game, actor, card) || opponent(actor);
+          var fireChoice = getHuogongChoice(game, actor, huogongSeat);
           if (fireChoice.ok && fireChoice.usableCostIds.length) {
-            cardOptions = { huogongCostCardId: fireChoice.usableCostIds[0] };
+            cardOptions = { target: huogongSeat, huogongCostCardId: fireChoice.usableCostIds[0] };
           } else if (fireChoice.pendingTargetChoice) {
             // L1: 目标 (玩家, ask) 展示牌未定 — 展示后引擎自动弃同花色
-            cardOptions = {};
+            cardOptions = { target: huogongSeat };
           } else {
-            cardOptions = { declineHuogong: true };
+            cardOptions = { target: huogongSeat, declineHuogong: true };
           }
         }
         cardResult = playCard(game, actor, card.id, cardOptions);
