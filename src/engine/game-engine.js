@@ -15,6 +15,7 @@
       import { HERO_CATALOG, HEROES } from '../data/heroes.js';
       import { CARD_CATALOG, CARD_INFO, PHASES } from '../data/cards.js';
       import { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS } from '../data/skill-status.js';
+      import { IDENTITY_PRESETS, ROLE_SIDES } from '../data/identity.js';
 
       var clone = Runtime.clone;
       var makeRng = Runtime.makeRng;
@@ -318,7 +319,9 @@
         fail: fail,
         processJudgeArea: function (game, actor) { return processJudgeArea(game, actor); },
         continueTurnAfterJudgeArea: function (game, actor) { return continueTurnAfterJudgeArea(game, actor); },
-        continueTurnAfterPreparePhase: function (game, actor) { return continueTurnAfterPreparePhase(game, actor); }
+        continueTurnAfterPreparePhase: function (game, actor) { return continueTurnAfterPreparePhase(game, actor); },
+        // v12 H2: AOE 逐座席队列被濒死救援挂起后的续跑 (锦囊域后置装配, 包装注入)
+        resumeAOETargets: function (game) { return TricksRuntime.advanceAOETargets(game); }
       });
       var requestPlayerResponse = ResponseRuntime.requestPlayerResponse;
       var RESPONSE_KIND_RESOLVERS = ResponseRuntime.RESPONSE_KIND_RESOLVERS;
@@ -905,7 +908,12 @@
           enemy: options.enemyRole || '反贼'
         };
         if (seats.length >= 3 && !options.roles) {
-          roles = { player: options.playerRole || '主公', enemy: options.enemyRole || '反贼', ally: options.allyRole || '忠臣' };
+          // v12 H5: 按身份预设逐席分配 (座次顺序即预设顺序, 首位主公)。
+          var preset = IDENTITY_PRESETS[seats.length] || IDENTITY_PRESETS[3];
+          roles = {};
+          for (var ri = 0; ri < seats.length; ri += 1) {
+            roles[seats[ri]] = options[seats[ri] + 'Role'] || preset[ri] || '反贼';
+          }
         }
         var firstActor = options.firstActor || firstActorFromRoles(roles, seats[0] || 'player');
         var game = {
@@ -926,6 +934,8 @@
           seats: seats,
           firstActor: firstActor,
           mode: seats.length >= 3 ? 'identity3' : 'duel',
+          // v12 H5: 身份→阵营映射随局携带 (胜负判定/内奸预留)。
+          roleSides: clone(ROLE_SIDES),
           player: makePlayer(clone(HERO_CATALOG[options.playerHero] || HEROES.player)),
           enemy: makePlayer(clone(HERO_CATALOG[options.enemyHero] || HEROES.enemy))
         };
@@ -1297,9 +1307,11 @@
           // 自独立开无懈窗口 (无懈只抵消「对一个目标」的效果, 双方都受伤时各
           // 自可被无懈)。未受伤角色不是目标, 不开窗。
           log(game, actorName(game, actor) + '使用【桃园结义】。');
-          var taoyuanTargets = [actor, opponent(actor)].filter(function (side) {
+          // v12 H2: 结算顺序泛化为座次环 (发动者起顺时针含自身); 1v1 恒为
+          // [actor, opponent(actor)]。
+          var taoyuanTargets = StateRuntime.seatsFrom(game, actor, true).filter(function (side) {
             var s = game[side];
-            return s && s.hp < s.maxHp;
+            return s && s.hp > 0 && s.hp < s.maxHp;
           });
           return advanceTaoyuanTargets(game, {
             actor: actor, card: card, options: options, targets: taoyuanTargets, idx: 0
@@ -1332,8 +1344,9 @@
             return finishTrickUse(game, actor, card, success('五谷丰登终止（牌堆不足）。'), options);
           }
           log(game, actorName(game, actor) + '使用【五谷丰登】，亮出 ' + wuguPool.map(function (c) { return '【' + c.name + '】'; }).join(' / ') + '。');
-          // 多角色结算顺序原则：从当前回合角色起按逆时针 → 1v1 即 [actor, opponent(actor)]
-          return finishTrickUse(game, actor, card, processWuguPick(game, actor, card, wuguPool, [actor, opponent(actor)], 0, options), options);
+          // 多角色结算顺序原则：从当前回合角色起按行动顺序 → 座次环
+          // (v12 H2: seatsFrom 泛化; 1v1 恒为 [actor, opponent(actor)])
+          return finishTrickUse(game, actor, card, processWuguPick(game, actor, card, wuguPool, StateRuntime.seatsFrom(game, actor, true).filter(function (side) { return game[side] && game[side].hp > 0; }), 0, options), options);
       }
 
       function playHuogongCardHandler(game, actor, card, options, self) {

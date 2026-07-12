@@ -12,6 +12,7 @@ const REQUIRED_FILES = [
   'src/data/heroes.js',
   'src/data/cards.js',
   'src/data/skill-status.js',
+  'src/data/identity.js',
   'src/engine/runtime.js',
   'src/engine/skill-runtime.js',
   'src/engine/card-runtime.js',

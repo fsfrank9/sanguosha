@@ -174,18 +174,25 @@
       }
     }
 
-    // H4: 铁索连环传导执行 — 1v1 中"其他处于连环状态的角色"只有对手。
+    // H4: 铁索连环传导执行 — "其他处于连环状态的角色"逐一受传导。
     // 传导伤害: 等量、同属性、同来源, 无实体来源牌 (原牌已结算完毕),
     // 标记 chainTransmit 防止递归再传导。
+    // v12 H2/H4: 泛化为座次环扫描 — 自受伤者下家起顺时针所有存活的横置
+    // 角色依次受传导 (1v1 恒为 [对手单人], 行为不变)。并发濒死选择由
+    // pendingChoice FIFO 队列按序排空。
     function transmitChainDamage(game, damageContext) {
       if (game.phase === 'gameover') return;
-      var nextActor = opponent(damageContext.targetActor);
-      var nextState = game[nextActor];
-      if (!nextState || !nextState.chained) return;
+      var ringSeats = seatsFrom(game, damageContext.targetActor, false);
       var natureName = damageContext.nature === 'fire' ? '火焰' : '雷电';
-      log(game, '【铁索连环】传导：' + actorName(game, nextActor) + '受到等量' + natureName + '伤害。');
-      damage(game, nextActor, damageContext.amount, damageContext.sourceActor,
-        damageContext.reason + '（铁索连环传导）', null, damageContext.nature, { chainTransmit: true });
+      for (var ringIdx = 0; ringIdx < ringSeats.length; ringIdx += 1) {
+        if (game.phase === 'gameover') return;
+        var nextActor = ringSeats[ringIdx];
+        var nextState = game[nextActor];
+        if (!nextState || nextState.hp <= 0 || !nextState.chained) continue;
+        log(game, '【铁索连环】传导：' + actorName(game, nextActor) + '受到等量' + natureName + '伤害。');
+        damage(game, nextActor, damageContext.amount, damageContext.sourceActor,
+          damageContext.reason + '（铁索连环传导）', null, damageContext.nature, { chainTransmit: true });
+      }
     }
 
     function flushDeferredDamageAfter(game) {

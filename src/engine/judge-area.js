@@ -176,20 +176,29 @@
           // v7 PR-12: gltjk card__scroll.md 注 — "若其下家不是此【闪电】的
           // 合法目标，则将对应的实体牌置入其下家的下家的判定区，以此类推。
           // 若所有角色都不是此【闪电】的合法目标，则将对应的实体牌置入其
-          // 判定区。" 在 1v1 中只有 2 名角色：下家=对手；下家的下家=自己。
-          // PR-6 已定义 "判定区里有同名延时锦囊的角色 = 非合法目标"。
-          var foeActor = opponent(actor);
-          var foeState = game[foeActor];
-          var foeAlreadyShandian = (foeState.judgeArea || []).some(function (j) {
-            return j && j.type === 'shandian';
-          });
-          if (foeAlreadyShandian) {
-            // 对手已有 闪电 → 非合法目标 → 全部不合法 → 回到自己
+          // 判定区。" PR-6 已定义 "判定区里有同名延时锦囊的角色 = 非合法目标"。
+          // v12 H2: 泛化为座次环扫描 — 自下家起顺时针找首个合法存活座席;
+          // 全部不合法 → 回到自己 (此刻闪电在途, 自己判定区必无同名)。
+          // 1v1 恒为 [对手] 单元素扫描, 行为不变。
+          var shandianMoved = false;
+          var shandianRing = StateRuntime.seatsFrom(game, actor, false);
+          for (var ringIdx = 0; ringIdx < shandianRing.length; ringIdx += 1) {
+            var candActor = shandianRing[ringIdx];
+            var candState = game[candActor];
+            if (!candState || candState.hp <= 0) continue;
+            var candAlreadyShandian = (candState.judgeArea || []).some(function (j) {
+              return j && j.type === 'shandian';
+            });
+            if (candAlreadyShandian) continue;
+            putCard(game, trick, { zone: 'judgeArea', actor: candActor });
+            log(game, '【闪电】移至' + actorName(game, candActor) + '的判定区。');
+            shandianMoved = true;
+            break;
+          }
+          if (!shandianMoved) {
+            // 后续座席均非合法目标 → 回到自己
             putCard(game, trick, { zone: 'judgeArea', actor: actor });
             log(game, '【闪电】移动失败（对手判定区已有同名牌），留在' + actorName(game, actor) + '的判定区。');
-          } else {
-            putCard(game, trick, { zone: 'judgeArea', actor: foeActor });
-            log(game, '【闪电】移至' + actorName(game, foeActor) + '的判定区。');
           }
         }
         resolveJudgementCard(game, actor, state, reason, judgementCard);

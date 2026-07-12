@@ -106,6 +106,13 @@
     return actor === 'player' ? 'enemy' : 'player';
   }
 
+  // v12 H3: 座席选项校验 — options.target 等外部传入值必须是当前对局的
+  // 合法座席名, 否则返回 null (调用方决定回退默认或拒绝)。
+  function resolveSeatOption(game, value) {
+    if (!value) return null;
+    return normalizeSeats(game).indexOf(value) >= 0 && game[value] ? value : null;
+  }
+
   function hasSkill(state, skillId) {
     return !!(state.skills || []).some(function (skill) { return skill.id === skillId; });
   }
@@ -194,6 +201,7 @@
     aliveSeats: aliveSeats,
     nextSeat: nextSeat,
     seatsFrom: seatsFrom,
+    resolveSeatOption: resolveSeatOption,
     opponent: opponent,
     hasSkill: hasSkill,
     canUseUnlimitedSha: canUseUnlimitedSha,
