@@ -1249,7 +1249,11 @@
         var declined = !decision.cardId;
         if (!declined) {
           var replacement = takeCard(game, decision.cardId, { zone: 'hand', actor: holder });
-          if (!replacement) return fail('找不到这张牌。');
+          // v12 G2 修复: 与鬼道同款 — 未找到牌必须重挂, 否则判定挂起悬空。
+          if (!replacement) {
+            setPendingChoice(game, pending);
+            return fail('找不到这张牌。');
+          }
           if (originalCard) discardCard(game, originalCard);
           resolvedCard = replacement;
           log(game, actorName(game, holder) + '发动【鬼才】，用【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）代替' + actorName(game, judgementActor) + '的判定牌。');
@@ -1646,13 +1650,21 @@
           var declined = !decision.cardId;
           if (!declined) {
             var chosen = (holderState.hand || []).find(function (c) { return c.id === decision.cardId; });
-            if (!chosen) return fail('找不到这张牌。');
+            // v12 G2 修复: 未找到牌也必须重挂 — 否则 pendingChoice 被清空而
+            // pauseState.judgeArea 挂起快照悬空, 判定永远无法续跑 (回合卡死)。
+            if (!chosen) {
+              setPendingChoice(game, pending);
+              return fail('找不到这张牌。');
+            }
             if (chosen.color !== 'black') {
               setPendingChoice(game, pending);
               return fail('【鬼道】只能打出黑色牌。');
             }
             var replacement = takeCard(game, decision.cardId, { zone: 'hand', actor: holder });
-            if (!replacement) return fail('找不到这张牌。');
+            if (!replacement) {
+              setPendingChoice(game, pending);
+              return fail('找不到这张牌。');
+            }
             if (originalCard) discardCard(game, originalCard);
             resolvedCard = replacement;
             log(game, actorName(game, holder) + '发动【鬼道】，打出【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）替换' + actorName(game, judgementActor) + '的判定牌。');
