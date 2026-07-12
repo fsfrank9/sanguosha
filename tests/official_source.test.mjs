@@ -120,7 +120,7 @@ test('wind pack fixture is a separate pack with the same spec contract', () => {
   assert.equal(windFixture.includeFullSkillText, false);
   assert.ok(windFixture.source.gidPolicy && windFixture.source.gidPolicy.includes('provisional-local'),
     'wind gid values must be documented as provisional until the official crawl lands');
-  assert.equal(windFixture.heroes.length, 5, 'wind repair batch tracks the 5 heroes touched by v12 G');
+  assert.equal(windFixture.heroes.length, 8, 'wind pack tracks all 8 wind heroes (v12 G2 完整包)');
 
   const gids = new Set();
   for (const hero of windFixture.heroes) {
@@ -135,6 +135,9 @@ test('wind pack fixture is a separate pack with the same spec contract', () => {
   assert.deepEqual(windByName['黄忠'].skills, ['烈弓']);
   assert.deepEqual(windByName['魏延'].skills, ['狂骨']);
   assert.deepEqual(windByName['小乔'].skills, ['天香', '红颜']);
+  assert.deepEqual(windByName['周泰'].skills, ['不屈']);
+  assert.deepEqual(windByName['张角'].skills, ['雷击', '鬼道', '黄天']);
+  assert.deepEqual(windByName['于吉'].skills, ['蛊惑']);
 
   assert.equal(windSpecs.pack, '风');
   assert.equal(windSpecs.containsImplementationSpecs, true);

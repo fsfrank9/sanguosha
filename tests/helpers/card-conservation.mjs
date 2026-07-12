@@ -65,6 +65,8 @@ export function collectCardCensus(game) {
       }
     }
     for (const card of state.judgeArea || []) registerZoneCard(card, `${actor}.judgeArea`);
+    // v12 G2: 不屈 — 武将牌上的"创"入普查
+    for (const card of state.chuang || []) registerZoneCard(card, `${actor}.chuang`);
   }
 
   const inFlight = [];

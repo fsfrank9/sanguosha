@@ -48,6 +48,10 @@
         var takeCard = deps.takeCard;
         var triggerEquipmentLoss = deps.triggerEquipmentLoss;
         var useSkill = deps.useSkill;
+        var reshuffleIfNeeded = deps.reshuffleIfNeeded;
+        var playSha = deps.playSha;
+        var applyHongyanJudgementView = deps.applyHongyanJudgementView;
+        var restoreHongyanJudgementView = deps.restoreHongyanJudgementView;
         var handLimit = deps.handLimit;
         var CARD_INFO = deps.CARD_INFO;
         var scoreCardForAI = deps.scoreCardForAI;
@@ -1247,9 +1251,17 @@
         var declined = !decision.cardId;
         if (!declined) {
           var replacement = takeCard(game, decision.cardId, { zone: 'hand', actor: holder });
-          if (!replacement) return fail('找不到这张牌。');
-          if (originalCard) discardCard(game, originalCard);
+          // v12 G2 修复: 与鬼道同款 — 未找到牌必须重挂, 否则判定挂起悬空。
+          if (!replacement) {
+            setPendingChoice(game, pending);
+            return fail('找不到这张牌。');
+          }
+          // v12 G2 复核修复: 原判定牌不经 resolveJudgementCard 离场 — 弃置前
+          // 还原红颜视图, 否则物理牌花色被永久改写 (牌堆完整性)。
+          if (originalCard) discardCard(game, restoreHongyanJudgementView(originalCard));
           resolvedCard = replacement;
+          // 替换牌成为新判定牌, 未经 judge() → 在此补施红颜视图 (判定归属者)。
+          applyHongyanJudgementView(game, judgementActor, resolvedCard);
           log(game, actorName(game, holder) + '发动【鬼才】，用【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）代替' + actorName(game, judgementActor) + '的判定牌。');
         } else {
           log(game, actorName(game, holder) + '选择不发动【鬼才】。');
@@ -1394,6 +1406,337 @@
         return previewResult || fail('没有【观星】。');
       }
 
+        // ───── v12 G2: 风包第二批 — 神速/天香/雷击/鬼道/不屈 (红颜为
+        // judge-area/state 花色视同层, 无 handler) ─────
+
+        // 神速 (夏侯渊) — gltjk wind spec: "你可以选择一至两项: 1.跳过判定
+        // 阶段和摸牌阶段; 2.跳过出牌阶段并弃置一张装备牌。你每选择一项,
+        // 视为你使用一张无距离限制的【杀】"。判定阶段开始前声明; 该杀不占
+        // 出牌阶段使用次数 (playSha options.skipShaCount)。
+        function shensuVirtualSha(game, actor, seq) {
+          return { id: 'virtual-shensu-' + actor + '-' + (game.turnHistory ? game.turnHistory.length : 0) + '-' + seq,
+                   name: '杀', type: 'sha', suit: 'none', rank: '-', color: 'none', virtual: true };
+        }
+
+        function shensuEquipCandidates(state) {
+          var equipped = equipmentList(state);
+          var handEquips = (state.hand || []).filter(function (c) {
+            var info = CARD_INFO[c.type];
+            return info && info.family === 'equipment';
+          });
+          return equipped.concat(handEquips);
+        }
+
+        function applyShensuOption(game, actor, optionIndex, equipCardId) {
+          var state = game[actor];
+          if (optionIndex === 2) {
+            var equipCard = removeOwnCardFromAnyZone(state, equipCardId, game);
+            if (!equipCard) return fail('【神速】选项二需要弃置一张装备牌。');
+            discardCard(game, equipCard);
+            state.flags.skipPlay = true;
+            log(game, actorName(game, actor) + '发动【神速】(选项二)：跳过出牌阶段并弃置【' + equipCard.name + '】。');
+          } else {
+            state.flags.skipJudge = true;
+            state.flags.skipDraw = true;
+            log(game, actorName(game, actor) + '发动【神速】(选项一)：跳过判定阶段和摸牌阶段。');
+          }
+          log(game, actorName(game, actor) + '视为使用一张无距离限制的【杀】。');
+          return playSha(game, actor, shensuVirtualSha(game, actor, optionIndex), { ignoreDistance: true, skipShaCount: true });
+        }
+
+        function triggerShensuPrepare(game, actor) {
+          var state = game[actor];
+          if (!state || !hasSkill(state, 'shensu') || game.phase === 'gameover') return null;
+          var pref = state.skillPreferences && state.skillPreferences.shensu;
+          if (pref === 'decline') return null;
+          if (actor === 'player') {
+            var candidates = shensuEquipCandidates(state);
+            setPendingChoice(game, {
+              kind: 'shensu-options',
+              actor: actor,
+              canOptionTwo: candidates.length > 0,
+              equipCandidates: candidates.map(function (c) {
+                return { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank };
+              })
+            });
+            return { suspended: true };
+          }
+          // AI 座席: 保守启发 — 仅当对手 1 血时用选项一抢斩 (选项二弃装备
+          // 换杀期望值普遍为负, 不启用)。虚拟杀若为玩家开出闪响应窗口,
+          // 挂 prepareResume 交由选择排空后续跑回合。
+          var foe = opponent(actor);
+          // v12 G2 修复: hp <= 1 会把已死 (hp 0) 对手也算进来 — 收紧为恰好
+          // 1 血 (存活) 才抢斩。
+          if (game[foe] && game[foe].hp === 1) {
+            applyShensuOption(game, actor, 1);
+            if (game.pendingChoice) {
+              if (!game.pauseState) game.pauseState = {};
+              game.pauseState.prepareResume = { actor: actor };
+              return { suspended: true };
+            }
+          }
+          return null;
+        }
+
+        function resolveShensuOptionsChoice(game, pending, decision) {
+          var actor = pending.actor;
+          var state = game[actor];
+          if (!state) return fail('未知角色。');
+          var options = decision && Array.isArray(decision.options) ? decision.options.slice() : [];
+          // v12 G2 复核修复: 先全量校验、后逐一应用 — 此前"选项一已发动、
+          // 选项二非法"时原决策整包重挂, 重试会重放已成功的选项一 (违反
+          // "每回合每个选项至多一次", 多打一张无距离杀)。校验通过后应用
+          // 阶段不再存在可失败路径, 也就不再需要中途重挂。
+          var invalid = options.some(function (o) { return o !== 1 && o !== 2; });
+          if (invalid) {
+            setPendingChoice(game, pending);
+            return fail('【神速】选项只能是 1 或 2。');
+          }
+          if (options.indexOf(2) >= 0) {
+            if (!decision.equipCardId) {
+              setPendingChoice(game, pending);
+              return fail('【神速】选项二需要指定要弃置的装备牌。');
+            }
+            var equipOk = shensuEquipCandidates(state).some(function (c) { return c.id === decision.equipCardId; });
+            if (!equipOk) {
+              setPendingChoice(game, pending);
+              return fail('【神速】选项二指定的装备牌不存在或不是装备牌。');
+            }
+          }
+          if (!options.length) {
+            log(game, actorName(game, actor) + '选择不发动【神速】。');
+          } else {
+            // 官方顺序: 选项一 (跳判定+摸牌) 先于 选项二 (跳出牌) 结算。
+            options.sort();
+            for (var i = 0; i < options.length; i += 1) {
+              applyShensuOption(game, actor, options[i], decision.equipCardId);
+              if (game.phase === 'gameover') return success('游戏结束。');
+            }
+          }
+          if (game.pendingChoice) {
+            // 虚拟杀开出了新的响应窗口 (罕见: 玩家杀 → AI 暂停不会发生;
+            // 防御性兜底) — 挂 prepareResume 由排空后续跑。
+            if (!game.pauseState) game.pauseState = {};
+            game.pauseState.prepareResume = { actor: actor };
+            return success('【神速】结算中，等待响应。');
+          }
+          return continueTurnAfterPreparePhase(game, actor);
+        }
+
+        // 天香 (小乔) — gltjk wind spec: "当你受到伤害时, 你可以弃置一张
+        // 红桃手牌, 将此伤害转移给你攻击范围内的一名其他角色, 然后其摸
+        // X 张牌 (X 为其已损失的体力值)"。1v1 转移目标恒为对手 (须在攻击
+        // 范围内)。交互沿用 铁骑 pre-v10 惯例: auto (伤害≥2 或致命时转移)
+        // / always (有成本即转移) / decline; 伤害流暂停框架落地后升级 ask。
+        // 红颜联动: 黑桃手牌经 effectiveCardSuit 视为红桃, 可作成本。
+        function triggerTianxiangDamageModify(context) {
+          var game = context.game;
+          var targetActor = context.targetActor;
+          var state = game[targetActor];
+          if (!state || !hasSkill(state, 'tianxiang') || game.phase === 'gameover') return null;
+          if (context.opts && context.opts.noTianxiangTransfer) return null;
+          var pref = (state.skillPreferences && state.skillPreferences.tianxiang) || 'auto';
+          if (pref === 'decline') return null;
+          var transferee = opponent(targetActor);
+          if (!game[transferee] || game[transferee].hp <= 0) return null;
+          if (!StateRuntime.canReachWithSha(game, targetActor, transferee)) return null;
+          var amount = Number(context.amount) || 0;
+          if (amount <= 0) return null;
+          var lethal = state.hp - amount <= 0;
+          if (pref !== 'always' && !(amount >= 2 || lethal)) return null;
+          var costs = (state.hand || []).filter(function (c) {
+            return StateRuntime.effectiveCardSuit(state, c) === 'heart';
+          });
+          if (!costs.length) return null;
+          var cost = costs
+            .map(function (c) { return { card: c, score: scoreCardForAI(game, targetActor, c) }; })
+            .sort(function (a, b) { return a.score - b.score; })[0].card;
+          removeCardFromHand(state, cost.id);
+          discardCard(game, cost);
+          log(game, actorName(game, targetActor) + '发动【天香】，弃置【' + cost.name + '】' + cost.suit + ' ' + cost.rank + '，将伤害转移给' + actorName(game, transferee) + '。');
+          context.transferTo = transferee;
+          context.onTransferred = function (g, t) {
+            var ts = g[t];
+            if (!ts || ts.hp <= 0) return;
+            var lost = Math.max(0, (ts.maxHp || 0) - ts.hp);
+            if (lost > 0) {
+              drawCards(g, t, lost);
+              log(g, actorName(g, t) + '因【天香】摸 ' + lost + ' 张牌。');
+            }
+          };
+          return { triggeredTianxiang: true };
+        }
+
+        // 雷击 (张角) — gltjk wind spec: "当你使用或打出【闪】时, 你可以令
+        // 一名其他角色进行判定: 若结果为黑桃, 你对该角色造成 2 点雷电伤害"。
+        // 1v1 目标恒为对手; 判定归对手 (红颜小乔判雷击 黑桃视为红桃 → 永不
+        // 命中, 由 judge() 视同层自然覆盖)。auto/decline 偏好 (铁骑惯例)。
+        function triggerLeijiShanUsed(context) {
+          var game = context.game;
+          var actor = context.actor;
+          var state = game[actor];
+          if (!state || !hasSkill(state, 'leiji') || game.phase === 'gameover') return null;
+          var pref = state.skillPreferences && state.skillPreferences.leiji;
+          if (pref === 'decline') {
+            log(game, actorName(game, actor) + '选择不发动【雷击】。');
+            return null;
+          }
+          var targetActor = opponent(actor);
+          var target = game[targetActor];
+          if (!target || target.hp <= 0) return null;
+          log(game, actorName(game, actor) + '发动【雷击】，令' + actorName(game, targetActor) + '进行判定。');
+          var leijiJudge = judge(game, targetActor, '【雷击】');
+          var hit = !!(leijiJudge && leijiJudge.suit === 'spade');
+          resolveJudgementCard(game, targetActor, target, '【雷击】', leijiJudge);
+          if (hit) {
+            log(game, '【雷击】判定为黑桃，' + actorName(game, targetActor) + '受到 2 点雷电伤害。');
+            damage(game, targetActor, 2, actor, '【雷击】', null, 'thunder');
+          } else {
+            log(game, '【雷击】判定未中。');
+          }
+          return { triggeredLeiji: true };
+        }
+
+        // 鬼道 (张角) — gltjk wind spec: "当一名角色的判定牌生效前, 你可以
+        // 打出一张黑色牌替换之"。机制与 鬼才 同构, 候选限黑色手牌; 玩家默认
+        // ask (pausable 判定挂面板), AI auto 取最低分黑牌。
+        function guidaoBlackHand(state) {
+          return (state.hand || []).filter(function (c) { return c.color === 'black'; });
+        }
+
+        function triggerGuidaoJudgementBeforeResolve(context) {
+          var game = context.game;
+          var judgementActor = context.actor;
+          var originalCard = context.originalCard || context.card;
+          if (!game || !originalCard || context.replaced) return null;
+          var order = [judgementActor, opponent(judgementActor)];
+          var holder = null;
+          for (var i = 0; i < order.length; i += 1) {
+            var s = game[order[i]];
+            if (s && hasSkill(s, 'guidao') && guidaoBlackHand(s).length > 0) {
+              holder = order[i];
+              break;
+            }
+          }
+          if (!holder) return null;
+          var holderState = game[holder];
+          var pref = (holderState.skillPreferences && holderState.skillPreferences.guidao)
+            || (holder === 'player' ? 'ask' : 'auto');
+          if (pref === 'decline') {
+            log(game, actorName(game, holder) + '选择不发动【鬼道】。');
+            return { declinedGuidao: true };
+          }
+          var blackCards = guidaoBlackHand(holderState);
+          if (pref === 'ask' && context.pausable) {
+            setPendingChoice(game, {
+              kind: 'guidao-replace',
+              actor: holder,
+              judgementActor: judgementActor,
+              reason: context.reason || '',
+              judgementCard: {
+                id: originalCard.id, name: originalCard.name,
+                type: originalCard.type, suit: originalCard.suit,
+                rank: originalCard.rank
+              },
+              candidates: blackCards.map(function (c) {
+                return { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank };
+              })
+            });
+            return { suspendedForGuidao: true };
+          }
+          var sortedGuidao = blackCards
+            .map(function (card) { return { card: card, score: scoreCardForAI(game, holder, card) }; })
+            .sort(function (a, b) { return a.score - b.score; });
+          var replacement = sortedGuidao[0].card;
+          var paidCard = removeCardFromHand(holderState, replacement.id);
+          if (!paidCard) return null;
+          discardCard(game, originalCard);
+          context.card = replacement;
+          context.replaced = true;
+          log(game, actorName(game, holder) + '发动【鬼道】，打出【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）替换' + actorName(game, judgementActor) + '的判定牌。');
+          return { replacedJudgementCard: true, holder: holder, originalCard: originalCard, replacementCard: replacement };
+        }
+
+        function resolveGuidaoReplaceChoice(game, pending, decision) {
+          var holder = pending.actor;
+          var judgementActor = pending.judgementActor || holder;
+          var holderState = game[holder];
+          var judgementActorState = game[judgementActor];
+          if (!holderState || !judgementActorState) return fail('未知角色。');
+          var saved = game.pauseState && game.pauseState.judgeArea;
+          if (!saved || saved.actor !== judgementActor) return fail('找不到挂起的判定。');
+          var originalCard = saved.currentJudgementCard;
+          var resolvedCard = originalCard;
+          var declined = !decision.cardId;
+          if (!declined) {
+            var chosen = (holderState.hand || []).find(function (c) { return c.id === decision.cardId; });
+            // v12 G2 修复: 未找到牌也必须重挂 — 否则 pendingChoice 被清空而
+            // pauseState.judgeArea 挂起快照悬空, 判定永远无法续跑 (回合卡死)。
+            if (!chosen) {
+              setPendingChoice(game, pending);
+              return fail('找不到这张牌。');
+            }
+            if (chosen.color !== 'black') {
+              setPendingChoice(game, pending);
+              return fail('【鬼道】只能打出黑色牌。');
+            }
+            var replacement = takeCard(game, decision.cardId, { zone: 'hand', actor: holder });
+            if (!replacement) {
+              setPendingChoice(game, pending);
+              return fail('找不到这张牌。');
+            }
+            // v12 G2 复核修复: 同鬼才 — 原判定牌还原视图后弃置; 替换牌补施视图。
+            if (originalCard) discardCard(game, restoreHongyanJudgementView(originalCard));
+            resolvedCard = replacement;
+            applyHongyanJudgementView(game, judgementActor, resolvedCard);
+            log(game, actorName(game, holder) + '发动【鬼道】，打出【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）替换' + actorName(game, judgementActor) + '的判定牌。');
+          } else {
+            log(game, actorName(game, holder) + '选择不发动【鬼道】。');
+          }
+          applyJudgeAreaOutcome(game, judgementActor, judgementActorState, saved.currentTrick, saved.currentReason, resolvedCard);
+          game.pauseState.judgeArea = {
+            actor: judgementActor,
+            pending: saved.pending,
+            idx: saved.idx + 1
+          };
+          var resumeResult = processJudgeArea(game, judgementActor);
+          if (resumeResult && resumeResult.suspended) {
+            return success('继续等待玩家选择。');
+          }
+          if (game.phase === 'gameover') return success('游戏结束。');
+          return continueTurnAfterJudgeArea(game, judgementActor);
+        }
+
+        // 不屈 (周泰) — gltjk wind spec: "锁定技, 当你处于濒死状态时, 你将
+        // 牌堆顶的一张牌置于你的武将牌上, 称为'创': 若此牌的点数与已有'创'
+        // 的点数均不相同, 你将体力回复至 1 点; 若与其中一张相同, 将此牌置入
+        // 弃牌堆。若你的武将牌上有'创', 你的手牌上限等于 X (X 为体力上限减
+        // 去'创'的数量)"。手牌上限条款在 state.handLimit; "创"为独立计数牌区
+        // (state.chuang), 入全局守恒普查。
+        function triggerBuquDyingEnter(context) {
+          var game = context.game;
+          var dyingActor = context.dyingActor;
+          var state = game[dyingActor];
+          if (!state || !hasSkill(state, 'buqu') || game.phase === 'gameover') return null;
+          reshuffleIfNeeded(game);
+          var card = takeCard(game, null, { zone: 'deck' });
+          if (!card) {
+            log(game, '牌堆已空，【不屈】无牌可置。');
+            return null;
+          }
+          var dup = (state.chuang || []).some(function (c) { return String(c.rank) === String(card.rank); });
+          if (dup) {
+            log(game, actorName(game, dyingActor) + '的【不屈】置出【' + card.name + '】' + card.suit + ' ' + card.rank + '，与已有"创"点数相同，置入弃牌堆。');
+            discardCard(game, card);
+            return { triggeredBuqu: true, saved: false };
+          }
+          if (!state.chuang) state.chuang = [];
+          putCard(game, card, { zone: 'chuang', actor: dyingActor });
+          state.hp = 1;
+          log(game, actorName(game, dyingActor) + '的【不屈】置"创"【' + card.name + '】' + card.suit + ' ' + card.rank + '（共 ' + state.chuang.length + ' 创），点数均不相同，体力回复至 1 点。');
+          return { triggeredBuqu: true, saved: true };
+        }
+
         SkillRuntime.registerSkill(skillRegistry, 'biyue', {
         onTurnEnd: function (context) {
           triggerBiyue(context.game, context.actor);
@@ -1523,6 +1866,26 @@
           return triggerLiegongNeedResponse(context.game, context.actor, context.targetActor, context.responseType, context.card);
         }
       });
+        SkillRuntime.registerSkill(skillRegistry, 'tianxiang', {
+        onDamageModify: function (context) {
+          return triggerTianxiangDamageModify(context);
+        }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'leiji', {
+        onShanUsed: function (context) {
+          return triggerLeijiShanUsed(context);
+        }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'guidao', {
+        onJudgementBeforeResolve: function (context) {
+          return triggerGuidaoJudgementBeforeResolve(context);
+        }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'buqu', {
+        onDyingEnter: function (context) {
+          return triggerBuquDyingEnter(context);
+        }
+      });
         SkillRuntime.registerSkill(skillRegistry, 'longdan', {
         onCardAs: function (context) {
           return triggerLongdanCardAs(context);
@@ -1602,6 +1965,9 @@
 
         // v12 F1: 引擎流程仍需直调的技能域函数面 (回绑为引擎内同名 var)
         return {
+          triggerShensuPrepare: triggerShensuPrepare,
+          resolveShensuOptionsChoice: resolveShensuOptionsChoice,
+          resolveGuidaoReplaceChoice: resolveGuidaoReplaceChoice,
           triggerGuanxingPreview: triggerGuanxingPreview,
           triggerLuoshenPrepare: triggerLuoshenPrepare,
           getGuanxingPreview: getGuanxingPreview,

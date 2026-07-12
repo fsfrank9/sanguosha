@@ -317,7 +317,8 @@
         success: success,
         fail: fail,
         processJudgeArea: function (game, actor) { return processJudgeArea(game, actor); },
-        continueTurnAfterJudgeArea: function (game, actor) { return continueTurnAfterJudgeArea(game, actor); }
+        continueTurnAfterJudgeArea: function (game, actor) { return continueTurnAfterJudgeArea(game, actor); },
+        continueTurnAfterPreparePhase: function (game, actor) { return continueTurnAfterPreparePhase(game, actor); }
       });
       var requestPlayerResponse = ResponseRuntime.requestPlayerResponse;
       var RESPONSE_KIND_RESOLVERS = ResponseRuntime.RESPONSE_KIND_RESOLVERS;
@@ -530,11 +531,18 @@
             log(game, actorName(game, actor) + '打出【' + response.card.name + '】响应' + reason + '。');
           }
         }
+        // v12 G2: 雷击 (张角) — "当你使用或打出【闪】时"统一派发点
+        // (杀响应/万箭/银月各路径都经本函数消耗【闪】; 八卦视为打出的
+        // 【闪】在 sha-flow.tryBaguaDodge 内另行派发)。
+        if (type === 'shan') {
+          SkillRuntime.runHook(skillRegistry, 'onShanUsed', { game: game, actor: actor });
+        }
         // v8 PR-B4: 银月枪 — 回合外打出黑色手牌触发
         if (game.turn !== actor) {
+          // v12 G2: 红颜 — 响应者 (小乔) 的黑桃牌视为红桃 → 不触发银月枪。
           var blackCards = response.extraCards && response.extraCards.length
-            ? response.extraCards.filter(function (c) { return c && c.color === 'black'; })
-            : (response.card && response.card.color === 'black' ? [response.card] : []);
+            ? response.extraCards.filter(function (c) { return c && StateRuntime.effectiveCardColor(game[actor], c) === 'black'; })
+            : (response.card && StateRuntime.effectiveCardColor(game[actor], response.card) === 'black' ? [response.card] : []);
           if (blackCards.length > 0) triggerYinyueQiang(game, actor);
         }
         return true;
@@ -564,7 +572,8 @@
           options: { response: true }
         });
         // v8 PR-B4: 银月枪 — 回合外用黑色手牌 (无懈) 触发
-        if (game.turn !== actor && card.color === 'black') {
+        // v12 G2 复核修复: 与 consumeResponse 对称 — 红颜黑桃视为红桃。
+        if (game.turn !== actor && StateRuntime.effectiveCardColor(game[actor], card) === 'black') {
           triggerYinyueQiang(game, actor);
         }
         return true;
@@ -743,6 +752,8 @@
         opponent: opponent
       });
       var judge = JudgeAreaRuntime.judge;
+      var applyHongyanJudgementView = JudgeAreaRuntime.applyHongyanJudgementView;
+      var restoreHongyanJudgementView = JudgeAreaRuntime.restoreHongyanJudgementView;
       var resolveJudgementCard = JudgeAreaRuntime.resolveJudgementCard;
       var judgementReasonFor = JudgeAreaRuntime.judgementReasonFor;
       var processJudgeArea = JudgeAreaRuntime.processJudgeArea;
@@ -836,11 +847,18 @@
         takeCard: takeCard,
         triggerEquipmentLoss: triggerEquipmentLoss,
         useSkill: useSkill,
+        reshuffleIfNeeded: reshuffleIfNeeded,
+        playSha: function (g, a, c, o) { return playSha(g, a, c, o); },
+        applyHongyanJudgementView: applyHongyanJudgementView,
+        restoreHongyanJudgementView: restoreHongyanJudgementView,
         handLimit: handLimit,
         CARD_INFO: CARD_INFO,
         scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); }
       });
       var triggerGuanxingPreview = SkillDomain.triggerGuanxingPreview;
+      var triggerShensuPrepare = SkillDomain.triggerShensuPrepare;
+      var resolveShensuOptionsChoice = SkillDomain.resolveShensuOptionsChoice;
+      var resolveGuidaoReplaceChoice = SkillDomain.resolveGuidaoReplaceChoice;
       var triggerLuoshenPrepare = SkillDomain.triggerLuoshenPrepare;
       var getGuanxingPreview = SkillDomain.getGuanxingPreview;
       var resolveFankuiPickChoice = SkillDomain.resolveFankuiPickChoice;
@@ -858,6 +876,9 @@
       // 一套 dispatcher。resolver 签名 (game, pending, decision), 各自负责清理
       // 对应 pauseState (失败时可重设 game.pendingChoice 以重试)。
       registerResponseKind('guicai-replace', resolveGuicaiReplaceChoice);
+      // v12 G2: 鬼道 (鬼才同构改判) 与 神速 (回合开始选项)
+      registerResponseKind('guidao-replace', resolveGuidaoReplaceChoice);
+      registerResponseKind('shensu-options', resolveShensuOptionsChoice);
       registerResponseKind('yiji-distribute', resolveYijiDistributeChoice);
       registerResponseKind('guanxing-reorder', resolveGuanxingChoice);
       registerResponseKind('fanjian-guess', resolveFanjianGuessChoice);
@@ -1458,11 +1479,24 @@
           var luoshenResult = triggerLuoshenPrepare(game, actor);
           if (luoshenResult && luoshenResult.suspended) return luoshenResult;
         }
+        // v12 G2: 神速 (夏侯渊) — 判定阶段开始前声明: 跳过阶段换无距离
+        // 虚拟【杀】。玩家经 pendingChoice 'shensu-options' 选择; AI 走
+        // 保守启发 (对手 1 血才动用选项一)。AI 虚拟杀若为玩家开出闪响应
+        // 窗口, 挂 pauseState.prepareResume 由选择排空后续跑。
+        if (hasSkill(state, 'shensu')) {
+          var shensuResult = triggerShensuPrepare(game, actor);
+          if (shensuResult && shensuResult.suspended) return shensuResult;
+        }
         return null;
       }
 
       function continueTurnAfterPreparePhase(game, actor) {
         setPhase(game, actor, 'judge');
+        // v12 G2: 神速 选项一 — 跳过判定阶段 (判定区牌保留, 下回合照常结算)。
+        if (game[actor].flags && game[actor].flags.skipJudge) {
+          log(game, actorName(game, actor) + '跳过判定阶段。');
+          return continueTurnAfterJudgeArea(game, actor);
+        }
         log(game, actorName(game, actor) + '的判定阶段。');
         var judgeResult = processJudgeArea(game, actor);
         if (judgeResult && judgeResult.suspended) {

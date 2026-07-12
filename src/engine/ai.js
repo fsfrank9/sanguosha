@@ -532,7 +532,13 @@
       maxActions = maxActions || 12;
       if (game.phase === 'gameover') return fail('游戏已经结束。');
 
-      if (game.turn !== actor || ['prepare', 'judge', 'draw'].indexOf(game.phase) < 0) {
+      // v12 G2 修复: 仅当回合不属于该 actor 时才开新回合。此前 phase 不在
+      // prepare/judge/draw 也会重启 — 但 endTurn 内部已自动 startTurn 下一
+      // 回合推进到出牌阶段, 且 pendingChoice 排空后的自动续跑也会把 phase
+      // 推到 play/discard: 两种情况下再调 runAITurn 都会 resetActorTurnState
+      // + 重跑准备阶段 (闭月/英姿/妄尊/神速 重复触发, 在途牌可被丢弃)。
+      // 同回合一律按当前阶段续跑, 不重启。
+      if (game.turn !== actor) {
         var started = startTurn(game, actor);
         if (!started.ok || game.phase === 'gameover') return started;
       }

@@ -2,7 +2,7 @@
 
 纯 HTML/CSS/JavaScript 实现的三国杀 1v1。原生 ES 模块 + GitHub Pages 静态托管:`src/` 就是浏览器加载的源码本身,根 `index.html` 是手写的模块入口——没有打包步骤、没有 npm 运行时依赖。
 
-**当前版本 `v12-F 收官`**:结构减重第二轮全部达线——F1 技能域整体迁往 `skills.js`(53 函数 1338 行),F5 牌结算链拆分(杀链 → 新 `sha-flow.js`,决斗/AOE/火攻/借刀/过河/五谷结算迁入 `tricks.js` 兑现其既定计划),F6 战场渲染域迁往 `panels/board-panels.js`。**game-engine 1941 行(验收 ≤2200 ✓),dom-adapter 1135 行(验收 ≤1200 ✓)**。43 个已实现技能(8 个主动)和 71 名武将;1v1 行为有测试护航。牌移动统一走 `moveCard` 原语并由全局牌数守恒断言护航;AI 具备转化 lookahead 与无懈/闪响应期望值决策。
+**当前版本 `v12-G 收官`**:风包 9 技能按官方规则全部接入——G1 据守/烈弓/狂骨,G2 神速/红颜/天香/雷击/鬼道/不屈,配套三框架(阶段跳过选择、花色视同层、濒死"创"区)。**49 个已实现技能**(8 个主动)和 71 名武将;黄天随 H 身份场激活、蛊惑留待多人评估。承接 F 收官(game-engine 1941 行 ✓ / dom-adapter 1135 行 ✓,域模块 skills/sha-flow/tricks/judge-area/damage-dying/response/equipment/ai)。牌移动统一走 `moveCard` 原语并由全局牌数守恒断言护航(含"创"区);AI 具备转化 lookahead 与无懈/闪响应期望值决策。
 
 ## 运行
 
@@ -61,7 +61,7 @@ docs/
 ## 内容现状
 
 - 武将 71 名 / 技能条目 128 条 / 唯一技能 ID 123 个。
-- 已接入引擎逻辑的技能 43 个(主动/交互 8 个:制衡、苦肉、仁德、反间、观星、青囊、洛神、结姻;风包首批:据守、烈弓、狂骨);未实现技能在 UI 中明确标记,不会"看起来有但触发不了"。标准包在 1v1 语境已封顶(余下激将/护驾/离间为多人专属,流离/同疾以 reserved hook 待多人激活);风包的神速/红颜/天香待专门框架(阶段跳过选择、花色视同层、伤害转移)后接入。
+- 已接入引擎逻辑的技能 49 个(主动/交互 8 个:制衡、苦肉、仁德、反间、观星、青囊、洛神、结姻;风包 9 技:据守、烈弓、狂骨、神速、红颜、天香、雷击、鬼道、不屈);未实现技能在 UI 中明确标记,不会"看起来有但触发不了"。标准包在 1v1 语境已封顶(余下激将/护驾/离间为多人专属,流离/同疾以 reserved hook 待多人激活);风包余下黄天随 H 身份场激活、蛊惑(多人质疑机制)留待多人评估。
 - 标准 + 军争核心牌组 39 张牌全部数据驱动;濒死/判定/响应窗口/无懈链/铁索传导等结算对照 `official-skill-cache/gltjk-sanguosha-rules` 官方规则集。
 - 技能逐项的引擎接入说明见 [`docs/history.md`](docs/history.md)。
 
@@ -86,7 +86,7 @@ docs/
 路线图见 [`docs/plans/2026-07-05-sanguosha-v12-roadmap.md`](docs/plans/2026-07-05-sanguosha-v12-roadmap.md)。**如实进度**(修复批核对后):
 
 1. **F 结构减重:收官,验收线双达标** — F1 技能域、F2 判定区、F3 PLAY_HANDLERS、F4 大厅面板、F5 牌结算链(杀链 sha-flow.js + 锦囊结算入 tricks.js)、F6 战场渲染域(board-panels.js)全部拆出;game-engine 1941 行(≤2200 ✓)/ dom-adapter 1135 行(≤1200 ✓)。
-2. **G 扩展包技能:首批 3 个落地**(据守/烈弓/狂骨,经修复批对齐官方规则);G0 风包 spec 独立 fixture 就位(5 将 6 技,官方页面爬取与 gid 核对待补);神速/红颜/天香待实现。
+2. **G 扩展包技能:收官** — 风包 9/11 技能接入(G1 据守/烈弓/狂骨 + G2 神速/红颜/天香/雷击/鬼道/不屈),fixture 扩至 8 将 11 技;验收"≥50"差 1 技为黄天(按计划随 H 激活即跨线),蛊惑留待多人评估。
 3. **H 多人模式:引擎侧最小骨架** — 座次工具、距离环、濒死救援座次队列、【杀】显式目标、3 人身份胜负判定;响应链多人化、其余牌类目标选择、多座 UI、身份技激活均未开始。
 4. **I AI 进阶:未开始**。
 
@@ -96,7 +96,7 @@ docs/
 
 - `tests/fixtures/official_standard_skills.json`:官网标准包武将/技能名紧凑 fixture(校验 catalog 一致性,恒 27 将)。
 - `tests/fixtures/official_standard_skill_specs.json`:可提交的结构化实现规格(来源 URL + `sourceTextRef` 摘要,不含原文)。
-- `tests/fixtures/official_wind_skills.json` / `official_wind_skill_specs.json`:风包独立 fixture(pack='风',5 将 6 技,含 `implementationStatus` 如实标记;gid 为临时编号、官方页面爬取待补,见文件内 `gidPolicy`/`rawCachePolicy`)。
+- `tests/fixtures/official_wind_skills.json` / `official_wind_skill_specs.json`:风包独立 fixture(pack='风',8 将 11 技,含 `implementationStatus` 如实标记;gid 为临时编号、官方页面爬取待补,见文件内 `gidPolicy`/`rawCachePolicy`)。
 - `.cache/sanguosha-official/`:本地原文缓存,已 gitignore 不入库。
 
 继续实现技能时按 cache-first 流程:先读本地缓存与已提交 specs,缓存缺失/过期才重新请求官网。

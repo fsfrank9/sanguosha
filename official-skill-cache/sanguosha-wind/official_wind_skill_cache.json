@@ -7,7 +7,7 @@
     "retrieval": "pending-crawl: 风包详情页尚未爬取; 条目由官方实体版规则文本人工转写。",
     "parser": "manual-transcription",
     "copyrightPolicy": "local gitignored development cache; do not commit official prose",
-    "gidPolicy": "provisional-local: gid 216-220 为本地临时编号 (顺接标准包缓存 214-215), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。"
+    "gidPolicy": "provisional-local: gid 216-223 为本地临时编号 (顺接标准包缓存 214-215), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。"
   },
   "includeFullSkillText": false,
   "containsOfficialText": false,
@@ -32,19 +32,21 @@
         {
           "name": "神速",
           "localSkillId": "shensu",
-          "implementationStatus": "pending",
+          "implementationStatus": "implemented",
           "sourceTextRef": "e1d93a03fefd",
           "sourceTextSha256": "e1d93a03fefddbecd7e3fc2d33ccf5412613c6ddc8c2f99a230f5642de5d325d",
           "implementationSpec": {
             "summary": "回合内可跳过指定阶段，每跳过一项视为使用一张无距离限制的【杀】。",
             "timing": "自己回合的判定阶段开始前声明，可选择一至两项。",
-            "condition": "选项一（跳过判定阶段和摸牌阶段）无附加条件；选项二需装备区有牌可弃。",
+            "condition": "选项一（跳过判定阶段和摸牌阶段）无附加条件；选项二需有装备牌可弃。",
             "cost": "跳过判定阶段和摸牌阶段（选项一）；跳过出牌阶段并弃置一张装备牌（选项二）。",
             "effect": "每选择一项，视为使用一张无距离限制的【杀】，不占出牌阶段【杀】的使用次数。",
             "frequency": "每回合每个选项至多一次。",
             "engineHooks": [
-              "planned.phaseSkipChoice",
-              "planned.virtualShaNoDistance"
+              "processPreparePhase",
+              "shensu-options",
+              "flags.skipJudge/skipDraw/skipPlay",
+              "playSha.ignoreDistance"
             ]
           }
         }
@@ -139,38 +141,158 @@
         {
           "name": "天香",
           "localSkillId": "tianxiang",
-          "implementationStatus": "pending",
+          "implementationStatus": "implemented",
           "sourceTextRef": "c5bc5863c64d",
           "sourceTextSha256": "c5bc5863c64dc7a7f905d8fcd6765e29e02fba5aa0191e2e9ac6946e697eb3b4",
           "implementationSpec": {
             "summary": "受到伤害时可弃红桃手牌，将伤害转移给攻击范围内一名角色并令其补牌。",
             "timing": "当你受到伤害时。",
-            "condition": "有红桃手牌，且你的攻击范围内存在其他角色。",
+            "condition": "有红桃手牌（红颜下黑桃视同），且你的攻击范围内存在其他角色。",
             "cost": "弃置一张红桃手牌。",
             "effect": "将此伤害转移给你攻击范围内的一名其他角色，然后其摸等同于其已损失体力值数量的牌。",
             "frequency": "每次受到伤害均可发动。",
             "engineHooks": [
-              "planned.damageTransfer",
-              "planned.redHeartDiscardCost"
+              "onDamageModify",
+              "transferTo",
+              "onTransferred",
+              "effectiveCardSuit"
             ]
           }
         },
         {
           "name": "红颜",
           "localSkillId": "hongyan",
-          "implementationStatus": "pending",
+          "implementationStatus": "implemented",
           "sourceTextRef": "a7b1eafbfdf3",
           "sourceTextSha256": "a7b1eafbfdf33c69040d29d6804b399c4ed1b5a00903472c480014f4afe9f931",
           "implementationSpec": {
             "summary": "锁定技：你的黑桃牌一律按红桃花色结算。",
-            "timing": "持续生效的花色视同层，覆盖手牌、装备与判定牌结算。",
+            "timing": "持续生效的花色视同层，覆盖判定牌与自有牌结算。",
             "condition": "锁定技，无发动条件。",
             "cost": "无成本。",
-            "effect": "你的黑桃牌视为红桃牌：如八卦判定必为红色、闪电判定永不命中你。",
+            "effect": "你的黑桃牌视为红桃牌：判定黑桃视为红桃（八卦必红、闪电/雷击永不命中）、黑桃杀不被仁王盾抵消、黑桃响应不触发银月枪、黑桃可作天香成本。",
             "frequency": "锁定技持续生效。",
             "engineHooks": [
-              "planned.suitViewLayer",
-              "planned.judgementSuitOverride"
+              "judge.hongyanView",
+              "effectiveCardSuit",
+              "effectiveCardColor"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 221,
+      "name": "周泰",
+      "localHeroId": "zhoutai",
+      "skills": [
+        {
+          "name": "不屈",
+          "localSkillId": "buqu",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "ccfdfeebaf94",
+          "sourceTextSha256": "ccfdfeebaf948c1bd3fb9af2d9aa4df7d9914810ed6c5d8cec1be8df3dbc0cf5",
+          "implementationSpec": {
+            "summary": "锁定技：濒死时置牌堆顶牌为\"创\"，点数均不同则体力回复至1点；有\"创\"时手牌上限受限。",
+            "timing": "当你处于濒死状态时。",
+            "condition": "锁定技强制发动。",
+            "cost": "无主动成本；武将牌上的\"创\"会压低手牌上限（X=体力上限-\"创\"数）。",
+            "effect": "将牌堆顶一张牌置为\"创\"：点数与已有\"创\"均不同则体力回复至1点，相同则置入弃牌堆。",
+            "frequency": "锁定技，每次濒死均触发。",
+            "engineHooks": [
+              "onDyingEnter",
+              "chuang-zone",
+              "handLimit"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 222,
+      "name": "张角",
+      "localHeroId": "zhangjiao",
+      "skills": [
+        {
+          "name": "雷击",
+          "localSkillId": "leiji",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "c2034327c035",
+          "sourceTextSha256": "c2034327c035570bc6658e04bac7de35bb62ed7cd1301ab4378f75fe0c581ee2",
+          "implementationSpec": {
+            "summary": "使用或打出【闪】时可令一名其他角色判定，黑桃则受2点雷电伤害。",
+            "timing": "当你使用或打出【闪】时（含八卦视为打出）。",
+            "condition": "场上存在其他存活角色。",
+            "cost": "无成本，可选发动。",
+            "effect": "令一名其他角色进行判定：若结果为黑桃，你对其造成2点雷电伤害。",
+            "frequency": "每次使用或打出【闪】均可发动。",
+            "engineHooks": [
+              "onShanUsed",
+              "judge",
+              "damage.thunder"
+            ]
+          }
+        },
+        {
+          "name": "鬼道",
+          "localSkillId": "guidao",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "1ade23c9b31a",
+          "sourceTextSha256": "1ade23c9b31aa8d356d63bd78ce58cd80cb63a30a89949f51064082ee18d53e6",
+          "implementationSpec": {
+            "summary": "任意角色的判定牌生效前，可打出一张黑色牌替换之。",
+            "timing": "一名角色的判定牌生效前。",
+            "condition": "手牌中有黑色牌。",
+            "cost": "打出一张黑色手牌。",
+            "effect": "以打出的黑色牌替换原判定牌，原判定牌置入弃牌堆。",
+            "frequency": "每次判定均可发动。",
+            "engineHooks": [
+              "onJudgementBeforeResolve",
+              "guidao-replace"
+            ]
+          }
+        },
+        {
+          "name": "黄天",
+          "localSkillId": "huangtian",
+          "implementationStatus": "pending",
+          "sourceTextRef": "30f12509ddc5",
+          "sourceTextSha256": "30f12509ddc575d6b912a294bf667c2bf95be3dd8278500266307a4ee734264b",
+          "implementationSpec": {
+            "summary": "主公技：其他群势力角色可在其出牌阶段将【闪】或【闪电】交给你。",
+            "timing": "其他群势力角色的出牌阶段。",
+            "condition": "你为主公且身份场启用（1v1 无同阵营给牌方，随 H 身份场激活）。",
+            "cost": "给牌方交出一张【闪】或【闪电】。",
+            "effect": "你获得该【闪】或【闪电】。",
+            "frequency": "官方 FAQ：每名角色每阶段限一次。",
+            "engineHooks": [
+              "pending.identityMode",
+              "planned.giveCardAction"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 223,
+      "name": "于吉",
+      "localHeroId": "yuji",
+      "skills": [
+        {
+          "name": "蛊惑",
+          "localSkillId": "guhuo",
+          "implementationStatus": "pending",
+          "sourceTextRef": "c8a0d017a631",
+          "sourceTextSha256": "c8a0d017a6318fc1960f1a5b6b4fe66c166401ffe210153ed1e75cdd3b1f0b21",
+          "implementationSpec": {
+            "summary": "扣置手牌声明为任意基本牌或非延时锦囊，经质疑流程后按声明结算。",
+            "timing": "需要使用或打出基本牌/非延时锦囊时。",
+            "condition": "有手牌可扣置；质疑机制需要多名角色参与。",
+            "cost": "扣置一张手牌（声明为假且被质疑时弃置）。",
+            "effect": "无人质疑则按声明结算；被质疑则翻开验证，按真伪奖惩。",
+            "frequency": "不限次数。",
+            "engineHooks": [
+              "pending.multiplayerChallenge"
             ]
           }
         }

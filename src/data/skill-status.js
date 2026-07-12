@@ -33,7 +33,12 @@
         // v12 G1 (修复批): 风包首批 — 据守 (曹仁) / 烈弓 (黄忠) / 狂骨 (魏延)。
         // 神速/红颜 曾被虚报为已实现 (神速 = 无成本虚拟杀、红颜 = 零实现),
         // 按"宁缺毋滥"撤出名单, 待阶段跳过框架 / 花色视同层落地后再接入。
-        'jushou', 'liegong', 'kuanggu'
+        'jushou', 'liegong', 'kuanggu',
+        // v12 G2 (风包第二批): 神速 (阶段跳过框架) / 红颜 (花色视同层) /
+        // 天香 (伤害转移) / 雷击+鬼道 (张角) / 不屈 (周泰, 濒死"创"区)。
+        // 黄天 (张角主公技) 随 H 身份场激活; 蛊惑 (于吉) 为多人质疑机制,
+        // 按"宁缺毋滥"均暂不接入 — spec 已入风包 fixture 如实标注。
+        'shensu', 'hongyan', 'tianxiang', 'leiji', 'guidao', 'buqu'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,

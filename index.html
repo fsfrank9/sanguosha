@@ -489,6 +489,23 @@
             <button class="btn small" id="luoshenStopBtn">结束</button>
           </div>
         </div>
+        <!-- v12 G2: 神速 (夏侯渊) — 准备阶段开始前声明至多两项选择, 选项二 /
+             一+二 需额外弃置一张装备牌。四个动作按钮 + 装备候选区都在面板
+             内部自管 (本地选中态 + 专属确认按钮), 与 guanshi/zhiheng 自建
+             多选面板同构, 不复用全局 stage() 两步机制 (那套只适合单张候选)。 -->
+        <div class="shensu-options-panel pending-prompt-panel" id="shensuOptionsPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="shensuOptionsHint">神速：可选择至多两项，每项视为使用一张无距离限制的【杀】</span>
+          <div class="shensu-options-actions pending-prompt-panel__actions">
+            <button class="btn small" id="shensuDeclineBtn">不发动</button>
+            <button class="btn small" id="shensuOptionOneBtn">仅选项一：跳过判定/摸牌</button>
+            <button class="btn small" id="shensuOptionTwoBtn">仅选项二：跳过出牌弃装备</button>
+            <button class="btn small" id="shensuBothBtn">选项一 + 二</button>
+          </div>
+          <div class="shensu-equip-candidates pending-prompt-panel__choices" id="shensuEquipCandidates" aria-live="polite"></div>
+          <div class="shensu-confirm-actions pending-prompt-panel__actions">
+            <button class="btn small" id="shensuConfirmEquipBtn" hidden>确认弃置装备</button>
+          </div>
+        </div>
         <!-- v9 PR-E25/E26: 闪响应面板 — 被【杀】攻击时玩家选用哪张牌当【闪】.
              v10 V4: 万箭齐发/银月枪 玩家闪响应也复用此面板.
              choices 容器由 renderPendingChoice 据 pending.options 动态填充

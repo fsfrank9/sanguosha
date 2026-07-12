@@ -32,6 +32,8 @@
     var flags = ensureFlags(state);
     flags.skipPlay = false;
     flags.skipDraw = false;
+    // v12 G2: 神速 选项一 — 跳过判定阶段标记 (回合级)
+    flags.skipJudge = false;
     flags.zhihengUsed = false;
     flags.fanjianUsed = false;
     flags.guanxingUsed = false;
@@ -52,6 +54,7 @@
 
   function resetEndOfTurnState(state) {
     if (!state) return;
+    if (state.flags) state.flags.skipJudge = false;
     state.usedSha = false;
     state.usedOrRespondedSha = false;
     state.shaBonus = 0;
