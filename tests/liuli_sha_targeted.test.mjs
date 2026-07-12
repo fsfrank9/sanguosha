@@ -34,7 +34,8 @@ test('v8 PR-C2: SKILL_METADATA 已注册 liuli (trigger=shaTargetedAfter)', () =
 
 test('v8 PR-C2: 引擎注册 liuli onShaTargeted hook + 调用 triggerLiuliOnShaTargeted', () => {
   assert.match(skillsSrc, /SkillRuntime\.registerSkill\(skillRegistry,\s*'liuli'/);
-  assert.match(engineSrc, /function triggerLiuliOnShaTargeted/);
+  // v12 F1: 流离 helper 已迁往 skills.js
+  assert.match(skillsSrc, /function triggerLiuliOnShaTargeted/);
 });
 
 test('v8 PR-C2: playSha 在 cixiong 后触发 onShaTargeted hook', () => {
