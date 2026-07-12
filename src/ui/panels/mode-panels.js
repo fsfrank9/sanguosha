@@ -20,7 +20,13 @@
     var pendingTiesuoCardId = null;
     var pendingTargetCardId = null;
     var pendingTargetZone = null;
+    // v12 H6: identity3 座席点选完成后, 目标区域/火攻面板显式带上该座席
+    // (null = 缺省 'enemy', 1v1 行为逐字不变)。showTargetZonePanel(cardId) /
+    // showHuogongPanel(cardId) 的既有签名受守护测试锁定 (v29/v30), 不能加参
+    // 数; 改用 ...ForSeat 包装入口先设本变量再调用原函数。
+    var pendingTargetSeatActor = null;
     var pendingHuogongCardId = null;
+    var pendingHuogongSeatActor = null;
     var pendingConversionCardId = null;
     // v6.1 guanxing pendingChoice tracking: three queues (unassigned / top /
     // bottom). `guanxingSelected` is the currently highlighted card id from
@@ -52,10 +58,18 @@
       if (els.handHint) els.handHint.textContent = '选择目标区域：手牌、装备区或延时锦囊区';
     }
 
+    // v12 H6: identity3 座席点选后带显式目标进入目标区域面板 (过河拆桥/顺手
+    // 牵羊在 identity3 复用同一套"选区域→选具体牌"富交互, 仅目标座席不同)。
+    function showTargetZonePanelForSeat(cardId, seatActor) {
+      pendingTargetSeatActor = seatActor || null;
+      showTargetZonePanel(cardId);
+    }
+
     function hideTargetZonePanel() {
       var game = getGame();
       pendingTargetCardId = null;
       pendingTargetZone = null;
+      pendingTargetSeatActor = null;
       if (getStaged() && getStaged().kind === 'target') setStaged(null);
       if (els.targetZonePanel) els.targetZonePanel.hidden = true;
       if (els.targetCardChoices) els.targetCardChoices.innerHTML = '<span class="mini-card">先选择一个区域，再点具体目标牌</span>';
@@ -64,6 +78,7 @@
     function hideHuogongPanel() {
       var game = getGame();
       pendingHuogongCardId = null;
+      pendingHuogongSeatActor = null;
       if (getStaged() && getStaged().kind === 'huogong') setStaged(null);
       if (els.huogongModePanel) els.huogongModePanel.hidden = true;
       if (els.huogongRevealText) els.huogongRevealText.textContent = '火攻：等待展示目标手牌';
@@ -227,7 +242,9 @@
       var game = getGame();
       pendingHuogongCardId = cardId;
       if (els.huogongModePanel) els.huogongModePanel.hidden = false;
-      var choice = Engine.getHuogongChoice(game, 'player');
+      // v12 H6: identity3 座席点选传入的显式目标 (缺省 undefined → 引擎/预览
+      // 回退对手, 1v1 行为逐字不变)。
+      var choice = Engine.getHuogongChoice(game, 'player', pendingHuogongSeatActor || undefined);
       if (!choice.ok || !choice.revealedCard) {
         if (els.huogongRevealText) els.huogongRevealText.textContent = '火攻：目标没有手牌，可直接结算无伤害';
         if (els.huogongCostChoices) els.huogongCostChoices.innerHTML = '<span class="mini-card">目标无手牌，无需弃牌</span>';
@@ -240,6 +257,12 @@
       html += '<span class="badge">不可用</span>' + (unusable.length ? unusable.map(function (card) { return huogongCostButton(card, false); }).join('') : '<span class="mini-card">无</span>');
       if (els.huogongCostChoices) els.huogongCostChoices.innerHTML = html;
       if (els.handHint) els.handHint.textContent = '火攻：选择一张同花色手牌，或点“不弃牌结算”';
+    }
+
+    // v12 H6: identity3 座席点选后带显式目标进入火攻成本面板。
+    function showHuogongPanelForSeat(cardId, seatActor) {
+      pendingHuogongSeatActor = seatActor || null;
+      showHuogongPanel(cardId);
     }
 
     function targetZoneLabel(zone) {
@@ -260,7 +283,8 @@
       // v9 PR-E23: 重选区域 → 旧 stage 失效
       if (getStaged() && getStaged().kind === 'target') setStaged(null);
       pendingTargetZone = zone;
-      var choices = Engine.getTargetZoneCards(game, 'enemy', zone);
+      // v12 H6: identity3 座席点选传入的显式目标 (缺省 'enemy', 1v1 不变)。
+      var choices = Engine.getTargetZoneCards(game, pendingTargetSeatActor || 'enemy', zone);
       var label = targetZoneLabel(zone);
       if (!choices.length) {
         els.targetCardChoices.innerHTML = '<span class="badge">' + escapeHtml(label) + '</span><span class="mini-card">该区域没有可选择的牌，请换一个区域</span>';
@@ -280,7 +304,11 @@
     function resolveTargetCard(zone, targetCardId) {
       var game = getGame();
       if (!pendingTargetCardId || !game || !targetCardId) return;
-      var result = Engine.playCard(game, 'player', pendingTargetCardId, { targetZone: zone, targetCardId: targetCardId });
+      var options = { targetZone: zone, targetCardId: targetCardId };
+      // v12 H6: identity3 座席点选的显式目标透传 (缺省不传 → 引擎回退对手,
+      // 1v1 行为逐字不变)。
+      if (pendingTargetSeatActor) options.target = pendingTargetSeatActor;
+      var result = Engine.playCard(game, 'player', pendingTargetCardId, options);
       hideTargetZonePanel();
       if (!result.ok) game.log.push(result.message);
       render();
@@ -289,11 +317,16 @@
     function resolveHuogong(costCardId, decline) {
       var game = getGame();
       if (!pendingHuogongCardId || !game) return;
-      var enemyHpBefore = game.enemy.hp;
-      var result = Engine.playCard(game, 'player', pendingHuogongCardId, decline ? { declineHuogong: true } : { huogongCostCardId: costCardId });
+      // v12 H6: identity3 座席点选的显式目标 (缺省 'enemy', 1v1 行为不变) —
+      // hp-before 快照与 flashHero 跟着实际目标座席走, 而非硬编码 enemy。
+      var targetActor = pendingHuogongSeatActor || 'enemy';
+      var targetHpBefore = game[targetActor] ? game[targetActor].hp : 0;
+      var options = decline ? { declineHuogong: true } : { huogongCostCardId: costCardId };
+      if (pendingHuogongSeatActor) options.target = pendingHuogongSeatActor;
+      var result = Engine.playCard(game, 'player', pendingHuogongCardId, options);
       hideHuogongPanel();
       if (!result.ok) game.log.push(result.message);
-      if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
+      if (game[targetActor] && game[targetActor].hp < targetHpBefore) flashHero(targetActor);
       render();
     }
 
@@ -331,6 +364,163 @@
       if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
       if (game.player.hp < playerHpBefore) flashHero('player');
       render();
+    }
+
+    // ───── v12 H6: identity3 座席点选 (通用骨架) ─────────────────────────
+    // 卡牌单目标点选 (杀/决斗/拆/顺/火攻/乐/兵/借刀/桃/无中) 与主动技目标
+    // 点选 (激将单座 / 离间双座顺序选) 共用同一套"高亮候选座席 → 点击英雄卡
+    // → 完成"交互骨架: startSeatPicker 记录合法座席 + 还需点几个, 满足后
+    // 回调 onComplete(pickedSeats), 未满足则继续等待下一次点击; 取消随时可
+    // 退出 (cancelSeatPicker)。面板本身是 #seatTargetModePanel (hint + 取消),
+    // 合法座席高亮由 board-panels.js 的 renderHero() 据
+    // activeSeatPickerLegalSeats() 加 .is-target-selectable class。
+    var seatPicker = null; // { legalSeats, needed, picked, onComplete, hintText }
+
+    function activeSeatPickerLegalSeats() {
+      return seatPicker ? seatPicker.legalSeats : null;
+    }
+
+    function startSeatPicker(opts) {
+      seatPicker = {
+        legalSeats: opts.legalSeats,
+        needed: opts.needed || 1,
+        picked: [],
+        onComplete: opts.onComplete,
+        hintText: opts.hintText
+      };
+      if (els.seatTargetModePanel) els.seatTargetModePanel.hidden = false;
+      if (els.seatTargetModeHint) els.seatTargetModeHint.textContent = opts.hintText || '选择目标：点击场上高亮的角色';
+      render();
+    }
+
+    function cancelSeatPicker() {
+      seatPicker = null;
+      if (els.seatTargetModePanel) els.seatTargetModePanel.hidden = true;
+    }
+
+    // 点击一个座席的英雄卡 (由 dom-adapter 的 hero 元素 click 绑定调用)。
+    // 非法/重复座席忽略; 凑够 needed 数后取出 picker、清面板、再回调 —
+    // 回调内部可能再次 startSeatPicker (如离间选完成本牌后没有二次选取,
+    // 但预留顺序: 先清空当前 picker 状态, 避免回调里的新 picker 被误清)。
+    function clickSeatForPicker(seat) {
+      if (!seatPicker) return;
+      if (seatPicker.legalSeats.indexOf(seat) < 0) return;
+      if (seatPicker.picked.indexOf(seat) >= 0) return;
+      seatPicker.picked.push(seat);
+      if (seatPicker.picked.length < seatPicker.needed) {
+        if (els.seatTargetModeHint) {
+          els.seatTargetModeHint.textContent = (seatPicker.hintText || '') + '（已选 ' + seatPicker.picked.length + ' / ' + seatPicker.needed + '）';
+        }
+        render();
+        return;
+      }
+      var picked = seatPicker.picked.slice();
+      var onComplete = seatPicker.onComplete;
+      cancelSeatPicker();
+      onComplete(picked);
+    }
+
+    // v12 H6: 单目标牌类型表 — 杀 (isShaCard 覆盖 sha/fire_sha/thunder_sha) +
+    // 决斗/拆/顺/火攻/乐/兵/借刀/桃/无中。铁索 (至多 2 目标) 与南蛮/万箭/
+    // 桃园/五谷/酒 等 AOE/自身/无目标牌不在此列, identity3 下沿用引擎缺省
+    // (照旧, 与 1v1 相同路径)。
+    var SEAT_TARGET_CARD_TYPES = ['juedou', 'guohe', 'shunshou', 'huogong', 'lebusishu', 'bingliang', 'jiedao', 'tao', 'wuzhong'];
+
+    function isSeatTargetCard(card) {
+      return !!card && (Engine.isShaCard(card) || SEAT_TARGET_CARD_TYPES.indexOf(card.type) >= 0);
+    }
+
+    // identity3 下选中一张单目标手牌时尝试进入座席点选模式; 返回 false 表示
+    // 不适用 (非 identity3 / 非单目标牌类型 / 无合法目标), 调用方应回退原
+    // "点牌即出" 路径。
+    function tryEnterSeatTargetMode(cardId) {
+      var game = getGame();
+      var card = findPlayerCard(cardId);
+      if (!game || game.mode !== 'identity3' || !isSeatTargetCard(card)) return false;
+      var legalSeats = Engine.legalTargetsForCard(game, 'player', card);
+      if (!legalSeats.length) return false;
+      startSeatPicker({
+        legalSeats: legalSeats,
+        needed: 1,
+        hintText: '选择【' + card.name + '】的目标：点击场上高亮的角色',
+        onComplete: function (seats) { resolveCardSeatTarget(cardId, seats[0]); }
+      });
+      return true;
+    }
+
+    // 借刀先选持刀者 (An), 受害者 (Bn) 缺省为自己 (与 1v1 旧行为一致,
+    // v12 H6 范围内只做 target 一段); 拆/顺/火攻座席确定后转入既有富选择
+    // 流程 (选区域/选具体牌, 或火攻自选成本牌) 而非直接结算, 保持与 1v1
+    // 同等交互深度; 其余单目标牌直接结算。
+    function resolveCardSeatTarget(cardId, seat) {
+      var game = getGame();
+      var card = findPlayerCard(cardId);
+      if (card && (card.type === 'guohe' || card.type === 'shunshou')) {
+        showTargetZonePanelForSeat(cardId, seat);
+        render();
+        return;
+      }
+      if (card && card.type === 'huogong') {
+        showHuogongPanelForSeat(cardId, seat);
+        render();
+        return;
+      }
+      var hpBefore = {};
+      Engine.seatList(game).forEach(function (s) { hpBefore[s] = game[s].hp; });
+      var result = Engine.playCard(game, 'player', cardId, { target: seat });
+      if (!result.ok) game.log.push(result.message);
+      Engine.seatList(game).forEach(function (s) { if (game[s].hp < hpBefore[s]) flashHero(s); });
+      render();
+    }
+
+    // v12 H6: 激将 (刘备主公技) — 出牌阶段选一名目标角色, 令蜀势力角色代出
+    // 【杀】(引擎 triggerJijiangActiveSkill 处理代打/合法性)。1v1 中虽也可能
+    // 持有该技能, 但同势力候选恒空, 沿用旧的通用 useSkill 直调路径 (仍会
+    // 因缺目标失败, 与改动前行为一致); 本入口只在 identity3 接管。
+    function tryEnterJijiangTargetMode() {
+      var game = getGame();
+      if (!game || game.mode !== 'identity3') return false;
+      var legalSeats = Engine.aliveSeats(game).filter(function (s) { return s !== 'player'; });
+      if (!legalSeats.length) return false;
+      startSeatPicker({
+        legalSeats: legalSeats,
+        needed: 1,
+        hintText: '激将：选择一名角色作为目标，令蜀势力角色代出【杀】',
+        onComplete: function (seats) {
+          var playerHpBefore = game.player.hp;
+          var result = Engine.useSkill(game, 'player', 'jijiang', [], { target: seats[0] });
+          if (!result.ok) game.log.push(result.message);
+          if (game.player.hp < playerHpBefore) flashHero('player');
+          render();
+        }
+      });
+      return true;
+    }
+
+    // v12 H6: 离间 (貂蝉) — 弃 1 张成本牌 (由 dom-adapter 的 confirmCardSkill
+    // 走既有 cardSkillConfig 流程先收好) 后, 依次选两名男性角色 (不含自己)。
+    // 返回 false 表示无合法双人组合 (调用方回退旧的直调 useSkill, 会因目标
+    // 不足报错, 与改动前行为一致)。
+    function startLijianTargetPicker(costCardIds) {
+      var game = getGame();
+      if (!game) return false;
+      var legalSeats = Engine.aliveSeats(game).filter(function (s) {
+        return s !== 'player' && game[s] && game[s].gender === 'male';
+      });
+      if (legalSeats.length < 2) return false;
+      startSeatPicker({
+        legalSeats: legalSeats,
+        needed: 2,
+        hintText: '离间：依次选择两名男性角色（不含你自己），令他们决斗',
+        onComplete: function (seats) {
+          var playerHpBefore = game.player.hp;
+          var result = Engine.useSkill(game, 'player', 'lijian', costCardIds, { targets: seats });
+          if (!result.ok) game.log.push(result.message);
+          if (game.player.hp < playerHpBefore) flashHero('player');
+          render();
+        }
+      });
+      return true;
     }
 
     // v11 B2: 观星模式面板渲染 (原 renderPendingChoice 内嵌块)。
@@ -423,6 +613,14 @@
         });
       });
       if (els.targetCancelBtn) els.targetCancelBtn.addEventListener('click', function () { hideTargetZonePanel(); render(); });
+      // v12 H6: identity3 座席点选 — 取消按钮 + 三席英雄卡点击 (点选中的合法
+      // 座席才生效, clickSeatForPicker 内部已校验)。
+      if (els.seatTargetCancelBtn) els.seatTargetCancelBtn.addEventListener('click', function () { cancelSeatPicker(); render(); });
+      ['player', 'enemy', 'ally'].forEach(function (seat) {
+        var heroEl = els[seat + 'Hero'];
+        if (!heroEl) return;
+        heroEl.addEventListener('click', function () { clickSeatForPicker(seat); });
+      });
     }
 
 
@@ -430,8 +628,10 @@
       showTiesuoPanel: showTiesuoPanel,
       hideTiesuoPanel: hideTiesuoPanel,
       showTargetZonePanel: showTargetZonePanel,
+      showTargetZonePanelForSeat: showTargetZonePanelForSeat,
       hideTargetZonePanel: hideTargetZonePanel,
       showHuogongPanel: showHuogongPanel,
+      showHuogongPanelForSeat: showHuogongPanelForSeat,
       hideHuogongPanel: hideHuogongPanel,
       showConversionPanel: showConversionPanel,
       hideConversionPanel: hideConversionPanel,
@@ -447,6 +647,13 @@
       resolveHuogong: resolveHuogong,
       resolveConversion: resolveConversion,
       showTargetCardChoices: showTargetCardChoices,
+      // v12 H6: identity3 座席点选 API — 卡牌目标 / jijiang / lijian 三入口 +
+      // 高亮查询 (board-panels 渲染用) + 取消。
+      tryEnterSeatTargetMode: tryEnterSeatTargetMode,
+      tryEnterJijiangTargetMode: tryEnterJijiangTargetMode,
+      startLijianTargetPicker: startLijianTargetPicker,
+      activeSeatPickerLegalSeats: activeSeatPickerLegalSeats,
+      cancelSeatPicker: cancelSeatPicker,
       render: renderModePanels,
       bind: bindModePanels
     };

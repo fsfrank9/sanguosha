@@ -268,6 +268,31 @@
       grid-template-columns: minmax(220px, 300px) 1fr minmax(260px, 360px);
     }
 
+    /* v12 H6: 3人身份场第三席 (ally) — 默认 display:none (1v1 零回归,
+       #allyZone 不参与 .duel-table grid 自动布局); identity3 对局中 JS 摘掉
+       hidden 属性显示。列模板照搬 .opponent-zone (判定区 | 英雄 | 装备区),
+       复用同一视觉语言而非新造。 */
+    .ally-zone {
+      display: grid;
+      grid-template-columns: minmax(220px, 300px) 1fr minmax(220px, 300px);
+      gap: 8px;
+      align-items: stretch;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .ally-zone[hidden] {
+      display: none !important;
+    }
+
+    /* v12 H6: identity3 对局在 opponent-zone 之下插入 ally-zone, 5 行网格
+       需要显式 grid-template-rows (否则 ally-zone 撑开的隐式行会挤压
+       hand-dock 回退到内容自适应高度)。1v1 (无 .is-identity3 class) 完全
+       不受影响, 沿用上方 4 行模板。 */
+    .duel-table.is-identity3 {
+      grid-template-rows: minmax(90px, .8fr) minmax(90px, .8fr) minmax(130px, .85fr) minmax(90px, .8fr) minmax(160px, 1.1fr);
+    }
+
     .arena-zone {
       display: grid;
       grid-template-columns: minmax(260px, .92fr) minmax(300px, 1.08fr);

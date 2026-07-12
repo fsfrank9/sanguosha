@@ -37,14 +37,21 @@
         els[actor + 'HandCount'].textContent = state.hand.length;
         els[actor + 'Hero'].setAttribute('data-camp', state.camp);
         els[actor + 'Hero'].classList.toggle('is-chained', !!state.chained);
+        // v12 H6: identity3 单目标牌/主动技 座席点选模式 — 合法目标座席
+        // 高亮 (view.seatTargetLegalSeats 为 null 时恒 false, 1v1 零回归)。
+        els[actor + 'Hero'].classList.toggle('is-target-selectable',
+          !!(view.seatTargetLegalSeats && view.seatTargetLegalSeats.indexOf(actor) >= 0));
         // v9 PR-E4: 主公徽章 — 由 view.game.roles[actor] === '主公' 决定显隐.
         // v9 PR-E14: 反贼徽章 — 同样由 view.game.roles[actor] === '反贼' 决定显隐.
         //   用户反馈: 之前只显主公不显反贼, 信息不对称.
+        // v12 H6: 忠臣徽章 — 3人身份场第三席身份标签, 同一 role 三态互斥显示.
         var role = view.game && view.game.roles && view.game.roles[actor];
         var lordBadge = els[actor + 'LordBadge'];
         if (lordBadge) lordBadge.hidden = role !== '主公';
         var rebelBadge = els[actor + 'RebelBadge'];
         if (rebelBadge) rebelBadge.hidden = role !== '反贼';
+        var loyalistBadge = els[actor + 'LoyalistBadge'];
+        if (loyalistBadge) loyalistBadge.hidden = role !== '忠臣';
         if (els[actor + 'Ribbon']) els[actor + 'Ribbon'].textContent = state.camp;
         if (actor === 'player') {
           lobbyPanels.renderPlayerSkillBar({
@@ -278,6 +285,11 @@
         if (els.enemyEquipmentArea) els.enemyEquipmentArea.innerHTML = equipmentCards(view.game.enemy.equipment);
         if (els.playerJudgeArea) els.playerJudgeArea.innerHTML = zoneCards(view.game.player.judgeArea, '空');
         if (els.enemyJudgeArea) els.enemyJudgeArea.innerHTML = zoneCards(view.game.enemy.judgeArea, '空');
+        // v12 H6: 3人身份场第三席装备/判定区 (1v1 无 view.game.ally, 不渲染).
+        if (view.game.ally) {
+          if (els.allyEquipmentArea) els.allyEquipmentArea.innerHTML = equipmentCards(view.game.ally.equipment);
+          if (els.allyJudgeArea) els.allyJudgeArea.innerHTML = zoneCards(view.game.ally.judgeArea, '空');
+        }
       }
 
       function suitLabel(suit) {
@@ -307,14 +319,22 @@
 
     function renderBoard(viewState) {
       view = viewState;
+      // v12 H6: 3人身份场第三席 (ally) — game.mode==='identity3' 时才存在
+      // game.ally / 显示 #allyZone; 1v1 duelTable 不带 .is-identity3 class,
+      // #allyZone 保持 [hidden] (CSS display:none), 零回归。
+      var identity3 = !!(view.game && view.game.mode === 'identity3');
+      if (els.duelTable) els.duelTable.classList.toggle('is-identity3', identity3);
+      if (els.allyZone) els.allyZone.hidden = !identity3;
       renderHero('player');
       renderHero('enemy');
+      if (identity3) renderHero('ally');
       renderHand();
       renderLog();
       renderStatus();
       renderPhaseTrack();
       renderZones();
       els.enemyHandBacks.innerHTML = miniBacks(view.game.enemy.hand.length);
+      if (identity3 && els.allyHandBacks) els.allyHandBacks.innerHTML = miniBacks(view.game.ally.hand.length);
     }
 
     function renderLogWithView(viewState) {
