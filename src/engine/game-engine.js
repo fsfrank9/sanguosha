@@ -590,15 +590,9 @@
         discardCard: function (g, c) { return discardCard(g, c); },
         drawCards: function (g, a, n) { return drawCards(g, a, n); },
         finishTrickUse: function (g, a, c, r, o) { return finishTrickUse(g, a, c, r, o); },
-        finishWugu: function (g, ctx) { return finishWugu(g, ctx); },
-        peekHuogongReveal: function (g, a) { return peekHuogongReveal(g, a); },
-        playAOE: function (g, a, c, rt, t) { return playAOE(g, a, c, rt, t); },
-        playDuel: function (g, a, c) { return playDuel(g, a, c); },
         removeCardFromHand: function (s, id) { return removeCardFromHand(s, id); },
         removeFirstMatchingCard: function (s, p) { return removeFirstMatchingCard(s, p); },
         removeTargetZoneCard: function (g, t, z, id) { return removeTargetZoneCard(g, t, z, id); },
-        resolveGuohe1v1: function (g, s, t, o) { return resolveGuohe1v1(g, s, t, o); },
-        resolveJiedaoDecision: function (g, s, o, c, op) { return resolveJiedaoDecision(g, s, o, c, op); },
         scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); },
         // v11 D1 (批次 33): AI 无懈期望值 — ai 域后置装配, 包装注入
         // v12 F5: 锦囊结算函数迁入所需能力 — 杀链域后置装配, 经闭包晚绑定
