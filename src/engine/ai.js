@@ -28,6 +28,8 @@
     var discardSelected = deps.discardSelected;
     var needsDiscard = deps.needsDiscard;
     var getDiscardCount = deps.getDiscardCount;
+    // v12 H5: 座席级合法目标矩阵 (出杀目标挑选)
+    var legalTargetsForCard = deps.legalTargetsForCard;
     var getHuogongChoice = deps.getHuogongChoice;
     // v11 C5 (批次 29): 锦囊类转化候选枚举 (与 UI 转化面板同源)
     var listCardConversions = deps.listCardConversions;
@@ -157,6 +159,18 @@
     function aiPrimaryFoe(game, actor) {
       var candidates = StateRuntime.hostileSeats(game, actor);
       return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : (candidates[0] || opponent(actor));
+    }
+
+    // v12 H5: AI 出杀目标 — 合法目标矩阵 ∩ 敌对座席 (1v1 恒为对手)。
+    // canPlayCard 的 ∃-目标语义包含友方座席 (玩家可显式指定), AI 必须
+    // 另行确认存在"可达且敌对"的目标, 否则不出杀 / 不转化。
+    function aiShaTargetSeat(game, actor, card) {
+      if (!legalTargetsForCard) return opponent(actor);
+      var candidates = legalTargetsForCard(game, actor, card).filter(function (seat) {
+        return StateRuntime.isHostileSeat(game, actor, seat);
+      });
+      if (!candidates.length) return null;
+      return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : candidates[0];
     }
 
     // v8 PR-D1: 出牌/锦囊 score 精细化。对 桃 / 杀 / 决斗 / 锦囊 都按
@@ -371,14 +385,18 @@
       self.hand.forEach(function (card) {
         // Original-card use.
         if (canPlayCard(game, actor, card).ok) {
-          // v8 PR-D3: 用 lookahead 综合分; sim 失败回退到 scoreCardForAI
-          var normalScore = aiScoreCardWithLookahead(game, actor, card, 'normal');
-          if (normalScore > 0) candidates.push({ card: card, mode: 'normal', score: normalScore });
+          // v12 H5: 杀类另行确认存在可达敌对目标 (∃-目标语义含友方座席)
+          if (!isShaType(card.type) || aiShaTargetSeat(game, actor, card)) {
+            // v8 PR-D3: 用 lookahead 综合分; sim 失败回退到 scoreCardForAI
+            var normalScore = aiScoreCardWithLookahead(game, actor, card, 'normal');
+            if (normalScore > 0) candidates.push({ card: card, mode: 'normal', score: normalScore });
+          }
         }
         // As-Sha conversion (武圣 / 龙胆). Skip cards that are already
         // 杀 — no conversion needed.
         if (!isShaType(card.type)) {
-          if (canPlayCardAs(game, actor, card, 'sha').ok) {
+          if (canPlayCardAs(game, actor, card, 'sha').ok
+              && aiShaTargetSeat(game, actor, { type: 'sha', name: '杀', color: card.color, suit: card.suit })) {
             var asScore = aiScoreCardWithLookahead(game, actor, card, 'asSha');
             if (asScore > 0) candidates.push({ card: card, mode: 'asSha', score: asScore });
           }
@@ -406,7 +424,8 @@
       var self = game[actor];
       if (!self) return null;
       self.flags = self.flags || {};
-      var target = game[aiPrimaryFoe(game, actor)];
+      var primaryFoeSeat = aiPrimaryFoe(game, actor);
+      var target = game[primaryFoeSeat];
 
       // 观星: free information; fire once per turn whenever deck has cards.
       if (hasSkill(self, 'guanxing') && !self.flags.guanxingUsed && game.deck.length > 0) {
@@ -455,7 +474,8 @@
         var jieyinCandidates = self.hand
           .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
           .sort(function (a, b) { return a.score - b.score; });
-        return { skillId: 'jieyin', cardIds: [jieyinCandidates[0].card.id, jieyinCandidates[1].card.id] };
+        // v12 H5: 显式目标座席 (评估与执行同一目标, 多席不误指友方)
+        return { skillId: 'jieyin', cardIds: [jieyinCandidates[0].card.id, jieyinCandidates[1].card.id], options: { target: primaryFoeSeat } };
       }
 
       // 青囊: heal whenever 自身 is wounded and 有手牌可弃。优先自救；
@@ -525,7 +545,8 @@
           // score card if every hand card is a spade.
           var nonSpade = fanjianCandidates.find(function (item) { return item.card.suit !== 'spade'; });
           var picked = nonSpade || fanjianCandidates[0];
-          return { skillId: 'fanjian', cardIds: [picked.card.id] };
+          // v12 H5: 显式目标座席 (评估与执行同一目标, 多席不误指友方)
+          return { skillId: 'fanjian', cardIds: [picked.card.id], options: { target: primaryFoeSeat } };
         }
       }
 
@@ -574,6 +595,12 @@
         var cardOptions;
         // v12 H5: 铁索缺省横置敌对座席 (至多 2 名); 1v1 恒为 [对手]。
         if (card.type === 'tiesuo') cardOptions = { mode: 'chain', targets: StateRuntime.hostileSeats(game, actor).slice(0, 2) };
+        // v12 H5: 杀显式目标 — playSha 缺省目标不做距离校验 (信息由显式
+        // 指定承担), AI 传入自己确认过"可达且敌对"的座席。
+        if (isShaType(card.type)) {
+          var aiShaSeat = aiShaTargetSeat(game, actor, card);
+          if (aiShaSeat) cardOptions = { target: aiShaSeat };
+        }
         if (card.type === 'huogong') {
           var fireChoice = getHuogongChoice(game, actor);
           if (fireChoice.ok && fireChoice.usableCostIds.length) {

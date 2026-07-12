@@ -964,7 +964,8 @@
         var cardIds = context.cardIds || [];
         if (!self || !hasSkill(self, 'jieyin')) return null;
         if (self.flags.jieyinUsed) return fail('【结姻】每回合限一次。');
-        var targetActor = opponent(actor);
+        // v12 H5: 目标经 context.targetActor (options.target 校验后缺省对手)
+        var targetActor = context.targetActor || opponent(actor);
         var target = game[targetActor];
         if (!target || target.gender !== 'male') return fail('【结姻】需要一名男性角色为目标。');
         if (target.hp >= target.maxHp) return fail('目标未受伤，不能发动【结姻】。');

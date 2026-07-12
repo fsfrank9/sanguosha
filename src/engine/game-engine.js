@@ -2230,7 +2230,9 @@
           game: game,
           actor: actor,
           state: self,
-          targetActor: opponent(actor),
+          // v12 H5: 主动技目标从 opponent() 二元假设改为显式 options.target
+          // (座席校验), 缺省回退 1v1 对手 — 多席 AI 反间/结姻 才不会误指友方。
+          targetActor: resolveSeatOption(game, options.target) || opponent(actor),
           skillId: skillId,
           cardIds: cardIds,
           options: options
@@ -2260,7 +2262,9 @@
         discardSelected: discardSelected,
         needsDiscard: needsDiscard,
         getDiscardCount: getDiscardCount,
-        getHuogongChoice: getHuogongChoice
+        getHuogongChoice: getHuogongChoice,
+        // v12 H5: 座席级合法目标矩阵 (AI 出杀目标挑选)
+        legalTargetsForCard: legalTargetsForCard
       });
       var scoreCardForAI = AIRuntime.scoreCardForAI;
       var aiEstimateShaCount = AIRuntime.aiEstimateShaCount;
