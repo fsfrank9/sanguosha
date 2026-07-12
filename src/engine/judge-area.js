@@ -39,29 +39,41 @@
         SkillRuntime.runHook(skillRegistry, 'onJudgementBeforeResolve', judgementContext);
         // v12 G2: 红颜 (小乔) — 锁定技: 判定归属者的黑桃判定牌视为红桃。
         // 时机在改判 (鬼才/鬼道) 之后, 对最终生效的判定牌应用; 采用朱雀
-        // 同款"临时改写 + 收尾还原"手法, 物理牌入弃牌堆前由
-        // resolveJudgementCard 还原, 不污染牌堆。
-        var finalCard = judgementContext.card;
-        if (finalCard && finalCard.suit === 'spade'
-            && StateRuntime.hasSkill(game[actor], 'hongyan')) {
-          finalCard.hongyanOriginalSuit = 'spade';
-          finalCard.hongyanOriginalColor = finalCard.color;
-          finalCard.suit = 'heart';
-          finalCard.color = 'red';
-          log(game, actorName(game, actor) + '的【红颜】生效，判定牌黑桃视为红桃。');
-        }
+        // 同款"临时改写 + 收尾还原"手法, 物理牌入弃牌堆前还原, 不污染牌堆。
+        applyHongyanJudgementView(game, actor, judgementContext.card);
         return judgementContext.card;
       }
 
-      function resolveJudgementCard(game, actor, state, reason, card) {
-        if (!card) return;
-        // v12 G2: 红颜视图还原 — 物理牌离开判定结算前恢复原花色。
-        if (card.hongyanOriginalSuit) {
+      // v12 G2 复核修复: 视图施加/还原中心化 — 除 judge()/resolveJudgementCard
+      // 自身外, 鬼才/鬼道 ask 路径的改判 resolver 也要用 (原判定牌不经
+      // resolveJudgementCard 离场、替换牌不经 judge() 施加视图, 两个方向
+      // 都曾泄漏: 物理牌花色被永久改写 / 红颜对替换牌失效)。
+      function applyHongyanJudgementView(game, actor, card) {
+        if (card && card.suit === 'spade' && !card.hongyanOriginalSuit
+            && StateRuntime.hasSkill(game[actor], 'hongyan')) {
+          card.hongyanOriginalSuit = 'spade';
+          card.hongyanOriginalColor = card.color;
+          card.suit = 'heart';
+          card.color = 'red';
+          log(game, actorName(game, actor) + '的【红颜】生效，判定牌黑桃视为红桃。');
+        }
+        return card;
+      }
+
+      function restoreHongyanJudgementView(card) {
+        if (card && card.hongyanOriginalSuit) {
           card.suit = card.hongyanOriginalSuit;
           card.color = card.hongyanOriginalColor;
           delete card.hongyanOriginalSuit;
           delete card.hongyanOriginalColor;
         }
+        return card;
+      }
+
+      function resolveJudgementCard(game, actor, state, reason, card) {
+        if (!card) return;
+        // v12 G2: 红颜视图还原 — 物理牌离开判定结算前恢复原花色。
+        restoreHongyanJudgementView(card);
         var judgementContext = {
           game: game,
           actor: actor,
@@ -187,6 +199,8 @@
 
         return {
           judge: judge,
+        applyHongyanJudgementView: applyHongyanJudgementView,
+        restoreHongyanJudgementView: restoreHongyanJudgementView,
           resolveJudgementCard: resolveJudgementCard,
           judgementReasonFor: judgementReasonFor,
           processJudgeArea: processJudgeArea,

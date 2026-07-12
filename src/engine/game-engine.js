@@ -572,7 +572,8 @@
           options: { response: true }
         });
         // v8 PR-B4: 银月枪 — 回合外用黑色手牌 (无懈) 触发
-        if (game.turn !== actor && card.color === 'black') {
+        // v12 G2 复核修复: 与 consumeResponse 对称 — 红颜黑桃视为红桃。
+        if (game.turn !== actor && StateRuntime.effectiveCardColor(game[actor], card) === 'black') {
           triggerYinyueQiang(game, actor);
         }
         return true;
@@ -751,6 +752,8 @@
         opponent: opponent
       });
       var judge = JudgeAreaRuntime.judge;
+      var applyHongyanJudgementView = JudgeAreaRuntime.applyHongyanJudgementView;
+      var restoreHongyanJudgementView = JudgeAreaRuntime.restoreHongyanJudgementView;
       var resolveJudgementCard = JudgeAreaRuntime.resolveJudgementCard;
       var judgementReasonFor = JudgeAreaRuntime.judgementReasonFor;
       var processJudgeArea = JudgeAreaRuntime.processJudgeArea;
@@ -846,6 +849,8 @@
         useSkill: useSkill,
         reshuffleIfNeeded: reshuffleIfNeeded,
         playSha: function (g, a, c, o) { return playSha(g, a, c, o); },
+        applyHongyanJudgementView: applyHongyanJudgementView,
+        restoreHongyanJudgementView: restoreHongyanJudgementView,
         handLimit: handLimit,
         CARD_INFO: CARD_INFO,
         scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); }

@@ -65,7 +65,18 @@
         var transferOpts = { noTianxiangTransfer: true };
         var transferResult = damage(game, transferee, amount, sourceActor, reason, sourceCard, damageNature, transferOpts);
         if (typeof damageModifyContext.onTransferred === 'function' && game.phase !== 'gameover') {
-          damageModifyContext.onTransferred(game, transferee);
+          // v12 G2 复核修复: 转移致命且濒死暂停等待救援时, 补牌回调若立即
+          // 执行会因 hp<=0 被跳过且永不重触发 ("摸 X 张"永久丢失)。挂入
+          // deferredAfterDying, 由 flushDeferredDamageAfter 在濒死结束后统一
+          // 执行 (X 按救援后的已损体力计, 与官方"然后其摸X张牌"时序一致)。
+          if (game.pauseState && game.pauseState.dying) {
+            if (!game.pauseState.deferredAfterDying) game.pauseState.deferredAfterDying = [];
+            game.pauseState.deferredAfterDying.push(function () {
+              damageModifyContext.onTransferred(game, transferee);
+            });
+          } else {
+            damageModifyContext.onTransferred(game, transferee);
+          }
         }
         return transferResult;
       }
@@ -179,10 +190,19 @@
 
     function flushDeferredDamageAfter(game) {
       var deferred = game.pauseState && game.pauseState.deferredDamageAfter;
-      if (!deferred || !deferred.length) return;
-      game.pauseState.deferredDamageAfter = [];
-      for (var i = 0; i < deferred.length; i += 1) {
-        finishDamageAfter(game, deferred[i]);
+      if (deferred && deferred.length) {
+        game.pauseState.deferredDamageAfter = [];
+        for (var i = 0; i < deferred.length; i += 1) {
+          finishDamageAfter(game, deferred[i]);
+        }
+      }
+      // v12 G2 复核修复: 濒死期间挂起的转移收尾回调 (天香补牌等) 一并冲刷。
+      var deferredCallbacks = game.pauseState && game.pauseState.deferredAfterDying;
+      if (deferredCallbacks && deferredCallbacks.length && game.phase !== 'gameover') {
+        game.pauseState.deferredAfterDying = [];
+        for (var j = 0; j < deferredCallbacks.length; j += 1) {
+          deferredCallbacks[j]();
+        }
       }
     }
 

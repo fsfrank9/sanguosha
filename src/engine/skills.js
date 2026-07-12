@@ -50,6 +50,8 @@
         var useSkill = deps.useSkill;
         var reshuffleIfNeeded = deps.reshuffleIfNeeded;
         var playSha = deps.playSha;
+        var applyHongyanJudgementView = deps.applyHongyanJudgementView;
+        var restoreHongyanJudgementView = deps.restoreHongyanJudgementView;
         var handLimit = deps.handLimit;
         var CARD_INFO = deps.CARD_INFO;
         var scoreCardForAI = deps.scoreCardForAI;
@@ -1254,8 +1256,12 @@
             setPendingChoice(game, pending);
             return fail('找不到这张牌。');
           }
-          if (originalCard) discardCard(game, originalCard);
+          // v12 G2 复核修复: 原判定牌不经 resolveJudgementCard 离场 — 弃置前
+          // 还原红颜视图, 否则物理牌花色被永久改写 (牌堆完整性)。
+          if (originalCard) discardCard(game, restoreHongyanJudgementView(originalCard));
           resolvedCard = replacement;
+          // 替换牌成为新判定牌, 未经 judge() → 在此补施红颜视图 (判定归属者)。
+          applyHongyanJudgementView(game, judgementActor, resolvedCard);
           log(game, actorName(game, holder) + '发动【鬼才】，用【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）代替' + actorName(game, judgementActor) + '的判定牌。');
         } else {
           log(game, actorName(game, holder) + '选择不发动【鬼才】。');
@@ -1475,9 +1481,25 @@
           var state = game[actor];
           if (!state) return fail('未知角色。');
           var options = decision && Array.isArray(decision.options) ? decision.options.slice() : [];
-          if (options.indexOf(2) >= 0 && !decision.equipCardId) {
+          // v12 G2 复核修复: 先全量校验、后逐一应用 — 此前"选项一已发动、
+          // 选项二非法"时原决策整包重挂, 重试会重放已成功的选项一 (违反
+          // "每回合每个选项至多一次", 多打一张无距离杀)。校验通过后应用
+          // 阶段不再存在可失败路径, 也就不再需要中途重挂。
+          var invalid = options.some(function (o) { return o !== 1 && o !== 2; });
+          if (invalid) {
             setPendingChoice(game, pending);
-            return fail('【神速】选项二需要指定要弃置的装备牌。');
+            return fail('【神速】选项只能是 1 或 2。');
+          }
+          if (options.indexOf(2) >= 0) {
+            if (!decision.equipCardId) {
+              setPendingChoice(game, pending);
+              return fail('【神速】选项二需要指定要弃置的装备牌。');
+            }
+            var equipOk = shensuEquipCandidates(state).some(function (c) { return c.id === decision.equipCardId; });
+            if (!equipOk) {
+              setPendingChoice(game, pending);
+              return fail('【神速】选项二指定的装备牌不存在或不是装备牌。');
+            }
           }
           if (!options.length) {
             log(game, actorName(game, actor) + '选择不发动【神速】。');
@@ -1485,11 +1507,7 @@
             // 官方顺序: 选项一 (跳判定+摸牌) 先于 选项二 (跳出牌) 结算。
             options.sort();
             for (var i = 0; i < options.length; i += 1) {
-              var applied = applyShensuOption(game, actor, options[i], decision.equipCardId);
-              if (applied && applied.ok === false) {
-                setPendingChoice(game, pending);
-                return applied;
-              }
+              applyShensuOption(game, actor, options[i], decision.equipCardId);
               if (game.phase === 'gameover') return success('游戏结束。');
             }
           }
@@ -1665,8 +1683,10 @@
               setPendingChoice(game, pending);
               return fail('找不到这张牌。');
             }
-            if (originalCard) discardCard(game, originalCard);
+            // v12 G2 复核修复: 同鬼才 — 原判定牌还原视图后弃置; 替换牌补施视图。
+            if (originalCard) discardCard(game, restoreHongyanJudgementView(originalCard));
             resolvedCard = replacement;
+            applyHongyanJudgementView(game, judgementActor, resolvedCard);
             log(game, actorName(game, holder) + '发动【鬼道】，打出【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）替换' + actorName(game, judgementActor) + '的判定牌。');
           } else {
             log(game, actorName(game, holder) + '选择不发动【鬼道】。');
