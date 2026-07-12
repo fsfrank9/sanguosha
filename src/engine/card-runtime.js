@@ -151,6 +151,8 @@
     if (!state) return null;
     if (ref.zone === 'hand') return state.hand;
     if (ref.zone === 'judgeArea') return state.judgeArea;
+    // v12 G2: 不屈 — 武将牌上的"创" (state.chuang)
+    if (ref.zone === 'chuang') return game[ref.actor] && game[ref.actor].chuang;
     return null;
   }
 

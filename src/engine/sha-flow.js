@@ -85,8 +85,9 @@
         var target = game[targetActor];
         var targetProtection = cardTargetProtection(game, actor, targetActor, card, '杀');
         if (targetProtection) return fail(targetProtection.message);
-        if (!canReachWithSha(game, actor, targetActor)) return fail('距离不足，当前武器范围无法使用【杀】。');
-        self.usedSha = true;
+        // v12 G2: 神速的视为使用【杀】"无距离限制" 且不计入出牌阶段次数。
+        if (!options.ignoreDistance && !canReachWithSha(game, actor, targetActor)) return fail('距离不足，当前武器范围无法使用【杀】。');
+        if (!options.skipShaCount) self.usedSha = true;
         self.usedOrRespondedSha = true;
         var amount = 1 + (self.shaBonus || 0);
         self.shaBonus = 0;
@@ -166,7 +167,8 @@
         var target = game[targetActor];
         var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
 
-        if (!ignoreArmor && card.color === 'black' && hasEquipmentEffect(target, 'blockBlackSha')) {
+        // v12 G2: 红颜 — 攻击者 (小乔) 的黑桃【杀】视为红桃 → 仁王盾不挡。
+        if (!ignoreArmor && StateRuntime.effectiveCardColor(self, card) === 'black' && hasEquipmentEffect(target, 'blockBlackSha')) {
           log(game, actorName(game, targetActor) + '的【仁王盾】抵消了黑色【杀】。');
           discardCard(game, card);
           return success('仁王盾抵消。');
@@ -243,6 +245,8 @@
         if (baguaJudge && baguaJudge.color === 'red') {
           log(game, actorName(game, targetActor) + '的【八卦阵】判定为红色，视为打出【闪】。');
           dodged = true;
+          // v12 G2: 八卦"视为打出【闪】"同样触发 雷击 等 onShanUsed 时机。
+          SkillRuntime.runHook(skillRegistry, 'onShanUsed', { game: game, actor: targetActor });
         }
         resolveJudgementCard(game, targetActor, target, '【八卦阵】', baguaJudge);
         return dodged;

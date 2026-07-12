@@ -7,6 +7,7 @@
   var actorName = StateRuntime.actorName;
 
   export function createResponseRuntime(deps) {
+    var continueTurnAfterPreparePhase = deps.continueTurnAfterPreparePhase;
     var log = deps.log;
     var success = deps.success;
     var fail = deps.fail;
@@ -81,6 +82,14 @@
     // 排空后调用本函数续跑判定区剩余结算 + 摸牌/出牌阶段。
     function resumeSuspendedTurnFlowIfReady(game) {
       if (!game || game.pendingChoice || game.phase === 'gameover') return null;
+      // v12 G2: 神速 — AI 座席在准备阶段发动神速, 虚拟【杀】向玩家开出
+      // 闪响应窗口而挂起; 选择排空后从准备阶段末续跑 (判定→摸牌→出牌)。
+      var savedPrepare = game.pauseState && game.pauseState.prepareResume;
+      if (savedPrepare) {
+        game.pauseState.prepareResume = null;
+        if (game.phase === 'gameover') return success('游戏结束。');
+        return continueTurnAfterPreparePhase(game, savedPrepare.actor);
+      }
       var savedJudge = game.pauseState && game.pauseState.judgeArea;
       if (!savedJudge || !savedJudge.outcomeApplied) return null;
       var actor = savedJudge.actor;

@@ -74,6 +74,10 @@ const VALID_TRIGGERS = new Set([
   'handLoss',
   // v11 C6 (批次 30): 枭姬触发时机 — "你失去装备区里的牌后"
   'equipmentLoss',
+  // v12 G2: 天香触发时机 — "当你受到伤害时" (onDamageModify 层)
+  'damageTaken',
+  // v12 G2: 不屈触发时机 — "当你处于濒死状态时"
+  'dyingEnter',
 ]);
 const VALID_FREQUENCIES = new Set([
   'oncePerTurn',
@@ -90,6 +94,8 @@ const VALID_COST_TYPES = new Set([
   'judgement',
   // v12 G1 (修复批): 据守的成本是将武将牌翻面 (跳过自己的下个回合)
   'turnOver',
+  // v12 G2: 神速的成本是跳过阶段 (选项二另弃一张装备牌)
+  'phaseSkip',
 ]);
 
 test('every implemented skill has structured metadata with valid tag values', () => {

@@ -61,8 +61,9 @@ test('engine exposes explicit skill implementation status for every catalog skil
 test('unimplemented skills are visible but explicitly disabled as todo, not silently clickable', () => {
   const todoSkills = collectSkills().filter(({ skill }) => skill.status === 'todo');
   // v8 PR-C1..C5 升级 5 个标准包技能 (guose/liuli/jijiu/qingnang/luoshen)
-  // 为 implemented, 所以 todo 下限从 80 降至 70 (剩余未实现仍多于此).
-  assert.ok(todoSkills.length >= 70, 'expanded hero pool should still mark not-yet-implemented skills as todo');
+  // 为 implemented, 所以 todo 下限从 80 降至 70; v12 G2 再入 6 技 (神速/红颜/
+  // 天香/雷击/鬼道/不屈) → 降至 64 (剩余未实现仍多于此).
+  assert.ok(todoSkills.length >= 64, 'expanded hero pool should still mark not-yet-implemented skills as todo');
   assert.equal(Engine.HERO_CATALOG.xuchu.skills[0].status, 'implemented');
   assert.equal(Engine.HERO_CATALOG.liubei.skills.find((skill) => skill.id === 'jijiang').status, 'display');
   assert.match(html, /skill-status-todo/, 'UI should render a todo style for unimplemented skills');

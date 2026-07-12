@@ -49,10 +49,26 @@
         reason: reason,
         sourceCard: sourceCard,
         amount: amount,
-        nature: damageNature
+        nature: damageNature,
+        opts: opts || null
       };
       SkillRuntime.runHook(skillRegistry, 'onDamageModify', damageModifyContext);
       amount = Number(damageModifyContext.amount) || 0;
+
+      // v12 G2: 天香 (小乔) — "受到伤害时"时机的伤害转移。handler (skills.js)
+      // 在 onDamageModify 内完成 弃红桃成本 + 合法性校验 后置 transferTo;
+      // 此处把整笔伤害改结算到转移目标 (其装备/濒死按自身结算), 完成后经
+      // onTransferred 回调补摸 X 张 (X = 其已损失体力, 官方"然后其摸X张牌")。
+      // 嵌套转移经 opts.noTianxiangTransfer 防递归。
+      if (damageModifyContext.transferTo && game[damageModifyContext.transferTo]) {
+        var transferee = damageModifyContext.transferTo;
+        var transferOpts = { noTianxiangTransfer: true };
+        var transferResult = damage(game, transferee, amount, sourceActor, reason, sourceCard, damageNature, transferOpts);
+        if (typeof damageModifyContext.onTransferred === 'function' && game.phase !== 'gameover') {
+          damageModifyContext.onTransferred(game, transferee);
+        }
+        return transferResult;
+      }
 
       // v11 E1 (批次 35): 装备伤害修正统一走 EquipmentRuntime 的有序
       // handler 表 (藤甲 火+1/防止 → 古锭 无手牌+1 → 白银 clamp → 寒冰
@@ -185,6 +201,18 @@
         return;
       }
       log(game, actorName(game, dyingActor) + '体力为 0，进入濒死状态。');
+      // v12 G2: 不屈 (周泰) — "当你处于濒死状态时"锁定时机。handler 掀牌堆
+      // 顶置"创"; 点数均不同 → 体力回复至 1, 直接脱离濒死 (不进求桃队列),
+      // damage() 主流程照常走 finishDamageAfter。
+      SkillRuntime.runHook(skillRegistry, 'onDyingEnter', {
+        game: game,
+        dyingActor: dyingActor,
+        sourceActor: sourceActor
+      });
+      if (game[dyingActor] && game[dyingActor].hp >= 1) {
+        log(game, actorName(game, dyingActor) + '脱离濒死状态。');
+        return;
+      }
       var turnActor = game.turn || dyingActor;
       var responderQueue = seatsFrom(game, turnActor, true).filter(function (seat) { return !!game[seat]; });
       game.pauseState.dying = {

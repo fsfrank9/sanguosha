@@ -87,6 +87,8 @@ test('phase runtime resets actor turn state at the start of a turn', () => {
   assert.deepEqual(normalize(missingFlags.flags), {
     skipPlay: false,
     skipDraw: false,
+    // v12 G2: 神速选项一 — 跳过判定阶段标记
+    skipJudge: false,
     zhihengUsed: false,
     fanjianUsed: false,
     guanxingUsed: false,

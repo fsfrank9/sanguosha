@@ -1,4 +1,5 @@
       import { SkillRuntime } from './skill-runtime.js';
+      import { StateRuntime } from './state.js';
 
       export function createJudgeAreaRuntime(deps) {
         var skillRegistry = deps.skillRegistry;
@@ -36,11 +37,31 @@
           pausable: !!(opts && opts.pausable)
         };
         SkillRuntime.runHook(skillRegistry, 'onJudgementBeforeResolve', judgementContext);
+        // v12 G2: 红颜 (小乔) — 锁定技: 判定归属者的黑桃判定牌视为红桃。
+        // 时机在改判 (鬼才/鬼道) 之后, 对最终生效的判定牌应用; 采用朱雀
+        // 同款"临时改写 + 收尾还原"手法, 物理牌入弃牌堆前由
+        // resolveJudgementCard 还原, 不污染牌堆。
+        var finalCard = judgementContext.card;
+        if (finalCard && finalCard.suit === 'spade'
+            && StateRuntime.hasSkill(game[actor], 'hongyan')) {
+          finalCard.hongyanOriginalSuit = 'spade';
+          finalCard.hongyanOriginalColor = finalCard.color;
+          finalCard.suit = 'heart';
+          finalCard.color = 'red';
+          log(game, actorName(game, actor) + '的【红颜】生效，判定牌黑桃视为红桃。');
+        }
         return judgementContext.card;
       }
 
       function resolveJudgementCard(game, actor, state, reason, card) {
         if (!card) return;
+        // v12 G2: 红颜视图还原 — 物理牌离开判定结算前恢复原花色。
+        if (card.hongyanOriginalSuit) {
+          card.suit = card.hongyanOriginalSuit;
+          card.color = card.hongyanOriginalColor;
+          delete card.hongyanOriginalSuit;
+          delete card.hongyanOriginalColor;
+        }
         var judgementContext = {
           game: game,
           actor: actor,

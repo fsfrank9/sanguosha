@@ -311,16 +311,18 @@ test('seatsFrom: 1v1 局 excludeSelf → 只含对手, 不会绕回自己', () =
 
 // ───── E. 神速/红颜 撤除 (宁缺毋滥, 待阶段跳过/花色视同层落地后再接入) ──
 
-test('IMPLEMENTED_SKILL_IDS/ACTIVE_SKILL_IDS 不含神速/红颜', () => {
-  assert.ok(!IMPLEMENTED_SKILL_IDS.includes('shensu'), 'shensu 不应被标记为已实现');
-  assert.ok(!IMPLEMENTED_SKILL_IDS.includes('hongyan'), 'hongyan 不应被标记为已实现');
-  assert.ok(!ACTIVE_SKILL_IDS.includes('shensu'), 'shensu 不应出现在主动技能按钮列表');
+// v12 G2 反转: G1 修复批曾按"宁缺毋滥"撤下神速/红颜; G2 落地阶段跳过
+// 框架与花色视同层后二者正式接入 (详见 v12_g2_wind_batch2.test.mjs)。
+test('v12 G2: 神速/红颜已随框架落地重新接入实现名单', () => {
+  assert.ok(IMPLEMENTED_SKILL_IDS.includes('shensu'), 'shensu 已实现 (阶段跳过框架)');
+  assert.ok(IMPLEMENTED_SKILL_IDS.includes('hongyan'), 'hongyan 已实现 (花色视同层)');
+  assert.ok(!ACTIVE_SKILL_IDS.includes('shensu'), '神速是回合开始选项, 不占出牌阶段技能按钮');
 });
 
-test('useSkill(shensu): 技能未注册 handler → 返回失败', () => {
+test('useSkill(shensu): 非出牌阶段主动技 → useSkill 入口仍返回失败', () => {
   const game = buildGame({ playerHero: 'xiahouyuan', enemyHero: 'liubei' });
   const r = Engine.useSkill(game, 'player', 'shensu', [], {});
-  assert.notEqual(r.ok, true, '神速尚未接入主动技能 handler, 不应返回成功');
+  assert.notEqual(r.ok, true, '神速走准备阶段 pendingChoice, 不走 useSkill 主动入口');
 });
 
 test('HERO_CATALOG: 夏侯渊/小乔仍保留英雄与技能条目 (仅技能未实现)', () => {

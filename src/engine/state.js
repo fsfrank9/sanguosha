@@ -147,9 +147,28 @@
 
   function handLimit(game, actor) {
     var state = game[actor];
+    // v12 G2: 不屈 — 武将牌上有"创"时, 手牌上限 = 体力上限 - "创"数
+    // (gltjk wind spec), 妄尊等回合级修正照常叠加。
+    if (state.chuang && state.chuang.length > 0) {
+      return Math.max(0, (state.maxHp || 0) - state.chuang.length + (state.handLimitDelta || 0));
+    }
     // v11 C8 (批次 32): handLimitDelta — 回合级手牌上限修正 (妄尊 -1 等),
     // 由 resetActorTurnState / resetEndOfTurnState 复位。
     return Math.max(0, (state.hp || 0) + (state.handLimitDelta || 0));
+  }
+
+  // v12 G2: 红颜 (小乔) — 锁定技"你的黑桃牌视为红桃牌"的花色视同层。
+  // 只做"读取视图", 不改物理牌 (朱雀教训: 判定/弃置的物理牌不可污染)。
+  function effectiveCardSuit(state, card) {
+    if (!card) return null;
+    if (state && hasSkill(state, 'hongyan') && card.suit === 'spade') return 'heart';
+    return card.suit;
+  }
+
+  function effectiveCardColor(state, card) {
+    if (!card) return null;
+    if (state && hasSkill(state, 'hongyan') && card.suit === 'spade') return 'red';
+    return card.color;
   }
 
   function getActorStatus(game, actor) {
@@ -185,6 +204,8 @@
     canReachWithSha: canReachWithSha,
     firstActorFromRoles: firstActorFromRoles,
     handLimit: handLimit,
+    effectiveCardSuit: effectiveCardSuit,
+    effectiveCardColor: effectiveCardColor,
     getActorStatus: getActorStatus,
     aliveActorCount: aliveActorCount
   };

@@ -201,6 +201,14 @@
         jushou:   { trigger: 'turnEnd',           frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'turnOver' },                 hooks: ['onTurnEnd'] },
         liegong:  { trigger: 'cardUse',           frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onNeedResponse'] },
         kuanggu:  { trigger: 'damageAfter',       frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
+        // v12 G2: 风包第二批。神速成本 = 跳过阶段 (选项二另弃一装备);
+        // 天香成本 = 弃一张红桃手牌; 红颜/不屈为锁定技; 雷击/鬼道可选。
+        shensu:   { trigger: 'preparePhase',      frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'phaseSkip' },                hooks: ['processPreparePhase', 'playSha'] },
+        tianxiang:{ trigger: 'damageTaken',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onDamageModify'] },
+        hongyan:  { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['judgeSuitView', 'effectiveCardColor'] },
+        leiji:    { trigger: 'cardUse',           frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onShanUsed'] },
+        guidao:   { trigger: 'beforeJudgement',   frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onJudgementBeforeResolve'] },
+        buqu:     { trigger: 'dyingEnter',        frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDyingEnter'] },
       };
 
       for (var _heroId in HERO_CATALOG) {

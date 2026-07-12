@@ -26,6 +26,8 @@
       hand: [],
       equipment: { weapon: null, armor: null, horseMinus: null, horsePlus: null },
       judgeArea: [],
+      // v12 G2: 不屈 (周泰) — 武将牌上的"创"区域 (独立计数牌区, 入守恒记账)
+      chuang: [],
       flags: {},
       skillPreferences: {},
       usedSha: false,
