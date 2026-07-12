@@ -30,13 +30,15 @@
         //   wangzun  袁术   主公准备阶段: 袁术摸一张 + 主公本回合手牌上限 -1
         //   tongji   袁术   锁定技: 1v1 恒不拦截 (reserved, 多人激活, 同流离)
         'wangzun', 'tongji',
-        // v12 G: 风包 1v1 可达技能池
-        'shensu', 'jushou', 'liegong', 'kuanggu', 'hongyan'
+        // v12 G1 (修复批): 风包首批 — 据守 (曹仁) / 烈弓 (黄忠) / 狂骨 (魏延)。
+        // 神速/红颜 曾被虚报为已实现 (神速 = 无成本虚拟杀、红颜 = 零实现),
+        // 按"宁缺毋滥"撤出名单, 待阶段跳过框架 / 花色视同层落地后再接入。
+        'jushou', 'liegong', 'kuanggu'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,
       // 不占技能按钮.
       // v11 C6: jieyin 为出牌阶段主动技 (占技能按钮, 选 2 张手牌)。
-      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin', 'shensu'];
+      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin'];
 
       export { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS };

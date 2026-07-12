@@ -25,7 +25,6 @@
         var triggerJushouTurnEnd = deps.triggerJushouTurnEnd;
         var triggerKuangguDamageAfter = deps.triggerKuangguDamageAfter;
         var triggerLiegongNeedResponse = deps.triggerLiegongNeedResponse;
-        var triggerShensuActiveSkill = deps.triggerShensuActiveSkill;
         var triggerLongdanCardAs = deps.triggerLongdanCardAs;
         var triggerWushengCardAs = deps.triggerWushengCardAs;
         var triggerQingguoCardAs = deps.triggerQingguoCardAs;
@@ -205,11 +204,6 @@
           return triggerLiuliOnShaTargeted(context);
         }
       });
-        SkillRuntime.registerSkill(skillRegistry, 'shensu', {
-        onActiveSkill: function (context) {
-          return triggerShensuActiveSkill(context);
-        }
-      });
         SkillRuntime.registerSkill(skillRegistry, 'zhiheng', {
         onActiveSkill: function (context) {
           return triggerZhihengActiveSkill(context);
@@ -259,7 +253,6 @@
         fanjian: true,
         qingnang: true,
           // v11 C6 (批次 30): 结姻
-        jieyin: true,
-        shensu: true
+        jieyin: true
       };
 

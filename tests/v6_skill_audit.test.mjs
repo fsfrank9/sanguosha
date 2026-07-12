@@ -10,10 +10,12 @@ import { HERO_CATALOG, IMPLEMENTED_SKILL_IDS } from './helpers/load-engine.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const SPEC_FIXTURE_PATH = path.join(
-  root,
+// v12 G0 (修复批): 风包 spec 从标准包 fixture 分离为独立 pack 文件,
+// 审计按 pack 列表合并加载 — 新包接入时在此追加。
+const SPEC_FIXTURE_PATHS = [
   'tests/fixtures/official_standard_skill_specs.json',
-);
+  'tests/fixtures/official_wind_skill_specs.json',
+].map((rel) => path.join(root, rel));
 const REQUIRED_SPEC_FIELDS = [
   'summary',
   'timing',
@@ -32,12 +34,17 @@ const REQUIRED_SCHEMA_FIELDS = [
 ];
 
 function loadSpecsByLocalId() {
-  const json = JSON.parse(fs.readFileSync(SPEC_FIXTURE_PATH, 'utf8'));
   const byId = new Map();
-  for (const hero of json.heroes || []) {
-    for (const skill of hero.skills || []) {
-      if (skill.localSkillId) {
-        byId.set(skill.localSkillId, { hero: hero.localHeroId || hero.name, ...skill });
+  for (const fixturePath of SPEC_FIXTURE_PATHS) {
+    const json = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+    for (const hero of json.heroes || []) {
+      for (const skill of hero.skills || []) {
+        if (skill.localSkillId) {
+          if (byId.has(skill.localSkillId)) {
+            throw new Error(`duplicate localSkillId across pack fixtures: ${skill.localSkillId}`);
+          }
+          byId.set(skill.localSkillId, { hero: hero.localHeroId || hero.name, ...skill });
+        }
       }
     }
   }
