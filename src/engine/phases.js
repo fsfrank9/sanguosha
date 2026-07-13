@@ -50,6 +50,10 @@
     // v11 C8 (批次 32): 结姻 每回合限一次 (批次 30 遗漏复位 — 修复为
     // 每回合而非每局一次)
     flags.jieyinUsed = false;
+    // v12 H 复核修复: 黄天/离间 每回合限一次 (H7 新增时遗漏复位 → 实为每局
+    // 一次)。与 jieyinUsed 同类, 回合开始/结束两处均复位。
+    flags.huangtianUsed = false;
+    flags.lijianUsed = false;
   }
 
   function resetEndOfTurnState(state) {
@@ -77,6 +81,9 @@
     flags.qingnangUsed = false;
     // v11 C8 (批次 32): 结姻 复位 (批次 30 遗漏修复)
     flags.jieyinUsed = false;
+    // v12 H 复核修复: 黄天/离间 每回合限一次复位 (回合结束侧)。
+    flags.huangtianUsed = false;
+    flags.lijianUsed = false;
   }
 
   export const PhaseRuntime = {

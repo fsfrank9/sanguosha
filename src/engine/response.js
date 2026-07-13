@@ -15,6 +15,8 @@
     var continueTurnAfterJudgeArea = deps.continueTurnAfterJudgeArea;
     // v12 H2: AOE 逐座席队列续跑 (tricks 域后置装配, 包装注入)
     var resumeAOETargets = deps.resumeAOETargets;
+    // v12 H 复核修复: 铁索传导环续跑 (damage-dying 域后置装配, 包装注入)
+    var resumeChainTransmit = deps.resumeChainTransmit;
 
     // v10 V3: 玩家响应窗口框架 — 统一暂停/恢复 API.
     //
@@ -91,6 +93,14 @@
         game.pauseState.prepareResume = null;
         if (game.phase === 'gameover') return success('游戏结束。');
         return continueTurnAfterPreparePhase(game, savedPrepare.actor);
+      }
+      // v12 H 复核修复: 铁索传导环某座席濒死暂停 → 救援排空后续跑剩余环
+      // 座席 (须早于 AOE 分支: 传导嵌套在单次 damage 内层, 内层先收敛)。
+      var savedChain = game.pauseState && game.pauseState.chainTransmit;
+      if (savedChain && resumeChainTransmit) {
+        var chainResult = resumeChainTransmit(game);
+        // 传导续跑中再次触发濒死暂停 → 保持挂起; 否则继续检查外层 (AOE 等)。
+        if (game.pendingChoice) return chainResult || success('回合暂停，等待玩家选择。');
       }
       // v12 H2: AOE (南蛮/万箭) 逐座席结算中某座席濒死暂停 → 救援选择排空后
       // 续跑队列剩余座席 (advanceAOETargets 完成后自清 pauseState.aoe)。

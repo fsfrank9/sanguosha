@@ -100,6 +100,8 @@ test('phase runtime resets actor turn state at the start of a turn', () => {
     fangtianBonus: false,   // v7 PR-15
     qingnangUsed: false,    // v8 PR-C4
     jieyinUsed: false,      // v11 C8 (批次 32): 结姻 每回合复位 (批次 30 遗漏修复)
+    huangtianUsed: false,   // v12 H 复核修复: 黄天 每回合复位 (H7 遗漏)
+    lijianUsed: false,      // v12 H 复核修复: 离间 每回合复位 (H7 遗漏)
   });
 });
 

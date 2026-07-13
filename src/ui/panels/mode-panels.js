@@ -374,50 +374,85 @@
     // 退出 (cancelSeatPicker)。面板本身是 #seatTargetModePanel (hint + 取消),
     // 合法座席高亮由 board-panels.js 的 renderHero() 据
     // activeSeatPickerLegalSeats() 加 .is-target-selectable class。
-    var seatPicker = null; // { legalSeats, needed, picked, onComplete, hintText }
+    // v12 H 复核修复: 座席点选骨架泛化为 min/max — 单目标牌 min=max=1 (点即
+    // 完成, 与旧 needed=1 行为一致); 铁索 min=1/max=2 (点满 2 自动完成, 或点
+    // 1 后按"确定"提前完成)。opts.extraAction = { label, handler } 渲染一个
+    // 附加按钮 (铁索的"重铸")。
+    var seatPicker = null; // { legalSeats, min, max, picked, onComplete, hintText, extraAction }
 
     function activeSeatPickerLegalSeats() {
       return seatPicker ? seatPicker.legalSeats : null;
     }
 
+    function renderSeatPickerControls() {
+      if (!seatPicker) return;
+      var canConfirm = seatPicker.picked.length >= seatPicker.min;
+      if (els.seatTargetConfirmBtn) els.seatTargetConfirmBtn.hidden = !(seatPicker.max > 1 && canConfirm);
+      if (els.seatTargetExtraBtn) {
+        els.seatTargetExtraBtn.hidden = !seatPicker.extraAction;
+        if (seatPicker.extraAction) els.seatTargetExtraBtn.textContent = seatPicker.extraAction.label;
+      }
+      if (els.seatTargetModeHint) {
+        var base = seatPicker.hintText || '选择目标：点击场上高亮的角色';
+        els.seatTargetModeHint.textContent = seatPicker.max > 1
+          ? base + '（已选 ' + seatPicker.picked.length + ' / 至多 ' + seatPicker.max + '）'
+          : base;
+      }
+    }
+
     function startSeatPicker(opts) {
+      var maxN = opts.max || opts.needed || 1;
       seatPicker = {
         legalSeats: opts.legalSeats,
-        needed: opts.needed || 1,
+        min: opts.min || 1,
+        max: maxN,
         picked: [],
         onComplete: opts.onComplete,
-        hintText: opts.hintText
+        hintText: opts.hintText,
+        extraAction: opts.extraAction || null
       };
       if (els.seatTargetModePanel) els.seatTargetModePanel.hidden = false;
-      if (els.seatTargetModeHint) els.seatTargetModeHint.textContent = opts.hintText || '选择目标：点击场上高亮的角色';
+      renderSeatPickerControls();
       render();
     }
 
     function cancelSeatPicker() {
       seatPicker = null;
       if (els.seatTargetModePanel) els.seatTargetModePanel.hidden = true;
+      if (els.seatTargetConfirmBtn) els.seatTargetConfirmBtn.hidden = true;
+      if (els.seatTargetExtraBtn) els.seatTargetExtraBtn.hidden = true;
+    }
+
+    function finishSeatPicker() {
+      if (!seatPicker || seatPicker.picked.length < seatPicker.min) return;
+      var picked = seatPicker.picked.slice();
+      var onComplete = seatPicker.onComplete;
+      cancelSeatPicker();
+      onComplete(picked);
+    }
+
+    // 附加按钮 (铁索"重铸") — 执行 extraAction.handler 后退出点选。
+    function seatPickerExtraAction() {
+      if (!seatPicker || !seatPicker.extraAction) return;
+      var handler = seatPicker.extraAction.handler;
+      cancelSeatPicker();
+      handler();
     }
 
     // 点击一个座席的英雄卡 (由 dom-adapter 的 hero 元素 click 绑定调用)。
-    // 非法/重复座席忽略; 凑够 needed 数后取出 picker、清面板、再回调 —
-    // 回调内部可能再次 startSeatPicker (如离间选完成本牌后没有二次选取,
-    // 但预留顺序: 先清空当前 picker 状态, 避免回调里的新 picker 被误清)。
+    // 非法/重复座席忽略; 达到 max 自动完成, 否则更新提示 (min<max 时"确定"
+    // 按钮已由 renderSeatPickerControls 据 picked 数显隐)。
     function clickSeatForPicker(seat) {
       if (!seatPicker) return;
       if (seatPicker.legalSeats.indexOf(seat) < 0) return;
       if (seatPicker.picked.indexOf(seat) >= 0) return;
       seatPicker.picked.push(seat);
-      if (seatPicker.picked.length < seatPicker.needed) {
-        if (els.seatTargetModeHint) {
-          els.seatTargetModeHint.textContent = (seatPicker.hintText || '') + '（已选 ' + seatPicker.picked.length + ' / ' + seatPicker.needed + '）';
-        }
-        render();
+      if (seatPicker.picked.length >= seatPicker.max) {
+        finishSeatPicker();
         return;
       }
-      var picked = seatPicker.picked.slice();
-      var onComplete = seatPicker.onComplete;
-      cancelSeatPicker();
-      onComplete(picked);
+      renderSeatPickerControls();
+      render();
     }
 
     // v12 H6: 单目标牌类型表 — 杀 (isShaCard 覆盖 sha/fire_sha/thunder_sha) +
@@ -448,10 +483,10 @@
       return true;
     }
 
-    // 借刀先选持刀者 (An), 受害者 (Bn) 缺省为自己 (与 1v1 旧行为一致,
-    // v12 H6 范围内只做 target 一段); 拆/顺/火攻座席确定后转入既有富选择
-    // 流程 (选区域/选具体牌, 或火攻自选成本牌) 而非直接结算, 保持与 1v1
-    // 同等交互深度; 其余单目标牌直接结算。
+    // 拆/顺/火攻座席确定后转入既有富选择流程 (选区域/选具体牌, 或火攻自选
+    // 成本牌) 而非直接结算, 保持与 1v1 同等交互深度; 借刀先选持刀者 (An)
+    // 再从其可 杀 到的候选中选受害者 (Bn) — 两段点选, 消除"UI 高亮持刀者但
+    // 受害者恒缺省自己→点选必败"的不一致; 其余单目标牌直接结算。
     function resolveCardSeatTarget(cardId, seat) {
       var game = getGame();
       var card = findPlayerCard(cardId);
@@ -465,11 +500,74 @@
         render();
         return;
       }
+      if (card && card.type === 'jiedao') {
+        // seat = 持刀者 An; 第二段选受害者 Bn (An 可 杀 到的座席)。
+        var victims = Engine.jiedaoVictimCandidates
+          ? Engine.jiedaoVictimCandidates(game, seat)
+          : [];
+        if (victims.length === 1) {
+          finishJiedao(cardId, seat, victims[0]);
+          return;
+        }
+        if (victims.length > 1) {
+          var holderName = (game[seat] && game[seat].name) || '持刀者';
+          startSeatPicker({
+            legalSeats: victims,
+            min: 1,
+            max: 1,
+            hintText: '借刀杀人：选择让' + holderName + '攻击的目标',
+            onComplete: function (vs) { finishJiedao(cardId, seat, vs[0]); }
+          });
+          render();
+          return;
+        }
+        // 理论不达 (legalTargetsForCard 已保证 An 有候选), 兜底缺省自己。
+        finishJiedao(cardId, seat, 'player');
+        return;
+      }
       var hpBefore = {};
       Engine.seatList(game).forEach(function (s) { hpBefore[s] = game[s].hp; });
       var result = Engine.playCard(game, 'player', cardId, { target: seat });
       if (!result.ok) game.log.push(result.message);
       Engine.seatList(game).forEach(function (s) { if (game[s].hp < hpBefore[s]) flashHero(s); });
+      render();
+    }
+
+    function finishJiedao(cardId, holderSeat, victimSeat) {
+      var game = getGame();
+      var hpBefore = {};
+      Engine.seatList(game).forEach(function (s) { hpBefore[s] = game[s].hp; });
+      var result = Engine.playCard(game, 'player', cardId, { target: holderSeat, jiedaoVictim: victimSeat });
+      if (!result.ok) game.log.push(result.message);
+      Engine.seatList(game).forEach(function (s) { if (game[s].hp < hpBefore[s]) flashHero(s); });
+      render();
+    }
+
+    // v12 H 复核修复: identity3 铁索连环座席点选 (旧 tiesuoModePanel 硬编码
+    // enemy/self/both, 无法选第三席)。改用泛化座席点选 (min1/max2 + "重铸"
+    // 附加按钮); 1v1 仍走 showTiesuoPanel 原路径。
+    function startTiesuoSeatPicker(cardId) {
+      var game = getGame();
+      var legalSeats = Engine.aliveSeats(game);
+      startSeatPicker({
+        legalSeats: legalSeats,
+        min: 1,
+        max: 2,
+        hintText: '铁索连环：点选 1-2 名角色横置/重置，或点"重铸"摸牌',
+        extraAction: {
+          label: '重铸',
+          handler: function () {
+            var result = Engine.playCard(game, 'player', cardId, { mode: 'recast' });
+            if (!result.ok) game.log.push(result.message);
+            render();
+          }
+        },
+        onComplete: function (seats) {
+          var result = Engine.playCard(game, 'player', cardId, { targets: seats });
+          if (!result.ok) game.log.push(result.message);
+          render();
+        }
+      });
       render();
     }
 
@@ -616,6 +714,9 @@
       // v12 H6: identity3 座席点选 — 取消按钮 + 三席英雄卡点击 (点选中的合法
       // 座席才生效, clickSeatForPicker 内部已校验)。
       if (els.seatTargetCancelBtn) els.seatTargetCancelBtn.addEventListener('click', function () { cancelSeatPicker(); render(); });
+      // v12 H 复核修复: 多目标 (铁索) 的"确定"提前完成 + "重铸"附加动作。
+      if (els.seatTargetConfirmBtn) els.seatTargetConfirmBtn.addEventListener('click', function () { finishSeatPicker(); render(); });
+      if (els.seatTargetExtraBtn) els.seatTargetExtraBtn.addEventListener('click', function () { seatPickerExtraAction(); render(); });
       ['player', 'enemy', 'ally'].forEach(function (seat) {
         var heroEl = els[seat + 'Hero'];
         if (!heroEl) return;
@@ -652,7 +753,9 @@
       tryEnterSeatTargetMode: tryEnterSeatTargetMode,
       tryEnterJijiangTargetMode: tryEnterJijiangTargetMode,
       startLijianTargetPicker: startLijianTargetPicker,
+      startTiesuoSeatPicker: startTiesuoSeatPicker,
       activeSeatPickerLegalSeats: activeSeatPickerLegalSeats,
+      seatPickerActive: function () { return !!seatPicker; },
       cancelSeatPicker: cancelSeatPicker,
       render: renderModePanels,
       bind: bindModePanels

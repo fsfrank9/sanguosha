@@ -180,21 +180,44 @@
     // 传导伤害: 等量、同属性、同来源, 无实体来源牌 (原牌已结算完毕),
     // 标记 chainTransmit 防止递归再传导。
     // v12 H2/H4: 泛化为座次环扫描 — 自受伤者下家起顺时针所有存活的横置
-    // 角色依次受传导 (1v1 恒为 [对手单人], 行为不变)。并发濒死选择由
-    // pendingChoice FIFO 队列按序排空。
+    // 角色依次受传导 (1v1 恒为 [对手单人], 行为不变)。
+    // v12 H 复核修复: 改为可挂起队列 (pauseState.chainTransmit + 逐座席后
+    // 检 pendingChoice)。此前同步循环在"某传导受害者濒死 ask 暂停"时会继续
+    // 对下一座席造成伤害, 而下一座席的 enterDying 被 pauseState.dying 单槽
+    // 守卫吞掉 → 该角色永久搁浅在 hp≤0、存活、无濒死态 (跳过救援/死亡/胜负
+    // 判定)。现在遇 pendingChoice 即保留队列, 由 resumeSuspendedTurnFlowIfReady
+    // 的 chainTransmit 分支在选择排空后续跑剩余座席。
     function transmitChainDamage(game, damageContext) {
       if (game.phase === 'gameover') return;
-      var ringSeats = seatsFrom(game, damageContext.targetActor, false);
-      var natureName = damageContext.nature === 'fire' ? '火焰' : '雷电';
-      for (var ringIdx = 0; ringIdx < ringSeats.length; ringIdx += 1) {
-        if (game.phase === 'gameover') return;
-        var nextActor = ringSeats[ringIdx];
+      if (!game.pauseState) game.pauseState = {};
+      game.pauseState.chainTransmit = {
+        ringSeats: seatsFrom(game, damageContext.targetActor, false),
+        idx: 0,
+        amount: damageContext.amount,
+        sourceActor: damageContext.sourceActor,
+        reason: damageContext.reason,
+        nature: damageContext.nature
+      };
+      return advanceChainTransmit(game);
+    }
+
+    function advanceChainTransmit(game) {
+      var ct = game.pauseState && game.pauseState.chainTransmit;
+      if (!ct) return;
+      var natureName = ct.nature === 'fire' ? '火焰' : '雷电';
+      while (ct.idx < ct.ringSeats.length) {
+        if (game.phase === 'gameover') break;
+        var nextActor = ct.ringSeats[ct.idx];
+        ct.idx += 1;
         var nextState = game[nextActor];
         if (!nextState || nextState.hp <= 0 || !nextState.chained) continue;
         log(game, '【铁索连环】传导：' + actorName(game, nextActor) + '受到等量' + natureName + '伤害。');
-        damage(game, nextActor, damageContext.amount, damageContext.sourceActor,
-          damageContext.reason + '（铁索连环传导）', null, damageContext.nature, { chainTransmit: true });
+        damage(game, nextActor, ct.amount, ct.sourceActor,
+          ct.reason + '（铁索连环传导）', null, ct.nature, { chainTransmit: true });
+        // 某传导受害者濒死 ask 暂停 → 保留队列, 待救援结算后续跑剩余座席。
+        if (game.pendingChoice) return;
       }
+      game.pauseState.chainTransmit = null;
     }
 
     function flushDeferredDamageAfter(game) {
@@ -203,6 +226,17 @@
         game.pauseState.deferredDamageAfter = [];
         for (var i = 0; i < deferred.length; i += 1) {
           finishDamageAfter(game, deferred[i]);
+          // v12 H 复核修复: finishDamageAfter 经铁索传导环可能触发新的濒死
+          // ask 暂停 → 剩余 deferred 项留待选择排空后再冲刷 (随濒死结算
+          // 再次调本函数), 避免暂停期间越序结算。
+          if (game.pendingChoice) {
+            var rest = deferred.slice(i + 1);
+            if (rest.length) {
+              game.pauseState.deferredDamageAfter =
+                (game.pauseState.deferredDamageAfter || []).concat(rest);
+            }
+            return;
+          }
         }
       }
       // v12 G2 复核修复: 濒死期间挂起的转移收尾回调 (天香补牌等) 一并冲刷。
@@ -524,6 +558,8 @@
     return {
       damage: damage,
       enterDying: enterDying,
-      resolveDyingRescueChoice: resolveDyingRescueChoice
+      resolveDyingRescueChoice: resolveDyingRescueChoice,
+      // v12 H 复核修复: 铁索传导队列被濒死救援挂起后的续跑入口。
+      advanceChainTransmit: advanceChainTransmit
     };
   }

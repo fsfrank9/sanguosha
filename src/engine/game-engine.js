@@ -190,6 +190,19 @@
         return null;
       }
 
+      // v12 H 复核修复: state → 座席名解析 (泛化任意座席数)。此前多处用
+      // `game.player === state ? 'player' : 'enemy'` 二元硬编码, 在 3 人身份
+      // 场把第三席误判为 enemy → 装备牌清错槽 (造牌) / 丈八取牌 null 崩溃 /
+      // 连营静默失效。1v1 下遍历结果与旧三元判断逐字一致。
+      function seatOfState(game, state) {
+        if (!game || !state) return null;
+        var seats = seatList(game);
+        for (var i = 0; i < seats.length; i += 1) {
+          if (game[seats[i]] === state) return seats[i];
+        }
+        return null;
+      }
+
       function removeOwnCardFromAnyZone(state, cardId, game) {
         var hit = findOwnCardById(state, cardId);
         if (!hit) return null;
@@ -198,8 +211,8 @@
         }
         // equipment — M2: 制衡/苦肉/武圣转化等把装备区牌当成本, 同样是"失去
         // 装备" — 传入 game 的调用方会触发失去时机 (白银狮子回血)。
-        if (game) {
-          var ownerActor = game.player === state ? 'player' : 'enemy';
+        var ownerActor = seatOfState(game, state);
+        if (game && ownerActor) {
           takeCard(game, cardId, { zone: 'equipment', actor: ownerActor, slot: hit.slot });
           triggerEquipmentLoss(game, ownerActor, hit.card);
         } else {
@@ -322,7 +335,9 @@
         continueTurnAfterJudgeArea: function (game, actor) { return continueTurnAfterJudgeArea(game, actor); },
         continueTurnAfterPreparePhase: function (game, actor) { return continueTurnAfterPreparePhase(game, actor); },
         // v12 H2: AOE 逐座席队列被濒死救援挂起后的续跑 (锦囊域后置装配, 包装注入)
-        resumeAOETargets: function (game) { return TricksRuntime.advanceAOETargets(game); }
+        resumeAOETargets: function (game) { return TricksRuntime.advanceAOETargets(game); },
+        // v12 H 复核修复: 铁索传导环被濒死救援挂起后的续跑 (伤害域后置装配, 包装注入)
+        resumeChainTransmit: function (game) { return DamageDyingRuntime.advanceChainTransmit(game); }
       });
       var requestPlayerResponse = ResponseRuntime.requestPlayerResponse;
       var RESPONSE_KIND_RESOLVERS = ResponseRuntime.RESPONSE_KIND_RESOLVERS;
@@ -374,8 +389,8 @@
         if (!originState || (originState.hand || []).length > 0) return;
         if (!hasSkill(originState, 'lianying')) return;
         if (originState.skillPreferences && originState.skillPreferences.lianying === 'decline') return;
-        var actor = game.player === originState ? 'player'
-          : (game.enemy === originState ? 'enemy' : null);
+        // v12 H 复核修复: 座席归属泛化 (此前第三席解析为 null → 连营静默失效)。
+        var actor = seatOfState(game, originState);
         if (!actor) return;
         log(game, actorName(game, actor) + '发动【连营】，摸一张牌。');
         drawCards(game, actor, 1);
@@ -494,7 +509,10 @@
           if (hasEquipmentEffect(state, 'zhangbaTwoHandSha')
               && state.hand.length >= 2
               && (!state.skillPreferences || state.skillPreferences.zhangba !== 'decline')) {
-            var zbActor = game.player === state ? 'player' : 'enemy';
+            // v12 H 复核修复: 座席归属泛化 — 此前 `game.player === state ?
+            // 'player' : 'enemy'` 在 3 人场把第三席误判为 enemy, takeCard 从
+            // enemy 手牌取不到 → null → zbFirst.id 崩溃。
+            var zbActor = seatOfState(game, state) || 'enemy';
             var zbFirst = takeCard(game, state.hand[0], { zone: 'hand', actor: zbActor });
             var zbSecond = takeCard(game, state.hand[0], { zone: 'hand', actor: zbActor });
             return {
@@ -1069,11 +1087,29 @@
         if (!saved) return fail('找不到【护驾】的挂起来源。');
         game.pauseState.shaResponse = null;
         var remaining = saved.shanRemaining || 1;
+        var hujiaPaidThis = false;
         if (wantsAid && consumeResponse(game, 'player', 'shan', '【杀】（护驾）', decision.cardId || null)) {
           log(game, actorName(game, 'player') + '响应【护驾】，代' + actorName(game, lordActor) + '打出【闪】。');
           remaining -= 1;
+          hujiaPaidThis = true;
         }
-        // 剩余需求 (无双第二张等) 由 AI 同势力座席接力; 玩家只询问一次。
+        // v12 H 复核修复: 无双第二张 — 玩家刚代打一张且仍有闪可代 → 再次
+        // 询问 (与激将侧对称)。此前只 AI 座席接力, 玩家手上还有第二张真闪
+        // 也被跳过 → 主公无谓掉血。
+        if (remaining > 0 && hujiaPaidThis && hasShanResponseAvailable(game.player)) {
+          saved.shanRemaining = remaining;
+          return requestPlayerResponse(game, {
+            kind: 'hujia-aid',
+            actor: 'player',
+            pauseKey: 'shaResponse',
+            source: saved,
+            options: listShanResponseOptions(game.player),
+            meta: { lordActor: lordActor, sourceActor: saved.actor, shaName: saved.card && saved.card.name },
+            logMessage: '等待' + actorName(game, 'player') + '决定是否再代打一张【闪】（无双）。',
+            statusMessage: '等待玩家护驾响应。'
+          });
+        }
+        // 剩余需求 (无双第二张等, 玩家已无闪) 由 AI 同势力座席接力。
         while (remaining > 0 && tryLordAidSync(game, lordActor, 'hujia', '【杀】')) {
           remaining -= 1;
         }
@@ -2319,6 +2355,10 @@
         nextSeat: nextSeat,
         seatsFrom: seatsFrom,
         legalTargetsForCard: legalTargetsForCard,
+        // v12 H 复核修复: 借刀受害者候选 (持刀者可 杀 到的座席) — UI 两段
+        // 点选 (先选持刀者 An, 再从其候选中选受害者 Bn) 需要, 消除"UI 高亮
+        // 合法持刀者但受害者恒缺省自己→点选必败"的不一致。
+        jiedaoVictimCandidates: jiedaoVictimCandidates,
         endTurn: endTurn,
         setSkillPreference: setSkillPreference,
         getSkillPreference: getSkillPreference,
