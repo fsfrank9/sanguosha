@@ -161,13 +161,16 @@
   }
 
   // 定位一张牌当前所在的区域描述符; 在途 (不在任何区域) 返回 null。
+  // v12 H 复核修复: 座席遍历泛化 (此前硬编码 player/enemy 两席, 对第三席的
+  // 手牌/判定区/装备返回 null → moveCard(from=null) 用于第三席时静默失败;
+  // 当前调用方均显式传 from 故不可达, 此为防御性加固)。
   function findCardZone(game, cardOrId) {
     var id = cardIdOf(cardOrId);
+    var seats = (game && game.seats && game.seats.length) ? game.seats : ['player', 'enemy'];
     var refs = [{ zone: 'deck' }, { zone: 'discard' }];
-    for (var a = 0; a < 2; a += 1) {
-      var actor = a === 0 ? 'player' : 'enemy';
-      refs.push({ zone: 'hand', actor: actor });
-      refs.push({ zone: 'judgeArea', actor: actor });
+    for (var a = 0; a < seats.length; a += 1) {
+      refs.push({ zone: 'hand', actor: seats[a] });
+      refs.push({ zone: 'judgeArea', actor: seats[a] });
     }
     for (var i = 0; i < refs.length; i += 1) {
       var list = zoneArrayOf(game, refs[i]);
@@ -176,8 +179,8 @@
         if (list[j].id === id) return refs[i];
       }
     }
-    for (var b = 0; b < 2; b += 1) {
-      var owner = b === 0 ? 'player' : 'enemy';
+    for (var b = 0; b < seats.length; b += 1) {
+      var owner = seats[b];
       var equipment = game[owner] && game[owner].equipment;
       if (!equipment) continue;
       for (var s = 0; s < EQUIP_SLOTS.length; s += 1) {

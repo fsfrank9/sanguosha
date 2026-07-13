@@ -205,6 +205,7 @@
           'allyHeroPickRow', 'allyHeroSelect',
           // v12 H6: identity3 单目标牌/主动技 座席点选模式面板。
           'seatTargetModePanel', 'seatTargetModeHint', 'seatTargetCancelBtn',
+          'seatTargetConfirmBtn', 'seatTargetExtraBtn',
           // v12 H6/H7: 激将/护驾 求助响应面板。
           'lordAidPanel', 'lordAidHint', 'lordAidChoices', 'lordAidDeclineBtn',
           // v9 PR-E5: 侧抽屉菜单 + 退出确认 modal
@@ -454,6 +455,9 @@
       function enterCardSkillMode(skillId) {
         var config = cardSkillConfig(skillId);
         if (!config) return false;
+        // v12 H 复核修复: 切入技能选牌前清理悬空的座席点选 (否则旧点选状态
+        // 与高亮不清, 玩家点英雄卡会用"之前那张牌"静默出牌)。
+        modePanels.cancelSeatPicker();
         skillSelectMode = skillId;
         selectedSkillCardIds = [];
         if (els.zhihengModePanel) els.zhihengModePanel.hidden = false;
@@ -531,7 +535,13 @@
           hideHuogongPanel();
           hideConversionPanel();
           hideGuanxingPanel();
-          showTiesuoPanel(cardId);
+          // v12 H 复核修复: identity3 铁索经泛化座席点选 (可选第三席, 1-2 目标
+          // + 重铸); 1v1 仍走旧 tiesuoModePanel (enemy/self/both/重铸)。
+          if (game.mode === 'identity3') {
+            modePanels.startTiesuoSeatPicker(cardId);
+          } else {
+            showTiesuoPanel(cardId);
+          }
           return;
         }
         if (clickedCard && (clickedCard.type === 'guohe' || clickedCard.type === 'shunshou') && game.phase === 'play') {
@@ -631,6 +641,8 @@
 
       function usePlayerSkill(skillId) {
         if (!game || game.turn !== 'player' || game.phase !== 'play' || enemyThinking) return;
+        // v12 H 复核修复: 发动任何技能前清理悬空座席点选 (见 enterCardSkillMode)。
+        modePanels.cancelSeatPicker();
         if (cardSkillConfig(skillId)) {
           hideTiesuoPanel();
           hideTargetZonePanel();
@@ -781,20 +793,26 @@
       // 身份判定区 (身份为固定预设 我=主公/敌=反贼/第三席=忠臣, 不可重抽,
       // 由 Engine.newGame 的 seats 预设自动分配)。
       function setMatchMode(mode) {
+        var prev = matchMode;
         matchMode = mode === 'identity3' ? 'identity3' : 'duel';
         var identity3 = matchMode === 'identity3';
         if (els.modeDuelBtn) els.modeDuelBtn.classList.toggle('is-active', !identity3);
         if (els.modeIdentity3Btn) els.modeIdentity3Btn.classList.toggle('is-active', identity3);
         if (els.allyHeroPickRow) els.allyHeroPickRow.hidden = !identity3;
         if (els.roleDraftPanel) els.roleDraftPanel.hidden = identity3;
-        // identity3 身份固定: 我方恒主公 (座次预设首位) — 选将顺序照旧
-        // 玩家先选; duel 模式回到随机身份的既有状态 (不重掷, 保留当前)。
+        if (prev === matchMode) return; // 同模式重复点击 → 不重置选将/身份
         if (identity3) {
+          // identity3 身份固定: 我方恒主公 (座次预设首位), 选将顺序照旧玩家先选。
           playerRole = '主公';
           enemyRole = '反贼';
           updateDraftUI();
           resetPickSequence();
           renderHeroPickGrid();
+        } else {
+          // v12 H 复核修复: 切回 1v1 必须恢复随机身份 — 此前 duel 分支什么都
+          // 不做, identity3 强制的 主公/反贼 会永久粘滞, 静默吃掉 1v1 的随机
+          // 身份特性 (红线: 1v1 行为不得被 identity3 污染)。
+          assignRandomRoles();
         }
       }
 
@@ -906,6 +924,7 @@
         hideHuogongPanel();
         hideConversionPanel();
         hideGuanxingPanel();
+        modePanels.cancelSeatPicker();
         exitSkillSelectMode();
         if (els.lobbyScreen) els.lobbyScreen.hidden = true;
         if (els.setupScreen) els.setupScreen.hidden = false;
@@ -938,6 +957,7 @@
         hideHuogongPanel();
         hideConversionPanel();
         hideGuanxingPanel();
+        modePanels.cancelSeatPicker();
         exitSkillSelectMode();
         ensureDistinctHeroes('player');
         var playerHero = els.playerHeroSelect ? els.playerHeroSelect.value : 'liubei';
