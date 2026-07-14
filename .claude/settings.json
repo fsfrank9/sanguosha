@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "command": "echo \"{\\\"hookSpecificOutput\\\":{\\\"hookEventName\\\":\\\"PreToolUse\\\",\\\"additionalContext\\\":\\\"[推送前必做] 先用 GitHub 工具确认当前分支的上游 PR 是否已合并 (pull_request_read / search_pull_requests)。已合并的 PR 是终态、不可复用: 应从 origin 默认分支重建同名分支、仅保留未合并提交 (rebase/cherry-pick) 再开新 PR; 切勿把新提交摞在已合并历史之上。\\\"},\\\"systemMessage\\\":\\\"\\u26a0 推送前核对上游 PR 合并状态\\\"}\"",
+            "statusMessage": "核对上游 PR 状态…"
+          }
+        ]
+      }
+    ]
+  }
+}
