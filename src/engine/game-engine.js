@@ -539,7 +539,18 @@
 
       function consumeResponse(game, actor, type, reason, preferredCardId) {
         var response = findResponseCard(game[actor], type, preferredCardId, game);
-        if (!response) return false;
+        if (!response) {
+          // v12 I2: 响应空窗记账 (纯遥测) — 自动响应含全部转化路径, 拿不出
+          // 即公开证明该座席当下凑不出此牌型; AI 估计在其下个回合开始 (摸牌,
+          // resetActorTurnState 清除) 前按 0 计。真实对局中这是公开信息。
+          // 复核修复 D1: 仅自动扫描路径 (无 preferredCardId) 记账 — 显式
+          // 指定的牌无效 (findResponseCard 不回退扫描) 不证明没有此牌型。
+          if (!preferredCardId && game[actor]) {
+            game[actor].aiRevealed = game[actor].aiRevealed || {};
+            game[actor].aiRevealed[type] = true;
+          }
+          return false;
+        }
         if (type === 'sha' && actor === game.turn) game[actor].usedOrRespondedSha = true;
         if (response.extraCards && response.extraCards.length) {
           // v7 PR-14: 丈八蛇矛 响应 — 弃两张物理手牌，虚拟杀不进弃牌堆
@@ -2385,6 +2396,18 @@
         aiScoreCardWithLookahead: aiScoreCardWithLookahead,
         // v8 PR-D4: threat-aware eval (考虑对方下回合威胁)
         aiEvaluateStateWithThreat: aiEvaluateStateWithThreat,
+        // v12 I: AI 进阶第二轮 — profile 路由 / 诚实计数估计 / 目标评估 /
+        // 两步 lookahead (供测试与基准对弈)
+        aiProfileOf: AIRuntime.aiProfileOf,
+        aiUnknownCounts: AIRuntime.aiUnknownCounts,
+        aiEstimateShaCountFor: AIRuntime.aiEstimateShaCountFor,
+        aiEstimateShanCountFor: AIRuntime.aiEstimateShanCountFor,
+        aiEstimateTaoCountFor: AIRuntime.aiEstimateTaoCountFor,
+        aiFoeEstimate: AIRuntime.aiFoeEstimate,
+        aiHostilityToward: AIRuntime.aiHostilityToward,
+        aiPickHostileTarget: AIRuntime.aiPickHostileTarget,
+        aiPrimaryFoe: AIRuntime.aiPrimaryFoe,
+        aiDeepTurnEval: AIRuntime.aiDeepTurnEval,
         runAITurn: runAITurn,
         opponent: opponent
       };

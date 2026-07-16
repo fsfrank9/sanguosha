@@ -27,6 +27,8 @@
     state.usedSha = false;
     state.usedOrRespondedSha = false;
     state.shaBonus = 0;
+    // v12 I2: 响应空窗记账随新回合 (摸牌) 失效 — 见 consumeResponse。
+    state.aiRevealed = null;
     // v11 C8 (批次 32): 妄尊 等回合级手牌上限修正复位
     state.handLimitDelta = 0;
     var flags = ensureFlags(state);

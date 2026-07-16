@@ -85,6 +85,158 @@
       return count;
     }
 
+    // ═════ v12 I: AI profile — 'v12' (缺省, 本阶段新启发) / 'v11' (冻结旧
+    // 路径, 供基准对弈与回退)。座席级 state.aiProfile 优先, 全局 game.aiProfile
+    // 兜底。验收基准 (tests/v12_i_benchmark) 让两个 profile 同场对弈。═════
+    function aiProfileOf(g, actor) {
+      var st = g && g[actor];
+      return (st && st.aiProfile) || (g && g.aiProfile) || 'v12';
+    }
+
+    // 特性门: v11 profile 全关; v12 可经 state.aiFeatureOff / game.aiFeatureOff
+    // (数组) 逐项关闭 — 消融实验与线上回退用, 正常对局不设。特性名:
+    //   'honestCount'  I2 诚实计数 (关闭回退全知直读)
+    //   'lookahead2'   I1 两步精化
+    //   'killPressure' 处决线/酒连招/压血线评估
+    //   'discardHold'  弃牌保留值
+    //   'multiTarget'  I3 多候选目标评分
+    function aiFeatureOn(g, actor, feature) {
+      if (aiProfileOf(g, actor) === 'v11') return false;
+      var st = g && g[actor];
+      var off = (st && st.aiFeatureOff) || (g && g.aiFeatureOff);
+      return !(off && off.indexOf(feature) >= 0);
+    }
+
+    // ═════ v12 I2: 可见信息计数建模 ═════
+    // 旧实现对"对手"的杀/闪估计直接读其暗置手牌 (全知作弊)。诚实模型:
+    //   - 牌堆构成是公开信息 (全场牌型总量恒定, 由牌守恒断言背书);
+    //   - 弃牌堆/所有装备区/判定区/"创" 公开可见; 自己手牌己方全知;
+    //   - 未知池 = 牌堆 + 其他座席手牌 (viewer 视角);
+    //   - 对手手牌的牌型期望 = 其手牌数 × 未知池中该牌型占比 (+ 转化技系数)。
+    // 每次询问全量普查 (~150 张遍历, 无缓存 — 避免克隆携带陈旧缓存)。
+    function aiNewCounts() {
+      return { sha: 0, shan: 0, tao: 0, wuxie: 0, black: 0, red: 0, shaRed: 0, shanBlack: 0, total: 0 };
+    }
+
+    function aiCountInto(counts, card) {
+      if (!card) return;
+      if (isShaType(card.type)) {
+        counts.sha += 1;
+        if (card.color === 'red') counts.shaRed += 1;
+      } else if (card.type === 'shan') {
+        counts.shan += 1;
+        if (card.color === 'black') counts.shanBlack += 1;
+      } else if (card.type === 'tao') counts.tao += 1;
+      else if (card.type === 'wuxie') counts.wuxie += 1;
+      if (card.color === 'black') counts.black += 1;
+      else if (card.color === 'red') counts.red += 1;
+      counts.total += 1;
+    }
+
+    function aiSeatZonesEach(g, seat, includeHand, fn) {
+      var st = g[seat];
+      if (!st) return;
+      if (includeHand) (st.hand || []).forEach(fn);
+      ['weapon', 'armor', 'horsePlus', 'horseMinus'].forEach(function (slot) {
+        if (st.equipment && st.equipment[slot]) fn(st.equipment[slot]);
+      });
+      (st.judgeArea || []).forEach(fn);
+      (st.chuang || []).forEach(fn);
+    }
+
+    // viewer 视角的未知池计数: 全场总量 − 可见量。在途牌 (pauseState) 两边
+    // 都不计, 差值一致 (期望占比偏差可忽略)。
+    function aiUnknownCounts(g, viewer) {
+      var totals = aiNewCounts();
+      var visible = aiNewCounts();
+      (g.deck || []).forEach(function (c) { aiCountInto(totals, c); });
+      (g.discard || []).forEach(function (c) { aiCountInto(totals, c); aiCountInto(visible, c); });
+      StateRuntime.seatList(g).forEach(function (seat) {
+        aiSeatZonesEach(g, seat, true, function (c) { aiCountInto(totals, c); });
+        aiSeatZonesEach(g, seat, seat === viewer, function (c) { aiCountInto(visible, c); });
+      });
+      var out = aiNewCounts();
+      Object.keys(out).forEach(function (k) { out[k] = Math.max(0, totals[k] - visible[k]); });
+      return out;
+    }
+
+    // 对 subject 座席的【杀】持有量估计 (viewer 视角, 返回浮点期望):
+    // subject === viewer → 精确 (旧实现); 否则按未知池占比 × 手牌数,
+    // 武圣 (红非杀)/龙胆 (闪) 转化按对应池占比折算, 丈八按余牌对半折算。
+    function aiEstimateShaCountFor(g, viewer, subject) {
+      var st = g[subject];
+      if (!st) return 0;
+      if (subject === viewer) return aiEstimateShaCount(st);
+      // 响应空窗: 该座席在本窗口内拿不出杀 (含全部转化路径) 已被公开证明
+      if (st.aiRevealed && st.aiRevealed.sha) return 0;
+      var unknown = aiUnknownCounts(g, viewer);
+      var hand = (st.hand || []).length;
+      if (unknown.total <= 0 || hand <= 0) {
+        // 无未知牌 → 只剩公开装备的转化面 (武圣红装备)
+        return aiWushengEquipShaCount(st);
+      }
+      var perCard = unknown.sha / unknown.total;
+      if (hasSkill(st, 'wusheng')) perCard += Math.max(0, unknown.red - unknown.shaRed) / unknown.total;
+      if (hasSkill(st, 'longdan')) perCard += unknown.shan / unknown.total;
+      var estimate = hand * Math.min(1, perCard) + aiWushengEquipShaCount(st);
+      if (hasEquipmentEffect(st, 'zhangbaTwoHandSha') && hand >= 2) {
+        estimate += Math.floor(Math.max(0, hand - estimate) / 2);
+      }
+      return estimate;
+    }
+
+    function aiWushengEquipShaCount(st) {
+      if (!hasSkill(st, 'wusheng')) return 0;
+      var count = 0;
+      ['weapon', 'armor', 'horsePlus', 'horseMinus'].forEach(function (slot) {
+        var eq = st.equipment && st.equipment[slot];
+        if (eq && eq.color === 'red') count += 1;
+      });
+      return count;
+    }
+
+    // 对 subject 座席的【闪】持有量估计 — 龙胆 (杀)/倾国 (黑非闪) 转化折算。
+    function aiEstimateShanCountFor(g, viewer, subject) {
+      var st = g[subject];
+      if (!st) return 0;
+      if (subject === viewer) return aiEstimateShanCount(st);
+      // 响应空窗: 该座席在本窗口内拿不出闪 (含全部转化路径) 已被公开证明
+      if (st.aiRevealed && st.aiRevealed.shan) return 0;
+      var unknown = aiUnknownCounts(g, viewer);
+      var hand = (st.hand || []).length;
+      if (unknown.total <= 0 || hand <= 0) return 0;
+      var perCard = unknown.shan / unknown.total;
+      if (hasSkill(st, 'longdan')) perCard += unknown.sha / unknown.total;
+      if (hasSkill(st, 'qingguo')) perCard += Math.max(0, unknown.black - unknown.shanBlack) / unknown.total;
+      return hand * Math.min(1, perCard);
+    }
+
+    // 对 subject 座席的【桃】持有量估计 (收割判断: 自救余量)。
+    function aiEstimateTaoCountFor(g, viewer, subject) {
+      var st = g[subject];
+      if (!st) return 0;
+      if (subject === viewer) {
+        return (st.hand || []).filter(function (c) { return c.type === 'tao'; }).length;
+      }
+      var unknown = aiUnknownCounts(g, viewer);
+      var hand = (st.hand || []).length;
+      if (unknown.total <= 0 || hand <= 0) return 0;
+      return hand * (unknown.tao / unknown.total);
+    }
+
+    // 按 viewer 的 profile 路由对 seat 的估计: v11 → 全知直读 (冻结旧行为);
+    // v12 → 诚实计数。viewer === seat 时两者相同 (读自己)。
+    function aiFoeEstimate(g, viewer, seat, kind) {
+      if (!aiFeatureOn(g, viewer, 'honestCount')) {
+        if (kind === 'sha') return aiEstimateShaCount(g[seat]);
+        if (kind === 'shan') return aiEstimateShanCount(g[seat]);
+        return (g[seat] && (g[seat].hand || []).filter(function (c) { return c.type === 'tao'; }).length) || 0;
+      }
+      if (kind === 'sha') return aiEstimateShaCountFor(g, viewer, seat);
+      if (kind === 'shan') return aiEstimateShanCountFor(g, viewer, seat);
+      return aiEstimateTaoCountFor(g, viewer, seat);
+    }
+
     // v11 D1 (批次 33): 无懈期望值评估 — 替代"有无懈就自动用"。
     // 只对链的第一张无懈 (chain.wuxied=false) 做取舍; 反无懈 (夺回自己锦囊
     // 的结算权) 保持既有行为。skillPreferences.wuxiePolicy='always' 回退旧
@@ -140,7 +292,8 @@
       if (trick === 'huogong') return self.hp <= 2;
       if (trick === 'juedou') {
         if (self.hp <= 2) return true;
-        return aiEstimateShaCount(self) <= aiEstimateShaCount(opp);
+        // v12 I2: 对手杀数按 profile 路由 (v12 诚实估计 / v11 全知直读)
+        return aiEstimateShaCount(self) <= aiFoeEstimate(game, responder, opponent(responder), 'sha');
       }
       if (trick === 'guohe' || trick === 'shunshou') {
         return equipCount > 0 || handCount <= 2;
@@ -154,76 +307,156 @@
       return true; // 无中/借刀/桃园与五谷 denial 窗口/未建模锦囊 → 保持旧行为
     }
 
+    // ═════ v12 I3: 多人目标评估 — 敌意记账 + 集火/收割/胜负手 ═════
+    // 敌意分: aggressionLog (damage() 纯遥测记账) 中 seat 对 viewer 阵营
+    // 造成的累计伤害。开放身份下作平分决胜与"谁在集火我方"信号; 为 v13
+    // 暗身份推断预留同一数据面。
+    function aiHostilityToward(g, viewer, seat) {
+      var ledger = g.aggressionLog || [];
+      var total = 0;
+      for (var i = 0; i < ledger.length; i += 1) {
+        var entry = ledger[i];
+        if (entry.source !== seat) continue;
+        if (entry.target === viewer || !StateRuntime.isHostileSeat(g, viewer, entry.target)) {
+          total += entry.amount || 0;
+        }
+      }
+      return total;
+    }
+
+    // 敌对候选中挑目标: 反贼打主公是胜负手; 低血可收割 (兼看其桃/闪余量
+    // 估计); 击杀反贼有摸三奖励; 敌意记账高者优先。单候选 / v11 profile
+    // 保持旧行为 (对手优先) — 1v1 恒单候选, 目标选择零变化。
+    function aiPickHostileTarget(g, actor, candidates) {
+      if (!candidates.length) return null;
+      if (candidates.length === 1) return candidates[0];
+      if (!aiFeatureOn(g, actor, 'multiTarget')) {
+        return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : candidates[0];
+      }
+      var roles = g.roles || {};
+      var mySide = StateRuntime.sideOf(g, actor);
+      var best = null;
+      candidates.forEach(function (seat) {
+        var st = g[seat];
+        if (!st) return;
+        var score = 0;
+        if (mySide === 'rebelSide' && roles[seat] === '主公') score += 50; // 主公倒下即反贼胜
+        if (st.hp <= 1) score += 30;
+        else if (st.hp === 2) score += 12;
+        if (roles[seat] === '反贼') score += 8; // 击杀反贼摸三张
+        score -= aiEstimateShanCountFor(g, actor, seat) * 8;
+        score -= aiEstimateTaoCountFor(g, actor, seat) * 6;
+        score += Math.min(20, aiHostilityToward(g, actor, seat) * 4);
+        if (seat === opponent(actor)) score += 1; // 平分沿用旧偏好
+        if (!best || score > best.score) best = { seat: seat, score: score };
+      });
+      return best ? best.seat : candidates[0];
+    }
+
     // v12 H5: AI 启发式评估的"对手"从 opponent() 二元假设改为阵营敌对
-    // 主目标 (1v1 恒为对手; 多席取首个敌对存活座席)。
+    // 主目标。v12 I3: 多候选按目标评分挑选 (1v1 恒为对手)。
     function aiPrimaryFoe(game, actor) {
       var candidates = StateRuntime.hostileSeats(game, actor);
-      return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : (candidates[0] || opponent(actor));
+      if (!candidates.length) return opponent(actor);
+      return aiPickHostileTarget(game, actor, candidates) || opponent(actor);
     }
 
     // v12 H5: AI 单目标牌的目标座席 — 合法目标矩阵 ∩ 敌对座席 (1v1 恒为
     // 对手)。canPlayCard 的 ∃-目标语义包含友方座席 (玩家可显式指定), AI
     // 必须另行确认存在"可达且敌对"的目标; 与引擎 resolveTrickTargetActor
-    // 的缺省池同构 (对手优先), 供出杀候选门与火攻预览/出牌保持同一目标。
+    // 的缺省池同构, 供出杀候选门与火攻预览/出牌保持同一目标。
+    // v12 I3: 多候选按目标评分挑选 (集火/收割/胜负手)。
     function aiShaTargetSeat(game, actor, card) {
       if (!legalTargetsForCard) return opponent(actor);
       var candidates = legalTargetsForCard(game, actor, card).filter(function (seat) {
         return StateRuntime.isHostileSeat(game, actor, seat);
       });
-      if (!candidates.length) return null;
-      return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : candidates[0];
+      return aiPickHostileTarget(game, actor, candidates);
     }
 
     // v8 PR-D1: 出牌/锦囊 score 精细化。对 桃 / 杀 / 决斗 / 锦囊 都按
     // 双方资源 + 自身受伤情况 给梯度分数, 替代原 v6 的 binary heuristic.
+    // v12 I: 拆为 raw 分 + 血线状态调整层 — 自身危险区 (hp<=2) 而对手血线
+    // 安全时收敛进攻 (对攻被反打即濒死, 实证败局的主要模式); 双方都进斩杀
+    // 区间时保持先手进攻。
+    var AI_AGGRESSIVE_TRICKS = ['juedou', 'nanman', 'wanjian', 'huogong', 'jiedao'];
+
     function scoreCardForAI(game, actor, card) {
+      var base = aiScoreCardRaw(game, actor, card);
+      if (!aiFeatureOn(game, actor, 'killPressure')) return base;
       var self = game[actor];
       var target = game[aiPrimaryFoe(game, actor)];
+      var aggressive = isShaType(card.type) || AI_AGGRESSIVE_TRICKS.indexOf(card.type) >= 0;
+      if (aggressive && self.hp <= 2 && target && target.hp >= 3) return base - 30;
+      return base;
+    }
+
+    function aiScoreCardRaw(game, actor, card) {
+      var self = game[actor];
+      var foeSeat = aiPrimaryFoe(game, actor);
+      var target = game[foeSeat];
 
       // 桃: hp 缺口梯度。critical (hp=1) > 多伤 > 轻伤; 满血给负分阻止 AI 用。
+      // v12 I: 轻伤 (缺口 1 且血线安全) 不吃桃 — 桃是濒死窗口硬通货,
+      // 平时慢回不如留作救命/抬处决期血线。
       if (card.type === 'tao') {
         if (self.hp >= self.maxHp) return -100;
         if (self.hp === 1) return 200;
         var deficit = self.maxHp - self.hp;
         if (deficit >= 2) return 120;
+        if (aiFeatureOn(game, actor, 'killPressure') && self.hp >= 3) return 25;
         return 80;
       }
 
       // 无中生有: 永远值钱 (1 张换 2 张)
       if (card.type === 'wuzhong') return 90;
 
-      // 酒: 仅当持手中有可用杀且本回合未出过杀 → buff 杀; 否则浪费
+      // 酒: 仅当持手中有可用杀且本回合未出过杀 → buff 杀; 否则浪费。
+      // v12 I1: 酒+杀 可致死目标 (hp<=2) → 处决连招优先级抬高。
       if (card.type === 'jiu') {
         var hasShaToBoost = !self.usedSha && self.hand.some(function (c) { return isShaType(c.type); });
-        return hasShaToBoost ? 82 : -10;
+        if (!hasShaToBoost) return -10;
+        if (aiFeatureOn(game, actor, 'killPressure') && target && target.hp <= 2
+            && aiFoeEstimate(game, actor, foeSeat, 'shan') < 1) {
+          return 140;
+        }
+        return 82;
       }
 
-      // 杀: 看目标可响应闪数量 (含 longdan/qingguo 转化); 0 闪 → 高分, 多闪 → 低
+      // 杀: 看目标可响应闪数量 (含 longdan/qingguo 转化); 0 闪 → 高分, 多闪 → 低。
+      // v12 I2: 对手闪数按 profile 路由 (v12 诚实估计返回浮点期望, 阈值改
+      // 半开区间 — 对整数输入与旧 ===0/===1 判定逐值一致)。
+      // v12 I1: 处决线 — 目标命悬 (含酒 buff 可致死) 且闪面稀薄 → 最高优先。
       if (isShaType(card.type)) {
         if (self.usedSha && !canUseUnlimitedSha(self)) return -100;
-        var targetShans = aiEstimateShanCount(target);
-        if (targetShans === 0) return 85;
-        if (targetShans === 1) return 60;
+        var targetShans = aiFoeEstimate(game, actor, foeSeat, 'shan');
+        if (aiFeatureOn(game, actor, 'killPressure')) {
+          var killReach = 1 + (self.shaBonus || 0);
+          if (target && target.hp <= killReach && targetShans < 1) return 150;
+        }
+        if (targetShans < 0.5) return 85;
+        if (targetShans < 1.5) return 60;
         return 35;
       }
 
-      // 决斗: 估算双方"互响应杀"链。我方杀数 vs 对方杀数 (含 武圣/龙胆 转化)。
+      // 决斗: 估算双方"互响应杀"链。我方杀数 (精确) vs 对方杀数 (估计)。
+      // 浮点估计下"持平"取 ±0.5 带宽 (整数输入时与旧 >/===/< 三分逐值一致)。
       if (card.type === 'juedou') {
         var ourSha = aiEstimateShaCount(self);
-        var theirSha = aiEstimateShaCount(target);
-        if (ourSha > theirSha) return 75;
-        if (ourSha === theirSha) return 40;
+        var theirSha = aiFoeEstimate(game, actor, foeSeat, 'sha');
+        if (ourSha > theirSha + 0.5) return 75;
+        if (ourSha >= theirSha - 0.5) return 40;
         return 10;
       }
 
       // 南蛮: 对方无杀响应 → 1 dmg, 否则等于浪费 (chip 评分降低)
       if (card.type === 'nanman') {
-        return aiEstimateShaCount(target) === 0 ? 80 : 30;
+        return aiFoeEstimate(game, actor, foeSeat, 'sha') < 0.5 ? 80 : 30;
       }
 
       // 万箭: 对方无闪响应 → 1 dmg
       if (card.type === 'wanjian') {
-        return aiEstimateShanCount(target) === 0 ? 80 : 30;
+        return aiFoeEstimate(game, actor, foeSeat, 'shan') < 0.5 ? 80 : 30;
       }
 
       // 过河拆桥: 算目标 手牌 + 装备 总数
@@ -244,6 +477,13 @@
       }
 
       if (card.family === 'equipment') return 50;
+      // v12 I: 闪电挂入自己判定区, 自己下回合先判 (黑桃 2-9 约 23% 吃 3 伤)
+      // — 期望值为负的自残轮盘, 不主动使用; 例外: 红颜 (小乔) 黑桃视为
+      // 红桃 → 闪电对自己必不命中, 挂出去零风险纯威胁。
+      if (card.type === 'shandian' && aiFeatureOn(game, actor, 'killPressure')
+          && !hasSkill(self, 'hongyan')) {
+        return -30;
+      }
       if (card.family === 'delayed') return 48;
       return 0;
     }
@@ -283,13 +523,54 @@
       return copy;
     }
 
+    // 单座席资源分 (多席评估的构件): hp 权重最高 + 手牌/装备, 判定区扣分。
+    function aiSeatScore(g, seat) {
+      var st = g[seat];
+      if (!st) return 0;
+      var slots = ['weapon', 'armor', 'horsePlus', 'horseMinus'];
+      var eq = slots.filter(function (s) { return st.equipment && st.equipment[s]; }).length;
+      return st.hp * 30 + (st.hand || []).length * 5 + eq * 8 - (st.judgeArea || []).length * 5;
+    }
+
     // 状态评估: 自身 hp 与对方差为主, 加上 hand / equipment / judge 区差
     // game over 时给极大的 +/- bonus.
+    // v12 I3: 多席 (identity3) 且 v12 profile → 阵营聚合评估: 友方 (自己 +
+    // 0.6×盟友) − 敌方均值; 终局按阵营 (winner='lordSide'/'rebelSide')。
+    // 1v1 双 profile 均保持旧公式逐字不变。
     function aiEvaluateState(g, actor) {
       var self = g[actor];
+      if (!self) return 0;
+      var seats = StateRuntime.seatList(g);
+      if (seats.length > 2 && aiProfileOf(g, actor) !== 'v11') {
+        if (g.phase === 'gameover') {
+          var mySide = StateRuntime.sideOf(g, actor);
+          if (g.winner && g.winner === mySide) return 100000;
+          if (g.winner) return -100000;
+        }
+        var friendly = aiSeatScore(g, actor);
+        if (self.hp <= 0) friendly -= 1000;
+        else if (self.hp === 1) friendly -= 50;
+        else if (self.hp === 2) friendly -= 10;
+        var hostileSum = 0;
+        var hostileCount = 0;
+        seats.forEach(function (seat) {
+          if (seat === actor) return;
+          var st = g[seat];
+          if (!st || st.hp <= 0) return;
+          if (StateRuntime.isHostileSeat(g, actor, seat)) {
+            hostileSum += aiSeatScore(g, seat);
+            hostileCount += 1;
+          } else {
+            friendly += aiSeatScore(g, seat) * 0.6;
+          }
+        });
+        // 敌方取均值保持与 1v1 同一量纲; 每存活敌席另计 -5 (人数劣势压力)
+        var hostileAvg = hostileCount ? hostileSum / hostileCount : 0;
+        return friendly - hostileAvg - hostileCount * 5;
+      }
       var oppActor = opponent(actor);
       var opp = g[oppActor];
-      if (!self || !opp) return 0;
+      if (!opp) return 0;
       if (g.phase === 'gameover') {
         if (g.winner === actor) return 100000;
         if (g.winner === oppActor) return -100000;
@@ -299,6 +580,12 @@
       if (self.hp <= 0) hpScore -= 1000;
       else if (self.hp === 1) hpScore -= 50;
       else if (self.hp === 2) hpScore -= 10;
+      // v12 I1: 压血线 — 把对手压进斩杀区间的非线性收益 (v11 冻结无此项)
+      if (aiFeatureOn(g, actor, 'killPressure')) {
+        if (opp.hp <= 0) hpScore += 500;
+        else if (opp.hp === 1) hpScore += 40;
+        else if (opp.hp === 2) hpScore += 15;
+      }
       // 手牌差
       var handScore = ((self.hand || []).length - (opp.hand || []).length) * 5;
       // 装备件数差
@@ -339,15 +626,26 @@
     // 用 estimateShaCount(opp) vs estimateShanCount(self) 估算下回合可能
     // 接到的伤害, 给 actor 视角下负分. AI 因此会优先 disrupt 对手的杀
     // (过河武器 / 顺手) 或缓解自身防御.
+    // v12 I2: 对手杀数按 profile 路由 (v12 诚实估计); I3: 多席 v12 下
+    // 汇总全部存活敌席的杀数威胁。
     function aiEvaluateStateWithThreat(g, actor) {
       var base = aiEvaluateState(g, actor);
       if (g.phase === 'gameover') return base;
       var self = g[actor];
-      var oppActor = opponent(actor);
-      var opp = g[oppActor];
-      if (!self || !opp) return base;
-      // 对方下回合能用几张杀 (estimateShaCount 含 武圣 红色 / 龙胆 闪 等)
-      var oppSha = aiEstimateShaCount(opp);
+      if (!self) return base;
+      var oppSha;
+      var seats = StateRuntime.seatList(g);
+      if (seats.length > 2 && aiProfileOf(g, actor) !== 'v11') {
+        oppSha = 0;
+        StateRuntime.hostileSeats(g, actor).forEach(function (seat) {
+          oppSha += aiFoeEstimate(g, actor, seat, 'sha');
+        });
+      } else {
+        var oppActor = opponent(actor);
+        if (!g[oppActor]) return base;
+        // 对方下回合能用几张杀 (含 武圣 红色 / 龙胆 闪 等转化)
+        oppSha = aiFoeEstimate(g, actor, oppActor, 'sha');
+      }
       // 我方能用几张闪 (estimateShanCount 含 龙胆 杀 / 倾国 黑 等)
       var selfShan = aiEstimateShanCount(self);
       // 预期入帐伤害 = max(0, 对方杀数 - 我方闪数). 简化 (忽略 paoxiao
@@ -356,27 +654,64 @@
       return base - incoming * 25;
     }
 
+    // 转化模式按"转化后的虚拟牌形状"打启发分 — 杀/乐不思蜀/过河拆桥 各按
+    // 其 scoreCardForAI 分支评估 (v11 C5, 自 aiScoreCardWithLookahead 抽出
+    // 供两步精化复用)。
+    function aiHeuristicForMode(g, actor, card, mode) {
+      if (mode === 'asSha') {
+        return scoreCardForAI(g, actor, { type: 'sha', family: 'basic', color: card.color });
+      }
+      if (mode === 'lebusishu') {
+        return scoreCardForAI(g, actor, { type: 'lebusishu', family: 'delayed', color: card.color });
+      }
+      if (mode === 'guohe') {
+        return scoreCardForAI(g, actor, { type: 'guohe', family: 'trick', color: card.color });
+      }
+      return scoreCardForAI(g, actor, card);
+    }
+
     // 综合分: 启发 + lookahead delta. sim 失败时回退仅启发.
     // v8 PR-D4: 评估改用 threat-aware 版本, 让 AI 考虑下回合对手反击潜力.
-    // v11 C5 (批次 29): 转化模式按"转化后的虚拟牌形状"打启发分 —
-    // 杀/乐不思蜀/过河拆桥 各按其 scoreCardForAI 分支评估。
+    // v12 I1: 模拟世界内 (aiSimulating) 短路为纯启发 — 深度模拟里嵌套的
+    // AI 决策不再逐候选克隆, 复杂度保持线性 (v11 无嵌套路径, 行为不变)。
     function aiScoreCardWithLookahead(g, actor, card, mode) {
-      var heuristic;
-      if (mode === 'asSha') {
-        heuristic = scoreCardForAI(g, actor, { type: 'sha', family: 'basic', color: card.color });
-      } else if (mode === 'lebusishu') {
-        heuristic = scoreCardForAI(g, actor, { type: 'lebusishu', family: 'delayed', color: card.color });
-      } else if (mode === 'guohe') {
-        heuristic = scoreCardForAI(g, actor, { type: 'guohe', family: 'trick', color: card.color });
-      } else {
-        heuristic = scoreCardForAI(g, actor, card);
-      }
+      var heuristic = aiHeuristicForMode(g, actor, card, mode);
+      if (g.aiSimulating) return heuristic;
       var preEval = aiEvaluateStateWithThreat(g, actor);
       var sim = aiSimulateCardPlay(g, actor, card, mode);
       if (!sim) return heuristic;
       var postEval = aiEvaluateStateWithThreat(sim, actor);
       var delta = postEval - preEval;
       return heuristic + delta;
+    }
+
+    // ═════ v12 I1: 两步 lookahead — "我方行动 → 对手最优回应 → 评估" ═════
+    // sim 为"我方出这张牌后"的私有克隆。深度评估 = 在克隆世界里用真实引擎
+    // 流程续跑: 我方按纯启发打完本回合剩余动作 (含弃牌/结束阶段), 座次下家
+    // 整回合 (真实摸牌/判定/技能时机), 然后以 actor 视角评估。模拟内的 AI
+    // 决策经 aiSimulating 短路为纯启发 (无嵌套克隆); ask 类偏好在克隆里一律
+    // 转 auto (模拟中无人类)。任何挂起/失败回退到 sim 静态评估。
+    function aiDeepTurnEval(sim, actor) {
+      var fallback = aiEvaluateStateWithThreat(sim, actor);
+      if (sim.phase === 'gameover') return fallback;
+      try {
+        StateRuntime.seatList(sim).forEach(function (seat) {
+          var prefs = sim[seat] && sim[seat].skillPreferences;
+          if (!prefs) return;
+          Object.keys(prefs).forEach(function (k) { if (prefs[k] === 'ask') prefs[k] = 'auto'; });
+        });
+        var mine = runAITurn(sim, actor);
+        if (!mine || !mine.ok || sim.pendingChoice) return fallback;
+        if (sim.phase === 'gameover') return aiEvaluateStateWithThreat(sim, actor);
+        var next = sim.turn;
+        if (next !== actor) {
+          var theirs = runAITurn(sim, next);
+          if (!theirs || !theirs.ok || sim.pendingChoice) return fallback;
+        }
+        return aiEvaluateStateWithThreat(sim, actor);
+      } catch (e) {
+        return fallback;
+      }
     }
 
     function aiChooseCard(game, actor) {
@@ -415,6 +750,28 @@
         }
       });
       candidates.sort(function (a, b) { return b.score - a.score; });
+      // v12 I1: 两步精化 — 对单步综合分 top-3 候选追加"对手最优回应"评估,
+      // 重打分后再排序 (剪枝: 其余候选保持单步分)。基线取"我方 pass → 对手
+      // 最优回应"的评估 (不出牌对手同样会回应, 用静态现状作基线会系统性
+      // 压低一切出牌)。单候选无从取舍时跳过; v11 profile 冻结单步旧行为。
+      // (aiSimulating 门: 深度模拟内部不再递归精化, 复杂度线性)
+      if (!game.aiSimulating && candidates.length > 1 && aiFeatureOn(game, actor, 'lookahead2')) {
+        var refineCount = Math.min(5, candidates.length);
+        var refined = candidates.slice(0, refineCount);
+        refined.forEach(function (cand) {
+          var simMode = cand.mode === 'convert' ? cand.asType : cand.mode;
+          var sim = aiSimulateCardPlay(game, actor, cand.card, simMode);
+          // sim 失败 (挂起/异常) → 以现状静态分参与深度比较 ("效果未知≈现状")
+          cand.deep = sim ? aiDeepTurnEval(sim, actor) : aiEvaluateStateWithThreat(game, actor);
+        });
+        // 深度分直接互比 (同一评估量纲, 无基线混刻度); 单步综合分作平分决胜。
+        // 只在 top-3 内部重排, 未精化候选不越位。
+        refined.sort(function (a, b) {
+          if (b.deep !== a.deep) return b.deep - a.deep;
+          return b.score - a.score;
+        });
+        candidates = refined.concat(candidates.slice(refineCount));
+      }
       return candidates.length
         ? { card: candidates[0].card, mode: candidates[0].mode, asType: candidates[0].asType }
         : null;
@@ -498,8 +855,9 @@
             .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
             .sort(function (a, b) { return a.score - b.score; })[0];
           // 杀多者先手 (targets[0] 视为使用决斗者), 杀少者先响应易败
+          // v12 I2: 杀数按 profile 路由 (v12 诚实估计)
           var lijianPair = lijianMales.slice(0, 2).sort(function (a, b) {
-            return aiEstimateShaCount(game[b]) - aiEstimateShaCount(game[a]);
+            return aiFoeEstimate(game, actor, b, 'sha') - aiFoeEstimate(game, actor, a, 'sha');
           });
           return { skillId: 'lijian', cardIds: [lijianCost.card.id], options: { targets: lijianPair } };
         }
@@ -626,12 +984,28 @@
       return cardResult;
     }
 
+    // v12 I2: 弃牌保留值 — 出牌分为 0 的响应牌 (闪/无懈) 在旧实现里最先被
+    // 弃, 等于主动裁军。v12 按"防御持有价值"垫底分: 闪保命 > 无懈保结算 >
+    // 桃已有高分; 受伤时闪/桃再加权。v11 profile 冻结旧行为 (纯出牌分)。
+    function aiDiscardHoldValue(game, actor, card) {
+      if (!aiFeatureOn(game, actor, 'discardHold')) return 0;
+      var self = game[actor];
+      var wounded = self.hp < self.maxHp;
+      if (card.type === 'shan') return self.hp <= 2 ? 70 : 55;
+      if (card.type === 'wuxie') return 45;
+      if (card.type === 'tao' && wounded) return 40; // 叠加其出牌分
+      if (isShaType(card.type)) return 15; // 决斗/南蛮/借刀 响应面
+      return 0;
+    }
+
     function aiDiscardCandidates(game, actor) {
       var state = game[actor];
       var count = getDiscardCount(game, actor);
       if (!state || count <= 0) return [];
       return state.hand
-        .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
+        .map(function (card) {
+          return { card: card, score: scoreCardForAI(game, actor, card) + aiDiscardHoldValue(game, actor, card) };
+        })
         .sort(function (a, b) { return a.score - b.score; })
         .slice(0, count)
         .map(function (item) { return item.card.id; });
@@ -703,12 +1077,25 @@
       scoreCardForAI: scoreCardForAI,
       aiEstimateShaCount: aiEstimateShaCount,
       aiEstimateShanCount: aiEstimateShanCount,
+      // v12 I2: 可见信息计数建模 (诚实估计) + profile 路由
+      aiProfileOf: aiProfileOf,
+      aiUnknownCounts: aiUnknownCounts,
+      aiEstimateShaCountFor: aiEstimateShaCountFor,
+      aiEstimateShanCountFor: aiEstimateShanCountFor,
+      aiEstimateTaoCountFor: aiEstimateTaoCountFor,
+      aiFoeEstimate: aiFoeEstimate,
+      // v12 I3: 目标评估
+      aiHostilityToward: aiHostilityToward,
+      aiPickHostileTarget: aiPickHostileTarget,
+      aiPrimaryFoe: aiPrimaryFoe,
       aiShouldUseWuxie: aiShouldUseWuxie,
       aiCloneGame: aiCloneGame,
       aiEvaluateState: aiEvaluateState,
       aiSimulateCardPlay: aiSimulateCardPlay,
       aiEvaluateStateWithThreat: aiEvaluateStateWithThreat,
       aiScoreCardWithLookahead: aiScoreCardWithLookahead,
+      // v12 I1: 两步 lookahead (真实整回合深度模拟)
+      aiDeepTurnEval: aiDeepTurnEval,
       aiChooseCard: aiChooseCard,
       aiChooseSkillAction: aiChooseSkillAction,
       aiTakeAction: aiTakeAction,

@@ -20,6 +20,13 @@ function buildGame(playerHero, enemyHero, seed) {
   }
   game.turn = 'player';
   game.phase = 'play';
+  // v12 I 复核注: 本装置 deck=[] 且 discard=[] → v12 诚实计数的"未知池"
+  // 恰好只剩对手手牌, 概率估计在数学上退化为精确读数, 与 v11 全知直读
+  // 重合 — 本文件的旧公式数值断言因此对 profile 不敏感 (巧合等价)。为
+  // 防装置改动打破巧合后测试对新公式静默重收敛, 依赖"对手估计精确值"的
+  // 用例已逐个钉在冻结的 v11 profile 上; v12 诚实估计行为由
+  // v12_i_ai_upgrade.test.mjs 另行断言。
+  game.aiProfile = 'v11';
   return game;
 }
 
@@ -119,6 +126,9 @@ test('v8 PR-D1: 桃 score — hp=1 critical 200', () => {
 
 test('v8 PR-D1: 桃 score — 多伤 (hp=maxHp-2) 120, 比轻伤 80 高', () => {
   const game = buildGame('liubei', 'caocao'); // maxHp=4
+  // v12 I: 本测试锁定 v8 梯度公式 — 钉在冻结的 v11 profile 上 (v12 缺省
+  // 轻伤且血线安全时留桃 25 分, 由 v12_i_* 测试批断言)。
+  game.aiProfile = 'v11';
   game.player.hp = 2;
   const heavy = Engine.aiScoreCard(game, 'player', c('tao'));
   assert.equal(heavy, 120);

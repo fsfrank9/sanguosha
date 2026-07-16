@@ -302,8 +302,13 @@
         : removeFirstMatchingCard(self, function (item) { return item.suit === revealed.suit; });
       if (!cost) return finishTrickUse(game, ctx.actor, ctx.card, success('没有同花色牌可弃，火攻未造成伤害。'), opt);
       if (cost.suit !== revealed.suit) {
+        // v12 I 修复: 显式成本牌在结算中途失效 — 出牌时预挑基于展示缓存,
+        // 无懈拉锯可消耗目标被缓存的展示牌 → 重新展示后花色改变。此处火攻
+        // 实体已弃、无 rehang 路径, fail 会让结算中途搁浅 (出牌方白弃火攻)。
+        // 按"弃同花色"意图自动改选; 无同花色 → 无伤结算 (与未指定成本一致)。
         putCard(game, cost, { zone: 'hand', actor: ctx.actor });
-        return fail('请选择与展示牌同花色的手牌。');
+        cost = removeFirstMatchingCard(self, function (item) { return item.suit === revealed.suit; });
+        if (!cost) return finishTrickUse(game, ctx.actor, ctx.card, success('没有同花色牌可弃，火攻未造成伤害。'), opt);
       }
       discardCard(game, cost);
       log(game, actorName(game, ctx.actor) + '弃置同花色【' + cost.name + '】发动【火攻】。');
