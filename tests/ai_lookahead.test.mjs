@@ -65,6 +65,9 @@ test('v8 PR-D3: aiCloneGame — 深克隆 + 独立 random + 不污染原 game', 
 
 test('v8 PR-D3: aiEvaluateState — hp 差为主要权重', () => {
   const game = buildGame('liubei', 'caocao');
+  // v12 I: 本测试锁定 v8 线性公式 — 钉在冻结的 v11 profile 上 (v12 缺省
+  // 增加"压血线"非线性项: 对手 hp<=2 时 +15/+40, 由 v12_i_* 测试批断言)。
+  game.aiProfile = 'v11';
   // 双方满血 → 0 差; hand 0:0 → 0; equip 0:0 → 0; judge 0:0 → 0 → 总分接近 0
   const baseScore = Engine.aiEvaluateState(game, 'player');
   // 现在 player hp - 1 → score 应降 30

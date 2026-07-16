@@ -110,6 +110,13 @@
       // 0, 否则深度致命伤被一张【桃】抹平, 严重削弱【闪电】/【酒】+【杀】等。
       target.hp = target.hp - amount;
       log(game, actorName(game, targetActor) + '因' + reason + '受到 ' + amount + ' 点伤害。');
+      // v12 I3: 敌意记账 (AI 目标评估用, 纯遥测不影响规则) — 记录"谁伤了谁",
+      // 供 aiHostilityToward 累计敌意分; 环形上限防无界增长。
+      if (sourceActor && sourceActor !== targetActor && game[sourceActor]) {
+        if (!game.aggressionLog) game.aggressionLog = [];
+        game.aggressionLog.push({ source: sourceActor, target: targetActor, amount: amount });
+        if (game.aggressionLog.length > 60) game.aggressionLog.shift();
+      }
       // H4 (审计二轮): 铁索连环传导 — gltjk card__scroll.md: 处于连环状态的
       // 角色受到属性 (火/雷) 伤害时解除连环状态; 若此伤害不是传导伤害, 该
       // 角色伤害结算完毕后, 对其他处于连环状态的角色依次造成等量同属性的
