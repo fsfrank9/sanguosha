@@ -109,7 +109,12 @@
         return resumeAOETargets(game);
       }
       var savedJudge = game.pauseState && game.pauseState.judgeArea;
-      if (!savedJudge || !savedJudge.outcomeApplied) return null;
+      if (!savedJudge) return null;
+      // v13 J0-2: 判定前无懈挂起 settle 后续跑 (wuxieSettled, 由
+      // 'delayed-judge' 延续记录), 与既有 outcomeApplied 续跑并列;
+      // 判定改判 (鬼才/鬼道) 挂起 (currentTrick 在快照上) 由各自 resolver
+      // 自行续跑, 不在此处触碰。
+      if (!savedJudge.outcomeApplied && !savedJudge.wuxieSettled) return null;
       var actor = savedJudge.actor;
       var resumeResult = processJudgeArea(game, actor);
       if (resumeResult && resumeResult.suspended) return success('回合暂停，等待玩家选择。');

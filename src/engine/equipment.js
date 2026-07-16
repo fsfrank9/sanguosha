@@ -167,6 +167,10 @@
         log(game, actorName(game, ctx.targetActor) + '的【藤甲】令火焰伤害 +1。');
         return { amount: ctx.amount + 1 };
       }
+      // v13 J0-3: 藤甲① "普通杀/南蛮/万箭对你无效" 的主路径已前移为结算
+      // 短路 (sha-flow.js continueShaAfterCixiong / tricks.js advanceAOETargets
+      // 在响应询问前免疫)。此分支保留为纵深防御 — 覆盖测试/技能直接调
+      // damage() 携带普通杀来源牌或南蛮/万箭 reason 的路径, 语义不变。
       if ((ctx.sourceCard && ctx.sourceCard.type === 'sha') || /南蛮入侵|万箭齐发/.test(ctx.reason || '')) {
         log(game, actorName(game, ctx.targetActor) + '的【藤甲】防止了这次伤害。');
         return { prevented: true };

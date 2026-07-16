@@ -184,6 +184,17 @@
           return success('仁王盾抵消。');
         }
 
+        // v13 J0-3 (PR #165 缺陷 3): 藤甲 — 锁定技"普通【杀】对你无效"
+        // (gltjk card__equipment.md)。免疫属"对该目标无效", 与仁王盾同层:
+        // 直接短路整个响应询问, 不再先问闪、伤害层事后防止。火/雷【杀】
+        // 不在免疫列 (火焰另有 藤甲② +1, 留在伤害修正层); 朱雀转化已在
+        // playSha 先行, 转化后的火杀照常走响应; 青釭剑无视防具时不短路。
+        if (!ignoreArmor && card.type === 'sha' && hasEquipmentEffect(target, 'tengjiaImmuneNormalShaAOE')) {
+          log(game, actorName(game, targetActor) + '的【藤甲】令普通【杀】无效。');
+          discardCard(game, card);
+          return success('藤甲免疫普通杀。');
+        }
+
         var responseContext = {
           game: game,
           actor: actor,
@@ -208,12 +219,25 @@
         if (targetActor === 'player' && !responseContext.responseLocked
             && target.skillPreferences && target.skillPreferences.shanResponse === 'ask'
             && hasShanResponseAvailable(target)) {
+          // v13 J0-3 (PR #165 缺陷 3): 八卦阵先行 — "需要使用/打出【闪】时"
+          // 先给判定机会 (红=视为打出闪, 免出手牌; 可用 skillPreferences.bagua
+          // ='decline' 关闭), 判定失败/无八卦才回到手牌响应窗口; 窗口内放弃
+          // 后不再补试八卦 (机会已在窗前给过)。无双两张需求逐张先试八卦。
+          var askShanNeeded = shanRequiredAgainstSha(game, actor);
+          var askBaguaPaid = 0;
+          while (askBaguaPaid < askShanNeeded && tryBaguaDodge(game, targetActor, ignoreArmor)) {
+            askBaguaPaid += 1;
+          }
+          if (askBaguaPaid >= askShanNeeded) {
+            return resolveShaAfterResponse(game, actor, card, amount, true, targetActor);
+          }
           return requestPlayerResponse(game, {
             kind: 'shan-response',
             actor: 'player',
             pauseKey: 'shaResponse',
             // v11 C1: 无双 → shanRemaining=2, 首张闪后再开第二个响应窗口。
-            source: { actor: actor, targetActor: targetActor, card: card, amount: amount, shanRemaining: shanRequiredAgainstSha(game, actor) },
+            // v13 J0-3: 八卦已顶掉的需求从 shanRemaining 中扣除。
+            source: { actor: actor, targetActor: targetActor, card: card, amount: amount, shanRemaining: askShanNeeded - askBaguaPaid, baguaTried: true },
             // v9 PR-E26: 列出所有可作【闪】的牌 (真闪 + 龙胆/倾国 转化), 玩家自选.
             options: listShanResponseOptions(target),
             meta: { sourceActor: actor, shaName: card.name },
@@ -231,11 +255,10 @@
           }
           dodged = true;
           for (var shanIndex = 0; shanIndex < shanNeeded; shanIndex += 1) {
-            // v11 D2 (批次 34): AI 座席每张需求先试八卦判定 (免费闪机会),
-            // 判定失败仍可出真闪; 玩家 auto 座席保持旧顺序 (真闪优先)。
-            if (targetActor !== 'player' && tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
+            // v13 J0-3: 全座席八卦先行 (此前玩家 auto 座席真闪优先) —
+            // "需要使用/打出【闪】时"防具先给发动机会, 判定失败再出真闪。
+            if (tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
             if (consumeResponse(game, targetActor, 'shan', '【杀】')) continue;
-            if (targetActor === 'player' && tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
             // v12 H7: 护驾 — 主公自身打不出【闪】时求助魏势力座席:
             // AI 主公 + 玩家可代打 → 挂起询问 (resolver 收尾杀结算);
             // 其余 → AI 座席同步接力。
@@ -267,6 +290,8 @@
       function tryBaguaDodge(game, targetActor, ignoreArmor) {
         var target = game[targetActor];
         if (!target || !hasEquipmentEffect(target, 'baguaShanJudge') || ignoreArmor) return false;
+        // v13 J0-3: "你可以判定" — 可选发动; decline 偏好整体关闭 (缺省 auto)。
+        if (target.skillPreferences && target.skillPreferences.bagua === 'decline') return false;
         var baguaJudge = judge(game, targetActor, '【八卦阵】');
         var dodged = false;
         if (baguaJudge && baguaJudge.color === 'red') {
@@ -350,7 +375,12 @@
           }
         }
         log(game, actorName(game, actor) + '发动【贯石斧】，弃置【' + discardedNames.join('】、【') + '】令【杀】强制命中。');
-        if (damage(game, targetActor, amount, actor, '【' + card.name + '】', card)) applyWeaponHitEffects(game, actor, targetActor);
+        // v13 J3: 同 resolveShaAfterResponse — 落点回调守卫武器命中特效。
+        damage(game, targetActor, amount, actor, '【' + card.name + '】', card, null, {
+          afterDamageSettled: function (g, landed) {
+            if (landed) applyWeaponHitEffects(g, actor, targetActor);
+          }
+        });
         return success('贯石斧强制命中。');
       }
 
@@ -400,7 +430,14 @@
           return success('目标闪避。');
         }
 
-        if (damage(game, targetActor, amount, actor, '【' + card.name + '】', card)) applyWeaponHitEffects(game, actor, targetActor);
+        // v13 J3: 伤害落点回调 — 被天香转移/被防止时目标未受伤害, 麒麟等
+        // "对目标角色造成伤害时"的武器命中特效不触发 (修复 v12 已知偏差);
+        // 天香 ask 挂起时回调随重入结算延迟触发, 时序与决策一致。
+        damage(game, targetActor, amount, actor, '【' + card.name + '】', card, null, {
+          afterDamageSettled: function (g, landed) {
+            if (landed) applyWeaponHitEffects(g, actor, targetActor);
+          }
+        });
         return success(target.name + '受到攻击。');
       }
 
@@ -427,17 +464,18 @@
           if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
         } else {
           log(game, actorName(game, 'player') + '选择不打出【闪】。');
-          // v11 C1: 放弃出闪 → 剩余每一张需求都须由八卦判定顶上才算抵消。
-          dodged = true;
-          for (var baguaIndex = 0; baguaIndex < shanRemaining; baguaIndex += 1) {
-            if (!tryBaguaDodge(game, 'player', isArmorIgnoredBySha(game, actor, card))) {
-              dodged = false;
-              break;
-            }
-          }
-          shanRemaining = 1; // 已按剩余需求整体判定完毕
+          // v13 J0-3: 八卦机会已在开窗前给过 (判定失败才开的窗), 放弃出闪
+          // 不再补试八卦 → 未抵消。
+          dodged = false;
+          shanRemaining = 1;
         }
-        // v11 C1: 无双 — 首张闪成功且仍有剩余需求 → 再开一个响应窗口。
+        // v11 C1: 无双 — 首张闪成功且仍有剩余需求 → 下一张需求产生:
+        // v13 J0-3: 先给八卦机会 (新需求新判定), 失败再开第二个响应窗口。
+        if (dodged && shanRemaining > 1) {
+          if (tryBaguaDodge(game, 'player', isArmorIgnoredBySha(game, actor, card))) {
+            shanRemaining -= 1;
+          }
+        }
         if (dodged && shanRemaining > 1) {
           if (hasShanResponseAvailable(game.player)) {
             return requestPlayerResponse(game, {
@@ -451,8 +489,8 @@
               statusMessage: '等待玩家响应【杀】(无双第二张)。'
             });
           }
-          // 无第二张可出 → 尝试八卦顶上, 否则未抵消。
-          dodged = tryBaguaDodge(game, 'player', isArmorIgnoredBySha(game, actor, card));
+          // 八卦已试过且无第二张可出 → 未抵消。
+          dodged = false;
         }
         // v12 H7: 玩家为主公且未抵消 → 求助魏势力 AI 座席代打【闪】(护驾)。
         if (!dodged && tryLordAidSync && tryLordAidSync(game, 'player', 'hujia', '【杀】')) {

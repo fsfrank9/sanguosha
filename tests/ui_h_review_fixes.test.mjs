@@ -105,10 +105,12 @@ test('U3: 借刀 — 持刀者可达多个受害者 → 第二段点选受害者
   $('playerHand').dispatchClick({ 'data-card-id': 'jd1' });
   $('handConfirmBtn').click();
   assert.equal($('seatTargetModePanel').hidden, false, '第一段: 选持刀者');
-  $('allyHero').click(); // 选 ally 作持刀者 An
+  $('allyHero').click(); // 选 ally 作持刀者 An (v13 J0-1: 暂存)
+  $('seatTargetConfirmBtn').click();
   // ally 可达 enemy + player → 进入第二段选受害者 (面板仍开)
   assert.equal($('seatTargetModePanel').hidden, false, '第二段: 选受害者 Bn');
-  $('enemyHero').click(); // 让 ally 攻击 enemy
+  $('enemyHero').click(); // 让 ally 攻击 enemy (暂存)
+  $('seatTargetConfirmBtn').click();
   assert.ok(!game.log.some((l) => l.includes('无效')), '无"无效受害目标"报错 (UI 高亮的目标可提交成功)');
 });
 
@@ -120,7 +122,8 @@ test('U3: 借刀 — 持刀者仅一名可达受害者 → 自动完成不报错
   UI.render();
   $('playerHand').dispatchClick({ 'data-card-id': 'jd2' });
   $('handConfirmBtn').click();
-  $('allyHero').click(); // ally 只能打 enemy (玩家出射程) → 自动选 enemy
+  $('allyHero').click(); // v13 J0-1: 暂存
+  $('seatTargetConfirmBtn').click(); // ally 只能打 enemy (玩家出射程) → 自动选 enemy
   assert.ok(!game.log.some((l) => l.includes('无效受害')), '受害者自动落在合法的 enemy, 不报错');
 });
 
@@ -149,17 +152,20 @@ test('U5: identity3 铁索 → 座席点选可选第三席横置', () => {
   assert.equal(game.ally.chained, true, '第三席 ally 被横置');
 });
 
-test('U5: identity3 铁索 → 可选 2 名目标 (点满自动完成)', () => {
+test('U5: identity3 铁索 → 可选 2 名目标 (v13 J0-1: 点满仍需确认)', () => {
   const game = start3p('diaochan', 'caocao', 'zhangfei');
   game.player.hand = [c('tiesuo', { id: 'ts2' })];
   UI.render();
   $('playerHand').dispatchClick({ 'data-card-id': 'ts2' });
   $('handConfirmBtn').click();
   $('enemyHero').click();
-  $('allyHero').click(); // 点满 2 → 自动完成
+  $('allyHero').click();
+  assert.equal($('seatTargetModePanel').hidden, false, 'v13 J0-1: 点满 2 目标仍等确认');
+  assert.ok(!game.enemy.chained, '确认前未结算');
+  $('seatTargetConfirmBtn').click();
   assert.equal(game.enemy.chained, true, 'enemy 横置');
   assert.equal(game.ally.chained, true, 'ally 横置');
-  assert.equal($('seatTargetModePanel').hidden, true, '点满 2 目标自动完成, 面板关闭');
+  assert.equal($('seatTargetModePanel').hidden, true, '确认后面板关闭');
 });
 
 test('U5: identity3 铁索 → "重铸"附加按钮弃牌摸牌', () => {

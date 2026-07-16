@@ -29,7 +29,11 @@
     guanshi: { guanshiForceHit: true },
     qinglong:{ qinglongChase: true },
     fangtian:{ fangtianLastHandBonus: true },
-    zhangba: { zhangbaTwoHandSha: true }
+    zhangba: { zhangbaTwoHandSha: true },
+    // v13 J0-3: 藤甲① "南蛮入侵/万箭齐发/普通杀对你无效" — 免疫短路在
+    // 响应询问前 (sha-flow.js / tricks.js 查此 flag); 藤甲② 火伤 +1 仍在
+    // equipment.js EQUIPMENT_DAMAGE_MODIFIERS。
+    tengjia: { tengjiaImmuneNormalShaAOE: true }
   };
 
   function equipmentSlots(state) {

@@ -379,6 +379,8 @@
       var damage = DamageDyingRuntime.damage;
       var enterDying = DamageDyingRuntime.enterDying;
       var resolveDyingRescueChoice = DamageDyingRuntime.resolveDyingRescueChoice;
+      // v13 J3: 天香 ask 询问 resolver
+      var resolveTianxiangAskChoice = DamageDyingRuntime.resolveTianxiangAskChoice;
 
       // v11 C2 (批次 26): 连营 — 统一手牌失去事件的第一个消费者。
       // CardRuntime 在 putCard 落位提交手牌失去后回调这里; 在途还原路径
@@ -791,7 +793,9 @@
         actorName: actorName,
         evaluateDelayedTrick: evaluateDelayedTrick,
         damage: function (g, a, n, s, r, c, nature, opts) { return damage(g, a, n, s, r, c, nature, opts); },
-        opponent: opponent
+        opponent: opponent,
+        // v13 J0-2: 判定前无懈窗口 (tricks 域已装配, 直接注入)
+        checkWuxieAndContinue: function (g, t, r, n, c) { return checkWuxieAndContinue(g, t, r, n, c); }
       });
       var judge = JudgeAreaRuntime.judge;
       var applyHongyanJudgementView = JudgeAreaRuntime.applyHongyanJudgementView;
@@ -936,6 +940,8 @@
       registerResponseKind('wugu-pick', resolveWuguPickChoice);
       registerResponseKind('guohe-1v1-pick', resolveGuohe1v1PickChoice);
       registerResponseKind('dying-rescue', resolveDyingRescueChoice);
+      // v13 J3: 天香 ask — 伤害流暂停询问 (弃红桃 + 转移目标 / 放弃)
+      registerResponseKind('tianxiang-ask', resolveTianxiangAskChoice);
       registerResponseKind('luoshen-continue', resolveLuoshenContinueChoice);
       // v11 C7 (批次 31): 耀武 — 伤害来源的奖励二选一
       registerResponseKind('yaowu-reward', resolveYaowuRewardChoice);
@@ -1285,12 +1291,12 @@
         if (isShaCard(card) && !legalTargetsForCard(game, actor, card).some(function (seat) { return seat !== actor; })) return fail('距离不足，当前武器范围无法使用【杀】。');
         if (isShaCard(card) && self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
         if (card.type === 'tao') {
-          // v7 PR-1: gltjk 基本牌·桃 使用方法Ⅰ —— 使用目标"包括你在内的一名已受伤的角色"。
-          // v12 H1: 任一存活座席受伤即可出【桃】；全员满血则无合法目标。
-          var taoAnyWounded = aliveSeats(game).some(function (seat) {
-            return game[seat].hp < game[seat].maxHp;
-          });
-          if (!taoAnyWounded) return fail('体力已满，不能使用【桃】。');
+          // v13 J0-4 (PR #165 玩家实测缺陷 4): 出牌阶段【桃】收口为标准语义 —
+          // 仅"自己已受伤"可使用且目标恒为自己; 濒死救援走独立求桃队列
+          // (attemptDyingRescue), 不受影响。gltjk card__basic.md 界限突破变体
+          // 文本 ("包括你在内的一名已受伤的角色") 记录为已知分歧, 见
+          // docs/audit/ 第三轮纪要。
+          if (self.hp >= self.maxHp) return fail('体力已满，不能使用【桃】。');
         }
         if (card.type === 'jiu') {
           // v7 PR-8: gltjk 基本牌·酒 使用方法Ⅰ —— "出牌阶段。每回合限一次。"
@@ -1401,7 +1407,7 @@
           return false;
         }
         if (isShaCard(card)) return canReachWithSha(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
-        if (card.type === 'tao') return seatState.hp < seatState.maxHp;
+        if (card.type === 'tao') return false; // v13 J0-4: 出牌阶段【桃】目标恒为自己
         if (card.type === 'wuzhong') return true;
         if (card.type === 'shandian') return false; // 闪电只对自己使用
         if (card.type === 'lebusishu' || card.type === 'bingliang') {
@@ -1531,10 +1537,13 @@
       }
 
       function playDelayedCardHandler(game, actor, card, options, self) {
-          // H1: 延时锦囊放置前开无懈窗口 (gltjk card__scroll.md — 无懈可击可在
-          // 锦囊「对一个目标生效前」抵消; 延时锦囊于放置时即指定目标)。
+          // v13 J0-2 (PR #165 缺陷 2): 延时锦囊放置时不再开无懈窗口 — 官方
+          // 无懈时机为"一张锦囊牌对一个目标生效前" (card__scroll.md:78), 而
+          // 延时锦囊的生效 = 目标判定阶段"先进行判定结算" (flow__use.md:133),
+          // 故无懈窗口移至 processJudgeArea 判定前 (judge-area.js, 无懈延续
+          // 'delayed-judge')。放置为直接置入判定区。
           // v12 H1: 乐/兵 经 options.target 显式指定 (缺省 1v1 对手); 闪电恒
-          // 对自己。无懈首询者 = 目标 (队列自动跳过来源, 1v1 恒为对方)。
+          // 对自己。card.delayedSource 记录使用者 — 判定时无懈链跳过来源。
           var delayedSide;
           if (card.type === 'shandian') {
             delayedSide = actor;
@@ -1545,39 +1554,34 @@
               return fail('无效的【' + card.name + '】目标。');
             }
           }
-          return checkWuxieAndContinue(game, delayedSide, '【' + card.name + '】', 'delayed-place', {
-            actor: actor, card: card, options: options, delayedSide: delayedSide
-          });
+          card.delayedSource = actor;
+          putCard(game, card, { zone: 'judgeArea', actor: delayedSide });
+          if (card.type === 'shandian') {
+            log(game, actorName(game, actor) + '将【闪电】置入自己的判定区。');
+          } else {
+            log(game, actorName(game, actor) + '将【' + card.name + '】置入' + actorName(game, delayedSide) + '的判定区。');
+          }
+          return success('延时锦囊已放置。');
       }
 
       function playTaoCardHandler(game, actor, card, options, self) {
-          // v7 PR-1: 目标"包括你在内的一名已受伤的角色"。options.taoTarget /
-          // options.target 可指定任意座席 (v12 H1: resolveSeatOption 校验);
-          // 未指定时默认为发动者，若发动者满血则回退到首个受伤座席
-          // (1v1 即对手, 保持 canPlayCard 已放行的合法性)。
+          // v13 J0-4 (PR #165 玩家实测缺陷 4): 出牌阶段【桃】目标恒为自己,
+          // 且仅自己已受伤时可用 (canPlayCard 已把关)。显式指定其他座席一律
+          // 拒绝并退牌 (守恒红线); 救援他人只保留濒死求桃队列一条路径。
           var requestedTaoTarget = resolveSeatOption(game, options.taoTarget || options.target);
-          var taoTargetActor;
-          if (requestedTaoTarget) {
-            taoTargetActor = requestedTaoTarget;
-          } else if (self.hp < self.maxHp) {
-            taoTargetActor = actor;
-          } else {
-            taoTargetActor = aliveSeats(game).filter(function (seat) {
-              return seat !== actor && game[seat].hp < game[seat].maxHp;
-            })[0] || opponent(actor);
+          if (requestedTaoTarget && requestedTaoTarget !== actor) {
+            putCard(game, card, { zone: 'hand', actor: actor });
+            return fail('出牌阶段【桃】只能对自己使用。');
           }
-          var taoTargetState = game[taoTargetActor];
-          if (!taoTargetState || taoTargetState.hp >= taoTargetState.maxHp) {
+          if (self.hp >= self.maxHp) {
             // v12 H1 修复: 拒绝时把牌放回手牌 (此前 playCard 已摘牌, 直接
             // fail 会让实体牌凭空消失 — 守恒红线)。
             putCard(game, card, { zone: 'hand', actor: actor });
-            return fail('目标体力已满，不能使用【桃】。');
+            return fail('体力已满，不能使用【桃】。');
           }
           discardCard(game, card);
-          // v11 C1: 救援 — 其他吴势力角色对主公孙权使用【桃】回复量 +1。
-          var taoHeal = 1 + taoRecoverBonus(game, actor, taoTargetActor);
-          taoTargetState.hp = Math.min(taoTargetState.maxHp, taoTargetState.hp + taoHeal);
-          log(game, actorName(game, actor) + '使用【桃】' + (taoTargetActor === actor ? '' : '对' + actorName(game, taoTargetActor)) + '，回复 ' + taoHeal + ' 点体力。');
+          self.hp = Math.min(self.maxHp, self.hp + 1);
+          log(game, actorName(game, actor) + '使用【桃】，回复 1 点体力。');
           return success('回复体力。');
       }
 
@@ -2176,12 +2180,13 @@
         removeOwnCardFromAnyZone(self, cardId, game);
         log(game, actorName(game, actor) + playable.message);
         if (asType === 'lebusishu') {
-          // v8 PR-C1: 国色 把方片当乐。L3 (审计二轮): 与普通乐不思蜀一致走
-          // delayed-place 无懈链 — 此前直接 push 判定区, 转化版乐无法被无懈。
+          // v8 PR-C1: 国色 把方片当乐。v13 J0-2: 与普通乐不思蜀一致 — 放置
+          // 时直接置入判定区, 无懈窗口移至判定阶段生效前 (delayed-judge)。
           var virtualLebu = virtualLebusishuFromCard(original);
-          return checkWuxieAndContinue(game, opponent(actor), '【乐不思蜀】', 'delayed-place', {
-            actor: actor, card: virtualLebu, options: {}, delayedSide: opponent(actor)
-          });
+          virtualLebu.delayedSource = actor;
+          putCard(game, virtualLebu, { zone: 'judgeArea', actor: opponent(actor) });
+          log(game, actorName(game, actor) + '将【乐不思蜀】置入' + actorName(game, opponent(actor)) + '的判定区。');
+          return success('延时锦囊已放置。');
         }
         if (asType === 'guohe') {
           // v11 C3 (批次 27): 奇袭 黑牌当拆 — 与普通过河拆桥一致: 先弃置来源
@@ -2366,6 +2371,8 @@
         nextSeat: nextSeat,
         seatsFrom: seatsFrom,
         legalTargetsForCard: legalTargetsForCard,
+        // v13 J0-4: 座席级合法目标单点查询 (UI 高亮 / 测试断言用)。
+        isLegalCardTarget: isLegalCardTarget,
         // v12 H 复核修复: 借刀受害者候选 (持刀者可 杀 到的座席) — UI 两段
         // 点选 (先选持刀者 An, 再从其候选中选受害者 Bn) 需要, 消除"UI 高亮
         // 合法持刀者但受害者恒缺省自己→点选必败"的不一致。

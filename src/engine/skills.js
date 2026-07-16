@@ -295,12 +295,40 @@
           };
           return fireNextYijiPoint(game);
         }
-        // Auto path: batched single-shot — draw 2 × amount, keep all.
+        // Auto path: batched draw 2 × amount, keep by default.
         for (var i = 0; i < context.amount; i += 1) {
-          drawCards(game, targetActor, 2);
+          var yijiBatch = drawCards(game, targetActor, 2);
           log(game, actorName(game, targetActor) + '发动【遗计】（第 ' + (i + 1) + ' / ' + context.amount + ' 点），摸两张牌。');
+          // v13 J1: AI 盟友补血线启发 — 官方语义"将其中的一张牌交给一名角色"
+          // (card__hero__wei.md 标/1V1 变体) 允许分给任意座席; 摸到【桃】且
+          // 存在低血线 (hp<=2) 友方座席时相赠。1v1 无友方座席 → 恒自留
+          // (旧行为零回归)。
+          aiYijiGiveToAlly(game, targetActor, yijiBatch);
         }
         return { triggeredYiji: true, drawPairs: context.amount };
+      }
+
+      // v13 J1: 遗计 AI 分牌启发 — 找最低血线的存活友方座席 (身份已知且非
+      // 敌对), 血线 <=2 时把本点摸到的【桃】交给他。
+      function aiYijiGiveToAlly(game, actor, batch) {
+        if (!batch || !batch.length) return;
+        var allies = StateRuntime.aliveSeats(game).filter(function (seat) {
+          return seat !== actor
+            && StateRuntime.sideOf(game, seat) !== null
+            && !StateRuntime.isHostileSeat(game, actor, seat);
+        });
+        if (!allies.length) return;
+        var needy = allies.sort(function (a, b) { return game[a].hp - game[b].hp; })[0];
+        if (game[needy].hp > 2) return;
+        var state = game[actor];
+        for (var bi = 0; bi < batch.length; bi += 1) {
+          var drawn = batch[bi] && state.hand.find(function (c) { return c.id === batch[bi].id; });
+          if (drawn && drawn.type === 'tao') {
+            moveCard(game, drawn.id, { zone: 'hand', actor: actor }, { zone: 'hand', actor: needy });
+            log(game, actorName(game, actor) + '将【遗计】所摸的【' + drawn.name + '】交给' + actorName(game, needy) + '。');
+            return;
+          }
+        }
       }
 
       function fireNextYijiPoint(game) {
@@ -330,6 +358,13 @@
           actor: targetActor,
           drawnIds: drawnIds,
           cards: cards,
+          // v13 J1: 可分配座席清单 (官方"交给一名角色"含任意存活座席) —
+          // 面板据此渲染逐牌座席轮换; 1v1 恒 [对手单席]。
+          seats: StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== targetActor;
+          }).map(function (seat) {
+            return { seat: seat, name: game[seat].name };
+          }),
           currentPoint: currentPoint,
           totalPoints: saved.totalPoints
         });
@@ -1208,21 +1243,36 @@
         var actor = pending.actor;
         var state = game[actor];
         if (!state) return fail('未知角色。');
-        var giveIds = Array.isArray(decision.giveIds) ? decision.giveIds : [];
-        var validIds = giveIds.filter(function (id) { return pending.drawnIds.indexOf(id) >= 0; });
-        if (validIds.length === 0) {
+        // v13 J1: 逐席分配 — decision.assignments = [{cardId, seat}] 可把
+        // 每张牌交给任意其他存活座席 (官方 "将其中的一张牌交给一名角色",
+        // card__hero__wei.md 标/1V1 变体; 未分配 = 留给自己)。旧 decision
+        // 形状 giveIds 兼容保留: 等价于全部交给 1v1 对手 (行为零回归)。
+        var assignments;
+        if (Array.isArray(decision.assignments)) {
+          assignments = decision.assignments;
+        } else {
+          var giveIds = Array.isArray(decision.giveIds) ? decision.giveIds : [];
+          assignments = giveIds.map(function (id) { return { cardId: id, seat: opponent(actor) }; });
+        }
+        var movedBySeat = {};
+        var movedAny = false;
+        for (var i = 0; i < assignments.length; i += 1) {
+          var entry = assignments[i];
+          if (!entry || pending.drawnIds.indexOf(entry.cardId) < 0) continue;
+          var seat = StateRuntime.resolveSeatOption(game, entry.seat);
+          if (!seat || seat === actor || !game[seat] || game[seat].hp <= 0) continue;
+          var card = moveCard(game, entry.cardId, { zone: 'hand', actor: actor }, { zone: 'hand', actor: seat });
+          if (!card) continue;
+          (movedBySeat[seat] = movedBySeat[seat] || []).push(card.name);
+          movedAny = true;
+        }
+        if (!movedAny) {
           log(game, actorName(game, actor) + '将【遗计】本点所摸的牌全部留给自己。');
         } else {
-          var opp = opponent(actor);
-          var moved = [];
-          for (var i = 0; i < validIds.length; i += 1) {
-            var card = moveCard(game, validIds[i], { zone: 'hand', actor: actor }, { zone: 'hand', actor: opp });
-            if (!card) continue;
-            moved.push(card.name);
-          }
-          if (moved.length > 0) {
-            log(game, actorName(game, actor) + '将【遗计】本点所摸的 ' + moved.length + ' 张牌交给' + actorName(game, opp) + '：' + moved.join('、') + '。');
-          }
+          Object.keys(movedBySeat).forEach(function (seat) {
+            var names = movedBySeat[seat];
+            log(game, actorName(game, actor) + '将【遗计】本点所摸的 ' + names.length + ' 张牌交给' + actorName(game, seat) + '：' + names.join('、') + '。');
+          });
         }
         // v6.1: per-point iteration. If pauseState has more points to
         // process, fire the next one (re-sets pendingChoice for the new
@@ -1528,32 +1578,17 @@
 
         // 天香 (小乔) — gltjk wind spec: "当你受到伤害时, 你可以弃置一张
         // 红桃手牌, 将此伤害转移给你攻击范围内的一名其他角色, 然后其摸
-        // X 张牌 (X 为其已损失的体力值)"。1v1 转移目标恒为对手 (须在攻击
-        // 范围内)。交互沿用 铁骑 pre-v10 惯例: auto (伤害≥2 或致命时转移)
-        // / always (有成本即转移) / decline; 伤害流暂停框架落地后升级 ask。
+        // X 张牌 (X 为其已损失的体力值)"。
+        // v13 J3: ask 升级 — 玩家 (tianxiang='ask') 由 damage() 入口挂起
+        // 询问 (伤害流暂停框架), resolver 以 opts.tianxiangDecision 重入本
+        // 钩子强制执行; 放弃以 opts.noTianxiangAsk 重入 (本钩子跳过)。
+        // AI 沿用 auto (伤害≥2 或致命时转移) / always / decline 三态; 转移
+        // 目标泛化为攻击范围内任意其他存活座席 (敌对优先, 1v1 恒为对手)。
         // 红颜联动: 黑桃手牌经 effectiveCardSuit 视为红桃, 可作成本。
-        function triggerTianxiangDamageModify(context) {
+        function tianxiangTransferContext(context, transferee, cost) {
           var game = context.game;
           var targetActor = context.targetActor;
           var state = game[targetActor];
-          if (!state || !hasSkill(state, 'tianxiang') || game.phase === 'gameover') return null;
-          if (context.opts && context.opts.noTianxiangTransfer) return null;
-          var pref = (state.skillPreferences && state.skillPreferences.tianxiang) || 'auto';
-          if (pref === 'decline') return null;
-          var transferee = opponent(targetActor);
-          if (!game[transferee] || game[transferee].hp <= 0) return null;
-          if (!StateRuntime.canReachWithSha(game, targetActor, transferee)) return null;
-          var amount = Number(context.amount) || 0;
-          if (amount <= 0) return null;
-          var lethal = state.hp - amount <= 0;
-          if (pref !== 'always' && !(amount >= 2 || lethal)) return null;
-          var costs = (state.hand || []).filter(function (c) {
-            return StateRuntime.effectiveCardSuit(state, c) === 'heart';
-          });
-          if (!costs.length) return null;
-          var cost = costs
-            .map(function (c) { return { card: c, score: scoreCardForAI(game, targetActor, c) }; })
-            .sort(function (a, b) { return a.score - b.score; })[0].card;
           removeCardFromHand(state, cost.id);
           discardCard(game, cost);
           log(game, actorName(game, targetActor) + '发动【天香】，弃置【' + cost.name + '】' + cost.suit + ' ' + cost.rank + '，将伤害转移给' + actorName(game, transferee) + '。');
@@ -1568,6 +1603,51 @@
             }
           };
           return { triggeredTianxiang: true };
+        }
+
+        function triggerTianxiangDamageModify(context) {
+          var game = context.game;
+          var targetActor = context.targetActor;
+          var state = game[targetActor];
+          if (!state || !hasSkill(state, 'tianxiang') || game.phase === 'gameover') return null;
+          var opts = context.opts || {};
+          if (opts.noTianxiangTransfer) return null;
+          var amount = Number(context.amount) || 0;
+          if (amount <= 0) return null;
+          // v13 J3: resolver 重入 — 按玩家决策强制执行 (跳过偏好/期望值)。
+          if (opts.tianxiangDecision) {
+            var dec = opts.tianxiangDecision;
+            var decCost = (state.hand || []).find(function (c) { return c.id === dec.costCardId; });
+            var decTarget = game[dec.transferTo];
+            if (!decCost || !decTarget || decTarget.hp <= 0) return null;
+            return tianxiangTransferContext(context, dec.transferTo, decCost);
+          }
+          if (opts.noTianxiangAsk) return null; // 玩家已放弃
+          var pref = (state.skillPreferences && state.skillPreferences.tianxiang) || 'auto';
+          if (pref === 'decline') return null;
+          if (pref === 'ask') return null; // ask 挂起由 damage() 入口负责
+          // v13 J3: 转移目标泛化 — 攻击范围内其他存活座席, 敌对优先;
+          // 1v1 恒为 [对手], 行为不变。
+          var candidates = StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== targetActor && game[seat].hp > 0
+              && StateRuntime.canReachWithSha(game, targetActor, seat);
+          });
+          if (!candidates.length) return null;
+          var hostiles = candidates.filter(function (seat) {
+            return StateRuntime.isHostileSeat(game, targetActor, seat);
+          });
+          var pool = hostiles.length ? hostiles : candidates;
+          var transferee = pool.indexOf(opponent(targetActor)) >= 0 ? opponent(targetActor) : pool[0];
+          var lethal = state.hp - amount <= 0;
+          if (pref !== 'always' && !(amount >= 2 || lethal)) return null;
+          var costs = (state.hand || []).filter(function (c) {
+            return StateRuntime.effectiveCardSuit(state, c) === 'heart';
+          });
+          if (!costs.length) return null;
+          var cost = costs
+            .map(function (c) { return { card: c, score: scoreCardForAI(game, targetActor, c) }; })
+            .sort(function (a, b) { return a.score - b.score; })[0].card;
+          return tianxiangTransferContext(context, transferee, cost);
         }
 
         // 雷击 (张角) — gltjk wind spec: "当你使用或打出【闪】时, 你可以令

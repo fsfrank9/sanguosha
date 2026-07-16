@@ -374,29 +374,46 @@
     // 退出 (cancelSeatPicker)。面板本身是 #seatTargetModePanel (hint + 取消),
     // 合法座席高亮由 board-panels.js 的 renderHero() 据
     // activeSeatPickerLegalSeats() 加 .is-target-selectable class。
-    // v12 H 复核修复: 座席点选骨架泛化为 min/max — 单目标牌 min=max=1 (点即
-    // 完成, 与旧 needed=1 行为一致); 铁索 min=1/max=2 (点满 2 自动完成, 或点
-    // 1 后按"确定"提前完成)。opts.extraAction = { label, handler } 渲染一个
-    // 附加按钮 (铁索的"重铸")。
+    // v12 H 复核修复: 座席点选骨架泛化为 min/max。
+    // v13 J0-1 (PR #165 缺陷 1): "有目标必过确认" — 点座席只是暂存 (再点
+    // 取消暂存 / 单目标点其他座席改选), 须按"确定"(#seatTargetConfirmBtn,
+    // 或 hand-confirm 快捷键) 才真正结算; 此前单目标点座席即直接打出。
+    // opts.extraAction = { label, handler } 渲染一个附加按钮 (铁索的"重铸")。
     var seatPicker = null; // { legalSeats, min, max, picked, onComplete, hintText, extraAction }
 
     function activeSeatPickerLegalSeats() {
       return seatPicker ? seatPicker.legalSeats : null;
     }
 
+    // v13 J0-1: 已暂存座席 (board-panels 据此加 .is-target-staged 高亮)。
+    function activeSeatPickerPickedSeats() {
+      return seatPicker ? seatPicker.picked : null;
+    }
+
     function renderSeatPickerControls() {
       if (!seatPicker) return;
+      var game = getGame();
       var canConfirm = seatPicker.picked.length >= seatPicker.min;
-      if (els.seatTargetConfirmBtn) els.seatTargetConfirmBtn.hidden = !(seatPicker.max > 1 && canConfirm);
+      // v13 J0-1: 满足最少目标数即显示"确定" (单目标也要确认)。
+      if (els.seatTargetConfirmBtn) els.seatTargetConfirmBtn.hidden = !canConfirm;
       if (els.seatTargetExtraBtn) {
         els.seatTargetExtraBtn.hidden = !seatPicker.extraAction;
         if (seatPicker.extraAction) els.seatTargetExtraBtn.textContent = seatPicker.extraAction.label;
       }
       if (els.seatTargetModeHint) {
         var base = seatPicker.hintText || '选择目标：点击场上高亮的角色';
-        els.seatTargetModeHint.textContent = seatPicker.max > 1
-          ? base + '（已选 ' + seatPicker.picked.length + ' / 至多 ' + seatPicker.max + '）'
-          : base;
+        if (seatPicker.picked.length) {
+          var pickedNames = seatPicker.picked.map(function (seat) {
+            return (game && game[seat] && game[seat].name) || seat;
+          }).join('、');
+          els.seatTargetModeHint.textContent = base + '（已选：' + pickedNames
+            + (seatPicker.max > 1 ? '，至多 ' + seatPicker.max + ' 个' : '')
+            + '，按"确定"结算）';
+        } else {
+          els.seatTargetModeHint.textContent = seatPicker.max > 1
+            ? base + '（已选 0 / 至多 ' + seatPicker.max + '）'
+            : base;
+        }
       }
     }
 
@@ -440,26 +457,30 @@
     }
 
     // 点击一个座席的英雄卡 (由 dom-adapter 的 hero 元素 click 绑定调用)。
-    // 非法/重复座席忽略; 达到 max 自动完成, 否则更新提示 (min<max 时"确定"
-    // 按钮已由 renderSeatPickerControls 据 picked 数显隐)。
+    // v13 J0-1: 点座席只暂存 — 重复点同席取消暂存; 单目标 (max=1) 已暂存
+    // 时点其他合法座席直接改选; 不再"点满 max 自动结算", 一律等"确定"。
     function clickSeatForPicker(seat) {
       if (!seatPicker) return;
       if (seatPicker.legalSeats.indexOf(seat) < 0) return;
-      if (seatPicker.picked.indexOf(seat) >= 0) return;
-      seatPicker.picked.push(seat);
-      if (seatPicker.picked.length >= seatPicker.max) {
-        finishSeatPicker();
-        return;
+      var pickedIdx = seatPicker.picked.indexOf(seat);
+      if (pickedIdx >= 0) {
+        seatPicker.picked.splice(pickedIdx, 1); // 再点取消暂存
+      } else if (seatPicker.max === 1 && seatPicker.picked.length === 1) {
+        seatPicker.picked = [seat];             // 单目标改选
+      } else if (seatPicker.picked.length < seatPicker.max) {
+        seatPicker.picked.push(seat);
+      } else {
+        return; // 多目标已满 → 先取消一个再选
       }
       renderSeatPickerControls();
       render();
     }
 
     // v12 H6: 单目标牌类型表 — 杀 (isShaCard 覆盖 sha/fire_sha/thunder_sha) +
-    // 决斗/拆/顺/火攻/乐/兵/借刀/桃/无中。铁索 (至多 2 目标) 与南蛮/万箭/
+    // 决斗/拆/顺/火攻/乐/兵/借刀/无中。铁索 (至多 2 目标) 与南蛮/万箭/
     // 桃园/五谷/酒 等 AOE/自身/无目标牌不在此列, identity3 下沿用引擎缺省
-    // (照旧, 与 1v1 相同路径)。
-    var SEAT_TARGET_CARD_TYPES = ['juedou', 'guohe', 'shunshou', 'huogong', 'lebusishu', 'bingliang', 'jiedao', 'tao', 'wuzhong'];
+    // (照旧, 与 1v1 相同路径)。v13 J0-4: 桃收口为恒对自己, 不再座席点选。
+    var SEAT_TARGET_CARD_TYPES = ['juedou', 'guohe', 'shunshou', 'huogong', 'lebusishu', 'bingliang', 'jiedao', 'wuzhong'];
 
     function isSeatTargetCard(card) {
       return !!card && (Engine.isShaCard(card) || SEAT_TARGET_CARD_TYPES.indexOf(card.type) >= 0);
@@ -755,6 +776,8 @@
       startLijianTargetPicker: startLijianTargetPicker,
       startTiesuoSeatPicker: startTiesuoSeatPicker,
       activeSeatPickerLegalSeats: activeSeatPickerLegalSeats,
+      // v13 J0-1: 已暂存座席查询 (board-panels .is-target-staged 高亮用)。
+      activeSeatPickerPickedSeats: activeSeatPickerPickedSeats,
       seatPickerActive: function () { return !!seatPicker; },
       cancelSeatPicker: cancelSeatPicker,
       render: renderModePanels,

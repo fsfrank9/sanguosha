@@ -164,6 +164,9 @@
           // 审计二轮 PR-8: 贯石斧自选两张 + 火攻展示牌自选 面板
           'guanshiDiscardPanel', 'guanshiDiscardHint', 'guanshiDiscardChoices', 'guanshiConfirmBtn', 'guanshiDeclineBtn',
           'huogongShowPanel', 'huogongShowHint', 'huogongShowChoices',
+          'huogongCostPanel', 'huogongCostHint', 'huogongCostChoices', 'huogongCostDeclineBtn',
+          'tianxiangAskPanel', 'tianxiangAskHint', 'tianxiangCostChoices', 'tianxiangTargetChoices',
+          'tianxiangConfirmBtn', 'tianxiangDeclineBtn',
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
           'cixiongFirePanel', 'cixiongFireHint', 'cixiongFireBtn', 'cixiongFireDeclineBtn',
           'cixiongChoosePanel', 'cixiongChooseHint', 'cixiongChooseChoices', 'cixiongChooseDrawBtn',
@@ -258,7 +261,9 @@
           stagedModalChoice: stagedModalChoice,
           // v12 H6: identity3 座席点选模式下的合法目标座席数组 (null = 未在
           // 点选中, 1v1 恒 null) — board-panels renderHero 据此加高亮 class.
-          seatTargetLegalSeats: modePanels.activeSeatPickerLegalSeats()
+          seatTargetLegalSeats: modePanels.activeSeatPickerLegalSeats(),
+          // v13 J0-1: 已暂存座席 (点选待确认) — renderHero 加 .is-target-staged.
+          seatTargetPickedSeats: modePanels.activeSeatPickerPickedSeats()
         };
       }
       function renderLog() { boardPanels.renderLog(uiView()); }
@@ -999,6 +1004,12 @@
         // 保持测试/AI 行为不变, UI 对局显式开启 ask).
         game.player.skillPreferences.guanshi = 'ask';
         game.player.skillPreferences.huogongShow = 'ask';
+        // v13 J2: 火攻显式成本失效时挂起重选 (引擎默认 auto 自动改选,
+        // UI 对局开启 ask 让玩家显式重选)。
+        game.player.skillPreferences.huogongCost = 'ask';
+        // v13 J3: 天香 ask — 玩家为小乔时受伤挂起询问 (引擎默认 auto 期望
+        // 值启发; 非小乔座席该偏好惰性无效)。
+        game.player.skillPreferences.tianxiang = 'ask';
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = false;
         _toggleCornerButtons(true);   // v9 PR-E19: 游戏内才显示菜单/分享角落按钮
@@ -1051,9 +1062,16 @@
         // 审计二轮 PR-8: 贯石斧 (可弃可不发动) + 火攻展示 (必选, stage 提交)
         { panelId: 'guanshiDiscardPanel',   confirmBtnId: 'guanshiConfirmBtn',      cancelBtnId: 'guanshiDeclineBtn' },
         { panelId: 'huogongShowPanel',      confirmBtnId: null,                     cancelBtnId: null },
+        // v13 J2: 火攻成本挂起重选 — 点候选 stage 后 hand-confirm 提交,
+        // cancel = 不弃置 (无伤结算)。
+        { panelId: 'huogongCostPanel',      confirmBtnId: null,                     cancelBtnId: 'huogongCostDeclineBtn' },
+        // v13 J3: 天香 ask — 选成本+目标后确认转移, cancel = 不发动。
+        { panelId: 'tianxiangAskPanel',     confirmBtnId: 'tianxiangConfirmBtn',    cancelBtnId: 'tianxiangDeclineBtn' },
         // v12 H6: identity3 单目标牌/主动技 座席点选模式 (无 confirm 语义 —
         // 点合法座席直接生效; 取消按钮退出)。
-        { panelId: 'seatTargetModePanel',   confirmBtnId: null,                     cancelBtnId: 'seatTargetCancelBtn' },
+        // v13 J0-1: 座席点选改"暂存-确认" — hand-confirm 路由到确定按钮
+        // (未暂存满 min 时按钮隐藏, _clickIfEnabled 自然 no-op)。
+        { panelId: 'seatTargetModePanel',   confirmBtnId: 'seatTargetConfirmBtn',   cancelBtnId: 'seatTargetCancelBtn' },
         // v12 H6/H7: 激将/护驾 求助响应面板 (候选两步化, 与 shanResponsePanel 同构)。
         { panelId: 'lordAidPanel',          confirmBtnId: null,                     cancelBtnId: 'lordAidDeclineBtn' }
       ];

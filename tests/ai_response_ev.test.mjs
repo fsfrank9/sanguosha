@@ -87,17 +87,32 @@ test('万箭 vs AI 八卦+闪: 红判定 → 省下真闪', () => {
   assert.ok(game.enemy.hand.some((x) => x.id === 'e-shan'), '真闪保留');
 });
 
-test('玩家 auto 座席保持旧序: 真闪优先, 八卦不判定', () => {
+test('v13 J0-3: 玩家 auto 座席也八卦先行 — 红判定省真闪', () => {
   const game = buildGame();
   game.turn = 'enemy';
   game.enemy.hand = [c('sha', { id: 'e-sha' })];
   game.player.hand = [c('shan', { id: 'p-shan' })];
   game.player.equipment.armor = c('bagua', { id: 'p-bg' });
+  game.deck = [redJudge('p-judged')];
+  const hp = game.player.hp;
+  Engine.playCard(game, 'enemy', 'e-sha');
+  assert.equal(game.player.hp, hp, '八卦红判定化解');
+  assert.ok(game.player.hand.some((x) => x.id === 'p-shan'), '真闪保留 (八卦先行)');
+  assert.ok(game.discard.some((x) => x.id === 'p-judged'), '判定牌已消耗');
+});
+
+test('v13 J0-3: skillPreferences.bagua=decline → 不判定, 回到真闪', () => {
+  const game = buildGame();
+  game.turn = 'enemy';
+  game.enemy.hand = [c('sha', { id: 'e-sha' })];
+  game.player.hand = [c('shan', { id: 'p-shan' })];
+  game.player.equipment.armor = c('bagua', { id: 'p-bg' });
+  game.player.skillPreferences.bagua = 'decline';
   game.deck = [redJudge('p-unused')];
   const hp = game.player.hp;
   Engine.playCard(game, 'enemy', 'e-sha');
   assert.equal(game.player.hp, hp, '闪化解');
-  assert.ok(game.discard.some((x) => x.id === 'p-shan'), '真闪消耗 (旧序)');
+  assert.ok(game.discard.some((x) => x.id === 'p-shan'), '真闪消耗');
   assert.ok(game.deck.some((x) => x.id === 'p-unused'), '八卦未判定 → 判定牌仍在牌堆');
 });
 

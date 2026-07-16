@@ -113,18 +113,24 @@ test('H1 万箭齐发: 对方无【无懈】且无【闪】→ 受 1 点伤害',
   assert.equal(game.enemy.hp, hp - 1, '无抵消无响应 → 受 1 点伤害');
 });
 
-// --- 延时锦囊放置 ---
+// --- 延时锦囊 (v13 J0-2: 放置直入判定区, 无懈窗口移至判定阶段生效前) ---
 
-test('H1 乐不思蜀: 对方持【无懈】(auto) → 抵消, 不进入判定区', () => {
+test('J0-2 乐不思蜀: 放置直入判定区; 判定前对方持【无懈】(auto) → 抵消', () => {
   const game = buildGame();
   game.player.hand = [c('lebusishu', { id: 'lbss' })];
   // v11 D1 (批次 33): 乐只在手牌有阵容 (>=2) 时才护 — 补一张手牌。
   game.enemy.hand = [c('wuxie', { id: 'lbss-wuxie' }), c('tao', { id: 'lbss-filler' })];
+  game.deck = [c('sha', { id: 'd1' }), c('sha', { id: 'd2' }), c('sha', { id: 'd3' })];
   const r = Engine.playCard(game, 'player', 'lbss');
   assert.equal(r.ok, true);
-  assert.equal(game.enemy.judgeArea.length, 0, '被无懈 → 未置入对方判定区');
+  assert.equal(game.enemy.judgeArea.length, 1, '放置时不开无懈窗口, 直入判定区');
+  assert.ok(!game.discard.some((card) => card.id === 'lbss-wuxie'), '放置时无懈未被询问消耗');
+  // 对方回合判定阶段: 生效前开无懈窗口 → auto 抵消
+  Engine.startTurn(game, 'enemy');
+  assert.equal(game.enemy.judgeArea.length, 0, '判定前被无懈 → 弃置, 不判定');
   assert.ok(game.discard.some((card) => card.id === 'lbss'), '【乐不思蜀】进入弃牌堆');
   assert.ok(game.discard.some((card) => card.id === 'lbss-wuxie'), '【无懈】已消耗');
+  assert.ok(!game.enemy.flags.skipPlay, '出牌阶段未被跳过');
 });
 
 test('H1 乐不思蜀: 对方无【无懈】→ 正常置入对方判定区', () => {

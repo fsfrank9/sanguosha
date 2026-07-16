@@ -105,13 +105,13 @@
           engineHooks: ['consumeResponse']
         },
         tao: {
-          summary: '出牌阶段对包括自己在内的一名已受伤的角色使用；濒死阶段任意角色对濒死者使用。',
+          summary: '出牌阶段仅自己已受伤时对自己使用；濒死阶段任意角色对濒死者使用。',
           timing: 'playPhase+dying',
-          targets: 'any-wounded-or-dying',
-          effect: 'v7 PR-1: options.taoTarget 指定 player/enemy；v7 PR-13: 濒死阶段任意 responder 可在 pendingChoice "dying-rescue" 中用本牌救援濒死者。',
+          targets: 'self-wounded-or-dying',
+          effect: 'v13 J0-4: 出牌阶段目标恒为自己且须已受伤 (PR #165 玩家实测收口)；v7 PR-13: 濒死阶段任意 responder 可在 pendingChoice "dying-rescue" 中用本牌救援濒死者。',
           frequency: 'unlimited',
           responseWindow: [],
-          engineHooks: ['playTao', 'options.taoTarget', 'attemptDyingRescue:tao', 'executeDyingRescue:tao']
+          engineHooks: ['playTao', 'attemptDyingRescue:tao', 'executeDyingRescue:tao']
         },
         jiu: {
           summary: '出牌阶段限一次，本回合下一张【杀】伤害 +1；濒死时(仅 self) 回复 1 点体力。',

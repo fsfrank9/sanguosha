@@ -41,6 +41,9 @@
         // 高亮 (view.seatTargetLegalSeats 为 null 时恒 false, 1v1 零回归)。
         els[actor + 'Hero'].classList.toggle('is-target-selectable',
           !!(view.seatTargetLegalSeats && view.seatTargetLegalSeats.indexOf(actor) >= 0));
+        // v13 J0-1: 已暂存 (点选待确认) 座席 — 加粗提亮描边。
+        els[actor + 'Hero'].classList.toggle('is-target-staged',
+          !!(view.seatTargetPickedSeats && view.seatTargetPickedSeats.indexOf(actor) >= 0));
         // v9 PR-E4: 主公徽章 — 由 view.game.roles[actor] === '主公' 决定显隐.
         // v9 PR-E14: 反贼徽章 — 同样由 view.game.roles[actor] === '反贼' 决定显隐.
         //   用户反馈: 之前只显主公不显反贼, 信息不对称.
