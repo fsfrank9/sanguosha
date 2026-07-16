@@ -442,7 +442,9 @@ test('game engine dispatches Guicai through judgement before-resolve hook seam',
   // v6.1 (cross-actor fix): the holder may be either the judgement actor
   // (own-judgement case) or the opponent (司马懿 replacing opponent's
   // judgement). We accept `state` or `holderState` as the variable name.
-  assert.match(skillsSource, /function triggerGuicaiJudgementBeforeResolve\(context\) \{[\s\S]*hasSkill\(\s*\w+\s*,\s*['"]guicai['"]\)[\s\S]*removeCardFromHand\(\s*\w+\s*,\s*replacement\.id\s*\)[\s\S]*discardCard\(game, originalCard\)[\s\S]*context\.card\s*=\s*replacement[\s\S]*context\.replaced\s*=\s*true/, 'Guicai helper should self-filter, pay a hand-card cost, discard the original judgement, and replace the context card');
+  // v13 评审收口: 自筛可经内联 hasSkill 或共享座次环扫描 findRingSkillHolder
+  // (内部同样 hasSkill 过滤) — 两种形状均满足"自筛"守护意图。
+  assert.match(skillsSource, /function triggerGuicaiJudgementBeforeResolve\(context\) \{[\s\S]*(?:hasSkill\(\s*\w+\s*,\s*['"]guicai['"]\)|findRingSkillHolder\(\s*game\s*,\s*\w+\s*,\s*['"]guicai['"])[\s\S]*removeCardFromHand\(\s*\w+\s*,\s*replacement\.id\s*\)[\s\S]*discardCard\(game, originalCard\)[\s\S]*context\.card\s*=\s*replacement[\s\S]*context\.replaced\s*=\s*true/, 'Guicai helper should self-filter, pay a hand-card cost, discard the original judgement, and replace the context card');
   assert.match(judgeSource, /var judgementContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*state[\s\S]*reason:\s*reason[\s\S]*card:\s*card[\s\S]*originalCard:\s*card[\s\S]*replaced:\s*false[\s\S]*\}/, 'judge should build a mutable before-resolve judgement context');
   assert.match(judgeSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onJudgementBeforeResolve['"]\s*,\s*judgementContext\s*\)/, 'judge should dispatch before-resolve judgement replacement through SkillRuntime');
   assert.match(judgeSource, /return judgementContext\.card/, 'judge should return the possibly replaced judgement card');

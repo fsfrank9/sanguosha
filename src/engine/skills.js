@@ -302,8 +302,11 @@
           // v13 J1: AI 盟友补血线启发 — 官方语义"将其中的一张牌交给一名角色"
           // (card__hero__wei.md 标/1V1 变体) 允许分给任意座席; 摸到【桃】且
           // 存在低血线 (hp<=2) 友方座席时相赠。1v1 无友方座席 → 恒自留
-          // (旧行为零回归)。
-          aiYijiGiveToAlly(game, targetActor, yijiBatch);
+          // (旧行为零回归)。评审收口: 仅 AI 座席启用 — 玩家席的 auto 档在
+          // 大厅按钮语义为"全部留己", 不得代玩家做分牌决策。
+          if (targetActor !== 'player') {
+            aiYijiGiveToAlly(game, targetActor, yijiBatch);
+          }
         }
         return { triggeredYiji: true, drawPairs: context.amount };
       }
@@ -736,6 +739,17 @@
       //   'auto'    — always pick hand[0] without prompting
       //   'decline' — never fire 鬼才 this trigger
       //   undefined — 'ask' for human player, 'auto' for AI
+      // v13 评审收口: 判定改判技持有者座次环扫描 (鬼才/鬼道共用) —
+      // 自判定归属者起顺时针, 首个存活、持技且付得起成本的座席。
+      function findRingSkillHolder(game, anchorActor, skillId, canPay) {
+        var order = StateRuntime.seatsFrom(game, anchorActor, true);
+        for (var i = 0; i < order.length; i += 1) {
+          var s = game[order[i]];
+          if (s && s.hp > 0 && hasSkill(s, skillId) && canPay(s)) return order[i];
+        }
+        return null;
+      }
+
       function triggerGuicaiJudgementBeforeResolve(context) {
         var game = context.game;
         var judgementActor = context.actor;
@@ -744,15 +758,9 @@
         // Find any actor at the table who can fire 鬼才.
         // v13 审计三轮: 座次环扫描 (判定归属者起顺时针) — 此前二元
         // [judgementActor, opponent(judgementActor)], 3p 第三席的鬼才恒不可达。
-        var order = StateRuntime.seatsFrom(game, judgementActor, true);
-        var holder = null;
-        for (var i = 0; i < order.length; i += 1) {
-          var s = game[order[i]];
-          if (s && s.hp > 0 && hasSkill(s, 'guicai') && s.hand && s.hand.length > 0) {
-            holder = order[i];
-            break;
-          }
-        }
+        var holder = findRingSkillHolder(game, judgementActor, 'guicai', function (s) {
+          return s.hand && s.hand.length > 0;
+        });
         if (!holder) return null;
         var holderState = game[holder];
         var pref = (holderState.skillPreferences && holderState.skillPreferences.guicai)
@@ -1344,11 +1352,22 @@
         }
         applyJudgeAreaOutcome(game, judgementActor, judgementActorState, saved.currentTrick, saved.currentReason, resolvedCard);
         // Resume the iteration from the trick AFTER the one we just resolved.
+        // v13 评审收口: 保留 J0-2 无懈簿记字段 (快照形状与主循环一致)。
         game.pauseState.judgeArea = {
           actor: judgementActor,
           pending: saved.pending,
-          idx: saved.idx + 1
+          idx: saved.idx + 1,
+          wuxieDoneIdx: saved.wuxieDoneIdx,
+          wuxieResults: saved.wuxieResults || {}
         };
+        // v13 评审收口: outcome 结算本身可产生待玩家选择 (闪电命中致濒死
+        // 求桃等) — 此前不检查直接续跑, 濒死挂起时回合被双推进。挂起并
+        // 标记 outcomeApplied, 由 resumeSuspendedTurnFlowIfReady 在选择
+        // 排空后续跑 (与 processJudgeArea 主循环 H2 分支同款)。
+        if (game.pendingChoice) {
+          game.pauseState.judgeArea.outcomeApplied = true;
+          return success('继续等待玩家选择。');
+        }
         var resumeResult = processJudgeArea(game, judgementActor);
         if (resumeResult && resumeResult.suspended) {
           return success('继续等待玩家选择。');
@@ -1650,16 +1669,11 @@
           if (pref === 'decline') return null;
           if (pref === 'ask') return null; // ask 挂起由 damage() 入口负责
           // v13 J3: 转移目标泛化 — 攻击范围内其他存活座席, 敌对优先;
-          // 1v1 恒为 [对手], 行为不变。
-          var candidates = StateRuntime.aliveSeats(game).filter(function (seat) {
-            return seat !== targetActor && game[seat].hp > 0
-              && StateRuntime.canReachWithSha(game, targetActor, seat);
-          });
+          // 1v1 恒为 [对手], 行为不变 (候选谓词与 damage() ask 面板共用
+          // StateRuntime.seatsInShaRangeOf, 消除漂移风险)。
+          var candidates = StateRuntime.seatsInShaRangeOf(game, targetActor);
           if (!candidates.length) return null;
-          var hostiles = candidates.filter(function (seat) {
-            return StateRuntime.isHostileSeat(game, targetActor, seat);
-          });
-          var pool = hostiles.length ? hostiles : candidates;
+          var pool = StateRuntime.hostileFirstPool(game, targetActor, candidates);
           var transferee = pool.indexOf(opponent(targetActor)) >= 0 ? opponent(targetActor) : pool[0];
           var lethal = state.hp - amount <= 0;
           if (pref !== 'always' && !(amount >= 2 || lethal)) return null;
@@ -1695,10 +1709,7 @@
             return seat !== actor && game[seat].hp > 0;
           });
           if (!candidates.length) return null;
-          var hostiles = candidates.filter(function (seat) {
-            return StateRuntime.isHostileSeat(game, actor, seat);
-          });
-          var pool = hostiles.length ? hostiles : candidates;
+          var pool = StateRuntime.hostileFirstPool(game, actor, candidates);
           var targetActor = (requested && requested !== actor && candidates.indexOf(requested) >= 0)
             ? requested
             : (pool.indexOf(opponent(actor)) >= 0 ? opponent(actor) : pool[0]);
@@ -1729,17 +1740,11 @@
           var judgementActor = context.actor;
           var originalCard = context.originalCard || context.card;
           if (!game || !originalCard || context.replaced) return null;
-          // v13 审计三轮: 座次环扫描 (同鬼才) — 此前二元 opponent(),
-          // 3p 第三席的鬼道持有者恒不可达。
-          var order = StateRuntime.seatsFrom(game, judgementActor, true);
-          var holder = null;
-          for (var i = 0; i < order.length; i += 1) {
-            var s = game[order[i]];
-            if (s && s.hp > 0 && hasSkill(s, 'guidao') && guidaoBlackHand(s).length > 0) {
-              holder = order[i];
-              break;
-            }
-          }
+          // v13 审计三轮: 座次环扫描 (与鬼才共用 findRingSkillHolder) —
+          // 此前二元 opponent(), 3p 第三席的鬼道持有者恒不可达。
+          var holder = findRingSkillHolder(game, judgementActor, 'guidao', function (s) {
+            return guidaoBlackHand(s).length > 0;
+          });
           if (!holder) return null;
           var holderState = game[holder];
           var pref = (holderState.skillPreferences && holderState.skillPreferences.guidao)
@@ -1816,11 +1821,19 @@
             log(game, actorName(game, holder) + '选择不发动【鬼道】。');
           }
           applyJudgeAreaOutcome(game, judgementActor, judgementActorState, saved.currentTrick, saved.currentReason, resolvedCard);
+          // v13 评审收口: 快照形状与主循环一致 (保留 J0-2 无懈簿记) +
+          // outcome 挂起检查 (闪电致濒死求桃时不得双推进; 同鬼才 resolver)。
           game.pauseState.judgeArea = {
             actor: judgementActor,
             pending: saved.pending,
-            idx: saved.idx + 1
+            idx: saved.idx + 1,
+            wuxieDoneIdx: saved.wuxieDoneIdx,
+            wuxieResults: saved.wuxieResults || {}
           };
+          if (game.pendingChoice) {
+            game.pauseState.judgeArea.outcomeApplied = true;
+            return success('继续等待玩家选择。');
+          }
           var resumeResult = processJudgeArea(game, judgementActor);
           if (resumeResult && resumeResult.suspended) {
             return success('继续等待玩家选择。');
@@ -1907,10 +1920,7 @@
             return game[seat] && game[seat].hp > 0 && (game[seat].hand || []).length > 0;
           });
           if (!candidates.length) return;
-          var hostiles = candidates.filter(function (seat) {
-            return StateRuntime.isHostileSeat(game, actor, seat);
-          });
-          var pool = hostiles.length ? hostiles : candidates;
+          var pool = StateRuntime.hostileFirstPool(game, actor, candidates);
           var picks = pool.slice(0, 2);
           if (picks.length < 2 && pref !== 'always') return;
           picks.forEach(function (seat) {

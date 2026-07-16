@@ -698,6 +698,10 @@
         // advanceWuguTargets / wuguPickForCurrent (定义在无懈续延区附近)。
         return advanceWuguTargets(game, {
           sourceActor: sourceActor,
+          // v13 评审收口: 无懈链 ctx 契约 — wuxieResponderQueue 按 ctx.actor
+          // 跳过来源, 缺失时出牌者会被询问无懈自己的五谷 (随首询锚点改为
+          // picker 而暴露的既有缺口)。
+          actor: sourceActor,
           wuguCardId: wuguCard && wuguCard.id,
           pool: pool,
           order: order,
@@ -729,6 +733,7 @@
         game.pauseState.wugu = null;
         return advanceWuguTargets(game, {
           sourceActor: saved.sourceActor,
+          actor: saved.sourceActor, // v13 评审收口: 无懈链 ctx 契约 (同上)
           wuguCardId: saved.wuguCardId,
           pool: pool,
           order: saved.order,
@@ -988,6 +993,10 @@
         if (!game.pauseState) game.pauseState = {};
         game.pauseState.aoe = {
           sourceActor: actor,
+          // v13 评审收口: aoe 状态兼作 'aoe-target' 无懈链 ctx —
+          // wuxieResponderQueue 按 ctx.actor 在净通过态跳过来源 (不询问
+          // 出牌者无懈自己的牌), 故须同时携带 actor 字段。
+          actor: actor,
           // L2: 保留实体牌引用 — 奸雄可获得造成伤害的南蛮/万箭实体牌
           card: card,
           responseType: responseType,

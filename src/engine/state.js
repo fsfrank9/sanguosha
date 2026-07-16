@@ -142,6 +142,22 @@
     return aliveSeats(game).filter(function (seat) { return seat !== actor; });
   }
 
+  // v13 评审收口: 候选内敌对优先池 — 候选中有敌对座席则只留敌对, 否则
+  // 原样返回 (天香转移/雷击/突袭等"敌对优先"目标挑选共用, 消除三处复制)。
+  function hostileFirstPool(game, actor, candidates) {
+    var hostiles = (candidates || []).filter(function (seat) { return isHostileSeat(game, actor, seat); });
+    return hostiles.length ? hostiles : (candidates || []);
+  }
+
+  // v13 评审收口: actor 攻击范围内的其他存活座席 (天香 ask 面板候选与
+  // AI auto 转移候选共用, 消除两处谓词漂移风险)。
+  function seatsInShaRangeOf(game, actor) {
+    return aliveSeats(game).filter(function (seat) {
+      return seat !== actor && game[seat] && game[seat].hp > 0
+        && canReachWithSha(game, actor, seat);
+    });
+  }
+
   function hasSkill(state, skillId) {
     return !!(state.skills || []).some(function (skill) { return skill.id === skillId; });
   }
@@ -239,6 +255,8 @@
     sideOf: sideOf,
     isHostileSeat: isHostileSeat,
     hostileSeats: hostileSeats,
+    hostileFirstPool: hostileFirstPool,
+    seatsInShaRangeOf: seatsInShaRangeOf,
     opponent: opponent,
     hasSkill: hasSkill,
     canUseUnlimitedSha: canUseUnlimitedSha,

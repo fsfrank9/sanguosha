@@ -123,15 +123,46 @@ test('J1 零回归: 1v1 旧 giveIds decision 形状 → 交给对手', () => {
   assert.ok(game.player.hand.some((x) => x.id === drawn[1]), '未勾选自留');
 });
 
-test('J1: AI auto 启发 — 低血线盟友 (hp<=2) 获赠摸到的【桃】', () => {
+test('J1: AI auto 启发 — 仅 AI 座席生效, 低血线盟友 (hp<=2) 获赠摸到的【桃】', () => {
+  // 郭嘉坐 AI 第三席 (ally, 忠臣); 同阵营主公 player 血线告急 → 获赠桃。
+  const game = Engine.newGame({
+    seed: 13103,
+    seats: ['player', 'enemy', 'ally'],
+    playerHero: 'liubei',
+    enemyHero: 'caocao',
+    allyHero: 'guojia'
+  });
+  game.log = [];
+  game.discard = [];
+  game.deck = [];
+  for (const actor of ['player', 'enemy', 'ally']) {
+    game[actor].hand = [];
+    game[actor].judgeArea = [];
+    game[actor].flags = {};
+    game[actor].equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
+    game[actor].hp = game[actor].maxHp;
+    game[actor].skillPreferences = {};
+  }
+  game.turn = 'enemy';
+  game.phase = 'play';
+  game.player.hp = 1; // 主公濒危 (郭嘉的同阵营盟友)
+  game.deck = [c('tao', { id: 'ai-tao' }), c('shan', { id: 'ai-shan' })];
+  game.enemy.hand = [c('sha', { id: 'e-sha' })];
+  Engine.playCard(game, 'enemy', 'e-sha', { target: 'ally' });
+  assert.ok(game.player.hand.some((x) => x.id === 'ai-tao'), '桃赠予低血线盟友 (主公)');
+  assert.ok(game.ally.hand.some((x) => x.id === 'ai-shan'), '非桃自留');
+});
+
+test('J1 评审收口: 玩家席 auto 档不代做分牌 ("全部留己"承诺), 全部自留', () => {
   const game = build3p();
-  // player 郭嘉 AI auto (缺省), ally 忠臣 hp=1 濒危
+  // player 郭嘉 (人类席) 缺省 auto, ally 忠臣 hp=1 濒危 — 不得代玩家赠牌
   game.ally.hp = 1;
   game.deck = [c('tao', { id: 'ai-tao' }), c('shan', { id: 'ai-shan' })];
   game.enemy.hand = [c('sha', { id: 'e-sha' })];
   Engine.playCard(game, 'enemy', 'e-sha', { target: 'player' });
-  assert.ok(game.ally.hand.some((x) => x.id === 'ai-tao'), '桃赠予低血线盟友');
-  assert.ok(game.player.hand.some((x) => x.id === 'ai-shan'), '非桃自留');
+  assert.ok(game.player.hand.some((x) => x.id === 'ai-tao'), '桃自留');
+  assert.ok(game.player.hand.some((x) => x.id === 'ai-shan'), '全部自留');
+  assert.equal(game.ally.hand.length, 0, '盟友未获赠 (玩家席不代决策)');
 });
 
 test('J1 零回归: 1v1 AI auto — 无盟友, 全部自留', () => {

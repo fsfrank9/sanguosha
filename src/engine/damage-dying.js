@@ -51,10 +51,7 @@
         var txCosts = (target.hand || []).filter(function (hc) {
           return StateRuntime.effectiveCardSuit(target, hc) === 'heart';
         });
-        var txTargets = aliveSeats(game).filter(function (seat) {
-          return seat !== targetActor && game[seat] && game[seat].hp > 0
-            && StateRuntime.canReachWithSha(game, targetActor, seat);
-        });
+        var txTargets = StateRuntime.seatsInShaRangeOf(game, targetActor);
         if (txCosts.length && txTargets.length) {
           if (!game.pauseState) game.pauseState = {};
           game.pauseState.tianxiangAsk = {
@@ -96,11 +93,13 @@
       // "伤害真的落在目标身上" 与 "被天香转移/被防止": landed=false 时
       // 麒麟等命中特效不触发 (修复 v12 已知偏差: 转移后仍对原目标结算
       // 命中特效)。挂起-重入路径经 pauseState.tianxiangAsk.opts 原样携带。
-      var notifyDamageSettled = function (landed, transferredTo) {
-        if (opts && typeof opts.afterDamageSettled === 'function') {
-          opts.afterDamageSettled(game, landed, transferredTo || null);
-        }
-      };
+      // 评审收口: damage() 是热路径 (基准每局数千次) — 仅调用方真的传入
+      // 回调时才构造通知闭包, 其余路径零分配。
+      var notifyDamageSettled = (opts && typeof opts.afterDamageSettled === 'function')
+        ? function (landed, transferredTo) {
+            opts.afterDamageSettled(game, landed, transferredTo || null);
+          }
+        : null;
 
       var damageModifyContext = {
         game: game,
@@ -143,7 +142,7 @@
             damageModifyContext.onTransferred(game, transferee);
           }
         }
-        notifyDamageSettled(false, transferee);
+        if (notifyDamageSettled) notifyDamageSettled(false, transferee);
         return transferResult;
       }
 
@@ -162,14 +161,14 @@
       });
       if (equipModify.prevented) {
         if (sourceCard) discardSourceCardIfPending(game, sourceCard);
-        notifyDamageSettled(false, null);
+        if (notifyDamageSettled) notifyDamageSettled(false, null);
         return false;
       }
       amount = equipModify.amount;
 
       if (amount <= 0) {
         if (sourceCard) discardSourceCardIfPending(game, sourceCard);
-        notifyDamageSettled(false, null);
+        if (notifyDamageSettled) notifyDamageSettled(false, null);
         return false;
       }
       // C1: 体力值可降至负数 (gltjk flow__neardeath.md — 1 体力的法正受
@@ -218,12 +217,12 @@
         if (game.pauseState && game.pauseState.dying) {
           if (!game.pauseState.deferredDamageAfter) game.pauseState.deferredDamageAfter = [];
           game.pauseState.deferredDamageAfter.push(damageContext);
-          notifyDamageSettled(true, null);
+          if (notifyDamageSettled) notifyDamageSettled(true, null);
           return true;
         }
       }
       finishDamageAfter(game, damageContext);
-      notifyDamageSettled(true, null);
+      if (notifyDamageSettled) notifyDamageSettled(true, null);
       return true;
     }
 

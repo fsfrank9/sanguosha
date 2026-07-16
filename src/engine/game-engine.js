@@ -1642,11 +1642,13 @@
       // 旧"全局单窗口"在 1v1 (单目标) 行为等价, 多席下一张无懈错误地抵消
       // 全部目标。逐席窗口移入 advanceAOETargets ('aoe-target' 延续)。
       function playNanmanCardHandler(game, actor, card, options, self) {
-          return playAOE(game, actor, card, 'sha', '南蛮入侵');
+          // finishTrickUse 保持在使用时点触发 onCardUse (集智) — 旧全局
+          // 无懈延续曾承担此包装, 迁移逐目标窗口时不得丢失 (评审修复)。
+          return finishTrickUse(game, actor, card, playAOE(game, actor, card, 'sha', '南蛮入侵'), options);
       }
 
       function playWanjianCardHandler(game, actor, card, options, self) {
-          return playAOE(game, actor, card, 'shan', '万箭齐发');
+          return finishTrickUse(game, actor, card, playAOE(game, actor, card, 'shan', '万箭齐发'), options);
       }
 
       function playGuoheCardHandler(game, actor, card, options, self) {
