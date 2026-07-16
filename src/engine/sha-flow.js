@@ -19,6 +19,7 @@
   var seatList = StateRuntime.seatList;
   var isShaCard = CardRuntime.isShaCard;
   var isShaType = CardRuntime.isShaType;
+  var putCard = CardRuntime.putCard;
 
   export function createShaFlowRuntime(deps) {
     var log = deps.log;
@@ -417,12 +418,22 @@
             var guanshiResult = applyGuanshiForcedHit(game, actor, targetActor, card, amount);
             if (guanshiResult) return guanshiResult;
           }
-          if (hasEquipmentEffect(self, 'qinglongChase')) {
+          // v13 审计三轮: 青龙偃月刀 — (a) "你可以"可选效果, 补 decline 偏好
+          // (缺省 auto 发动, 沿用朱雀/银月惯例); (b) 续杀锁定为"相同的目标"
+          // (官方 card__equipment.md — 此前无显式目标, 多席下 defaultHostileTarget
+          // 可能改指他人); (c) 续杀被 playSha 拒绝 (目标保护等边界) 时退回
+          // 手牌, 不再让实体牌滞留在途 (守恒)。
+          if (hasEquipmentEffect(self, 'qinglongChase')
+              && !(self.skillPreferences && self.skillPreferences.qinglong === 'decline')) {
             var follow = removeFirstCardOfType(self, 'sha');
             if (follow) {
-              log(game, actorName(game, actor) + '发动【青龙偃月刀】，继续使用一张【杀】。');
+              log(game, actorName(game, actor) + '发动【青龙偃月刀】，继续对' + actorName(game, targetActor) + '使用一张【杀】。');
               discardCard(game, card);
-              return playSha(game, actor, follow);
+              var chaseResult = playSha(game, actor, follow, { target: targetActor, skipShaCount: true });
+              if (chaseResult && chaseResult.ok) return chaseResult;
+              putCard(game, follow, { zone: 'hand', actor: actor });
+              log(game, '【青龙偃月刀】续杀不合法，收回【' + follow.name + '】。');
+              return success('目标闪避。');
             }
           }
           log(game, actorName(game, targetActor) + '闪避成功，没有受到伤害。');

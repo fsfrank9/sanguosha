@@ -585,16 +585,16 @@
       }
 
       function collectGanglieDiscardCandidates(source) {
+        // v13 审计三轮: 刚烈成本为"弃置两张手牌" (card__hero__wei.md 各变体
+        // 措辞一致) — 仅手牌可作候选; 此前误把装备区牌一并列入 (手牌与
+        // 装备是不同区域, 装备不能顶替手牌成本)。手牌不足两张时无此选项,
+        // 只能受 1 点伤害 (runGanglieJudgement 的 <2 门槛沿用本清单)。
         var list = [];
         if (source.hand) {
           source.hand.forEach(function (c) {
             list.push({ zone: 'hand', id: c.id, name: c.name, suit: c.suit, rank: c.rank });
           });
         }
-        ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
-          var card = source.equipment && source.equipment[slot];
-          if (card) list.push({ zone: 'equipment', slot: slot, id: card.id, name: card.name, suit: card.suit, rank: card.rank });
-        });
         return list;
       }
 
@@ -742,11 +742,13 @@
         var originalCard = context.originalCard || context.card;
         if (!game || !originalCard || context.replaced) return null;
         // Find any actor at the table who can fire 鬼才.
-        var order = [judgementActor, opponent(judgementActor)];
+        // v13 审计三轮: 座次环扫描 (判定归属者起顺时针) — 此前二元
+        // [judgementActor, opponent(judgementActor)], 3p 第三席的鬼才恒不可达。
+        var order = StateRuntime.seatsFrom(game, judgementActor, true);
         var holder = null;
         for (var i = 0; i < order.length; i += 1) {
           var s = game[order[i]];
-          if (s && hasSkill(s, 'guicai') && s.hand && s.hand.length > 0) {
+          if (s && s.hp > 0 && hasSkill(s, 'guicai') && s.hand && s.hand.length > 0) {
             holder = order[i];
             break;
           }
@@ -943,12 +945,30 @@
         // reflects the spec sequence in any log readback.
         if (self.hp < 1) return fail('体力不足，不能发动【苦肉】。');
         self.hp -= 1;
-        log(game, actorName(game, actor) + '发动【苦肉】，失去 1 点体力并摸两张牌。');
-        drawCards(game, actor, 2);
+        log(game, actorName(game, actor) + '发动【苦肉】，失去 1 点体力。');
+        // v13 审计三轮: 官方顺序 — 扣减体力事件内嵌濒死结算 (体力至 0 立即
+        // 濒死, flow__decreaselife.md), 完整落定后才执行"然后摸两张牌";
+        // 濒死中死亡则不再摸牌; 濒死 ask 挂起时摸牌挂入 deferredAfterDying
+        // 延后回调 (v12 G2 天香补牌同款), 救回后续跑。此前先摸牌后濒死,
+        // 顺序与官方相反。
         if (self.hp <= 0 && game.phase !== 'gameover') {
-          // v7 PR-13: 苦肉 把 hp 降到 0 时，按 spec 进入濒死结算（不直接 game-over）
           enterDying(game, actor, actor);
+          if (game.pauseState && game.pauseState.dying) {
+            if (!game.pauseState.deferredAfterDying) game.pauseState.deferredAfterDying = [];
+            game.pauseState.deferredAfterDying.push(function () {
+              if (game.phase !== 'gameover' && self.hp > 0) {
+                log(game, actorName(game, actor) + '因【苦肉】摸两张牌。');
+                drawCards(game, actor, 2);
+              }
+            });
+            return success('苦肉：等待濒死结算。');
+          }
+          if (game.phase === 'gameover' || self.hp <= 0) {
+            return success('苦肉：角色未能脱离濒死。');
+          }
         }
+        log(game, actorName(game, actor) + '因【苦肉】摸两张牌。');
+        drawCards(game, actor, 2);
         return success('苦肉完成。');
       }
 
@@ -1079,9 +1099,12 @@
         if (!cardIds.length) return fail('请选择一张交给对方的牌。');
         var fanjianCard = removeCardFromHand(self, cardIds[0]);
         if (!fanjianCard) return fail('选择的牌不存在。');
-        putCard(game, fanjianCard, { zone: 'hand', actor: targetActor });
         self.flags.fanjianUsed = true;
-        log(game, actorName(game, actor) + '发动【反间】，将【' + fanjianCard.name + '】交给' + actorName(game, targetActor) + '。');
+        // v13 审计三轮: 官方顺序 = 目标先声明花色, 然后才获得牌并展示
+        // (card__hero__wu.md "选择一种花色…先获得…再展示之")。此前先
+        // putCard 进目标手牌再询问 — 人类目标可直接从手牌区读出真实花色,
+        // 永不猜错。现牌在猜测落定前保持在途 (pauseState.fanjian)。
+        log(game, actorName(game, actor) + '发动【反间】，令' + actorName(game, targetActor) + '猜测所交牌的花色。');
 
         // Backward-compat override: explicit guess from caller skips the prompt.
         if (options.guessedSuit) {
@@ -1089,8 +1112,9 @@
         }
 
         if (targetActor === 'player') {
-          // Set pendingChoice; the player UI shows the card NAME but not
-          // suit, then 4 suit buttons.
+          // pendingChoice 只暴露牌名不暴露花色; 实体牌在途暂存。
+          if (!game.pauseState) game.pauseState = {};
+          game.pauseState.fanjian = { card: fanjianCard, sourceActor: actor, targetActor: targetActor };
           setPendingChoice(game, {
             kind: 'fanjian-guess',
             actor: targetActor,
@@ -1105,7 +1129,9 @@
       }
 
       function applyFanjianGuess(game, sourceActor, targetActor, fanjianCard, guessedSuit) {
-        log(game, actorName(game, targetActor) + '猜测【' + fanjianCard.name + '】的花色为「' + guessedSuit + '」（实际：' + fanjianCard.suit + '）。');
+        // 猜测落定 → 目标获得牌并展示 → 比对花色。
+        putCard(game, fanjianCard, { zone: 'hand', actor: targetActor });
+        log(game, actorName(game, targetActor) + '猜测花色为「' + guessedSuit + '」，获得并展示【' + fanjianCard.name + '】（实际：' + fanjianCard.suit + '）。');
         if (guessedSuit !== fanjianCard.suit) {
           log(game, '猜错，' + actorName(game, targetActor) + '受到 1 点伤害。');
           damage(game, targetActor, 1, sourceActor, '【反间】', null, 'normal');
@@ -1116,19 +1142,16 @@
       }
 
       function resolveFanjianGuessChoice(game, pending, decision) {
-        var targetActor = pending.actor;
-        var sourceActor = pending.sourceActor;
-        var target = game[targetActor];
-        if (!target) return fail('未知角色。');
-        var fanjianCard = target.hand.find(function (c) { return c.id === pending.cardId; });
-        if (!fanjianCard) return fail('找不到【反间】所交的牌。');
+        var saved = game.pauseState && game.pauseState.fanjian;
+        if (!saved) return fail('找不到【反间】的暂停状态。');
         var guess = decision && decision.suit;
         if (['spade', 'heart', 'club', 'diamond'].indexOf(guess) < 0) {
           // Restore pending so UI can keep prompting on invalid input.
           setPendingChoice(game, pending);
           return fail('请选择有效的花色（spade/heart/club/diamond）。');
         }
-        return applyFanjianGuess(game, sourceActor, targetActor, fanjianCard, guess);
+        game.pauseState.fanjian = null;
+        return applyFanjianGuess(game, saved.sourceActor, saved.targetActor, saved.card, guess);
       }
 
       // v6.1: count = min(aliveActorCount, 5, deckSize). 1v1 ⇒ 2 (was hardcoded 5).
@@ -1652,8 +1675,11 @@
 
         // 雷击 (张角) — gltjk wind spec: "当你使用或打出【闪】时, 你可以令
         // 一名其他角色进行判定: 若结果为黑桃, 你对该角色造成 2 点雷电伤害"。
-        // 1v1 目标恒为对手; 判定归对手 (红颜小乔判雷击 黑桃视为红桃 → 永不
-        // 命中, 由 judge() 视同层自然覆盖)。auto/decline 偏好 (铁骑惯例)。
+        // v13 审计三轮: 目标泛化为任意其他存活座席 (敌对优先, 1v1 恒对手;
+        // 此前二元 opponent(), 3p 下张角非 player/enemy 席时恒指错)。判定
+        // 归目标 (红颜小乔判雷击 黑桃视为红桃 → 永不命中, 由 judge() 视同
+        // 层自然覆盖)。auto/decline 偏好 (铁骑惯例); options.target 可显式
+        // 指定 (供 future ask 面板)。
         function triggerLeijiShanUsed(context) {
           var game = context.game;
           var actor = context.actor;
@@ -1664,7 +1690,18 @@
             log(game, actorName(game, actor) + '选择不发动【雷击】。');
             return null;
           }
-          var targetActor = opponent(actor);
+          var requested = StateRuntime.resolveSeatOption(game, context.options && context.options.target);
+          var candidates = StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && game[seat].hp > 0;
+          });
+          if (!candidates.length) return null;
+          var hostiles = candidates.filter(function (seat) {
+            return StateRuntime.isHostileSeat(game, actor, seat);
+          });
+          var pool = hostiles.length ? hostiles : candidates;
+          var targetActor = (requested && requested !== actor && candidates.indexOf(requested) >= 0)
+            ? requested
+            : (pool.indexOf(opponent(actor)) >= 0 ? opponent(actor) : pool[0]);
           var target = game[targetActor];
           if (!target || target.hp <= 0) return null;
           log(game, actorName(game, actor) + '发动【雷击】，令' + actorName(game, targetActor) + '进行判定。');
@@ -1692,11 +1729,13 @@
           var judgementActor = context.actor;
           var originalCard = context.originalCard || context.card;
           if (!game || !originalCard || context.replaced) return null;
-          var order = [judgementActor, opponent(judgementActor)];
+          // v13 审计三轮: 座次环扫描 (同鬼才) — 此前二元 opponent(),
+          // 3p 第三席的鬼道持有者恒不可达。
+          var order = StateRuntime.seatsFrom(game, judgementActor, true);
           var holder = null;
           for (var i = 0; i < order.length; i += 1) {
             var s = game[order[i]];
-            if (s && hasSkill(s, 'guidao') && guidaoBlackHand(s).length > 0) {
+            if (s && s.hp > 0 && hasSkill(s, 'guidao') && guidaoBlackHand(s).length > 0) {
               holder = order[i];
               break;
             }
@@ -1854,18 +1893,30 @@
           var actor = context.actor;
           var state = game[actor];
           if (!state || !hasSkill(state, 'tuxi')) return;
-          if (game[opponent(actor)].hand.length <= 0) return;
-            // v6.1: spec condition is "发动者**选择**发动". Read
-            // skillPreferences.tuxi to honor the choice: 'decline' skips
-            // entirely. Default is auto-fire (preserves v5/v6 behavior so
-            // existing tests + AI continue to work without per-turn toggles).
           var pref = state.skillPreferences && state.skillPreferences.tuxi;
           if (pref === 'decline') {
             log(game, actorName(game, actor) + '选择本回合不发动【突袭】。');
             return;
           }
-          takeHandCard(game, opponent(actor), actor, '发动【突袭】，获得');
-          context.drawCount = Math.max(0, context.drawCount - 1);
+          // v13 审计三轮: 官方语义 — "放弃摸牌, 改为获得一至两名角色的各
+          // 一张手牌" (card__hero__wei.md): 发动即放弃全部常规摸牌; 候选
+          // 泛化为其他存活且有手牌的座席 (座次环序, 敌对优先; 此前恒偷
+          // 二元 opponent 且仅 -1 摸牌 = 偷1+摸1, 系语义误读)。AI 期望值
+          // 门: 可偷满 2 张才发动 (偷 1 弃 2 摸恒亏); pref='always' 强制。
+          var candidates = StateRuntime.seatsFrom(game, actor, false).filter(function (seat) {
+            return game[seat] && game[seat].hp > 0 && (game[seat].hand || []).length > 0;
+          });
+          if (!candidates.length) return;
+          var hostiles = candidates.filter(function (seat) {
+            return StateRuntime.isHostileSeat(game, actor, seat);
+          });
+          var pool = hostiles.length ? hostiles : candidates;
+          var picks = pool.slice(0, 2);
+          if (picks.length < 2 && pref !== 'always') return;
+          picks.forEach(function (seat) {
+            takeHandCard(game, seat, actor, '发动【突袭】，获得');
+          });
+          context.drawCount = 0;
         }
       });
         SkillRuntime.registerSkill(skillRegistry, 'luoyi', {
@@ -2142,6 +2193,13 @@
           if (game[seatA].gender !== 'male' || game[seatB].gender !== 'male') {
             return fail('【离间】只能指定男性角色。');
           }
+          // v13 审计三轮: 虚拟决斗须过目标合法性 — 空城等"不能成为【决斗】
+          // 目标"的保护对离间的视为决斗同样生效 (此前绕过, 与真决斗路径
+          // isLegalCardTarget → cardTargetProtection 不一致)。成本未弃置前
+          // 校验, 拒绝时零副作用。
+          var lijianProtection = cardTargetProtection(game, seatA, seatB,
+            { type: 'juedou', name: '决斗', virtual: true }, '决斗');
+          if (lijianProtection) return fail(lijianProtection.message);
           var lijianCost = removeCardFromHand(self, cardIds[0]);
           if (!lijianCost) return fail('选择的手牌不存在。');
           discardCard(game, lijianCost);

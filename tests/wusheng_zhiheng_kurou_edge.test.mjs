@@ -32,19 +32,37 @@ function buildGame(playerHero, enemyHero, seed) {
 
 // ─── 苦肉 hp=1 allowed (spec: 发动者存活, hp > 0) ────────────────────
 
-test('苦肉 at hp=1 succeeds (lose 1 → hp=0 → game over, but spec-allowed)', () => {
+test('苦肉 at hp=1: 失去体力→濒死结算先行, 死亡则不再摸牌 (v13 官方顺序)', () => {
+  // v13 审计三轮: 官方顺序 — 扣减体力事件内嵌濒死结算 (flow__decreaselife.md),
+  // 完整落定后才执行"然后摸两张牌"; 濒死中死亡 → 后续摸牌不执行 (此前先
+  // 摸后濒死, 顺序颠倒)。
   const game = buildGame('huanggai', 'caocao');
   game.player.hp = 1;
-  // Pad deck so the 2-draw resolves before the game-over branch.
   game.deck = [c('sha', { id: 'kurou-draw-1' }), c('sha', { id: 'kurou-draw-2' })];
 
   const result = assertCardConservation(game, () => Engine.useSkill(game, 'player', 'kurou'));
 
   assert.equal(result.ok, true, 'spec allows hp=1 苦肉');
   assert.equal(game.player.hp, 0, 'lost 1 HP → 0');
-  assert.equal(game.player.hand.length, 2, 'drew 2 cards before death');
+  assert.equal(game.player.hand.length, 0, '死亡 → "然后摸两张牌"不再执行');
+  assert.equal(game.deck.length, 2, '牌堆未被摸');
   assert.equal(game.phase, 'gameover', '1v1 hp=0 ends the game');
   assert.equal(game.winner, 'enemy');
+});
+
+test('苦肉 at hp=1 + 手有桃自救: 濒死救回后继续摸两张 (v13)', () => {
+  const game = buildGame('huanggai', 'caocao');
+  game.player.hp = 1;
+  game.player.hand = [c('tao', { id: 'self-tao' })];
+  game.player.skillPreferences = { dying: 'auto' };
+  game.deck = [c('sha', { id: 'kurou-draw-1' }), c('sha', { id: 'kurou-draw-2' })];
+
+  const result = assertCardConservation(game, () => Engine.useSkill(game, 'player', 'kurou'));
+
+  assert.equal(result.ok, true, result.message);
+  assert.equal(game.player.hp, 1, '桃自救回 1');
+  assert.equal(game.player.hand.length, 2, '救回后照常摸两张');
+  assert.equal(game.phase, 'play', '对局继续');
 });
 
 test('苦肉 at hp>1 still works (legacy path unchanged)', () => {

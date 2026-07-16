@@ -693,6 +693,8 @@
       var settleWuxieChain = TricksRuntime.settleWuxieChain;
       var advanceTaoyuanTargets = TricksRuntime.advanceTaoyuanTargets;
       var advanceWuguTargets = TricksRuntime.advanceWuguTargets;
+      // v13 审计三轮: 铁索使用分支逐目标无懈驱动
+      var advanceTiesuoTargets = TricksRuntime.advanceTiesuoTargets;
       var wuguPickForCurrent = TricksRuntime.wuguPickForCurrent;
 
       // v11 B1: 装备域装配 — 依赖注入引擎闭包能力 (函数声明经包装注入,
@@ -713,7 +715,9 @@
         scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); },
         consumeResponse: function (g, a, t, r, p) { return consumeResponse(g, a, t, r, p); },
         hasShanResponseAvailable: function (s) { return hasShanResponseAvailable(s); },
-        listShanResponseOptions: function (s) { return listShanResponseOptions(s); }
+        listShanResponseOptions: function (s) { return listShanResponseOptions(s); },
+        // v13 审计三轮: 银月枪八卦先行 (sha-flow 域后置装配, 包装注入)
+        tryBaguaDodge: function (g, t, ig) { return tryBaguaDodge(g, t, ig); }
       });
       var equipCard = EquipmentRuntime.equipCard;
       var loseEquipment = EquipmentRuntime.loseEquipment;
@@ -1398,8 +1402,10 @@
         var seatState = game[seat];
         if (typeof seatState.hp !== 'number' || seatState.hp <= 0) return false;
         if (seat === actor) {
-          // 自指: 桃 (已受伤) / 无中生有 / 闪电 (判定区无同名)
+          // 自指: 桃 (已受伤) / 酒 (本实现仅自己, 见下方非自指分支注) /
+          // 无中生有 / 闪电 (判定区无同名)
           if (card.type === 'tao') return seatState.hp < seatState.maxHp;
+          if (card.type === 'jiu') return !(seatState.flags && seatState.flags.jiuUsedThisTurn);
           if (card.type === 'wuzhong') return true;
           if (card.type === 'shandian') {
             return !(seatState.judgeArea || []).some(function (judge) { return judge && judge.type === 'shandian'; });
@@ -1408,6 +1414,12 @@
         }
         if (isShaCard(card)) return canReachWithSha(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
         if (card.type === 'tao') return false; // v13 J0-4: 出牌阶段【桃】目标恒为自己
+        // v13 审计三轮: 【酒】使用方法Ⅰ矩阵自洽 — 本实现为"仅自己"变体
+        // (与执行路径 playJiuCardHandler 一致; 此前矩阵对他人误报合法)。
+        // 已知分歧如实记录: gltjk card__basic.md:58 (军争/国-标) 写"包括你
+        // 在内的一名角色" (可指定他人, 借刀驱使的杀可吃增益), 指定他人的
+        // 完整实现留待 K 阶段座席泛化桶, 见 docs/audit 三轮纪要 backlog。
+        if (card.type === 'jiu') return false;
         if (card.type === 'wuzhong') return true;
         if (card.type === 'shandian') return false; // 闪电只对自己使用
         if (card.type === 'lebusishu' || card.type === 'bingliang') {
@@ -1601,12 +1613,13 @@
           //   "使用目标: 包括你在内的一名角色"。options.wuzhongTarget /
           //   options.target 可指定任意座席 (v12 H1: resolveSeatOption 校验,
           //   无效值静默回退 actor — 与旧字面量白名单行为一致); 缺省 = actor。
-          // H1: 摸牌前开无懈窗口。v12 H2: 首询者 = 目标 (队列跳过来源)。
+          // H1: 摸牌前开无懈窗口。v13 审计三轮: 首询者 = 目标座席 (自指时
+          // 队列自动跳过来源, 座次环泛化 — 此前自指走二元 opponent(), 3p
+          // 下首询锚点跳过第三席)。
           discardCard(game, card);
           var wzTargetActor = resolveSeatOption(game, options.wuzhongTarget || options.target) || actor;
           log(game, actorName(game, actor) + '使用【无中生有】' + (wzTargetActor === actor ? '' : '令' + actorName(game, wzTargetActor)) + '。');
-          var wzResponder = wzTargetActor === actor ? opponent(actor) : wzTargetActor;
-          return checkWuxieAndContinue(game, wzResponder, '【无中生有】', 'wuzhong', {
+          return checkWuxieAndContinue(game, wzTargetActor, '【无中生有】', 'wuzhong', {
             actor: actor, card: card, options: options, wzTargetActor: wzTargetActor
           });
       }
@@ -1624,18 +1637,16 @@
           });
       }
 
-      // H1: 南蛮入侵 / 万箭齐发 在 1v1 中只有 1 名目标 (对方), 单个无懈窗口
-        // 即与官方一致。无懈窗口在 playAOE (响应 / 伤害) 之前。
+      // v13 审计三轮: 南蛮/万箭 改逐目标无懈 — 官方多目标牌逐目标结算,
+      // "生效前"响应对每名目标独立重现 (flow__use.md; 与桃园/五谷同型)。
+      // 旧"全局单窗口"在 1v1 (单目标) 行为等价, 多席下一张无懈错误地抵消
+      // 全部目标。逐席窗口移入 advanceAOETargets ('aoe-target' 延续)。
       function playNanmanCardHandler(game, actor, card, options, self) {
-          return checkWuxieAndContinue(game, opponent(actor), '【南蛮入侵】', 'nanman', {
-            actor: actor, card: card, options: options
-          });
+          return playAOE(game, actor, card, 'sha', '南蛮入侵');
       }
 
       function playWanjianCardHandler(game, actor, card, options, self) {
-          return checkWuxieAndContinue(game, opponent(actor), '【万箭齐发】', 'wanjian', {
-            actor: actor, card: card, options: options
-          });
+          return playAOE(game, actor, card, 'shan', '万箭齐发');
       }
 
       function playGuoheCardHandler(game, actor, card, options, self) {
@@ -1730,22 +1741,26 @@
       }
 
       function playTiesuoCardHandler(game, actor, card, options, self) {
-          discardCard(game, card);
+          // v12 H1: 目标座席经 resolveSeatOption 校验 (任意存活座席, 至多 2 名)。
+          // v13 审计三轮: 使用分支补逐目标无懈窗口 (普通锦囊, 官方无豁免;
+          // 目标校验先行, 失败退牌)。重铸不是"使用", 不开窗。
           if (options.mode === 'recast') {
+            discardCard(game, card);
             log(game, actorName(game, actor) + '重铸【铁索连环】，摸一张牌。');
             drawCards(game, actor, 1);
             return success('铁索连环重铸完成。');
           }
-          // v12 H1: 目标座席经 resolveSeatOption 校验 (任意存活座席, 至多 2 名)。
           var targets = Array.from(options.targets || [opponent(actor)]).filter(function (side, index, array) {
             return resolveSeatOption(game, side) && game[side].hp > 0 && array.indexOf(side) === index;
           }).slice(0, 2);
-          if (!targets.length) return fail('请选择要横置或重置的角色。');
-          targets.forEach(function (side) {
-            game[side].chained = !game[side].chained;
-            log(game, actorName(game, actor) + '使用【铁索连环】，' + actorName(game, side) + (game[side].chained ? '横置。' : '重置。'));
+          if (!targets.length) {
+            putCard(game, card, { zone: 'hand', actor: actor });
+            return fail('请选择要横置或重置的角色。');
+          }
+          discardCard(game, card);
+          return advanceTiesuoTargets(game, {
+            actor: actor, card: card, options: options, targets: targets, idx: 0
           });
-          return finishTrickUse(game, actor, card, success('铁索连环结算完成。'), options);
       }
 
       function playJiedaoCardHandler(game, actor, card, options, self) {

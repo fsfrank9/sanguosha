@@ -158,7 +158,12 @@
     var from = game[fromActor];
     var to = game[toActor];
     if (!from || !to) return Infinity;
-    var seats = normalizeSeats(game);
+    // v13 审计三轮: 座次环距离剔除已阵亡座席 (官方: 计算距离时跳过已死亡
+    // 角色)。3 席死 1 人时两种算法同值, 4-5 席 (v13 K) 起才有可观测差异。
+    var seats = normalizeSeats(game).filter(function (seat) {
+      return seat === fromActor || seat === toActor
+        || (game[seat] && typeof game[seat].hp === 'number' && game[seat].hp > 0);
+    });
     var fromIdx = seats.indexOf(fromActor);
     var toIdx = seats.indexOf(toActor);
     var ring = seats.length > 1 && fromIdx >= 0 && toIdx >= 0

@@ -416,22 +416,45 @@
       return finishTrickUse(game, ctx.actor, ctx.card, success('摸两张牌。'), ctx.options);
     });
 
-    registerWuxieContinuation('nanman', function (game, ctx, wuxied) {
+    // v13 审计三轮: 南蛮/万箭改逐目标无懈 (官方 flow__use.md — 多目标牌
+    // 逐目标结算, "生效前"响应逐目标重现; 与桃园/五谷同型)。旧全局单窗口
+    // 'nanman'/'wanjian' 延续废除, 逐席窗口在 advanceAOETargets 内开
+    // ('aoe-target' 延续)。
+    registerWuxieContinuation('aoe-target', function (game, ctx, wuxied) {
+      var aoe = game.pauseState && game.pauseState.aoe;
+      if (!aoe) return fail('AOE 结算状态丢失。');
       if (wuxied) {
-        discardCard(game, ctx.card);
-        return finishTrickUse(game, ctx.actor, ctx.card, success('南蛮入侵被无懈可击。'), ctx.options);
+        log(game, '【' + aoe.title + '】对' + actorName(game, aoe.order[aoe.idx]) + '的效果被【无懈可击】抵消。');
+        aoe.idx += 1;
       }
-      return finishTrickUse(game, ctx.actor, ctx.card,
-        playAOE(game, ctx.actor, ctx.card, 'sha', '南蛮入侵'), ctx.options);
+      return advanceAOETargets(game);
     });
 
-    registerWuxieContinuation('wanjian', function (game, ctx, wuxied) {
-      if (wuxied) {
-        discardCard(game, ctx.card);
-        return finishTrickUse(game, ctx.actor, ctx.card, success('万箭齐发被无懈可击。'), ctx.options);
+    // v13 审计三轮: 铁索连环 (使用分支) 补无懈窗口 — 普通锦囊, 官方无
+    // 豁免条款; 逐目标 (至多 2 名) 独立开窗。重铸不是"使用", 不开窗。
+    function advanceTiesuoTargets(game, ctx) {
+      while (ctx.idx < ctx.targets.length) {
+        var side = ctx.targets[ctx.idx];
+        if (!game[side] || game[side].hp <= 0) { ctx.idx += 1; continue; }
+        return checkWuxieAndContinue(
+          game, side,
+          '【铁索连环】（' + actorName(game, side) + '）',
+          'tiesuo-target', ctx
+        );
       }
-      return finishTrickUse(game, ctx.actor, ctx.card,
-        playAOE(game, ctx.actor, ctx.card, 'shan', '万箭齐发'), ctx.options);
+      return finishTrickUse(game, ctx.actor, ctx.card, success('铁索连环结算完成。'), ctx.options);
+    }
+
+    registerWuxieContinuation('tiesuo-target', function (game, ctx, wuxied) {
+      var side = ctx.targets[ctx.idx];
+      if (wuxied) {
+        log(game, '【铁索连环】对' + actorName(game, side) + '的效果被【无懈可击】抵消。');
+      } else if (game[side]) {
+        game[side].chained = !game[side].chained;
+        log(game, actorName(game, ctx.actor) + '使用【铁索连环】，' + actorName(game, side) + (game[side].chained ? '横置。' : '重置。'));
+      }
+      ctx.idx += 1;
+      return advanceTiesuoTargets(game, ctx);
     });
 
     // v13 J0-2 (PR #165 缺陷 2): 延时锦囊无懈时机迁移 — 放置时不再开窗
@@ -461,8 +484,11 @@
           ctx.idx += 1; // 期间已被治满 (理论不出现) → 跳过
           continue;
         }
+        // v13 审计三轮: 首询者 = 当前目标座席 (座次环泛化; 此前二元
+        // opponent(target), 3p 下首询锚点错跳。1v1 队列跳过来源后恒为
+        // 对方单人, 逐步行为不变)。
         return checkWuxieAndContinue(
-          game, opponent(target),
+          game, target,
           '【桃园结义】（' + actorName(game, target) + '）',
           'taoyuan-target', ctx
         );
@@ -491,8 +517,9 @@
         if (!ctx.pool.length) break; // 牌已分完
         var picker = ctx.order[ctx.idx];
         if (!game[picker]) { ctx.idx += 1; continue; }
+        // v13 审计三轮: 首询者 = 当前 picker 座席 (座次环泛化, 同桃园)。
         return checkWuxieAndContinue(
-          game, opponent(picker),
+          game, picker,
           '【五谷丰登】（' + actorName(game, picker) + '）',
           'wugu-target', ctx
         );
@@ -1001,6 +1028,19 @@
             aoe.idx += 1;
             continue;
           }
+          // v13 审计三轮: 逐目标无懈窗口 — 官方多目标牌逐目标结算,
+          // "生效前"响应 (无懈) 对每名目标独立重现 (flow__use.md; 与桃园/
+          // 五谷同型)。有效性检测 (藤甲) 在前、生效前响应在后 (flow__use.md
+          // 步骤序)。wuxieCheckedIdx 防同一目标重复开窗; 被抵消由
+          // 'aoe-target' 延续推进游标。
+          if (aoe.wuxieCheckedIdx !== aoe.idx) {
+            aoe.wuxieCheckedIdx = aoe.idx;
+            return checkWuxieAndContinue(
+              game, targetActor,
+              '【' + title + '】（' + actorName(game, targetActor) + '）',
+              'aoe-target', aoe
+            );
+          }
           // v13 J0-3: 八卦阵先行 — 需打出【闪】的座席 (万箭) 先给判定机会
           // (全座席统一; 此前玩家座席在窗口后/真闪后才试), 红判定即化解。
           // 【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦。
@@ -1195,6 +1235,8 @@
       settleWuxieChain: settleWuxieChain,
       advanceTaoyuanTargets: advanceTaoyuanTargets,
       advanceWuguTargets: advanceWuguTargets,
+      // v13 审计三轮: 铁索使用分支逐目标无懈驱动
+      advanceTiesuoTargets: advanceTiesuoTargets,
       wuguPickForCurrent: wuguPickForCurrent
     };
   }

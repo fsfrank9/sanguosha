@@ -263,6 +263,10 @@
       // v13 J0-2: 延时锦囊无懈窗口移至判定阶段生效前 — 受害者即判定区
       // 归属者 (含闪电, 落点此刻已确定, 不再"漂移")。
       else if (trick === 'delayed-judge') victim = ctx.ownerActor;
+      // v13 审计三轮: 南蛮/万箭逐目标窗口 — 受害者 = 当前结算座席。
+      else if (trick === 'aoe-target') victim = ctx.order && ctx.order[ctx.idx];
+      // v13 审计三轮: 铁索使用分支逐目标窗口 — 受害者 = 当前目标座席。
+      else if (trick === 'tiesuo-target') victim = ctx.targets && ctx.targets[ctx.idx];
       else victim = ctx.targetActor || ctx.delayedSide || (ctx.actor ? opponent(ctx.actor) : null);
       var interested;
       if (beneficial) {
@@ -289,8 +293,21 @@
       var equipCount = ['weapon', 'armor', 'horsePlus', 'horseMinus'].filter(function (slot) {
         return self.equipment && self.equipment[slot];
       }).length;
-      if (trick === 'nanman') return aiEstimateShaCount(self) === 0 && self.hp <= 2;
-      if (trick === 'wanjian') return aiEstimateShanCount(self) === 0 && self.hp <= 2;
+      // v13 审计三轮: 南蛮/万箭逐目标窗口 ('aoe-target') — 受害者是自己时
+      // 沿用旧 EV 规则 (有响应牌或血线安全则吃 1 伤保无懈); 受害者是友方
+      // 时保持恒用 (保护立场已由 aiWuxieStance 过滤)。
+      if (trick === 'aoe-target') {
+        var aoeVictim = chain.ctx && chain.ctx.order && chain.ctx.order[chain.ctx.idx];
+        if (aoeVictim !== responder) return true;
+        if (chain.ctx.responseType === 'sha') return aiEstimateShaCount(self) === 0 && self.hp <= 2;
+        return aiEstimateShanCount(self) === 0 && self.hp <= 2;
+      }
+      // v13 审计三轮: 铁索使用分支 — 仅在自己将被横置且血线告急时消耗无懈。
+      if (trick === 'tiesuo-target') {
+        var tsVictim = chain.ctx && chain.ctx.targets && chain.ctx.targets[chain.ctx.idx];
+        var tsState = tsVictim && game[tsVictim];
+        return !!(tsState && !tsState.chained && tsState.hp <= 2);
+      }
       if (trick === 'huogong') return self.hp <= 2;
       if (trick === 'juedou') {
         if (self.hp <= 2) return true;

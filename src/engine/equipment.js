@@ -30,6 +30,8 @@
     var consumeResponse = deps.consumeResponse;
     var hasShanResponseAvailable = deps.hasShanResponseAvailable;
     var listShanResponseOptions = deps.listShanResponseOptions;
+    // v13 审计三轮: 银月枪走八卦先行 (sha-flow 域后置装配, 包装注入)
+    var tryBaguaDodge = deps.tryBaguaDodge;
 
     // M2 (审计二轮): "当你失去装备区里的【白银狮子】时, 你回复1点体力" —
     // 任何失去方式 (弃置/被拆/被顺/替换/作为技能或转化成本) 都应触发。
@@ -182,6 +184,9 @@
     // 若其没有手牌, 你令伤害值+1"。时机=藤甲之后、白银之前 (白银仍能把
     // 2 点 clamp 回 1 点, 符合两件装备同时生效的 spec 互动)。
     function applyGudingModifier(game, ctx) {
+      // v13 审计三轮: 天香转移的接续结算不触发来源武器效果 ("使用【杀】对
+      // 目标角色造成伤害时" — 转移接收者不是杀的目标)。
+      if (ctx.sourceWeaponExpired) return null;
       if (!ctx.sourceActor || !ctx.sourceCard || !CardRuntime.isShaCard(ctx.sourceCard) || ctx.amount <= 0) return null;
       var source = game[ctx.sourceActor];
       var target = game[ctx.targetActor];
@@ -205,6 +210,8 @@
     // v8 PR-B1: 寒冰剑 — "每当你使用【杀】对目标角色造成伤害时, 若其有牌,
     // 你可以防止此伤害, 依次弃置其两张牌"。时机=hp 扣减前、白银之后。
     function applyHanbingModifier(game, ctx) {
+      // v13 审计三轮: 同古锭 — 天香转移后不对接收者重新判定寒冰。
+      if (ctx.sourceWeaponExpired) return null;
       if (ctx.amount <= 0 || !ctx.sourceActor || !ctx.sourceCard || !CardRuntime.isShaCard(ctx.sourceCard)) return null;
       var hbResult = applyHanbingPrevent(game, ctx.sourceActor, ctx.targetActor);
       if (hbResult && hbResult.prevented) return { prevented: true };
@@ -416,6 +423,10 @@
         return;
       }
       log(game, actorName(game, holderActor) + '发动【银月枪】，令' + actorName(game, targetActor) + '出闪或受 1 点伤害。');
+      // v13 审计三轮: 银月枪的"打出【闪】"同样是"需要打出闪时" — 八卦阵
+      // 先行判定 (J0-3 同款顺序: 防具先给机会, 红判定即化解且不开手牌
+      // 窗口; 失败才回到真闪/询问)。
+      if (tryBaguaDodge && tryBaguaDodge(game, targetActor, false)) return;
       // v10 V4: 银月枪 触发 + 玩家为目标 + shanResponse=ask + 有闪 → 暂停.
       if (targetActor === 'player') {
         var yinyueTarget = game.player;

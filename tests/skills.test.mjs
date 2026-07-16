@@ -498,17 +498,34 @@ test('马超【铁骑】 red judgment suppresses Bagua automatic Shan', () => {
   assert.ok(!game.log.some((entry) => /八卦阵/.test(entry)), 'Bagua should not trigger after red Tieqi locks response');
 });
 
-test('张辽【突袭】 steals one enemy hand card and draws one fewer card during draw phase', () => {
+test('张辽【突袭】 v13 审计三轮: 1v1 单候选缺省不发动 (偷1弃2摸恒亏), 照常摸牌', () => {
+  // spec (card__hero__wei.md): "放弃摸牌, 改为获得一至两名角色的各一张手牌"
+  // — 发动即放弃全部摸牌; 旧实现"偷1+摸1"系语义误读。AI 期望值门: 可偷满
+  // 2 张 (≥2 名有牌座席) 才发动; 1v1 单候选缺省不发动。
   const game = skillGame('zhangliao', 'sunquan');
-  game.enemy.hand = [c('shan', { id: 'stolen-by-tuxi' })];
-  game.deck = [c('tao', { id: 'normal-draw' })];
+  game.enemy.hand = [c('shan', { id: 'not-stolen' })];
+  game.deck = [c('tao', { id: 'draw-2' }), c('sha', { id: 'draw-1' })];
 
   const result = Engine.startTurn(game, 'player');
 
   assert.equal(result.ok, true, result.message);
   assert.equal(game.phase, 'play');
-  assert.deepEqual(ids(game.enemy.hand), []);
-  assert.deepEqual(ids(game.player.hand).sort(), ['normal-draw', 'stolen-by-tuxi'].sort());
+  assert.deepEqual(ids(game.enemy.hand), ['not-stolen'], '对手手牌未被偷');
+  assert.deepEqual(ids(game.player.hand).sort(), ['draw-1', 'draw-2'].sort(), '照常摸两张');
+});
+
+test('张辽【突袭】 v13 审计三轮: pref=always 强制发动 → 放弃全部摸牌, 仅获得所偷牌', () => {
+  const game = skillGame('zhangliao', 'sunquan');
+  game.player.skillPreferences = { tuxi: 'always' };
+  game.enemy.hand = [c('shan', { id: 'stolen-by-tuxi' })];
+  game.deck = [c('tao', { id: 'not-drawn' })];
+
+  const result = Engine.startTurn(game, 'player');
+
+  assert.equal(result.ok, true, result.message);
+  assert.deepEqual(ids(game.enemy.hand), [], '对手手牌被偷');
+  assert.deepEqual(ids(game.player.hand), ['stolen-by-tuxi'], '放弃摸牌, 只有所偷 1 张');
+  assert.ok(game.deck.some((card) => card.id === 'not-drawn'), '常规摸牌被放弃');
 });
 
 test('周瑜【英姿】 draws three cards in draw phase', () => {

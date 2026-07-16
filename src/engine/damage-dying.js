@@ -36,6 +36,9 @@
       var target = game[targetActor];
       if (!target) return false;
       amount = Number(amount) || 0;
+      // v13 审计三轮: 天香转移的接续结算不再享受来源武器效果 (青釭无视
+      // 防具 / 古锭 / 寒冰), 见 transferOpts.sourceWeaponExpired。
+      var sourceWeaponExpired = !!(opts && opts.sourceWeaponExpired);
       // v13 J3: 天香 ask — 伤害流暂停框架。目标为 tianxiang='ask' 的小乔
       // 且有红桃成本与攻击范围内转移目标时, 在任何 onDamageModify 钩子运行
       // 前挂起 (钩子零重复副作用), resolver (resolveTianxiangAskChoice) 以
@@ -81,7 +84,8 @@
         }
       }
       var armor = target.equipment && target.equipment.armor;
-      var ignoreArmor = !!(armor && sourceActor && sourceCard && isArmorIgnoredBySha(game, sourceActor, sourceCard));
+      var ignoreArmor = !sourceWeaponExpired
+        && !!(armor && sourceActor && sourceCard && isArmorIgnoredBySha(game, sourceActor, sourceCard));
       var damageNature = nature || 'normal';
       if (sourceCard && sourceCard.type === 'fire_sha') damageNature = 'fire';
       if (sourceCard && sourceCard.type === 'thunder_sha') damageNature = 'thunder';
@@ -118,7 +122,12 @@
       // 嵌套转移经 opts.noTianxiangTransfer 防递归。
       if (damageModifyContext.transferTo && game[damageModifyContext.transferTo]) {
         var transferee = damageModifyContext.transferTo;
-        var transferOpts = { noTianxiangTransfer: true };
+        // v13 审计三轮: 来源武器效果随转移结束 — 官方 worked example
+        // (card__equipment.md:50 "此时【青釭剑】的效果结束"): 青釭无视防具
+        // 不得穿透转移落点的防具; 同理 古锭/寒冰 ("使用【杀】对目标角色
+        // 造成伤害时") 的条件目标是杀的原目标, 不对转移接收者重新判定。
+        // 接收者自己的防具 (藤甲② 火+1 / 白银 clamp) 照常生效。
+        var transferOpts = { noTianxiangTransfer: true, sourceWeaponExpired: true };
         var transferResult = damage(game, transferee, amount, sourceActor, reason, sourceCard, damageNature, transferOpts);
         if (typeof damageModifyContext.onTransferred === 'function' && game.phase !== 'gameover') {
           // v12 G2 复核修复: 转移致命且濒死暂停等待救援时, 补牌回调若立即
@@ -148,7 +157,8 @@
         sourceCard: sourceCard,
         amount: amount,
         nature: damageNature,
-        ignoreArmor: ignoreArmor
+        ignoreArmor: ignoreArmor,
+        sourceWeaponExpired: sourceWeaponExpired
       });
       if (equipModify.prevented) {
         if (sourceCard) discardSourceCardIfPending(game, sourceCard);
@@ -289,8 +299,14 @@
     function transmitChainDamage(game, damageContext) {
       if (game.phase === 'gameover') return;
       if (!game.pauseState) game.pauseState = {};
+      // v13 审计三轮: 传导顺序按官方"多角色同时结算从当前回合角色起顺时针"
+      // (rule__principle.md) — 自当前回合角色起扫描 (排除本次受伤者自身);
+      // 此前自受伤者下家起算。1v1 双席两种起算恒为 [对方单人], 行为不变。
+      var chainAnchor = (game.turn && game[game.turn]) ? game.turn : damageContext.targetActor;
       game.pauseState.chainTransmit = {
-        ringSeats: seatsFrom(game, damageContext.targetActor, false),
+        ringSeats: seatsFrom(game, chainAnchor, true).filter(function (seat) {
+          return seat !== damageContext.targetActor;
+        }),
         idx: 0,
         amount: damageContext.amount,
         sourceActor: damageContext.sourceActor,
@@ -363,25 +379,20 @@
         return;
       }
       log(game, actorName(game, dyingActor) + '体力为 0，进入濒死状态。');
-      // v12 G2: 不屈 (周泰) — "当你处于濒死状态时"锁定时机。handler 掀牌堆
-      // 顶置"创"; 点数均不同 → 体力回复至 1, 直接脱离濒死 (不进求桃队列),
-      // damage() 主流程照常走 finishDamageAfter。
-      SkillRuntime.runHook(skillRegistry, 'onDyingEnter', {
-        game: game,
-        dyingActor: dyingActor,
-        sourceActor: sourceActor
-      });
-      if (game[dyingActor] && game[dyingActor].hp >= 1) {
-        log(game, actorName(game, dyingActor) + '脱离濒死状态。');
-        return;
-      }
+      // v13 审计三轮: 不屈 (周泰) 等"处于濒死状态时"锁定技不再在入口抢先
+      // 结算 — 官方将其与桃/酒响应归入同一顺时针责任链, 于濒死者自己的
+      // 响应轮次触发 (见 processDyingNext 的 dyingEnterFired 分支)。此前
+      // 在建队列前无条件先跑, 排在濒死者之前的座席 (如身份场队友) 失去
+      // 先行救援的机会。1v1 中不屈结果不变 (队列另一人是 AI 攻击方, 恒
+      // 不救援)。
       var turnActor = game.turn || dyingActor;
       var responderQueue = seatsFrom(game, turnActor, true).filter(function (seat) { return !!game[seat]; });
       game.pauseState.dying = {
         actor: dyingActor,
         source: sourceActor,
         responders: responderQueue,
-        idx: 0
+        idx: 0,
+        dyingEnterFired: false
       };
       processDyingNext(game);
     }
@@ -408,6 +419,22 @@
         if (!game[responder]) {
           saved.idx += 1;
           continue;
+        }
+        // v13 审计三轮: 轮到濒死者本人时, 先结算其"处于濒死状态时"锁定技
+        // (不屈掀"创"), 回复至 1 即脱离濒死; 失败才进入其桃/酒自救。
+        if (responder === dyingActor && !saved.dyingEnterFired) {
+          saved.dyingEnterFired = true;
+          SkillRuntime.runHook(skillRegistry, 'onDyingEnter', {
+            game: game,
+            dyingActor: dyingActor,
+            sourceActor: saved.source
+          });
+          if (dyingState.hp >= 1) {
+            log(game, actorName(game, dyingActor) + '脱离濒死状态。');
+            game.pauseState.dying = null;
+            flushDeferredDamageAfter(game);
+            return { saved: true };
+          }
         }
         var attemptResult = attemptDyingRescue(game, responder, dyingActor);
         if (attemptResult && attemptResult.paused) {
