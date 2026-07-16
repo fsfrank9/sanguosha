@@ -36,13 +36,70 @@
       var target = game[targetActor];
       if (!target) return false;
       amount = Number(amount) || 0;
+      // v13 审计三轮: 天香转移的接续结算不再享受来源武器效果 (青釭无视
+      // 防具 / 古锭 / 寒冰), 见 transferOpts.sourceWeaponExpired。
+      var sourceWeaponExpired = !!(opts && opts.sourceWeaponExpired);
+      // v13 J3: 天香 ask — 伤害流暂停框架。目标为 tianxiang='ask' 的小乔
+      // 且有红桃成本与攻击范围内转移目标时, 在任何 onDamageModify 钩子运行
+      // 前挂起 (钩子零重复副作用), resolver (resolveTianxiangAskChoice) 以
+      // 原始参数 + 玩家决策重入本函数 (opts.tianxiangDecision / 放弃走
+      // opts.noTianxiangAsk), 钩子在重入时只跑一遍。
+      if (amount > 0
+          && !(opts && (opts.noTianxiangTransfer || opts.noTianxiangAsk || opts.tianxiangDecision))
+          && hasSkill(target, 'tianxiang')
+          && target.skillPreferences && target.skillPreferences.tianxiang === 'ask') {
+        var txCosts = (target.hand || []).filter(function (hc) {
+          return StateRuntime.effectiveCardSuit(target, hc) === 'heart';
+        });
+        var txTargets = StateRuntime.seatsInShaRangeOf(game, targetActor);
+        if (txCosts.length && txTargets.length) {
+          if (!game.pauseState) game.pauseState = {};
+          game.pauseState.tianxiangAsk = {
+            targetActor: targetActor,
+            amount: amount,
+            sourceActor: sourceActor,
+            reason: reason,
+            sourceCard: sourceCard,
+            nature: nature,
+            opts: opts || null
+          };
+          setPendingChoice(game, {
+            kind: 'tianxiang-ask',
+            actor: targetActor,
+            amount: amount,
+            reason: reason,
+            costIds: txCosts.map(function (hc) { return hc.id; }),
+            cards: txCosts.map(function (hc) {
+              return { id: hc.id, name: hc.name, suit: hc.suit, rank: hc.rank };
+            }),
+            targets: txTargets.map(function (seat) {
+              return { seat: seat, name: game[seat].name };
+            })
+          });
+          log(game, '等待' + actorName(game, targetActor) + '决定是否发动【天香】转移' + (reason || '伤害') + '。');
+          return true; // 伤害在途, 由 resolver 重入结算
+        }
+      }
       var armor = target.equipment && target.equipment.armor;
-      var ignoreArmor = !!(armor && sourceActor && sourceCard && isArmorIgnoredBySha(game, sourceActor, sourceCard));
+      var ignoreArmor = !sourceWeaponExpired
+        && !!(armor && sourceActor && sourceCard && isArmorIgnoredBySha(game, sourceActor, sourceCard));
       var damageNature = nature || 'normal';
       if (sourceCard && sourceCard.type === 'fire_sha') damageNature = 'fire';
       if (sourceCard && sourceCard.type === 'thunder_sha') damageNature = 'thunder';
       if (/火攻/.test(reason || '')) damageNature = 'fire';
       if (/闪电|雷/.test(reason || '')) damageNature = 'thunder';
+
+      // v13 J3: 伤害落点回调 — 调用方 (杀链的武器命中特效等) 需要区分
+      // "伤害真的落在目标身上" 与 "被天香转移/被防止": landed=false 时
+      // 麒麟等命中特效不触发 (修复 v12 已知偏差: 转移后仍对原目标结算
+      // 命中特效)。挂起-重入路径经 pauseState.tianxiangAsk.opts 原样携带。
+      // 评审收口: damage() 是热路径 (基准每局数千次) — 仅调用方真的传入
+      // 回调时才构造通知闭包, 其余路径零分配。
+      var notifyDamageSettled = (opts && typeof opts.afterDamageSettled === 'function')
+        ? function (landed, transferredTo) {
+            opts.afterDamageSettled(game, landed, transferredTo || null);
+          }
+        : null;
 
       var damageModifyContext = {
         game: game,
@@ -64,7 +121,12 @@
       // 嵌套转移经 opts.noTianxiangTransfer 防递归。
       if (damageModifyContext.transferTo && game[damageModifyContext.transferTo]) {
         var transferee = damageModifyContext.transferTo;
-        var transferOpts = { noTianxiangTransfer: true };
+        // v13 审计三轮: 来源武器效果随转移结束 — 官方 worked example
+        // (card__equipment.md:50 "此时【青釭剑】的效果结束"): 青釭无视防具
+        // 不得穿透转移落点的防具; 同理 古锭/寒冰 ("使用【杀】对目标角色
+        // 造成伤害时") 的条件目标是杀的原目标, 不对转移接收者重新判定。
+        // 接收者自己的防具 (藤甲② 火+1 / 白银 clamp) 照常生效。
+        var transferOpts = { noTianxiangTransfer: true, sourceWeaponExpired: true };
         var transferResult = damage(game, transferee, amount, sourceActor, reason, sourceCard, damageNature, transferOpts);
         if (typeof damageModifyContext.onTransferred === 'function' && game.phase !== 'gameover') {
           // v12 G2 复核修复: 转移致命且濒死暂停等待救援时, 补牌回调若立即
@@ -80,6 +142,7 @@
             damageModifyContext.onTransferred(game, transferee);
           }
         }
+        if (notifyDamageSettled) notifyDamageSettled(false, transferee);
         return transferResult;
       }
 
@@ -93,16 +156,19 @@
         sourceCard: sourceCard,
         amount: amount,
         nature: damageNature,
-        ignoreArmor: ignoreArmor
+        ignoreArmor: ignoreArmor,
+        sourceWeaponExpired: sourceWeaponExpired
       });
       if (equipModify.prevented) {
         if (sourceCard) discardSourceCardIfPending(game, sourceCard);
+        if (notifyDamageSettled) notifyDamageSettled(false, null);
         return false;
       }
       amount = equipModify.amount;
 
       if (amount <= 0) {
         if (sourceCard) discardSourceCardIfPending(game, sourceCard);
+        if (notifyDamageSettled) notifyDamageSettled(false, null);
         return false;
       }
       // C1: 体力值可降至负数 (gltjk flow__neardeath.md — 1 体力的法正受
@@ -151,11 +217,46 @@
         if (game.pauseState && game.pauseState.dying) {
           if (!game.pauseState.deferredDamageAfter) game.pauseState.deferredDamageAfter = [];
           game.pauseState.deferredDamageAfter.push(damageContext);
+          if (notifyDamageSettled) notifyDamageSettled(true, null);
           return true;
         }
       }
       finishDamageAfter(game, damageContext);
+      if (notifyDamageSettled) notifyDamageSettled(true, null);
       return true;
+    }
+
+    // v13 J3: 天香 ask resolver — decision {cardId, target} 弃红桃转移;
+    // {decline} 放弃 (伤害以 noTianxiangAsk 重入照常结算)。挂起点在钩子
+    // 运行前 (见 damage() 入口), 重入即完整补跑一遍伤害结算。
+    function resolveTianxiangAskChoice(game, pending, decision) {
+      var saved = game.pauseState && game.pauseState.tianxiangAsk;
+      if (!saved) return fail('找不到【天香】询问的暂停状态。');
+      var d = decision || {};
+      var reOpts = {};
+      if (saved.opts) {
+        Object.keys(saved.opts).forEach(function (k) { reOpts[k] = saved.opts[k]; });
+      }
+      if (d.cardId && d.target && !d.decline) {
+        var seat = StateRuntime.resolveSeatOption(game, d.target);
+        var state = game[saved.targetActor];
+        var chosen = state && (state.hand || []).find(function (hc) { return hc.id === d.cardId; });
+        var costOk = chosen && StateRuntime.effectiveCardSuit(state, chosen) === 'heart';
+        var targetOk = seat && seat !== saved.targetActor && game[seat] && game[seat].hp > 0
+          && StateRuntime.canReachWithSha(game, saved.targetActor, seat);
+        if (!costOk || !targetOk) {
+          setPendingChoice(game, pending);
+          return fail('请选择一张红桃手牌与攻击范围内的转移目标，或放弃发动【天香】。');
+        }
+        reOpts.tianxiangDecision = { costCardId: d.cardId, transferTo: seat };
+      } else {
+        log(game, actorName(game, saved.targetActor) + '选择不发动【天香】。');
+        reOpts.noTianxiangAsk = true;
+      }
+      game.pauseState.tianxiangAsk = null;
+      damage(game, saved.targetActor, saved.amount, saved.sourceActor,
+        saved.reason, saved.sourceCard, saved.nature, reOpts);
+      return success('【天香】询问已结算。');
     }
 
     // M1: "受到伤害后" 时机的统一收尾 — 派发 onDamageAfter hooks (目标存活
@@ -197,8 +298,14 @@
     function transmitChainDamage(game, damageContext) {
       if (game.phase === 'gameover') return;
       if (!game.pauseState) game.pauseState = {};
+      // v13 审计三轮: 传导顺序按官方"多角色同时结算从当前回合角色起顺时针"
+      // (rule__principle.md) — 自当前回合角色起扫描 (排除本次受伤者自身);
+      // 此前自受伤者下家起算。1v1 双席两种起算恒为 [对方单人], 行为不变。
+      var chainAnchor = (game.turn && game[game.turn]) ? game.turn : damageContext.targetActor;
       game.pauseState.chainTransmit = {
-        ringSeats: seatsFrom(game, damageContext.targetActor, false),
+        ringSeats: seatsFrom(game, chainAnchor, true).filter(function (seat) {
+          return seat !== damageContext.targetActor;
+        }),
         idx: 0,
         amount: damageContext.amount,
         sourceActor: damageContext.sourceActor,
@@ -271,25 +378,20 @@
         return;
       }
       log(game, actorName(game, dyingActor) + '体力为 0，进入濒死状态。');
-      // v12 G2: 不屈 (周泰) — "当你处于濒死状态时"锁定时机。handler 掀牌堆
-      // 顶置"创"; 点数均不同 → 体力回复至 1, 直接脱离濒死 (不进求桃队列),
-      // damage() 主流程照常走 finishDamageAfter。
-      SkillRuntime.runHook(skillRegistry, 'onDyingEnter', {
-        game: game,
-        dyingActor: dyingActor,
-        sourceActor: sourceActor
-      });
-      if (game[dyingActor] && game[dyingActor].hp >= 1) {
-        log(game, actorName(game, dyingActor) + '脱离濒死状态。');
-        return;
-      }
+      // v13 审计三轮: 不屈 (周泰) 等"处于濒死状态时"锁定技不再在入口抢先
+      // 结算 — 官方将其与桃/酒响应归入同一顺时针责任链, 于濒死者自己的
+      // 响应轮次触发 (见 processDyingNext 的 dyingEnterFired 分支)。此前
+      // 在建队列前无条件先跑, 排在濒死者之前的座席 (如身份场队友) 失去
+      // 先行救援的机会。1v1 中不屈结果不变 (队列另一人是 AI 攻击方, 恒
+      // 不救援)。
       var turnActor = game.turn || dyingActor;
       var responderQueue = seatsFrom(game, turnActor, true).filter(function (seat) { return !!game[seat]; });
       game.pauseState.dying = {
         actor: dyingActor,
         source: sourceActor,
         responders: responderQueue,
-        idx: 0
+        idx: 0,
+        dyingEnterFired: false
       };
       processDyingNext(game);
     }
@@ -316,6 +418,22 @@
         if (!game[responder]) {
           saved.idx += 1;
           continue;
+        }
+        // v13 审计三轮: 轮到濒死者本人时, 先结算其"处于濒死状态时"锁定技
+        // (不屈掀"创"), 回复至 1 即脱离濒死; 失败才进入其桃/酒自救。
+        if (responder === dyingActor && !saved.dyingEnterFired) {
+          saved.dyingEnterFired = true;
+          SkillRuntime.runHook(skillRegistry, 'onDyingEnter', {
+            game: game,
+            dyingActor: dyingActor,
+            sourceActor: saved.source
+          });
+          if (dyingState.hp >= 1) {
+            log(game, actorName(game, dyingActor) + '脱离濒死状态。');
+            game.pauseState.dying = null;
+            flushDeferredDamageAfter(game);
+            return { saved: true };
+          }
         }
         var attemptResult = attemptDyingRescue(game, responder, dyingActor);
         if (attemptResult && attemptResult.paused) {
@@ -566,6 +684,8 @@
       damage: damage,
       enterDying: enterDying,
       resolveDyingRescueChoice: resolveDyingRescueChoice,
+      // v13 J3: 天香 ask 询问 resolver (引擎中央注册表登记)。
+      resolveTianxiangAskChoice: resolveTianxiangAskChoice,
       // v12 H 复核修复: 铁索传导队列被濒死救援挂起后的续跑入口。
       advanceChainTransmit: advanceChainTransmit
     };

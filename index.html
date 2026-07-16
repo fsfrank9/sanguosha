@@ -512,6 +512,20 @@
           <span class="badge pending-prompt-panel__hint" id="huogongShowHint">火攻：选择展示一张手牌</span>
           <div class="huogong-show-choices pending-prompt-panel__choices" id="huogongShowChoices" aria-live="polite"></div>
         </div>
+        <!-- v13 J2: 火攻成本挂起重选 — 显式成本在结算中途失效时重选同花色 -->
+        <div class="huogong-cost-panel pending-prompt-panel" id="huogongCostPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="huogongCostHint">火攻：重选要弃置的同花色手牌</span>
+          <div class="huogong-cost-choices pending-prompt-panel__choices" id="huogongCostChoices" aria-live="polite"></div>
+          <button class="btn small" id="huogongCostDeclineBtn">不弃置（无伤结算）</button>
+        </div>
+        <!-- v13 J3: 天香 ask — 受到伤害时弃红桃转移 (选成本 + 选目标 + 确认/放弃) -->
+        <div class="tianxiang-ask-panel pending-prompt-panel" id="tianxiangAskPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="tianxiangAskHint">天香：弃置一张红桃手牌，将伤害转移给攻击范围内的一名角色</span>
+          <div class="tianxiang-cost-choices pending-prompt-panel__choices" id="tianxiangCostChoices" aria-live="polite"></div>
+          <div class="tianxiang-target-choices pending-prompt-panel__choices" id="tianxiangTargetChoices" aria-live="polite"></div>
+          <button class="btn small" id="tianxiangConfirmBtn" disabled>转移伤害</button>
+          <button class="btn small" id="tianxiangDeclineBtn">不发动</button>
+        </div>
         <div class="dying-rescue-panel pending-prompt-panel" id="dyingRescuePanel" hidden>
           <span class="badge pending-prompt-panel__hint" id="dyingRescueHint">濒死救援：用【桃】或【酒】救援</span>
           <div class="dying-rescue-choices pending-prompt-panel__choices" id="dyingRescueChoices" aria-live="polite"></div>

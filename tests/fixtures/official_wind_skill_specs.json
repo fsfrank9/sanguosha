@@ -4,7 +4,7 @@
     "indexUrl": "https://www.sanguosha.com/hero",
     "rawCachePath": ".cache/sanguosha-official/official_wind_skill_texts.json",
     "rawCachePolicy": "cache-first: keep official prose only in the gitignored local cache; regenerate this public spec fixture from cache and fetch official pages only when the cache is missing or stale. 风包爬取待补: 当前条目由风包官方实体规则文本人工转写生成, sourceTextRef/sourceTextSha256 为该转写文本的 sha256, 首次爬取官方页面时必须复核。",
-    "gidPolicy": "provisional-local: gid 216-223 为本地临时编号 (顺接标准包缓存 214-215), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。"
+    "gidPolicy": "provisional-local: gid 216-223 为本地临时编号 (顺接标准包缓存 214-215), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。v13 J4 (2026-07-16) 核对尝试: 本执行环境网络策略拦截 www.sanguosha.com (代理 403), 无法爬取官方索引页 — 如实记录降级, 临时编号保留, 待可直连官网的环境回填。"
   },
   "pack": "风",
   "includeFullSkillText": false,

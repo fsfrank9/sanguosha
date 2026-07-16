@@ -129,46 +129,74 @@ test('拆 EV: 富手牌无装备 → 保留无懈, 让拆一张', () => {
   assert.ok(game.discard.some((x) => x.id === 't1'), '被拆一张手牌');
 });
 
-// ───── 延时锦囊 ─────────────────────────────────────────────────────
+// ───── 延时锦囊 (v13 J0-2: 无懈时机移至判定阶段生效前) ─────────────────
 
-test('乐 EV: 穷手牌 (仅无懈) → 保留, 乐入判定区', () => {
+test('乐 EV: 放置时不再询问; 判定前穷手牌 (仅无懈) → 保留', () => {
   const game = buildGame();
   game.player.hand = [c('lebusishu', { id: 'lbss' })];
   game.enemy.hand = [c('wuxie', { id: 'e-wx' })];
+  game.deck = [c('sha', { id: 'd1' }), c('sha', { id: 'd2' }),
+    c('tao', { id: 'j-heart', suit: 'heart' })]; // 判定牌 (末位先取) 红桃 → 乐判定成功
   Engine.playCard(game, 'player', 'lbss');
-  assert.ok(keptWuxie(game, 'e-wx'));
-  assert.equal(game.enemy.judgeArea.length, 1, '乐入判定区');
+  assert.ok(keptWuxie(game, 'e-wx'), '放置时无询问');
+  assert.equal(game.enemy.judgeArea.length, 1, '乐直接入判定区');
+  // 敌方回合判定阶段: 判定前开无懈窗口 — 穷手牌 EV → 保留
+  Engine.startTurn(game, 'enemy');
+  assert.ok(keptWuxie(game, 'e-wx'), '判定前 EV 保留无懈');
+  assert.equal(game.enemy.judgeArea.length, 0, '乐已判定并弃置');
 });
 
-test('兵粮 EV: 手牌拮据 (<=2) → 无懈护摸牌', () => {
+test('兵粮 EV: 判定前手牌拮据 (<=2) → 无懈护摸牌', () => {
   const game = buildGame();
   game.player.hand = [c('bingliang', { id: 'bl' })];
   game.enemy.hand = [c('wuxie', { id: 'e-wx' })];
+  game.deck = [c('sha', { id: 'd1' }), c('sha', { id: 'd2' }), c('sha', { id: 'd3' })];
   Engine.playCard(game, 'player', 'bl');
-  assert.ok(game.discard.some((x) => x.id === 'e-wx'), '无懈已用');
-  assert.equal(game.enemy.judgeArea.length, 0);
+  assert.equal(game.enemy.judgeArea.length, 1, '放置时不询问, 兵粮入判定区');
+  Engine.startTurn(game, 'enemy');
+  assert.ok(game.discard.some((x) => x.id === 'e-wx'), '判定前无懈已用');
+  assert.equal(game.enemy.judgeArea.length, 0, '兵粮被抵消弃置');
+  assert.ok(!game.enemy.flags.skipDraw, '摸牌阶段未被跳过');
 });
 
-test('兵粮 EV: 富手牌 → 保留', () => {
+test('兵粮 EV: 判定前富手牌 → 保留无懈, 兵粮照常判定', () => {
   const game = buildGame();
   game.player.hand = [c('bingliang', { id: 'bl' })];
   game.enemy.hand = [c('wuxie', { id: 'e-wx' }), c('tao', { id: 't1' }), c('tao', { id: 't2' })];
+  game.deck = [c('sha', { id: 'd1' }), c('sha', { id: 'd2' }),
+    c('sha', { id: 'j-spade', suit: 'spade' })]; // 判定黑桃 → 非梅花, 跳摸牌
   Engine.playCard(game, 'player', 'bl');
-  assert.ok(keptWuxie(game, 'e-wx'));
-  assert.equal(game.enemy.judgeArea.length, 1, '兵粮入判定区');
+  Engine.startTurn(game, 'enemy');
+  assert.ok(keptWuxie(game, 'e-wx'), '富手牌 → 保留');
+  assert.ok(game.log.some((l) => l.includes('【兵粮寸断】判定失败')), '兵粮照常生效');
 });
 
-test('闪电 EV: 高威胁延时 → 照旧无懈', () => {
+test('闪电 EV: 判定前受害者已确定 — 归属者一方无懈, 闪电移至下家', () => {
   const game = buildGame();
   game.turn = 'enemy';
-  game.enemy.hand = [c('shandian', { id: 'e-sd' })];
-  game.player.hand = [];
-  // 闪电放自己判定区, responder 是对手... 反向: 玩家放闪电, 敌方决定
-  game.turn = 'player';
-  game.player.hand = [c('shandian', { id: 'p-sd' })];
+  // 闪电已在敌方判定区 (上一轮移动而来的布局), 敌方有无懈 → 判定前自保
+  game.enemy.judgeArea = [c('shandian', { id: 'e-sd' })];
   game.enemy.hand = [c('wuxie', { id: 'e-wx' })];
-  Engine.playCard(game, 'player', 'p-sd');
-  assert.ok(game.discard.some((x) => x.id === 'e-wx'), '闪电放置被无懈 (保持旧行为)');
+  game.deck = [c('sha', { id: 'd1' }), c('sha', { id: 'd2' }), c('sha', { id: 'd3' })];
+  const hp = game.enemy.hp;
+  Engine.startTurn(game, 'enemy');
+  assert.ok(game.discard.some((x) => x.id === 'e-wx'), '闪电高威胁 → 判定前无懈');
+  assert.equal(game.enemy.hp, hp, '未受闪电伤害 (未判定)');
+  assert.ok(game.player.judgeArea.some((x) => x.id === 'e-sd'),
+    '被抵消的闪电按移动规则置入下家判定区 (card__scroll.md:207)');
+});
+
+test('闪电 EV: 敌方不会替对手挡雷 — 玩家判定区的闪电, 敌方保留无懈', () => {
+  const game = buildGame();
+  game.player.judgeArea = [c('shandian', { id: 'p-sd' })];
+  game.enemy.hand = [c('wuxie', { id: 'e-wx' })];
+  // 判定牌黑桃 5 (2~9) → 闪电命中玩家
+  game.deck = [c('sha', { id: 'd1' }), c('sha', { id: 'd2' }),
+    c('sha', { id: 'j-hit', suit: 'spade', rank: '5' })];
+  const hp = game.player.hp;
+  Engine.startTurn(game, 'player');
+  assert.ok(keptWuxie(game, 'e-wx'), '受害者是敌人 → 立场不符, 保留');
+  assert.equal(game.player.hp, hp - 3, '闪电命中 3 点雷伤');
 });
 
 // ───── 反无懈 / denial / 回退开关 ───────────────────────────────────

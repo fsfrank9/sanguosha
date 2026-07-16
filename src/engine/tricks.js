@@ -297,24 +297,79 @@
         log(game, actorName(game, ctx.actor) + '选择不弃置同花色牌，【火攻】未造成伤害。');
         return finishTrickUse(game, ctx.actor, ctx.card, success('火攻未追加弃牌。'), opt);
       }
-      var cost = opt.huogongCostCardId
-        ? removeCardFromHand(self, opt.huogongCostCardId)
-        : removeFirstMatchingCard(self, function (item) { return item.suit === revealed.suit; });
-      if (!cost) return finishTrickUse(game, ctx.actor, ctx.card, success('没有同花色牌可弃，火攻未造成伤害。'), opt);
-      if (cost.suit !== revealed.suit) {
-        // v12 I 修复: 显式成本牌在结算中途失效 — 出牌时预挑基于展示缓存,
-        // 无懈拉锯可消耗目标被缓存的展示牌 → 重新展示后花色改变。此处火攻
-        // 实体已弃、无 rehang 路径, fail 会让结算中途搁浅 (出牌方白弃火攻)。
-        // 按"弃同花色"意图自动改选; 无同花色 → 无伤结算 (与未指定成本一致)。
+      var cost = opt.huogongCostCardId ? removeCardFromHand(self, opt.huogongCostCardId) : null;
+      if (cost && cost.suit !== revealed.suit) {
+        // v12 I 修复 → v13 J2: 显式成本牌在结算中途失效 — 出牌时预挑基于
+        // 展示缓存, 无懈拉锯可消耗目标被缓存的展示牌 → 重新展示后花色改变。
+        // 火攻实体已弃、无 rehang 路径, fail 会让结算中途搁浅。退回手牌走
+        // 重选路径: 玩家 (huogongCost='ask') 挂起面板显式重选; AI/auto 自动
+        // 改选同花色 (旧行为)。
         putCard(game, cost, { zone: 'hand', actor: ctx.actor });
+        cost = null;
+      }
+      if (!cost) {
+        var usableCosts = (self.hand || []).filter(function (item) { return item.suit === revealed.suit; });
+        if (!usableCosts.length) {
+          return finishTrickUse(game, ctx.actor, ctx.card, success('没有同花色牌可弃，火攻未造成伤害。'), opt);
+        }
+        var costPref = (self.skillPreferences && self.skillPreferences.huogongCost) || 'auto';
+        if (costPref === 'ask') {
+          // v13 J2: 挂起重选三件套 — pauseState 存续 ctx, resolver 收尾。
+          game.pauseState.huogongCost = {
+            ctx: ctx,
+            revealedSuit: revealed.suit
+          };
+          setPendingChoice(game, {
+            kind: 'huogong-cost',
+            actor: ctx.actor,
+            targetActor: hgTargetActor,
+            revealed: { name: revealed.name, suit: revealed.suit, rank: revealed.rank },
+            usableCostIds: usableCosts.map(function (uc) { return uc.id; }),
+            cards: usableCosts.map(function (uc) {
+              return { id: uc.id, name: uc.name, suit: uc.suit, rank: uc.rank };
+            })
+          });
+          return success('等待' + actorName(game, ctx.actor) + '重选【火攻】成本牌。');
+        }
         cost = removeFirstMatchingCard(self, function (item) { return item.suit === revealed.suit; });
         if (!cost) return finishTrickUse(game, ctx.actor, ctx.card, success('没有同花色牌可弃，火攻未造成伤害。'), opt);
       }
+      return settleHuogongCost(game, ctx, cost);
+    }
+
+    // 火攻成本已确定后的统一收尾 (同步路径 / huogong-cost resolver 共用)。
+    function settleHuogongCost(game, ctx, cost) {
+      var hgTargetActor = ctx.targetActor || opponent(ctx.actor);
       discardCard(game, cost);
       log(game, actorName(game, ctx.actor) + '弃置同花色【' + cost.name + '】发动【火攻】。');
       damage(game, hgTargetActor, 1, ctx.actor, '【火攻】', ctx.card, 'fire');
-      return finishTrickUse(game, ctx.actor, ctx.card, success('火攻结算完成。'), opt);
+      return finishTrickUse(game, ctx.actor, ctx.card, success('火攻结算完成。'), ctx.options || {});
     }
+
+    // v13 J2: 火攻成本重选 resolver — decision.cardId 选同花色手牌;
+    // decision.decline 走"不弃置"无伤结算; 无效选择重挂面板。
+    function resolveHuogongCostChoice(game, pending, decision) {
+      var saved = game.pauseState && game.pauseState.huogongCost;
+      if (!saved) return fail('找不到【火攻】成本重选的暂停状态。');
+      var ctx = saved.ctx;
+      var self = game[pending.actor];
+      if (decision && decision.decline) {
+        game.pauseState.huogongCost = null;
+        log(game, actorName(game, ctx.actor) + '选择不弃置同花色牌，【火攻】未造成伤害。');
+        return finishTrickUse(game, ctx.actor, ctx.card, success('火攻未追加弃牌。'), ctx.options || {});
+      }
+      var cardId = decision && decision.cardId;
+      var chosen = cardId && self && self.hand.find(function (hc) { return hc.id === cardId; });
+      if (!chosen || chosen.suit !== saved.revealedSuit) {
+        setPendingChoice(game, pending);
+        return fail('请选择一张与展示牌同花色的手牌，或选择不弃置。');
+      }
+      game.pauseState.huogongCost = null;
+      removeCardFromHand(self, chosen.id);
+      return settleHuogongCost(game, ctx, chosen);
+    }
+
+    registerResponseKind('huogong-cost', resolveHuogongCostChoice);
 
     // L1: 玩家目标 (huogongShow='ask') 自选展示牌的 resolver。
     function resolveHuogongShowChoice(game, pending, decision) {
@@ -361,37 +416,62 @@
       return finishTrickUse(game, ctx.actor, ctx.card, success('摸两张牌。'), ctx.options);
     });
 
-    registerWuxieContinuation('nanman', function (game, ctx, wuxied) {
+    // v13 审计三轮: 南蛮/万箭改逐目标无懈 (官方 flow__use.md — 多目标牌
+    // 逐目标结算, "生效前"响应逐目标重现; 与桃园/五谷同型)。旧全局单窗口
+    // 'nanman'/'wanjian' 延续废除, 逐席窗口在 advanceAOETargets 内开
+    // ('aoe-target' 延续)。
+    registerWuxieContinuation('aoe-target', function (game, ctx, wuxied) {
+      var aoe = game.pauseState && game.pauseState.aoe;
+      if (!aoe) return fail('AOE 结算状态丢失。');
       if (wuxied) {
-        discardCard(game, ctx.card);
-        return finishTrickUse(game, ctx.actor, ctx.card, success('南蛮入侵被无懈可击。'), ctx.options);
+        log(game, '【' + aoe.title + '】对' + actorName(game, aoe.order[aoe.idx]) + '的效果被【无懈可击】抵消。');
+        aoe.idx += 1;
       }
-      return finishTrickUse(game, ctx.actor, ctx.card,
-        playAOE(game, ctx.actor, ctx.card, 'sha', '南蛮入侵'), ctx.options);
+      return advanceAOETargets(game);
     });
 
-    registerWuxieContinuation('wanjian', function (game, ctx, wuxied) {
-      if (wuxied) {
-        discardCard(game, ctx.card);
-        return finishTrickUse(game, ctx.actor, ctx.card, success('万箭齐发被无懈可击。'), ctx.options);
+    // v13 审计三轮: 铁索连环 (使用分支) 补无懈窗口 — 普通锦囊, 官方无
+    // 豁免条款; 逐目标 (至多 2 名) 独立开窗。重铸不是"使用", 不开窗。
+    function advanceTiesuoTargets(game, ctx) {
+      while (ctx.idx < ctx.targets.length) {
+        var side = ctx.targets[ctx.idx];
+        if (!game[side] || game[side].hp <= 0) { ctx.idx += 1; continue; }
+        return checkWuxieAndContinue(
+          game, side,
+          '【铁索连环】（' + actorName(game, side) + '）',
+          'tiesuo-target', ctx
+        );
       }
-      return finishTrickUse(game, ctx.actor, ctx.card,
-        playAOE(game, ctx.actor, ctx.card, 'shan', '万箭齐发'), ctx.options);
+      return finishTrickUse(game, ctx.actor, ctx.card, success('铁索连环结算完成。'), ctx.options);
+    }
+
+    registerWuxieContinuation('tiesuo-target', function (game, ctx, wuxied) {
+      var side = ctx.targets[ctx.idx];
+      if (wuxied) {
+        log(game, '【铁索连环】对' + actorName(game, side) + '的效果被【无懈可击】抵消。');
+      } else if (game[side]) {
+        game[side].chained = !game[side].chained;
+        log(game, actorName(game, ctx.actor) + '使用【铁索连环】，' + actorName(game, side) + (game[side].chained ? '横置。' : '重置。'));
+      }
+      ctx.idx += 1;
+      return advanceTiesuoTargets(game, ctx);
     });
 
-    registerWuxieContinuation('delayed-place', function (game, ctx, wuxied) {
-      if (wuxied) {
-        discardCard(game, ctx.card);
-        return success('延时锦囊被无懈可击。');
+    // v13 J0-2 (PR #165 缺陷 2): 延时锦囊无懈时机迁移 — 放置时不再开窗
+    // (旧 'delayed-place' 延续废除), 改为目标判定阶段生效前开链。本延续是
+    // 纯记录器: 把 settle 结果写回 pauseState.judgeArea 快照, 由
+    // processJudgeArea (同步路径) 或 resumeSuspendedTurnFlowIfReady
+    // (玩家挂起排空后, 见 wuxieSettled 分支) 续跑判定区结算 — 不在此处
+    // 递归调用 processJudgeArea, 避免同步 settle 时的重入。
+    registerWuxieContinuation('delayed-judge', function (game, ctx, wuxied) {
+      var snap = game.pauseState && game.pauseState.judgeArea;
+      if (snap && snap.awaitingWuxie && snap.idx === ctx.trickIdx && snap.actor === ctx.ownerActor) {
+        snap.wuxieDoneIdx = ctx.trickIdx;
+        snap.wuxieResults[ctx.trickIdx] = !!wuxied;
+        snap.awaitingWuxie = false;
+        snap.wuxieSettled = true;
       }
-      var side = ctx.delayedSide;
-      putCard(game, ctx.card, { zone: 'judgeArea', actor: side });
-      if (ctx.card.type === 'shandian') {
-        log(game, actorName(game, ctx.actor) + '将【闪电】置入自己的判定区。');
-      } else {
-        log(game, actorName(game, ctx.actor) + '将【' + ctx.card.name + '】置入' + actorName(game, side) + '的判定区。');
-      }
-      return success('延时锦囊生效。');
+      return success(wuxied ? '延时锦囊被无懈可击。' : '延时锦囊照常生效。');
     });
 
     // H1b: 桃园结义 逐目标无懈驱动。targets = 受伤角色 (按 [actor, opponent]
@@ -404,8 +484,11 @@
           ctx.idx += 1; // 期间已被治满 (理论不出现) → 跳过
           continue;
         }
+        // v13 审计三轮: 首询者 = 当前目标座席 (座次环泛化; 此前二元
+        // opponent(target), 3p 下首询锚点错跳。1v1 队列跳过来源后恒为
+        // 对方单人, 逐步行为不变)。
         return checkWuxieAndContinue(
-          game, opponent(target),
+          game, target,
           '【桃园结义】（' + actorName(game, target) + '）',
           'taoyuan-target', ctx
         );
@@ -434,8 +517,9 @@
         if (!ctx.pool.length) break; // 牌已分完
         var picker = ctx.order[ctx.idx];
         if (!game[picker]) { ctx.idx += 1; continue; }
+        // v13 审计三轮: 首询者 = 当前 picker 座席 (座次环泛化, 同桃园)。
         return checkWuxieAndContinue(
-          game, opponent(picker),
+          game, picker,
           '【五谷丰登】（' + actorName(game, picker) + '）',
           'wugu-target', ctx
         );
@@ -614,6 +698,10 @@
         // advanceWuguTargets / wuguPickForCurrent (定义在无懈续延区附近)。
         return advanceWuguTargets(game, {
           sourceActor: sourceActor,
+          // v13 评审收口: 无懈链 ctx 契约 — wuxieResponderQueue 按 ctx.actor
+          // 跳过来源, 缺失时出牌者会被询问无懈自己的五谷 (随首询锚点改为
+          // picker 而暴露的既有缺口)。
+          actor: sourceActor,
           wuguCardId: wuguCard && wuguCard.id,
           pool: pool,
           order: order,
@@ -645,6 +733,7 @@
         game.pauseState.wugu = null;
         return advanceWuguTargets(game, {
           sourceActor: saved.sourceActor,
+          actor: saved.sourceActor, // v13 评审收口: 无懈链 ctx 契约 (同上)
           wuguCardId: saved.wuguCardId,
           pool: pool,
           order: saved.order,
@@ -904,6 +993,10 @@
         if (!game.pauseState) game.pauseState = {};
         game.pauseState.aoe = {
           sourceActor: actor,
+          // v13 评审收口: aoe 状态兼作 'aoe-target' 无懈链 ctx —
+          // wuxieResponderQueue 按 ctx.actor 在净通过态跳过来源 (不询问
+          // 出牌者无懈自己的牌), 故须同时携带 actor 字段。
+          actor: actor,
           // L2: 保留实体牌引用 — 奸雄可获得造成伤害的南蛮/万箭实体牌
           card: card,
           responseType: responseType,
@@ -936,6 +1029,35 @@
             aoe.idx += 1;
             continue;
           }
+          // v13 J0-3 (PR #165 缺陷 3): 藤甲 — 锁定技"南蛮入侵/万箭齐发对你
+          // 无效" (gltjk card__equipment.md): 免疫座席直接跳过, 不开响应
+          // 询问、不进伤害层事后防止。
+          if (hasEquipmentEffect(targetState, 'tengjiaImmuneNormalShaAOE')) {
+            log(game, actorName(game, targetActor) + '的【藤甲】令【' + title + '】无效。');
+            aoe.idx += 1;
+            continue;
+          }
+          // v13 审计三轮: 逐目标无懈窗口 — 官方多目标牌逐目标结算,
+          // "生效前"响应 (无懈) 对每名目标独立重现 (flow__use.md; 与桃园/
+          // 五谷同型)。有效性检测 (藤甲) 在前、生效前响应在后 (flow__use.md
+          // 步骤序)。wuxieCheckedIdx 防同一目标重复开窗; 被抵消由
+          // 'aoe-target' 延续推进游标。
+          if (aoe.wuxieCheckedIdx !== aoe.idx) {
+            aoe.wuxieCheckedIdx = aoe.idx;
+            return checkWuxieAndContinue(
+              game, targetActor,
+              '【' + title + '】（' + actorName(game, targetActor) + '）',
+              'aoe-target', aoe
+            );
+          }
+          // v13 J0-3: 八卦阵先行 — 需打出【闪】的座席 (万箭) 先给判定机会
+          // (全座席统一; 此前玩家座席在窗口后/真闪后才试), 红判定即化解。
+          // 【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦。
+          if (responseType === 'shan' && tryBaguaDodge(game, targetActor, false)) {
+            log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
+            aoe.idx += 1;
+            continue;
+          }
           // v10 V4: 万箭齐发 (responseType='shan') + 玩家为目标 + shanResponse=ask +
           // 有闪可响应 → 暂停, 让玩家自选闪 / 不出. 引擎默认仍走自动响应.
           if (responseType === 'shan' && targetActor === 'player') {
@@ -956,16 +1078,7 @@
             }
           }
           aoe.idx += 1;
-          // v11 D2 (批次 34): AI 座席先试八卦判定 (免费闪机会), 成功则省下
-          // 真闪应对后续威胁; 玩家 auto 座席保持旧顺序 (真闪优先)。
-          if (responseType === 'shan' && targetActor !== 'player'
-              && tryBaguaDodge(game, targetActor, false)) {
-            log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
-          } else if (consumeResponse(game, targetActor, responseType, '【' + title + '】')) {
-            log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
-          } else if (responseType === 'shan' && targetActor === 'player' && tryBaguaDodge(game, targetActor, false)) {
-            // H2: 【万箭齐发】需打出【闪】, 八卦阵 红判定可化解。
-            //      (【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦)
+          if (consumeResponse(game, targetActor, responseType, '【' + title + '】')) {
             log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
           } else {
             // v12 H7: 激将/护驾 — 主公座席打不出所需牌时求助同势力:
@@ -1018,10 +1131,8 @@
         } else {
           log(game, actorName(game, 'player') + '选择不打出【闪】响应【' + title + '】。');
         }
-        // H2: 玩家未以【闪】化解 (放弃 / 无闪 / 指定牌无效) → 八卦阵 红判定可化解。
-        if (!dodged && tryBaguaDodge(game, 'player', false)) {
-          dodged = true;
-        }
+        // v13 J0-3: 八卦机会已在开窗前给过 (advanceAOETargets 内判定失败才
+        // 开的窗), 此处不再补试。
         // v12 H7: 玩家为主公时求助魏势力 AI 座席代打【闪】(护驾)。
         if (!dodged && tryLordAidSync && tryLordAidSync(game, 'player', 'hujia', '【' + title + '】')) {
           dodged = true;
@@ -1133,6 +1244,8 @@
       settleWuxieChain: settleWuxieChain,
       advanceTaoyuanTargets: advanceTaoyuanTargets,
       advanceWuguTargets: advanceWuguTargets,
+      // v13 审计三轮: 铁索使用分支逐目标无懈驱动
+      advanceTiesuoTargets: advanceTiesuoTargets,
       wuguPickForCurrent: wuguPickForCurrent
     };
   }

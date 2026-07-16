@@ -143,18 +143,24 @@ test('L2: 万箭齐发致伤 → 奸雄获得万箭牌', () => {
   assert.ok(!game.discard.some((card) => card.id === 'wj-1'), '弃牌堆无重复');
 });
 
-test('L3: 国色方片当乐 → 可被无懈可击抵消 (不再绕过无懈窗口)', () => {
+test('L3/v13 J0-2: 国色方片当乐 → 判定阶段生效前可被无懈抵消', () => {
   const game = makeGame('daqiao', 'sunquan');
   game.player.hand = [c('sha', { id: 'dia-sha', suit: 'diamond', color: 'red' })];
   // v11 D1 (批次 33): AI 无懈走期望值 — 乐只在手牌有阵容 (>=2) 时才护,
   // 补一张手牌满足条件, 保持本测试对无懈链的覆盖意图。
   game.enemy.hand = [c('wuxie', { id: 'foe-wuxie', suit: 'spade', color: 'black' }), c('tao', { id: 'foe-filler' })];
+  game.deck = [c('sha', { id: 'd1' }), c('sha', { id: 'd2' }), c('sha', { id: 'd3' })];
 
   const result = Engine.playCardAs(game, 'player', 'dia-sha', 'lebusishu');
   assert.equal(result.ok, true, result.message);
-  assert.equal(game.enemy.judgeArea.length, 0, '被无懈抵消 → 不入判定区');
+  // v13 J0-2: 放置时不再开无懈窗口 — 直接入判定区
+  assert.equal(game.enemy.judgeArea.length, 1, '放置时直接入判定区');
+  // 目标判定阶段生效前开无懈窗口 → 敌方 (手牌有阵容) 自保
+  Engine.startTurn(game, 'enemy');
+  assert.equal(game.enemy.judgeArea.length, 0, '判定前被无懈抵消');
   assert.ok(game.discard.some((card) => card.id === 'foe-wuxie'), '无懈已打出');
   assert.ok(game.discard.some((card) => card.id === 'dia-sha'), '被抵消的乐 (物理方片) 进弃牌堆');
+  assert.ok(!game.enemy.flags.skipPlay, '出牌阶段未被跳过');
 });
 
 test('L3: 国色方片当乐 (对方无无懈) → 正常入判定区', () => {

@@ -12,6 +12,8 @@
         var evaluateDelayedTrick = deps.evaluateDelayedTrick;
         var damage = deps.damage;
         var opponent = deps.opponent;
+        // v13 J0-2: 判定前无懈窗口 (tricks 域无懈链, 引擎装配注入)
+        var checkWuxieAndContinue = deps.checkWuxieAndContinue;
 
       function judge(game, actor, reason, opts) {
         reshuffleIfNeeded(game);
@@ -96,9 +98,9 @@
       }
 
       // Re-entrant judge-area processor. State that needs to survive a pause
-      // (e.g. 鬼才 prompting) is held on game.pauseState.judgeArea so the
-      // same function can resume from the right trick index after the player
-      // resolves the prompt.
+      // (e.g. 鬼才 prompting / v13 判定前无懈) is held on
+      // game.pauseState.judgeArea so the same function can resume from the
+      // right trick index after the player resolves the prompt.
       function processJudgeArea(game, actor) {
         var state = game[actor];
         state.flags = state.flags || {};
@@ -106,9 +108,13 @@
         var saved = game.pauseState.judgeArea;
         var pending;
         var startIdx;
+        var wuxieDoneIdx;
+        var wuxieResults;
         if (saved && saved.actor === actor) {
           pending = saved.pending;
           startIdx = saved.idx;
+          wuxieDoneIdx = (saved.wuxieDoneIdx === undefined) ? -1 : saved.wuxieDoneIdx;
+          wuxieResults = saved.wuxieResults || {};
         } else {
           // v12 G2 修复: 此处原有 skipPlay/skipDraw 复位与 resetActorTurnState
           // 的回合开始复位冗余, 且会清掉准备阶段 (神速选项二) 刚设置的
@@ -116,8 +122,15 @@
           // 判定阶段只负责让 乐不思蜀/兵粮 的 outcome 重新置位。
           if (!state.judgeArea) state.judgeArea = [];
           // 整批取出判定区待结算牌 (在途), 逐张结算后 discardCard / 移动。
+          // v13 J0-2: 官方判定阶段结算顺序为 LIFO — "进行其中最后置入其判定
+          // 区里的那张延时类锦囊牌的使用结算，然后重复此流程" (flow__game.md
+          // 判定阶段) → 整批倒序。每张牌本阶段只结算一次 (结算中新置入本区
+          // 的牌 — 如闪电移动失败回到自己 — 不在本阶段重复结算)。
           pending = state.judgeArea.splice(0);
+          pending.reverse();
           startIdx = 0;
+          wuxieDoneIdx = -1;
+          wuxieResults = {};
         }
         for (var i = startIdx; i < pending.length; i += 1) {
           // v12 H5: 该角色已在判定结算中阵亡 (闪电, 身份场对局继续) —
@@ -131,6 +144,49 @@
           }
           var trick = pending[i];
           var reason = judgementReasonFor(trick);
+          // v13 J0-2 (PR #165 缺陷 2): 判定前无懈窗口 — 官方无懈时机为
+          // "一张锦囊牌对一个目标生效前" (card__scroll.md:78), 延时锦囊的
+          // 生效即判定结算 (flow__use.md:133)。放置时不再询问 (game-engine
+          // playDelayedCardHandler), 此处在每张延时锦囊判定前开链:
+          //   - 同步 settle (全 AI 放弃/使用) → continuation 把结果写回快照,
+          //     本循环随即消费;
+          //   - 玩家 ask 挂起 → 返回 suspended, settle 后 continuation 置
+          //     wuxieSettled, 由 resumeSuspendedTurnFlowIfReady 续跑本函数。
+          if (reason && checkWuxieAndContinue && wuxieDoneIdx < i) {
+            game.pauseState.judgeArea = {
+              actor: actor,
+              pending: pending,
+              idx: i,
+              wuxieDoneIdx: wuxieDoneIdx,
+              wuxieResults: wuxieResults,
+              awaitingWuxie: true
+            };
+            checkWuxieAndContinue(game, actor, reason, 'delayed-judge', {
+              // ctx.actor = 放置者 (无懈队列净通过态跳过来源; 直接构造判定区
+              // 的测试布局无此字段 → 不跳过任何座席)
+              actor: trick.delayedSource || null,
+              ownerActor: actor,
+              trickIdx: i,
+              trickType: trick.type
+            });
+            if (game.pendingChoice) return { suspended: true };
+            saved = game.pauseState.judgeArea;
+            wuxieDoneIdx = (saved && saved.wuxieDoneIdx !== undefined) ? saved.wuxieDoneIdx : i;
+            wuxieResults = (saved && saved.wuxieResults) || wuxieResults;
+            if (saved) saved.wuxieSettled = false;
+          }
+          if (reason && wuxieResults[i]) {
+            // 被无懈: 乐/兵 → 置入弃牌堆; 闪电 → 不判定, 按官方移动规则走
+            // ("目标角色被取消后…将对应的实体牌置入其下家的判定区",
+            // card__scroll.md:207)。
+            log(game, '【' + trick.name + '】对' + actorName(game, actor) + '的效果被【无懈可击】抵消。');
+            if (trick.type === 'shandian') {
+              moveShandianOnward(game, actor, trick);
+            } else {
+              discardCard(game, trick);
+            }
+            continue;
+          }
           var judgementCard = reason ? judge(game, actor, reason, { pausable: true }) : null;
           if (game.pendingChoice) {
             // judge() invoked a hook that asked for a choice. Snapshot the
@@ -139,6 +195,8 @@
               actor: actor,
               pending: pending,
               idx: i,
+              wuxieDoneIdx: wuxieDoneIdx,
+              wuxieResults: wuxieResults,
               currentTrick: trick,
               currentReason: reason,
               currentJudgementCard: judgementCard
@@ -165,6 +223,8 @@
               actor: actor,
               pending: pending,
               idx: i + 1,
+              wuxieDoneIdx: wuxieDoneIdx,
+              wuxieResults: wuxieResults,
               outcomeApplied: true
             };
             return { suspended: true };
@@ -173,6 +233,33 @@
         // Clear the snapshot if we exited cleanly.
         if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
         return { ok: true };
+      }
+
+      // v13 J0-2: 闪电移动规则 (官方 card__scroll.md:207 — 使用结算结束后/
+      // 目标角色被取消后): 自下家起顺时针找首个判定区无同名【闪电】的存活
+      // 座席; 全部不合法 → 回到自己的判定区。判定不命中 (applyJudgeAreaOutcome
+      // 的 moveToNext) 与被无懈 (processJudgeArea) 共用。
+      function moveShandianOnward(game, actor, trick) {
+        var moved = false;
+        var ring = StateRuntime.seatsFrom(game, actor, false);
+        for (var ringIdx = 0; ringIdx < ring.length; ringIdx += 1) {
+          var candActor = ring[ringIdx];
+          var candState = game[candActor];
+          if (!candState || candState.hp <= 0) continue;
+          var candAlreadyShandian = (candState.judgeArea || []).some(function (j) {
+            return j && j.type === 'shandian';
+          });
+          if (candAlreadyShandian) continue;
+          putCard(game, trick, { zone: 'judgeArea', actor: candActor });
+          log(game, '【闪电】移至' + actorName(game, candActor) + '的判定区。');
+          moved = true;
+          break;
+        }
+        if (!moved) {
+          // 后续座席均非合法目标 → 回到自己
+          putCard(game, trick, { zone: 'judgeArea', actor: actor });
+          log(game, '【闪电】移动失败（对手判定区已有同名牌），留在' + actorName(game, actor) + '的判定区。');
+        }
       }
 
       function applyJudgeAreaOutcome(game, actor, state, trick, reason, judgementCard) {
@@ -188,33 +275,9 @@
         if (trick.type === 'shandian' && outcome.hit) {
           damage(game, actor, outcome.damage, null, '【闪电】');
         } else if (trick.type === 'shandian' && outcome.moveToNext) {
-          // v7 PR-12: gltjk card__scroll.md 注 — "若其下家不是此【闪电】的
-          // 合法目标，则将对应的实体牌置入其下家的下家的判定区，以此类推。
-          // 若所有角色都不是此【闪电】的合法目标，则将对应的实体牌置入其
-          // 判定区。" PR-6 已定义 "判定区里有同名延时锦囊的角色 = 非合法目标"。
-          // v12 H2: 泛化为座次环扫描 — 自下家起顺时针找首个合法存活座席;
-          // 全部不合法 → 回到自己 (此刻闪电在途, 自己判定区必无同名)。
-          // 1v1 恒为 [对手] 单元素扫描, 行为不变。
-          var shandianMoved = false;
-          var shandianRing = StateRuntime.seatsFrom(game, actor, false);
-          for (var ringIdx = 0; ringIdx < shandianRing.length; ringIdx += 1) {
-            var candActor = shandianRing[ringIdx];
-            var candState = game[candActor];
-            if (!candState || candState.hp <= 0) continue;
-            var candAlreadyShandian = (candState.judgeArea || []).some(function (j) {
-              return j && j.type === 'shandian';
-            });
-            if (candAlreadyShandian) continue;
-            putCard(game, trick, { zone: 'judgeArea', actor: candActor });
-            log(game, '【闪电】移至' + actorName(game, candActor) + '的判定区。');
-            shandianMoved = true;
-            break;
-          }
-          if (!shandianMoved) {
-            // 后续座席均非合法目标 → 回到自己
-            putCard(game, trick, { zone: 'judgeArea', actor: actor });
-            log(game, '【闪电】移动失败（对手判定区已有同名牌），留在' + actorName(game, actor) + '的判定区。');
-          }
+          // v7 PR-12: gltjk card__scroll.md 注 — 座次环移动规则; v13 J0-2:
+          // 抽出为 moveShandianOnward, 与"被无懈后移动"共用。
+          moveShandianOnward(game, actor, trick);
         }
         resolveJudgementCard(game, actor, state, reason, judgementCard);
         if (outcome.discardTrick) discardCard(game, trick);
@@ -228,6 +291,7 @@
           resolveJudgementCard: resolveJudgementCard,
           judgementReasonFor: judgementReasonFor,
           processJudgeArea: processJudgeArea,
-          applyJudgeAreaOutcome: applyJudgeAreaOutcome
+          applyJudgeAreaOutcome: applyJudgeAreaOutcome,
+          moveShandianOnward: moveShandianOnward
         };
       }

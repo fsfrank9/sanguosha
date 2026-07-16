@@ -16,7 +16,12 @@
     var promptCardChoice = ctx.promptCardChoice;
     var actorDisplayName = ctx.actorDisplayName;
 
-    var yijiGiveSelection = [];
+    // v13 J1: 遗计逐席分配 — cardId → 座席 (undefined = 留己); 点牌在
+    // [留己 → 座席1 → 座席2 → …] 间轮换 (1v1 恒 留己/交给对方 两态)。
+    var yijiAssignments = {};
+    // v13 J3: 天香 ask 面板本地态 — 已选成本牌 / 转移目标。
+    var tianxiangCostId = null;
+    var tianxiangTargetSeat = null;
     var ganglieSelectedIds = [];
     var guanshiDiscardSelection = [];
     // v12 G2: 神速 面板本地态 — shensuOptionMode 记录用户点了"选项二"还是
@@ -72,27 +77,30 @@
       if (kind === 'yiji-distribute' && pending.actor === 'player') {
         els.yijiPromptPanel.hidden = false;
         // Drop selections that no longer match this prompt's drawn IDs.
-        yijiGiveSelection = yijiGiveSelection.filter(function (id) {
-          return pending.drawnIds.indexOf(id) >= 0;
+        Object.keys(yijiAssignments).forEach(function (id) {
+          if (pending.drawnIds.indexOf(id) < 0) delete yijiAssignments[id];
         });
+        var yijiSeats = pending.seats || [];
         if (els.yijiPromptHint) {
           els.yijiPromptHint.textContent =
-            '遗计：勾选要交给对方的牌（' + pending.cards.length + ' 张可分配，未勾选的留己）';
+            '遗计：点牌轮换分配对象（' + pending.cards.length + ' 张可分配，未分配的留己）';
         }
         if (els.yijiCandidates) {
           els.yijiCandidates.innerHTML = pending.cards.map(function (card) {
-            var selected = yijiGiveSelection.indexOf(card.id) >= 0;
-            return '<button class="mini-card yiji-candidate' + (selected ? ' selected' : '') +
+            var assignedSeat = yijiAssignments[card.id];
+            var seatEntry = assignedSeat ? yijiSeats.filter(function (s) { return s.seat === assignedSeat; })[0] : null;
+            var stateLabel = seatEntry ? ' · 交给' + seatEntry.name : ' · 留己';
+            return '<button class="mini-card yiji-candidate' + (seatEntry ? ' selected' : '') +
               '" data-yiji-card-id="' + escapeHtml(card.id) +
-              '" title="切换：交给对方 / 留给自己">' +
+              '" title="点击轮换：留己 / 交给某座席">' +
               escapeHtml('【' + card.name + '】' + suitLabel(card.suit) + ' ' + (card.rank || '')) +
-              (selected ? ' · 交给对方' : ' · 留己') +
+              escapeHtml(stateLabel) +
               '</button>';
           }).join('') || '<span class="mini-card">未摸到任何牌</span>';
         }
       } else {
         els.yijiPromptPanel.hidden = true;
-        yijiGiveSelection = [];
+        yijiAssignments = {};
       }
     }
     // (观星模式面板状态仍在主 adapter, 其渲染保留在 renderPendingChoice; 批次三迁移)
@@ -268,6 +276,64 @@
         }
       } else {
         els.huogongShowPanel.hidden = true;
+      }
+    }
+    // v13 J3: 天香 ask — 受伤挂起: 选红桃成本 + 攻击范围内转移目标。
+    if (els.tianxiangAskPanel) {
+      if (kind === 'tianxiang-ask' && pending.actor === 'player') {
+        els.tianxiangAskPanel.hidden = false;
+        if (tianxiangCostId && (pending.costIds || []).indexOf(tianxiangCostId) < 0) tianxiangCostId = null;
+        if (tianxiangTargetSeat && !(pending.targets || []).some(function (t) { return t.seat === tianxiangTargetSeat; })) tianxiangTargetSeat = null;
+        // 单一转移目标 → 预选 (1v1 恒对手)。
+        if (!tianxiangTargetSeat && (pending.targets || []).length === 1) tianxiangTargetSeat = pending.targets[0].seat;
+        if (els.tianxiangAskHint) {
+          els.tianxiangAskHint.textContent =
+            '天香：受到 ' + (pending.amount || 1) + ' 点伤害（' + (pending.reason || '') + '）。'
+            + '弃置一张红桃手牌并选择转移目标，或不发动。';
+        }
+        if (els.tianxiangCostChoices) {
+          els.tianxiangCostChoices.innerHTML = (pending.cards || []).map(function (card) {
+            return promptCardChoice(card, {
+              dataAttrs: { tianxiangCostId: card.id },
+              title: '弃置这张红桃手牌',
+              extraClass: 'tianxiang-cost-choice' + (tianxiangCostId === card.id ? ' selected' : '')
+            });
+          }).join('') || '<span class="mini-card">没有红桃手牌</span>';
+        }
+        if (els.tianxiangTargetChoices) {
+          els.tianxiangTargetChoices.innerHTML = '<span class="badge">转移给</span>' + (pending.targets || []).map(function (t) {
+            return '<button class="mini-card tianxiang-target-choice' + (tianxiangTargetSeat === t.seat ? ' selected' : '') +
+              '" data-tianxiang-target="' + escapeHtml(t.seat) + '">' + escapeHtml(t.name) + '</button>';
+          }).join('');
+        }
+        if (els.tianxiangConfirmBtn) els.tianxiangConfirmBtn.disabled = !(tianxiangCostId && tianxiangTargetSeat);
+      } else {
+        els.tianxiangAskPanel.hidden = true;
+        tianxiangCostId = null;
+        tianxiangTargetSeat = null;
+      }
+    }
+    // v13 J2: 火攻成本挂起重选 — 显式成本在结算中途失效 (无懈拉锯 ×
+    // 展示缓存消耗 × 重展示花色变化) 时, 玩家重选同花色成本或不弃置。
+    if (els.huogongCostPanel) {
+      if (kind === 'huogong-cost' && pending.actor === 'player') {
+        els.huogongCostPanel.hidden = false;
+        if (els.huogongCostHint) {
+          els.huogongCostHint.textContent =
+            '火攻：目标现展示【' + (pending.revealed && pending.revealed.name || '') + '】（'
+            + suitLabel(pending.revealed && pending.revealed.suit) + '），重选要弃置的同花色手牌，或不弃置（无伤结算）。';
+        }
+        if (els.huogongCostChoices) {
+          els.huogongCostChoices.innerHTML = (pending.cards || []).map(function (card) {
+            return promptCardChoice(card, {
+              dataAttrs: { huogongCostCardId: card.id },
+              title: '弃置这张同花色手牌',
+              extraClass: 'huogong-cost-choice'
+            });
+          }).join('') || '<span class="mini-card">没有同花色手牌</span>';
+        }
+      } else {
+        els.huogongCostPanel.hidden = true;
       }
     }
     // v8 PR-A3: 雌雄双股剑 fire — source 决定是否对异性发动
@@ -603,6 +669,46 @@
       var cardId = btn.getAttribute('data-huogong-show-card-id');
       stage({ cardId: cardId }, '[data-huogong-show-card-id="' + cardId + '"]');
     });
+    // v13 J3: 天香 ask — 点成本/目标记录本地态, 确认后提交; 不发动直提。
+    if (els.tianxiangCostChoices) els.tianxiangCostChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-tianxiang-cost-id]');
+      if (!btn) return;
+      tianxiangCostId = btn.getAttribute('data-tianxiang-cost-id');
+      render();
+    });
+    if (els.tianxiangTargetChoices) els.tianxiangTargetChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-tianxiang-target]');
+      if (!btn) return;
+      tianxiangTargetSeat = btn.getAttribute('data-tianxiang-target');
+      render();
+    });
+    if (els.tianxiangConfirmBtn) els.tianxiangConfirmBtn.addEventListener('click', function () {
+      if (!tianxiangCostId || !tianxiangTargetSeat) return;
+      var result = Engine.resolvePendingChoice(getGame(), { cardId: tianxiangCostId, target: tianxiangTargetSeat });
+      tianxiangCostId = null;
+      tianxiangTargetSeat = null;
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.tianxiangDeclineBtn) els.tianxiangDeclineBtn.addEventListener('click', function () {
+      tianxiangCostId = null;
+      tianxiangTargetSeat = null;
+      var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    // v13 J2: 火攻成本重选 — 点候选 stage 后 hand-confirm 提交; 不弃置按钮直提。
+    if (els.huogongCostChoices) els.huogongCostChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-huogong-cost-card-id]');
+      if (!btn) return;
+      var cardId = btn.getAttribute('data-huogong-cost-card-id');
+      stage({ cardId: cardId }, '[data-huogong-cost-card-id="' + cardId + '"]');
+    });
+    if (els.huogongCostDeclineBtn) els.huogongCostDeclineBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
     // v8 PR-A3: 雌雄 fire 面板
     if (els.cixiongFireBtn) els.cixiongFireBtn.addEventListener('click', function () {
       var result = Engine.resolvePendingChoice(getGame(), { fire: true });
@@ -739,19 +845,31 @@
       var btn = event.target.closest('[data-yiji-card-id]');
       if (!btn) return;
       var id = btn.getAttribute('data-yiji-card-id');
-      var idx = yijiGiveSelection.indexOf(id);
-      if (idx >= 0) yijiGiveSelection.splice(idx, 1);
-      else yijiGiveSelection.push(id);
+      // v13 J1: 轮换分配 — 留己 → seats[0] → seats[1] → … → 留己。
+      var game = getGame();
+      var pending = game && Engine.getPendingChoice(game);
+      var seats = (pending && pending.seats) || [];
+      var current = yijiAssignments[id];
+      if (!current) {
+        if (seats.length) yijiAssignments[id] = seats[0].seat;
+      } else {
+        var idx = seats.map(function (s) { return s.seat; }).indexOf(current);
+        if (idx >= 0 && idx + 1 < seats.length) yijiAssignments[id] = seats[idx + 1].seat;
+        else delete yijiAssignments[id];
+      }
       render();
     });
     if (els.yijiConfirmBtn) els.yijiConfirmBtn.addEventListener('click', function () {
-      Engine.resolvePendingChoice(getGame(), { giveIds: yijiGiveSelection.slice() });
-      yijiGiveSelection = [];
+      var assignments = Object.keys(yijiAssignments).map(function (id) {
+        return { cardId: id, seat: yijiAssignments[id] };
+      });
+      Engine.resolvePendingChoice(getGame(), { assignments: assignments });
+      yijiAssignments = {};
       render();
     });
     if (els.yijiKeepAllBtn) els.yijiKeepAllBtn.addEventListener('click', function () {
-      Engine.resolvePendingChoice(getGame(), { giveIds: [] });
-      yijiGiveSelection = [];
+      Engine.resolvePendingChoice(getGame(), { assignments: [] });
+      yijiAssignments = {};
       render();
     });
     }

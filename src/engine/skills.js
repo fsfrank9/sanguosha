@@ -295,12 +295,43 @@
           };
           return fireNextYijiPoint(game);
         }
-        // Auto path: batched single-shot — draw 2 × amount, keep all.
+        // Auto path: batched draw 2 × amount, keep by default.
         for (var i = 0; i < context.amount; i += 1) {
-          drawCards(game, targetActor, 2);
+          var yijiBatch = drawCards(game, targetActor, 2);
           log(game, actorName(game, targetActor) + '发动【遗计】（第 ' + (i + 1) + ' / ' + context.amount + ' 点），摸两张牌。');
+          // v13 J1: AI 盟友补血线启发 — 官方语义"将其中的一张牌交给一名角色"
+          // (card__hero__wei.md 标/1V1 变体) 允许分给任意座席; 摸到【桃】且
+          // 存在低血线 (hp<=2) 友方座席时相赠。1v1 无友方座席 → 恒自留
+          // (旧行为零回归)。评审收口: 仅 AI 座席启用 — 玩家席的 auto 档在
+          // 大厅按钮语义为"全部留己", 不得代玩家做分牌决策。
+          if (targetActor !== 'player') {
+            aiYijiGiveToAlly(game, targetActor, yijiBatch);
+          }
         }
         return { triggeredYiji: true, drawPairs: context.amount };
+      }
+
+      // v13 J1: 遗计 AI 分牌启发 — 找最低血线的存活友方座席 (身份已知且非
+      // 敌对), 血线 <=2 时把本点摸到的【桃】交给他。
+      function aiYijiGiveToAlly(game, actor, batch) {
+        if (!batch || !batch.length) return;
+        var allies = StateRuntime.aliveSeats(game).filter(function (seat) {
+          return seat !== actor
+            && StateRuntime.sideOf(game, seat) !== null
+            && !StateRuntime.isHostileSeat(game, actor, seat);
+        });
+        if (!allies.length) return;
+        var needy = allies.sort(function (a, b) { return game[a].hp - game[b].hp; })[0];
+        if (game[needy].hp > 2) return;
+        var state = game[actor];
+        for (var bi = 0; bi < batch.length; bi += 1) {
+          var drawn = batch[bi] && state.hand.find(function (c) { return c.id === batch[bi].id; });
+          if (drawn && drawn.type === 'tao') {
+            moveCard(game, drawn.id, { zone: 'hand', actor: actor }, { zone: 'hand', actor: needy });
+            log(game, actorName(game, actor) + '将【遗计】所摸的【' + drawn.name + '】交给' + actorName(game, needy) + '。');
+            return;
+          }
+        }
       }
 
       function fireNextYijiPoint(game) {
@@ -330,6 +361,13 @@
           actor: targetActor,
           drawnIds: drawnIds,
           cards: cards,
+          // v13 J1: 可分配座席清单 (官方"交给一名角色"含任意存活座席) —
+          // 面板据此渲染逐牌座席轮换; 1v1 恒 [对手单席]。
+          seats: StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== targetActor;
+          }).map(function (seat) {
+            return { seat: seat, name: game[seat].name };
+          }),
           currentPoint: currentPoint,
           totalPoints: saved.totalPoints
         });
@@ -550,16 +588,16 @@
       }
 
       function collectGanglieDiscardCandidates(source) {
+        // v13 审计三轮: 刚烈成本为"弃置两张手牌" (card__hero__wei.md 各变体
+        // 措辞一致) — 仅手牌可作候选; 此前误把装备区牌一并列入 (手牌与
+        // 装备是不同区域, 装备不能顶替手牌成本)。手牌不足两张时无此选项,
+        // 只能受 1 点伤害 (runGanglieJudgement 的 <2 门槛沿用本清单)。
         var list = [];
         if (source.hand) {
           source.hand.forEach(function (c) {
             list.push({ zone: 'hand', id: c.id, name: c.name, suit: c.suit, rank: c.rank });
           });
         }
-        ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
-          var card = source.equipment && source.equipment[slot];
-          if (card) list.push({ zone: 'equipment', slot: slot, id: card.id, name: card.name, suit: card.suit, rank: card.rank });
-        });
         return list;
       }
 
@@ -701,21 +739,28 @@
       //   'auto'    — always pick hand[0] without prompting
       //   'decline' — never fire 鬼才 this trigger
       //   undefined — 'ask' for human player, 'auto' for AI
+      // v13 评审收口: 判定改判技持有者座次环扫描 (鬼才/鬼道共用) —
+      // 自判定归属者起顺时针, 首个存活、持技且付得起成本的座席。
+      function findRingSkillHolder(game, anchorActor, skillId, canPay) {
+        var order = StateRuntime.seatsFrom(game, anchorActor, true);
+        for (var i = 0; i < order.length; i += 1) {
+          var s = game[order[i]];
+          if (s && s.hp > 0 && hasSkill(s, skillId) && canPay(s)) return order[i];
+        }
+        return null;
+      }
+
       function triggerGuicaiJudgementBeforeResolve(context) {
         var game = context.game;
         var judgementActor = context.actor;
         var originalCard = context.originalCard || context.card;
         if (!game || !originalCard || context.replaced) return null;
         // Find any actor at the table who can fire 鬼才.
-        var order = [judgementActor, opponent(judgementActor)];
-        var holder = null;
-        for (var i = 0; i < order.length; i += 1) {
-          var s = game[order[i]];
-          if (s && hasSkill(s, 'guicai') && s.hand && s.hand.length > 0) {
-            holder = order[i];
-            break;
-          }
-        }
+        // v13 审计三轮: 座次环扫描 (判定归属者起顺时针) — 此前二元
+        // [judgementActor, opponent(judgementActor)], 3p 第三席的鬼才恒不可达。
+        var holder = findRingSkillHolder(game, judgementActor, 'guicai', function (s) {
+          return s.hand && s.hand.length > 0;
+        });
         if (!holder) return null;
         var holderState = game[holder];
         var pref = (holderState.skillPreferences && holderState.skillPreferences.guicai)
@@ -908,12 +953,30 @@
         // reflects the spec sequence in any log readback.
         if (self.hp < 1) return fail('体力不足，不能发动【苦肉】。');
         self.hp -= 1;
-        log(game, actorName(game, actor) + '发动【苦肉】，失去 1 点体力并摸两张牌。');
-        drawCards(game, actor, 2);
+        log(game, actorName(game, actor) + '发动【苦肉】，失去 1 点体力。');
+        // v13 审计三轮: 官方顺序 — 扣减体力事件内嵌濒死结算 (体力至 0 立即
+        // 濒死, flow__decreaselife.md), 完整落定后才执行"然后摸两张牌";
+        // 濒死中死亡则不再摸牌; 濒死 ask 挂起时摸牌挂入 deferredAfterDying
+        // 延后回调 (v12 G2 天香补牌同款), 救回后续跑。此前先摸牌后濒死,
+        // 顺序与官方相反。
         if (self.hp <= 0 && game.phase !== 'gameover') {
-          // v7 PR-13: 苦肉 把 hp 降到 0 时，按 spec 进入濒死结算（不直接 game-over）
           enterDying(game, actor, actor);
+          if (game.pauseState && game.pauseState.dying) {
+            if (!game.pauseState.deferredAfterDying) game.pauseState.deferredAfterDying = [];
+            game.pauseState.deferredAfterDying.push(function () {
+              if (game.phase !== 'gameover' && self.hp > 0) {
+                log(game, actorName(game, actor) + '因【苦肉】摸两张牌。');
+                drawCards(game, actor, 2);
+              }
+            });
+            return success('苦肉：等待濒死结算。');
+          }
+          if (game.phase === 'gameover' || self.hp <= 0) {
+            return success('苦肉：角色未能脱离濒死。');
+          }
         }
+        log(game, actorName(game, actor) + '因【苦肉】摸两张牌。');
+        drawCards(game, actor, 2);
         return success('苦肉完成。');
       }
 
@@ -1044,9 +1107,12 @@
         if (!cardIds.length) return fail('请选择一张交给对方的牌。');
         var fanjianCard = removeCardFromHand(self, cardIds[0]);
         if (!fanjianCard) return fail('选择的牌不存在。');
-        putCard(game, fanjianCard, { zone: 'hand', actor: targetActor });
         self.flags.fanjianUsed = true;
-        log(game, actorName(game, actor) + '发动【反间】，将【' + fanjianCard.name + '】交给' + actorName(game, targetActor) + '。');
+        // v13 审计三轮: 官方顺序 = 目标先声明花色, 然后才获得牌并展示
+        // (card__hero__wu.md "选择一种花色…先获得…再展示之")。此前先
+        // putCard 进目标手牌再询问 — 人类目标可直接从手牌区读出真实花色,
+        // 永不猜错。现牌在猜测落定前保持在途 (pauseState.fanjian)。
+        log(game, actorName(game, actor) + '发动【反间】，令' + actorName(game, targetActor) + '猜测所交牌的花色。');
 
         // Backward-compat override: explicit guess from caller skips the prompt.
         if (options.guessedSuit) {
@@ -1054,8 +1120,9 @@
         }
 
         if (targetActor === 'player') {
-          // Set pendingChoice; the player UI shows the card NAME but not
-          // suit, then 4 suit buttons.
+          // pendingChoice 只暴露牌名不暴露花色; 实体牌在途暂存。
+          if (!game.pauseState) game.pauseState = {};
+          game.pauseState.fanjian = { card: fanjianCard, sourceActor: actor, targetActor: targetActor };
           setPendingChoice(game, {
             kind: 'fanjian-guess',
             actor: targetActor,
@@ -1070,7 +1137,9 @@
       }
 
       function applyFanjianGuess(game, sourceActor, targetActor, fanjianCard, guessedSuit) {
-        log(game, actorName(game, targetActor) + '猜测【' + fanjianCard.name + '】的花色为「' + guessedSuit + '」（实际：' + fanjianCard.suit + '）。');
+        // 猜测落定 → 目标获得牌并展示 → 比对花色。
+        putCard(game, fanjianCard, { zone: 'hand', actor: targetActor });
+        log(game, actorName(game, targetActor) + '猜测花色为「' + guessedSuit + '」，获得并展示【' + fanjianCard.name + '】（实际：' + fanjianCard.suit + '）。');
         if (guessedSuit !== fanjianCard.suit) {
           log(game, '猜错，' + actorName(game, targetActor) + '受到 1 点伤害。');
           damage(game, targetActor, 1, sourceActor, '【反间】', null, 'normal');
@@ -1081,19 +1150,16 @@
       }
 
       function resolveFanjianGuessChoice(game, pending, decision) {
-        var targetActor = pending.actor;
-        var sourceActor = pending.sourceActor;
-        var target = game[targetActor];
-        if (!target) return fail('未知角色。');
-        var fanjianCard = target.hand.find(function (c) { return c.id === pending.cardId; });
-        if (!fanjianCard) return fail('找不到【反间】所交的牌。');
+        var saved = game.pauseState && game.pauseState.fanjian;
+        if (!saved) return fail('找不到【反间】的暂停状态。');
         var guess = decision && decision.suit;
         if (['spade', 'heart', 'club', 'diamond'].indexOf(guess) < 0) {
           // Restore pending so UI can keep prompting on invalid input.
           setPendingChoice(game, pending);
           return fail('请选择有效的花色（spade/heart/club/diamond）。');
         }
-        return applyFanjianGuess(game, sourceActor, targetActor, fanjianCard, guess);
+        game.pauseState.fanjian = null;
+        return applyFanjianGuess(game, saved.sourceActor, saved.targetActor, saved.card, guess);
       }
 
       // v6.1: count = min(aliveActorCount, 5, deckSize). 1v1 ⇒ 2 (was hardcoded 5).
@@ -1208,21 +1274,36 @@
         var actor = pending.actor;
         var state = game[actor];
         if (!state) return fail('未知角色。');
-        var giveIds = Array.isArray(decision.giveIds) ? decision.giveIds : [];
-        var validIds = giveIds.filter(function (id) { return pending.drawnIds.indexOf(id) >= 0; });
-        if (validIds.length === 0) {
+        // v13 J1: 逐席分配 — decision.assignments = [{cardId, seat}] 可把
+        // 每张牌交给任意其他存活座席 (官方 "将其中的一张牌交给一名角色",
+        // card__hero__wei.md 标/1V1 变体; 未分配 = 留给自己)。旧 decision
+        // 形状 giveIds 兼容保留: 等价于全部交给 1v1 对手 (行为零回归)。
+        var assignments;
+        if (Array.isArray(decision.assignments)) {
+          assignments = decision.assignments;
+        } else {
+          var giveIds = Array.isArray(decision.giveIds) ? decision.giveIds : [];
+          assignments = giveIds.map(function (id) { return { cardId: id, seat: opponent(actor) }; });
+        }
+        var movedBySeat = {};
+        var movedAny = false;
+        for (var i = 0; i < assignments.length; i += 1) {
+          var entry = assignments[i];
+          if (!entry || pending.drawnIds.indexOf(entry.cardId) < 0) continue;
+          var seat = StateRuntime.resolveSeatOption(game, entry.seat);
+          if (!seat || seat === actor || !game[seat] || game[seat].hp <= 0) continue;
+          var card = moveCard(game, entry.cardId, { zone: 'hand', actor: actor }, { zone: 'hand', actor: seat });
+          if (!card) continue;
+          (movedBySeat[seat] = movedBySeat[seat] || []).push(card.name);
+          movedAny = true;
+        }
+        if (!movedAny) {
           log(game, actorName(game, actor) + '将【遗计】本点所摸的牌全部留给自己。');
         } else {
-          var opp = opponent(actor);
-          var moved = [];
-          for (var i = 0; i < validIds.length; i += 1) {
-            var card = moveCard(game, validIds[i], { zone: 'hand', actor: actor }, { zone: 'hand', actor: opp });
-            if (!card) continue;
-            moved.push(card.name);
-          }
-          if (moved.length > 0) {
-            log(game, actorName(game, actor) + '将【遗计】本点所摸的 ' + moved.length + ' 张牌交给' + actorName(game, opp) + '：' + moved.join('、') + '。');
-          }
+          Object.keys(movedBySeat).forEach(function (seat) {
+            var names = movedBySeat[seat];
+            log(game, actorName(game, actor) + '将【遗计】本点所摸的 ' + names.length + ' 张牌交给' + actorName(game, seat) + '：' + names.join('、') + '。');
+          });
         }
         // v6.1: per-point iteration. If pauseState has more points to
         // process, fire the next one (re-sets pendingChoice for the new
@@ -1271,11 +1352,22 @@
         }
         applyJudgeAreaOutcome(game, judgementActor, judgementActorState, saved.currentTrick, saved.currentReason, resolvedCard);
         // Resume the iteration from the trick AFTER the one we just resolved.
+        // v13 评审收口: 保留 J0-2 无懈簿记字段 (快照形状与主循环一致)。
         game.pauseState.judgeArea = {
           actor: judgementActor,
           pending: saved.pending,
-          idx: saved.idx + 1
+          idx: saved.idx + 1,
+          wuxieDoneIdx: saved.wuxieDoneIdx,
+          wuxieResults: saved.wuxieResults || {}
         };
+        // v13 评审收口: outcome 结算本身可产生待玩家选择 (闪电命中致濒死
+        // 求桃等) — 此前不检查直接续跑, 濒死挂起时回合被双推进。挂起并
+        // 标记 outcomeApplied, 由 resumeSuspendedTurnFlowIfReady 在选择
+        // 排空后续跑 (与 processJudgeArea 主循环 H2 分支同款)。
+        if (game.pendingChoice) {
+          game.pauseState.judgeArea.outcomeApplied = true;
+          return success('继续等待玩家选择。');
+        }
         var resumeResult = processJudgeArea(game, judgementActor);
         if (resumeResult && resumeResult.suspended) {
           return success('继续等待玩家选择。');
@@ -1528,32 +1620,17 @@
 
         // 天香 (小乔) — gltjk wind spec: "当你受到伤害时, 你可以弃置一张
         // 红桃手牌, 将此伤害转移给你攻击范围内的一名其他角色, 然后其摸
-        // X 张牌 (X 为其已损失的体力值)"。1v1 转移目标恒为对手 (须在攻击
-        // 范围内)。交互沿用 铁骑 pre-v10 惯例: auto (伤害≥2 或致命时转移)
-        // / always (有成本即转移) / decline; 伤害流暂停框架落地后升级 ask。
+        // X 张牌 (X 为其已损失的体力值)"。
+        // v13 J3: ask 升级 — 玩家 (tianxiang='ask') 由 damage() 入口挂起
+        // 询问 (伤害流暂停框架), resolver 以 opts.tianxiangDecision 重入本
+        // 钩子强制执行; 放弃以 opts.noTianxiangAsk 重入 (本钩子跳过)。
+        // AI 沿用 auto (伤害≥2 或致命时转移) / always / decline 三态; 转移
+        // 目标泛化为攻击范围内任意其他存活座席 (敌对优先, 1v1 恒为对手)。
         // 红颜联动: 黑桃手牌经 effectiveCardSuit 视为红桃, 可作成本。
-        function triggerTianxiangDamageModify(context) {
+        function tianxiangTransferContext(context, transferee, cost) {
           var game = context.game;
           var targetActor = context.targetActor;
           var state = game[targetActor];
-          if (!state || !hasSkill(state, 'tianxiang') || game.phase === 'gameover') return null;
-          if (context.opts && context.opts.noTianxiangTransfer) return null;
-          var pref = (state.skillPreferences && state.skillPreferences.tianxiang) || 'auto';
-          if (pref === 'decline') return null;
-          var transferee = opponent(targetActor);
-          if (!game[transferee] || game[transferee].hp <= 0) return null;
-          if (!StateRuntime.canReachWithSha(game, targetActor, transferee)) return null;
-          var amount = Number(context.amount) || 0;
-          if (amount <= 0) return null;
-          var lethal = state.hp - amount <= 0;
-          if (pref !== 'always' && !(amount >= 2 || lethal)) return null;
-          var costs = (state.hand || []).filter(function (c) {
-            return StateRuntime.effectiveCardSuit(state, c) === 'heart';
-          });
-          if (!costs.length) return null;
-          var cost = costs
-            .map(function (c) { return { card: c, score: scoreCardForAI(game, targetActor, c) }; })
-            .sort(function (a, b) { return a.score - b.score; })[0].card;
           removeCardFromHand(state, cost.id);
           discardCard(game, cost);
           log(game, actorName(game, targetActor) + '发动【天香】，弃置【' + cost.name + '】' + cost.suit + ' ' + cost.rank + '，将伤害转移给' + actorName(game, transferee) + '。');
@@ -1570,10 +1647,53 @@
           return { triggeredTianxiang: true };
         }
 
+        function triggerTianxiangDamageModify(context) {
+          var game = context.game;
+          var targetActor = context.targetActor;
+          var state = game[targetActor];
+          if (!state || !hasSkill(state, 'tianxiang') || game.phase === 'gameover') return null;
+          var opts = context.opts || {};
+          if (opts.noTianxiangTransfer) return null;
+          var amount = Number(context.amount) || 0;
+          if (amount <= 0) return null;
+          // v13 J3: resolver 重入 — 按玩家决策强制执行 (跳过偏好/期望值)。
+          if (opts.tianxiangDecision) {
+            var dec = opts.tianxiangDecision;
+            var decCost = (state.hand || []).find(function (c) { return c.id === dec.costCardId; });
+            var decTarget = game[dec.transferTo];
+            if (!decCost || !decTarget || decTarget.hp <= 0) return null;
+            return tianxiangTransferContext(context, dec.transferTo, decCost);
+          }
+          if (opts.noTianxiangAsk) return null; // 玩家已放弃
+          var pref = (state.skillPreferences && state.skillPreferences.tianxiang) || 'auto';
+          if (pref === 'decline') return null;
+          if (pref === 'ask') return null; // ask 挂起由 damage() 入口负责
+          // v13 J3: 转移目标泛化 — 攻击范围内其他存活座席, 敌对优先;
+          // 1v1 恒为 [对手], 行为不变 (候选谓词与 damage() ask 面板共用
+          // StateRuntime.seatsInShaRangeOf, 消除漂移风险)。
+          var candidates = StateRuntime.seatsInShaRangeOf(game, targetActor);
+          if (!candidates.length) return null;
+          var pool = StateRuntime.hostileFirstPool(game, targetActor, candidates);
+          var transferee = pool.indexOf(opponent(targetActor)) >= 0 ? opponent(targetActor) : pool[0];
+          var lethal = state.hp - amount <= 0;
+          if (pref !== 'always' && !(amount >= 2 || lethal)) return null;
+          var costs = (state.hand || []).filter(function (c) {
+            return StateRuntime.effectiveCardSuit(state, c) === 'heart';
+          });
+          if (!costs.length) return null;
+          var cost = costs
+            .map(function (c) { return { card: c, score: scoreCardForAI(game, targetActor, c) }; })
+            .sort(function (a, b) { return a.score - b.score; })[0].card;
+          return tianxiangTransferContext(context, transferee, cost);
+        }
+
         // 雷击 (张角) — gltjk wind spec: "当你使用或打出【闪】时, 你可以令
         // 一名其他角色进行判定: 若结果为黑桃, 你对该角色造成 2 点雷电伤害"。
-        // 1v1 目标恒为对手; 判定归对手 (红颜小乔判雷击 黑桃视为红桃 → 永不
-        // 命中, 由 judge() 视同层自然覆盖)。auto/decline 偏好 (铁骑惯例)。
+        // v13 审计三轮: 目标泛化为任意其他存活座席 (敌对优先, 1v1 恒对手;
+        // 此前二元 opponent(), 3p 下张角非 player/enemy 席时恒指错)。判定
+        // 归目标 (红颜小乔判雷击 黑桃视为红桃 → 永不命中, 由 judge() 视同
+        // 层自然覆盖)。auto/decline 偏好 (铁骑惯例); options.target 可显式
+        // 指定 (供 future ask 面板)。
         function triggerLeijiShanUsed(context) {
           var game = context.game;
           var actor = context.actor;
@@ -1584,7 +1704,15 @@
             log(game, actorName(game, actor) + '选择不发动【雷击】。');
             return null;
           }
-          var targetActor = opponent(actor);
+          var requested = StateRuntime.resolveSeatOption(game, context.options && context.options.target);
+          var candidates = StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && game[seat].hp > 0;
+          });
+          if (!candidates.length) return null;
+          var pool = StateRuntime.hostileFirstPool(game, actor, candidates);
+          var targetActor = (requested && requested !== actor && candidates.indexOf(requested) >= 0)
+            ? requested
+            : (pool.indexOf(opponent(actor)) >= 0 ? opponent(actor) : pool[0]);
           var target = game[targetActor];
           if (!target || target.hp <= 0) return null;
           log(game, actorName(game, actor) + '发动【雷击】，令' + actorName(game, targetActor) + '进行判定。');
@@ -1612,15 +1740,11 @@
           var judgementActor = context.actor;
           var originalCard = context.originalCard || context.card;
           if (!game || !originalCard || context.replaced) return null;
-          var order = [judgementActor, opponent(judgementActor)];
-          var holder = null;
-          for (var i = 0; i < order.length; i += 1) {
-            var s = game[order[i]];
-            if (s && hasSkill(s, 'guidao') && guidaoBlackHand(s).length > 0) {
-              holder = order[i];
-              break;
-            }
-          }
+          // v13 审计三轮: 座次环扫描 (与鬼才共用 findRingSkillHolder) —
+          // 此前二元 opponent(), 3p 第三席的鬼道持有者恒不可达。
+          var holder = findRingSkillHolder(game, judgementActor, 'guidao', function (s) {
+            return guidaoBlackHand(s).length > 0;
+          });
           if (!holder) return null;
           var holderState = game[holder];
           var pref = (holderState.skillPreferences && holderState.skillPreferences.guidao)
@@ -1697,11 +1821,19 @@
             log(game, actorName(game, holder) + '选择不发动【鬼道】。');
           }
           applyJudgeAreaOutcome(game, judgementActor, judgementActorState, saved.currentTrick, saved.currentReason, resolvedCard);
+          // v13 评审收口: 快照形状与主循环一致 (保留 J0-2 无懈簿记) +
+          // outcome 挂起检查 (闪电致濒死求桃时不得双推进; 同鬼才 resolver)。
           game.pauseState.judgeArea = {
             actor: judgementActor,
             pending: saved.pending,
-            idx: saved.idx + 1
+            idx: saved.idx + 1,
+            wuxieDoneIdx: saved.wuxieDoneIdx,
+            wuxieResults: saved.wuxieResults || {}
           };
+          if (game.pendingChoice) {
+            game.pauseState.judgeArea.outcomeApplied = true;
+            return success('继续等待玩家选择。');
+          }
           var resumeResult = processJudgeArea(game, judgementActor);
           if (resumeResult && resumeResult.suspended) {
             return success('继续等待玩家选择。');
@@ -1774,18 +1906,27 @@
           var actor = context.actor;
           var state = game[actor];
           if (!state || !hasSkill(state, 'tuxi')) return;
-          if (game[opponent(actor)].hand.length <= 0) return;
-            // v6.1: spec condition is "发动者**选择**发动". Read
-            // skillPreferences.tuxi to honor the choice: 'decline' skips
-            // entirely. Default is auto-fire (preserves v5/v6 behavior so
-            // existing tests + AI continue to work without per-turn toggles).
           var pref = state.skillPreferences && state.skillPreferences.tuxi;
           if (pref === 'decline') {
             log(game, actorName(game, actor) + '选择本回合不发动【突袭】。');
             return;
           }
-          takeHandCard(game, opponent(actor), actor, '发动【突袭】，获得');
-          context.drawCount = Math.max(0, context.drawCount - 1);
+          // v13 审计三轮: 官方语义 — "放弃摸牌, 改为获得一至两名角色的各
+          // 一张手牌" (card__hero__wei.md): 发动即放弃全部常规摸牌; 候选
+          // 泛化为其他存活且有手牌的座席 (座次环序, 敌对优先; 此前恒偷
+          // 二元 opponent 且仅 -1 摸牌 = 偷1+摸1, 系语义误读)。AI 期望值
+          // 门: 可偷满 2 张才发动 (偷 1 弃 2 摸恒亏); pref='always' 强制。
+          var candidates = StateRuntime.seatsFrom(game, actor, false).filter(function (seat) {
+            return game[seat] && game[seat].hp > 0 && (game[seat].hand || []).length > 0;
+          });
+          if (!candidates.length) return;
+          var pool = StateRuntime.hostileFirstPool(game, actor, candidates);
+          var picks = pool.slice(0, 2);
+          if (picks.length < 2 && pref !== 'always') return;
+          picks.forEach(function (seat) {
+            takeHandCard(game, seat, actor, '发动【突袭】，获得');
+          });
+          context.drawCount = 0;
         }
       });
         SkillRuntime.registerSkill(skillRegistry, 'luoyi', {
@@ -2062,6 +2203,13 @@
           if (game[seatA].gender !== 'male' || game[seatB].gender !== 'male') {
             return fail('【离间】只能指定男性角色。');
           }
+          // v13 审计三轮: 虚拟决斗须过目标合法性 — 空城等"不能成为【决斗】
+          // 目标"的保护对离间的视为决斗同样生效 (此前绕过, 与真决斗路径
+          // isLegalCardTarget → cardTargetProtection 不一致)。成本未弃置前
+          // 校验, 拒绝时零副作用。
+          var lijianProtection = cardTargetProtection(game, seatA, seatB,
+            { type: 'juedou', name: '决斗', virtual: true }, '决斗');
+          if (lijianProtection) return fail(lijianProtection.message);
           var lijianCost = removeCardFromHand(self, cardIds[0]);
           if (!lijianCost) return fail('选择的手牌不存在。');
           discardCard(game, lijianCost);

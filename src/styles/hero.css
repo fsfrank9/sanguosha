@@ -194,6 +194,13 @@
       box-shadow: 0 0 0 3px var(--gold), 0 20px 60px var(--shadow), inset 0 1px rgba(255, 255, 255, .08);
     }
 
+    /* v13 J0-1: 座席点选暂存态 — 已点选待确认的目标座席, 描边加粗提亮
+       (同色系, 区别于 selectable 的候选态). */
+    .hero.is-target-staged {
+      cursor: pointer;
+      box-shadow: 0 0 0 5px var(--gold), 0 0 18px var(--gold), 0 20px 60px var(--shadow), inset 0 1px rgba(255, 255, 255, .12);
+    }
+
     .damage-float {
       position: absolute;
       z-index: 5;

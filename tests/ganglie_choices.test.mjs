@@ -114,7 +114,9 @@ test('Player source picks the 2 specific hand cards to discard', () => {
   assert.ok(game.discard.some(c => c.id === 'discard-this-2'));
 });
 
-test('Player source can include equipment in the 2-card discard', () => {
+test('v13 审计三轮: 刚烈成本仅手牌 — 手牌不足 2 张时装备不可顶替, 直接受 1 伤', () => {
+  // spec (card__hero__wei.md): "1.弃置两张手牌；2.受到1点伤害" — 装备区牌
+  // 不是手牌, 不能作为该选项的成本 (此前误将装备计入候选)。
   const game = buildGame('sunquan', 'xiahoudun');
   game.player.hand = [
     c('sha', { id: 'attack-sha', suit: 'spade', color: 'black' }),
@@ -123,22 +125,39 @@ test('Player source can include equipment in the 2-card discard', () => {
   game.player.equipment.weapon = c('zhuge', { id: 'equip-weapon' });
   game.deck = [c('sha', { id: 'judge-black', suit: 'club', color: 'black' })];
 
+  const hpBefore = game.player.hp;
+  assertCardConservation(game, () => Engine.playCard(game, 'player', 'attack-sha'));
+  // 出杀后手牌只剩 1 张 (spare-hand), 装备不计 → 无"弃两张"选项 → 直接受伤
+  assert.equal(Engine.getPendingChoice(game), null, '手牌不足 2 → 无选择直接受伤');
+  assert.equal(game.player.hp, hpBefore - 1, '受 1 点刚烈反制伤害');
+  assert.equal(game.player.equipment.weapon.id, 'equip-weapon', '装备保留 (不可作成本)');
+  assert.ok(game.player.hand.some(c => c.id === 'spare-hand'), '手牌保留');
+});
+
+test('v13 审计三轮: 刚烈候选仅列手牌 (手牌够 2 张时装备不入候选)', () => {
+  const game = buildGame('sunquan', 'xiahoudun');
+  game.player.hand = [
+    c('sha', { id: 'attack-sha', suit: 'spade', color: 'black' }),
+    c('shan', { id: 'hand-1', suit: 'heart', color: 'red' }),
+    c('tao', { id: 'hand-2', suit: 'heart', color: 'red' })
+  ];
+  game.player.equipment.weapon = c('zhuge', { id: 'equip-weapon' });
+  game.deck = [c('sha', { id: 'judge-black', suit: 'club', color: 'black' })];
+
   assertCardConservation(game, () => Engine.playCard(game, 'player', 'attack-sha'));
   const pending = Engine.getPendingChoice(game);
-  assert.ok(pending);
-  // pendingChoice candidates should include hand cards + equipment.
+  assert.ok(pending, '手牌够 2 张 → 出选择');
   const candidateIds = pending.candidates.map(e => e.id);
-  assert.ok(candidateIds.includes('spare-hand'), 'hand card is a candidate');
-  assert.ok(candidateIds.includes('equip-weapon'), 'equipment card is a candidate');
+  assert.ok(candidateIds.includes('hand-1'), '手牌是候选');
+  assert.ok(!candidateIds.includes('equip-weapon'), '装备不是候选');
 
   assertCardConservation(game, () => Engine.resolvePendingChoice(game, {
     mode: 'discard',
-    cardIds: ['spare-hand', 'equip-weapon']
+    cardIds: ['hand-1', 'hand-2']
   }));
-
-  assert.equal(game.player.equipment.weapon, null, 'equipment slot cleared');
-  assert.ok(game.discard.some(c => c.id === 'equip-weapon'), 'equipment card in discard');
-  assert.ok(game.discard.some(c => c.id === 'spare-hand'), 'hand card in discard');
+  assert.ok(game.discard.some(c => c.id === 'hand-1'));
+  assert.ok(game.discard.some(c => c.id === 'hand-2'));
+  assert.equal(game.player.equipment.weapon.id, 'equip-weapon', '装备保留');
 });
 
 test('Player source can refuse the discard option and take 1 damage instead', () => {

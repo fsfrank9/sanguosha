@@ -86,7 +86,7 @@ function armFanjianSuitButtons() {
   $('fanjianDiamondBtn').setAttribute('data-fanjian-suit', 'diamond');
 }
 
-test('反间面板: 敌方周瑜反间 → 弹出 → 猜对花色 → 无伤害, 牌已入手', () => {
+test('反间面板: 敌方周瑜反间 → 弹出 → 猜对花色 → 无伤害, 猜后牌才入手 (v13)', () => {
   const game = startGameViaUI('liubei', 'zhouyu');
   game.turn = 'enemy';
   game.enemy.hand = [c('sha', { id: 'ui-fj-card', suit: 'heart', color: 'red' })];
@@ -96,12 +96,15 @@ test('反间面板: 敌方周瑜反间 → 弹出 → 猜对花色 → 无伤害
   Engine.useSkill(game, 'enemy', 'fanjian', ['ui-fj-card']);
   UI.render();
   assert.equal($('fanjianPromptPanel').hidden, false, '反间面板弹出');
-  assert.ok(game.player.hand.some((card) => card.id === 'ui-fj-card'), '牌已先转移入手');
+  // v13 审计三轮: 官方顺序 = 先声明花色再获得牌 — 猜测落定前牌不进手牌区
+  // (此前先入手, 人类目标可从手牌区读出真实花色永不猜错)。
+  assert.ok(!game.player.hand.some((card) => card.id === 'ui-fj-card'), '猜测前牌不在手牌区');
 
   $('fanjianHeartBtn').click(); // stage {suit:'heart'}
   $('handConfirmBtn').click();
   assert.equal(game.pendingChoice, null, '猜测已提交');
   assert.equal(game.player.hp, playerHp, '猜对 (红桃) → 无伤害');
+  assert.ok(game.player.hand.some((card) => card.id === 'ui-fj-card'), '猜后牌入手');
   assert.equal($('fanjianPromptPanel').hidden, true, '面板关闭');
 });
 

@@ -29,7 +29,11 @@
     guanshi: { guanshiForceHit: true },
     qinglong:{ qinglongChase: true },
     fangtian:{ fangtianLastHandBonus: true },
-    zhangba: { zhangbaTwoHandSha: true }
+    zhangba: { zhangbaTwoHandSha: true },
+    // v13 J0-3: 藤甲① "南蛮入侵/万箭齐发/普通杀对你无效" — 免疫短路在
+    // 响应询问前 (sha-flow.js / tricks.js 查此 flag); 藤甲② 火伤 +1 仍在
+    // equipment.js EQUIPMENT_DAMAGE_MODIFIERS。
+    tengjia: { tengjiaImmuneNormalShaAOE: true }
   };
 
   function equipmentSlots(state) {
@@ -138,6 +142,22 @@
     return aliveSeats(game).filter(function (seat) { return seat !== actor; });
   }
 
+  // v13 评审收口: 候选内敌对优先池 — 候选中有敌对座席则只留敌对, 否则
+  // 原样返回 (天香转移/雷击/突袭等"敌对优先"目标挑选共用, 消除三处复制)。
+  function hostileFirstPool(game, actor, candidates) {
+    var hostiles = (candidates || []).filter(function (seat) { return isHostileSeat(game, actor, seat); });
+    return hostiles.length ? hostiles : (candidates || []);
+  }
+
+  // v13 评审收口: actor 攻击范围内的其他存活座席 (天香 ask 面板候选与
+  // AI auto 转移候选共用, 消除两处谓词漂移风险)。
+  function seatsInShaRangeOf(game, actor) {
+    return aliveSeats(game).filter(function (seat) {
+      return seat !== actor && game[seat] && game[seat].hp > 0
+        && canReachWithSha(game, actor, seat);
+    });
+  }
+
   function hasSkill(state, skillId) {
     return !!(state.skills || []).some(function (skill) { return skill.id === skillId; });
   }
@@ -154,7 +174,12 @@
     var from = game[fromActor];
     var to = game[toActor];
     if (!from || !to) return Infinity;
-    var seats = normalizeSeats(game);
+    // v13 审计三轮: 座次环距离剔除已阵亡座席 (官方: 计算距离时跳过已死亡
+    // 角色)。3 席死 1 人时两种算法同值, 4-5 席 (v13 K) 起才有可观测差异。
+    var seats = normalizeSeats(game).filter(function (seat) {
+      return seat === fromActor || seat === toActor
+        || (game[seat] && typeof game[seat].hp === 'number' && game[seat].hp > 0);
+    });
     var fromIdx = seats.indexOf(fromActor);
     var toIdx = seats.indexOf(toActor);
     var ring = seats.length > 1 && fromIdx >= 0 && toIdx >= 0
@@ -230,6 +255,8 @@
     sideOf: sideOf,
     isHostileSeat: isHostileSeat,
     hostileSeats: hostileSeats,
+    hostileFirstPool: hostileFirstPool,
+    seatsInShaRangeOf: seatsInShaRangeOf,
     opponent: opponent,
     hasSkill: hasSkill,
     canUseUnlimitedSha: canUseUnlimitedSha,

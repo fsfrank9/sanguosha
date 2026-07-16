@@ -39,47 +39,23 @@ function buildGame(opts) {
   return game;
 }
 
-// ───── 出牌阶段: 吴势力对主公孙权用桃 ────────────────────────────────
+// ───── 出牌阶段: v13 J0-4 后跨席用桃被拒, 救援仅剩濒死路径 ─────────────
 
-test('救援: 吴势力(吕蒙)对受伤主公孙权用桃 → 回复 2', () => {
+test('v13 J0-4: 出牌阶段吴势力对受伤主公用桃被拒绝 (桃只能对自己)', () => {
   const game = buildGame();
   game.player.hp = 1;
+  game.enemy.hp = game.enemy.maxHp - 1; // 自己受伤, canPlayCard 放行
   game.enemy.hand = [c('tao', { id: 'etao' })];
   assertCardConservation(game, () => {
     const r = Engine.playCard(game, 'enemy', 'etao', { taoTarget: 'player' });
-    assert.equal(r.ok, true);
+    assert.equal(r.ok, false, '出牌阶段桃目标恒为自己');
   });
-  assert.equal(game.player.hp, 3, '1 + 救援加成 = 回复 2');
-  assert.ok(game.log.some((l) => l.includes('【救援】')), '有救援日志');
-  assert.ok(game.discard.some((card) => card.id === 'etao'), '桃进弃牌堆');
-});
-
-test('救援: 回复量受 maxHp 封顶', () => {
-  const game = buildGame();
-  game.player.hp = game.player.maxHp - 1;
-  game.enemy.hand = [c('tao', { id: 'etao' })];
-  Engine.playCard(game, 'enemy', 'etao', { taoTarget: 'player' });
-  assert.equal(game.player.hp, game.player.maxHp, '封顶到 maxHp');
-});
-
-test('反例: 非吴势力(曹操)对主公孙权用桃 → 只回复 1', () => {
-  const game = buildGame({ enemyHero: 'caocao' });
-  game.player.hp = 1;
-  game.enemy.hand = [c('tao', { id: 'etao' })];
-  Engine.playCard(game, 'enemy', 'etao', { taoTarget: 'player' });
-  assert.equal(game.player.hp, 2, '非吴势力 → 无加成');
+  assert.equal(game.player.hp, 1, '主公血量不变');
+  assert.equal(game.enemy.hand.length, 1, '桃退回手牌');
   assert.ok(!game.log.some((l) => l.includes('【救援】')), '无救援日志');
 });
 
-test('反例: 孙权非主公身份 → 只回复 1', () => {
-  const game = buildGame({ playerRole: '忠臣', enemyRole: '主公' });
-  game.player.hp = 1;
-  game.enemy.hand = [c('tao', { id: 'etao' })];
-  Engine.playCard(game, 'enemy', 'etao', { taoTarget: 'player' });
-  assert.equal(game.player.hp, 2, '非主公 → 无加成');
-});
-
-test('反例: 孙权自用桃 → 只回复 1', () => {
+test('反例: 孙权自用桃 → 只回复 1 (救援不加成自用)', () => {
   const game = buildGame();
   game.turn = 'player';
   game.player.hp = 1;

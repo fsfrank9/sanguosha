@@ -72,16 +72,30 @@ test('回归: 非吕布的杀 1 张闪即可闪避', () => {
   assert.equal(game.player.hand.length, 1, '只消耗 1 张闪');
 });
 
-test('无双 杀 + 八卦: 1 张闪 + 红判定顶第二张 → 闪避', () => {
+test('无双 杀 + 八卦: 首判黑靠真闪、二判红顶第二张 → 闪避 (v13 J0-3 逐需求八卦先行)', () => {
   const game = buildGame();
   game.enemy.hand = [c('sha', { id: 'esha' })];
   game.player.hand = [c('shan', { id: 'pshan' })];
   game.player.equipment.armor = c('bagua', { id: 'bg1' });
-  game.deck = [redJudge('j-red')];
+  // deck.pop() 先取末位 → 第一需求判黑 (八卦失败→真闪), 第二需求判红 (八卦顶上)
+  game.deck = [redJudge('j-red'), blackJudge('j-black')];
   const hp = game.player.hp;
   assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'esha'));
   assert.equal(game.player.hp, hp, '闪 + 八卦红判定 → 抵消两张需求');
   assert.equal(game.player.hand.length, 0);
+});
+
+test('无双 杀 + 八卦: 红判定顶第一张 + 真闪第二张 → 闪避且省一张闪 (八卦先行)', () => {
+  const game = buildGame();
+  game.enemy.hand = [c('sha', { id: 'esha' })];
+  game.player.hand = [c('shan', { id: 'pshan' }), c('shan', { id: 'pshan-keep' })];
+  game.player.equipment.armor = c('bagua', { id: 'bg1' });
+  // 第一需求判红 (八卦先行省闪), 第二需求判黑 (真闪兜底)
+  game.deck = [blackJudge('j-black'), redJudge('j-red')];
+  const hp = game.player.hp;
+  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'esha'));
+  assert.equal(game.player.hp, hp, '八卦红 + 真闪 → 闪避');
+  assert.equal(game.player.hand.length, 1, '八卦先行省下一张闪');
 });
 
 test('无双 杀 + 八卦: 无闪, 两次红判定 → 闪避', () => {

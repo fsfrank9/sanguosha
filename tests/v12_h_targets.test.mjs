@@ -129,17 +129,24 @@ test('5. 借刀杀人 A=enemy B=ally, 借刀者 player 全程未受伤', () => {
 
 // ═══════════════════ 6. 桃/无中/火攻/铁索 — 显式第三席目标 ═══════════════
 
-test('6. 桃/无中生有/火攻/铁索连环 显式第三席目标全部走通', () => {
+test('6. 无中生有/火攻/铁索连环 显式第三席目标走通; 桃跨席被拒 (v13 J0-4)', () => {
   const game = buildGame({ seed: 35007 });
   stockDeck(game, 15); // 无中生有令 ally 摸 2 张; 牌堆需先垫够避免空牌堆洗牌污染布局
   game.ally.hp = game.ally.maxHp - 2;
+  game.player.hp = game.player.maxHp - 1; // 自己受伤, 桃 canPlayCard 放行
   game.player.hand = [c('tao', { id: 't-1' }), c('huogong', { id: 'hg-1' }),
     c('wuzhong', { id: 'wz-1' }), c('tiesuo', { id: 'ts-1' }), c('sha', { id: 'cost-x', suit: 'heart' })];
   game.ally.hand = [c('sha', { id: 'a-reveal', suit: 'heart' })];
 
+  // v13 J0-4: 出牌阶段桃目标恒为自己 — 显式第三席目标被拒绝且牌不离手。
   const r1 = assertCardConservation(game, () => Engine.playCard(game, 'player', 't-1', { target: 'ally' }));
-  assert.equal(r1.ok, true, r1.message);
-  assert.equal(game.ally.hp, game.ally.maxHp - 1, '桃显式喂给 ally');
+  assert.equal(r1.ok, false, '桃跨席目标被拒');
+  assert.equal(game.ally.hp, game.ally.maxHp - 2, 'ally 血量不变');
+  assert.ok(game.player.hand.some((x) => x.id === 't-1'), '桃退回手牌');
+  // 桃对自己正常使用 (第三席在场零干扰)。
+  const r1b = assertCardConservation(game, () => Engine.playCard(game, 'player', 't-1'));
+  assert.equal(r1b.ok, true, r1b.message);
+  assert.equal(game.player.hp, game.player.maxHp, '桃恒对自己回复');
 
   // 火攻先于无中生有结算: 此时 ally 手牌仅 'a-reveal' 一张 (heart), 展示
   // 结果确定, 避免无中生有摸牌后候选变多导致展示牌不确定 (fixture 顺序,
