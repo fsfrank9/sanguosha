@@ -350,6 +350,21 @@ test('K2-11b. 酒他指过期: 使用者回合结束时未消费的跨席 shaBon
   assert.equal(game.ally.shaBonus, 0, '"此回合内"过期: 回合结束统一清全席未消费加成');
 });
 
+test('K2-11c. 酒他指 + 使用者本回合内阵亡: 回合因阵亡终止同样清全席 shaBonus (review 修复)', () => {
+  const game = buildGame(SEATS4, { seed: 45019 });
+  stockDeck(game, 12, 'dt');
+  game.player.hand = [c('jiu', { id: 'j-3' })];
+  const res = Engine.playCard(game, 'player', 'j-3', { target: 'ally' });
+  assert.equal(res.ok, true, res.message);
+  assert.equal(game.ally.shaBonus, 1);
+  // 使用者随后于本回合内阵亡 (刚烈反伤/借刀反噬等), completeTurn 走
+  // 阵亡早退分支 — 修复前该分支跳过全清, 加成泄漏到后续回合。
+  game.player.hp = 0;
+  const endRes = Engine.endTurn(game);
+  assert.equal(endRes.ok, true, endRes.message);
+  assert.equal(game.ally.shaBonus, 0, '阵亡终止的回合结束同样过期全席 shaBonus');
+});
+
 // ═══════════ 12. 铁索缺省目标去二元化 (本批修复回归) ═══════════
 
 test('K2-12. 铁索缺省目标: 忠臣席直调无显式 targets → 敌对池首位, 不再错指玩家', () => {

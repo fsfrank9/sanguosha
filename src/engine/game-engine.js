@@ -2089,10 +2089,24 @@
         return fail('未知阶段。');
       }
 
+      // v13 K2/K5: 【酒】"此回合内"过期收口 — shaBonus 可经他指挂在任意
+      // 座席 (官方: 目标于使用酒的那个回合内的下一张杀), 回合结束统一
+      // 清全席未消费加成, 防跨多回合存活 (resetEndOfTurnState 只复位
+      // 回合结束者本席)。酒是 shaBonus 唯一写入方, 全清即"此回合内"语义。
+      function clearAllShaBonus(game) {
+        seatList(game).forEach(function (seat) {
+          if (game[seat]) game[seat].shaBonus = 0;
+        });
+      }
+
       function completeTurn(game, ending) {
         // v12 H5: 阵亡角色的回合终止 — 不再触发其回合结束时机 (闭月/据守等)。
         if (game[ending] && game[ending].hp <= 0) {
           log(game, actorName(game, ending) + '的回合因阵亡终止。');
+          // v13 K5 (review 修复): 阵亡早退同样是"回合结束" — 不清会让
+          // 酒他指的加成泄漏到后续回合 (使用者饮酒喂人后本回合内反伤
+          // 阵亡等场景)。
+          clearAllShaBonus(game);
           return startTurn(game, nextSeat(game, ending));
         }
         SkillRuntime.runHook(skillRegistry, 'onTurnEnd', {
@@ -2100,13 +2114,7 @@
           actor: ending
         });
         resetEndOfTurnState(game[ending]);
-        // v13 K2: 【酒】"此回合内"过期收口 — shaBonus 可经他指挂在任意
-        // 座席 (官方: 目标于使用酒的那个回合内的下一张杀), 回合结束统一
-        // 清全席未消费加成, 防跨多回合存活 (resetEndOfTurnState 只复位
-        // 回合结束者本席)。酒是 shaBonus 唯一写入方, 全清即"此回合内"语义。
-        seatList(game).forEach(function (seat) {
-          if (game[seat]) game[seat].shaBonus = 0;
-        });
+        clearAllShaBonus(game);
         log(game, actorName(game, ending) + '结束回合。');
         return startTurn(game, nextSeat(game, ending));
       }
