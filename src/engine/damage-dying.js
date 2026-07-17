@@ -385,7 +385,14 @@
       // 先行救援的机会。1v1 中不屈结果不变 (队列另一人是 AI 攻击方, 恒
       // 不救援)。
       var turnActor = game.turn || dyingActor;
-      var responderQueue = seatsFrom(game, turnActor, true).filter(function (seat) { return !!game[seat]; });
+      // v13 K2: 队列排除已阵亡座席 (濒死者本人 hp<=0 仍须入队) — 此前只查
+      // 座席存在, 亡席在环上"陪跑"(手牌已清空恒 skipped, 功能无害), 4/5 席
+      // 多人阵亡后显式过滤, 防未来救援逻辑变化时死灰复燃。
+      var responderQueue = seatsFrom(game, turnActor, true).filter(function (seat) {
+        var seatState = game[seat];
+        if (!seatState) return false;
+        return seat === dyingActor || seatState.hp > 0;
+      });
       game.pauseState.dying = {
         actor: dyingActor,
         source: sourceActor,

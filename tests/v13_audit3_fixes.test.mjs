@@ -310,16 +310,18 @@ test('distanceBetween 剔除亡者 (3 席死 1 人时两存活席距离为 1)', 
   assert.ok(targets.indexOf('enemy') >= 0, '亡者剔除后 enemy 距离 1 → 顺手可达');
 });
 
-// ───── 酒: 目标矩阵自洽 (仅自己变体, 已知分歧记录) ───────────────────
+// ───── 酒: 目标矩阵自洽 ─────────────────────────────────────────────
+// v13 K2 (座席泛化桶销账): 官方语义放开他指 — gltjk card__basic.md:58
+// "使用目标: 包括你在内的一名角色"。旧断言钉住的"仅自己"变体分歧已清。
 
-test('酒: isLegalCardTarget 自洽 — 自己合法 (未用过), 他人不合法', () => {
+test('酒: isLegalCardTarget 自洽 — 自己合法 (未用过), 他人按官方语义合法', () => {
   const game = build({ seed: 13415 });
   const jiu = c('jiu', { id: 'j-1' });
   game.player.hand = [jiu];
   assert.equal(Engine.isLegalCardTarget(game, 'player', jiu, 'player'), true);
-  assert.equal(Engine.isLegalCardTarget(game, 'player', jiu, 'enemy'), false, '本实现为仅自己变体 (分歧已记录)');
+  assert.equal(Engine.isLegalCardTarget(game, 'player', jiu, 'enemy'), true, 'v13 K2: "包括你在内的一名角色" (card__basic.md:58)');
   game.player.flags.jiuUsedThisTurn = true;
-  assert.equal(Engine.isLegalCardTarget(game, 'player', jiu, 'player'), false, '本回合已用过');
+  assert.equal(Engine.isLegalCardTarget(game, 'player', jiu, 'player'), false, '本回合已用过 (限次挂使用者)');
 });
 
 for (const [name, fn] of tests) {
