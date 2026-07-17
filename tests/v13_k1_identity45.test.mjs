@@ -35,10 +35,12 @@ function build(seats, opts = {}) {
 
 test('K1: 4 人档预设 — 主/忠/反/内 逐席分配, 首位主公先手', () => {
   const game = Engine.newGame({ seed: 15002, seats: SEATS4 });
+  // v13 K3: 座次顺序对齐座席语义 (enemy=反贼/ally=忠臣, 与 3 人档一致);
+  // 构成仍为官方 1主1忠1反1内。
   assert.deepEqual(
     SEATS4.map((seat) => game.roles[seat]),
-    ['主公', '忠臣', '反贼', '内奸'],
-    '4 人档为官方 主/忠/反/内 各一'
+    ['主公', '反贼', '忠臣', '内奸'],
+    '4 人档为官方 主/忠/反/内 各一 (座次: 主/反/忠/内)'
   );
   assert.equal(game.mode, 'identity3', '身份场模式标签覆盖 4 人档');
   assert.equal(game.firstActor, 'player', '首位 (主公) 先手');
@@ -50,9 +52,10 @@ test('K1: 4 人档预设 — 主/忠/反/内 逐席分配, 首位主公先手', 
 
 test('K1: 5 人档预设 — 主/忠/反/反/内 逐席开局', () => {
   const game = Engine.newGame({ seed: 15003, seats: SEATS5 });
+  // v13 K3: 座次对齐座席语义 (enemy=反贼/ally=忠臣); 构成 1主1忠2反1内。
   assert.deepEqual(
     SEATS5.map((seat) => game.roles[seat]),
-    ['主公', '忠臣', '反贼', '反贼', '内奸']
+    ['主公', '反贼', '忠臣', '反贼', '内奸']
   );
   assert.equal(game.roleSides[game.roles.ally3], 'renegade', '内奸阵营映射就绪');
   assert.deepEqual(Engine.aliveSeats(game), SEATS5);

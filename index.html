@@ -124,14 +124,17 @@
           <span class="badge">双方英雄池一致，不能同名对战</span>
         </div>
         <!-- v12 H6: 对战模式选择 — 1v1 单挑 / 3人身份场。默认 1v1 (与旧版
-             行为逐字一致); 切到 3人身份场后显示第三席 (ally) 武将下拉,
-             且身份判定区隐藏 (identity3 身份为固定预设: 我方=主公 / 对方=
-             反贼 / 第三席=忠臣, 不支持随机指定, 随 Engine.newGame 座次预设
-             自动分配)。 -->
+             行为逐字一致); 切到身份场后显示对应席位武将下拉, 且身份判定区
+             隐藏 (身份为固定预设, 随 Engine.newGame 座次预设自动分配)。
+             v13 K3: 增 4/5 人身份场 — 座次预设 4 人 主/反/忠/内,
+             5 人 主/反/忠/反/内 (enemy=反贼 / ally=忠臣, 席位语义与 3 人
+             档一致; 第四/五席用中性席位文案, 身份看徽章)。 -->
         <div class="match-mode-panel" id="matchModePanel">
           <span class="badge">对战模式</span>
           <button type="button" class="btn small is-active" id="modeDuelBtn" data-match-mode="duel">1v1 单挑</button>
           <button type="button" class="btn small" id="modeIdentity3Btn" data-match-mode="identity3">3人身份场</button>
+          <button type="button" class="btn small" id="modeIdentity4Btn" data-match-mode="identity4">4人身份场</button>
+          <button type="button" class="btn small" id="modeIdentity5Btn" data-match-mode="identity5">5人身份场</button>
         </div>
         <div class="role-draft-panel" id="roleDraftPanel">
           <span class="badge">身份判定</span>
@@ -168,10 +171,17 @@
           <label class="setup-side">我方武将 <select id="playerHeroSelect"></select></label>
           <label class="setup-side">敌方武将 <select id="enemyHeroSelect"></select></label>
         </div>
-        <!-- v12 H6: 第三席 (ally) 武将下拉 — 仅 3人身份场显示 (默认 hidden,
-             1v1 零回归); 身份固定为忠臣, 随 newGame seats 预设自动分配。 -->
+        <!-- v12 H6: 第三席 (ally) 武将下拉 — 仅身份场显示 (默认 hidden,
+             1v1 零回归); 身份固定为忠臣, 随 newGame seats 预设自动分配。
+             v13 K3: 第四/五席同款下拉 (identity4/identity5 逐档显示)。 -->
         <div class="hero-select-panel setup-grid" id="allyHeroPickRow" hidden>
           <label class="setup-side">第三席（忠臣）武将 <select id="allyHeroSelect"></select></label>
+        </div>
+        <div class="hero-select-panel setup-grid" id="ally2HeroPickRow" hidden>
+          <label class="setup-side">第四席武将 <select id="ally2HeroSelect"></select></label>
+        </div>
+        <div class="hero-select-panel setup-grid" id="ally3HeroPickRow" hidden>
+          <label class="setup-side">第五席（内奸）武将 <select id="ally3HeroSelect"></select></label>
         </div>
         <!-- v9 PR-E11: 顺序选将完成后自动进入游戏 (handleHeroPickCardClick
              pickStep>=2 → newGame). 此 fallback 按钮 hidden, 仅留绑定. -->
@@ -253,6 +263,81 @@
           <div class="equipment-area" id="allyEquipmentArea"><span class="mini-card">未装备</span></div>
           <div class="panel-title" style="margin-top:12px">队友手牌</div>
           <div class="small-card-row" id="allyHandBacks"></div>
+        </div>
+      </section>
+
+      <!-- v13 K3: 4/5 人身份场第四/五席 — 预置槽位方案 (与 ally-zone 同构
+           复用, 默认 hidden, 1v1/3p 零回归), board-panels 按 game.seats
+           存在性逐席显隐。席位文案中性 (第四席/第五席), 身份看徽章。 -->
+      <section class="ally-zone" id="ally2Zone" hidden>
+        <div class="zone-panel">
+          <div class="zone-title">第四席判定区 <span class="badge">延时锦囊</span></div>
+          <div class="judge-area" id="ally2JudgeArea"><span class="mini-card">空</span></div>
+        </div>
+
+        <article class="hero ally" id="ally2Hero" data-camp="群">
+          <div class="hero-aura"></div>
+          <span class="lord-badge" id="ally2LordBadge" hidden aria-label="主公">主</span>
+          <span class="rebel-badge" id="ally2RebelBadge" hidden aria-label="反贼">反</span>
+          <span class="loyalist-badge" id="ally2LoyalistBadge" hidden aria-label="忠臣">忠</span>
+          <span class="renegade-badge" id="ally2RenegadeBadge" hidden aria-label="内奸">内</span>
+          <div class="camp-ribbon" id="ally2Ribbon">群</div>
+          <div class="hero-head">
+            <div>
+              <div class="hero-name" id="ally2Name">第四席</div>
+              <span class="badge" id="ally2Camp"></span>
+            </div>
+            <span class="badge" id="ally2TurnBadge">电脑</span>
+          </div>
+          <p class="quote" id="ally2Quote"></p>
+          <div class="hp-row" id="ally2Hp"></div>
+          <div class="stat-grid">
+            <div class="stat"><small>手牌</small><strong id="ally2HandCount">0</strong></div>
+            <div class="stat"><small>状态</small><strong id="ally2State">待机</strong></div>
+          </div>
+        </article>
+
+        <div class="zone-panel">
+          <div class="zone-title">第四席装备区 <span class="badge">武器 / 防具 / 坐骑</span></div>
+          <div class="equipment-area" id="ally2EquipmentArea"><span class="mini-card">未装备</span></div>
+          <div class="panel-title" style="margin-top:12px">第四席手牌</div>
+          <div class="small-card-row" id="ally2HandBacks"></div>
+        </div>
+      </section>
+
+      <section class="ally-zone" id="ally3Zone" hidden>
+        <div class="zone-panel">
+          <div class="zone-title">第五席判定区 <span class="badge">延时锦囊</span></div>
+          <div class="judge-area" id="ally3JudgeArea"><span class="mini-card">空</span></div>
+        </div>
+
+        <article class="hero ally" id="ally3Hero" data-camp="群">
+          <div class="hero-aura"></div>
+          <span class="lord-badge" id="ally3LordBadge" hidden aria-label="主公">主</span>
+          <span class="rebel-badge" id="ally3RebelBadge" hidden aria-label="反贼">反</span>
+          <span class="loyalist-badge" id="ally3LoyalistBadge" hidden aria-label="忠臣">忠</span>
+          <span class="renegade-badge" id="ally3RenegadeBadge" hidden aria-label="内奸">内</span>
+          <div class="camp-ribbon" id="ally3Ribbon">群</div>
+          <div class="hero-head">
+            <div>
+              <div class="hero-name" id="ally3Name">第五席</div>
+              <span class="badge" id="ally3Camp"></span>
+            </div>
+            <span class="badge" id="ally3TurnBadge">电脑</span>
+          </div>
+          <p class="quote" id="ally3Quote"></p>
+          <div class="hp-row" id="ally3Hp"></div>
+          <div class="stat-grid">
+            <div class="stat"><small>手牌</small><strong id="ally3HandCount">0</strong></div>
+            <div class="stat"><small>状态</small><strong id="ally3State">待机</strong></div>
+          </div>
+        </article>
+
+        <div class="zone-panel">
+          <div class="zone-title">第五席装备区 <span class="badge">武器 / 防具 / 坐骑</span></div>
+          <div class="equipment-area" id="ally3EquipmentArea"><span class="mini-card">未装备</span></div>
+          <div class="panel-title" style="margin-top:12px">第五席手牌</div>
+          <div class="small-card-row" id="ally3HandBacks"></div>
         </div>
       </section>
 
@@ -512,10 +597,14 @@
           <span class="badge pending-prompt-panel__hint" id="huogongShowHint">火攻：选择展示一张手牌</span>
           <div class="huogong-show-choices pending-prompt-panel__choices" id="huogongShowChoices" aria-live="polite"></div>
         </div>
-        <!-- v13 J2: 火攻成本挂起重选 — 显式成本在结算中途失效时重选同花色 -->
+        <!-- v13 J2: 火攻成本挂起重选 — 显式成本在结算中途失效时重选同花色。
+             v13 K3 (缺陷修复): 候选容器 id 原与 huogongModePanel 内的
+             huogongCostChoices 重复, 真实浏览器 getElementById 恒取文档序
+             首个 → 重选候选被渲染进隐藏的旧面板 (fake-dom 注册表语义掩盖
+             了该缺陷); 改为唯一 id huogongCostRepickChoices。 -->
         <div class="huogong-cost-panel pending-prompt-panel" id="huogongCostPanel" hidden>
           <span class="badge pending-prompt-panel__hint" id="huogongCostHint">火攻：重选要弃置的同花色手牌</span>
-          <div class="huogong-cost-choices pending-prompt-panel__choices" id="huogongCostChoices" aria-live="polite"></div>
+          <div class="huogong-cost-choices pending-prompt-panel__choices" id="huogongCostRepickChoices" aria-live="polite"></div>
           <button class="btn small" id="huogongCostDeclineBtn">不弃置（无伤结算）</button>
         </div>
         <!-- v13 J3: 天香 ask — 受到伤害时弃红桃转移 (选成本 + 选目标 + 确认/放弃) -->

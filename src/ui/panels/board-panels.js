@@ -55,6 +55,10 @@
         if (rebelBadge) rebelBadge.hidden = role !== '反贼';
         var loyalistBadge = els[actor + 'LoyalistBadge'];
         if (loyalistBadge) loyalistBadge.hidden = role !== '忠臣';
+        // v13 K3: 内奸徽章 — 4/5 人身份场 (player/enemy/ally 无此节点,
+        // guard 跳过; 身份四态互斥显示)。
+        var renegadeBadge = els[actor + 'RenegadeBadge'];
+        if (renegadeBadge) renegadeBadge.hidden = role !== '内奸';
         if (els[actor + 'Ribbon']) els[actor + 'Ribbon'].textContent = state.camp;
         if (actor === 'player') {
           lobbyPanels.renderPlayerSkillBar({
@@ -166,6 +170,17 @@
         return escapeHtml(base) + (chained ? ' <span class="badge chain-status">铁索横置</span>' : '');
       }
 
+      // v13 K3: 座席胜负归属 — 1v1 winner 为座席名, 身份场为阵营名
+      // (lordSide/rebelSide/renegade), 按该席身份的阵营映射判定。
+      function seatWon(seat) {
+        var winnerVal = view.game && view.game.winner;
+        if (!winnerVal) return false;
+        if (winnerVal === seat) return true;
+        var role = view.game.roles && view.game.roles[seat];
+        var side = role && view.game.roleSides ? view.game.roleSides[role] : null;
+        return !!side && winnerVal === side;
+      }
+
       function renderStatus() {
         var isGameOver = view.game.phase === 'gameover';
         var isPlayerTurn = view.game.turn === 'player';
@@ -174,8 +189,18 @@
         var text = '';
 
         if (isGameOver) {
-          title = view.game.winner === 'player' ? '胜利！' : '败北……';
-          text = view.game.winner === 'player' ? '你平定了这场乱世对决。点击“新开一局”再战。' : '电脑赢下了这一局。调整出牌顺序再来一次。';
+          // v13 K3 (缺陷修复): 身份场终局横幅此前只认 winner==='player'
+          // (1v1 座席名), lordSide/rebelSide/renegade 阵营胜利恒显"败北"。
+          // 按玩家所属阵营判定胜负归属; 1v1 winner 仍为座席名, 行为不变。
+          var winnerVal = view.game.winner;
+          var playerWon = seatWon('player');
+          var winnerLabel = winnerVal === 'lordSide' ? '主忠方'
+            : winnerVal === 'rebelSide' ? '反贼方'
+            : winnerVal === 'renegade' ? '内奸' : '电脑';
+          title = playerWon ? '胜利！' : '败北……';
+          text = playerWon
+            ? '你平定了这场乱世对决。点击“新开一局”再战。'
+            : winnerLabel + '赢下了这一局。调整出牌顺序再来一次。';
         } else if (discardNeeded) {
           title = '弃牌阶段';
           text = '你的手牌超过体力上限。点选需要弃置的牌，然后确认弃牌。';
@@ -228,8 +253,9 @@
           els.confirmDiscardBtn.hidden = !discardNeeded;
           els.confirmDiscardBtn.disabled = !discardNeeded || view.selectedDiscardIds.length < Engine.getDiscardCount(view.game, 'player');
         }
-        els.playerState.innerHTML = stateStatusMarkup('player', isGameOver ? (view.game.winner === 'player' ? '胜利' : '败北') : (isPlayerTurn ? '行动' : '等待'));
-        els.enemyState.innerHTML = stateStatusMarkup('enemy', isGameOver ? (view.game.winner === 'enemy' ? '胜利' : '败北') : (!isPlayerTurn ? '行动' : '等待'));
+        // v13 K3: 胜负归属走 seatWon (身份场按阵营, 1v1 按座席名不变)。
+        els.playerState.innerHTML = stateStatusMarkup('player', isGameOver ? (seatWon('player') ? '胜利' : '败北') : (isPlayerTurn ? '行动' : '等待'));
+        els.enemyState.innerHTML = stateStatusMarkup('enemy', isGameOver ? (seatWon('enemy') ? '胜利' : '败北') : (!isPlayerTurn ? '行动' : '等待'));
         // v9 PR-E14: 之前默认显示 "电脑" / "玩家" 是冗余信息 (1v1 位置一目了然),
         // 而且 turn-badge 在 hero-head 右侧与右上 lord/rebel-badge 重叠造成文字
         // 被遮挡. 改成: 仅 "当前回合" 时显示, 其余 hidden.
@@ -288,11 +314,12 @@
         if (els.enemyEquipmentArea) els.enemyEquipmentArea.innerHTML = equipmentCards(view.game.enemy.equipment);
         if (els.playerJudgeArea) els.playerJudgeArea.innerHTML = zoneCards(view.game.player.judgeArea, '空');
         if (els.enemyJudgeArea) els.enemyJudgeArea.innerHTML = zoneCards(view.game.enemy.judgeArea, '空');
-        // v12 H6: 3人身份场第三席装备/判定区 (1v1 无 view.game.ally, 不渲染).
-        if (view.game.ally) {
-          if (els.allyEquipmentArea) els.allyEquipmentArea.innerHTML = equipmentCards(view.game.ally.equipment);
-          if (els.allyJudgeArea) els.allyJudgeArea.innerHTML = zoneCards(view.game.ally.judgeArea, '空');
-        }
+        // v12 H6 / v13 K3: 身份场第三/四/五席装备/判定区 (1v1 无该席, 不渲染).
+        extraSeatsOf(view.game).forEach(function (seat) {
+          if (!view.game[seat]) return;
+          if (els[seat + 'EquipmentArea']) els[seat + 'EquipmentArea'].innerHTML = equipmentCards(view.game[seat].equipment);
+          if (els[seat + 'JudgeArea']) els[seat + 'JudgeArea'].innerHTML = zoneCards(view.game[seat].judgeArea, '空');
+        });
       }
 
       function suitLabel(suit) {
@@ -320,24 +347,43 @@
           + '</span>';
       }
 
+    // v13 K3: 非玩家席泛化 — 座席即 DOM id 前缀 (enemy/ally/ally2/ally3
+    // 槽位预置于 index.html, 缺席保持 [hidden])。席数判断走 game.seats
+    // (mode 'identity3' 是身份场标签, 覆盖 3-5 人档, 不携带席数)。
+    function extraSeatsOf(game) {
+      var seats = (game && game.seats) || [];
+      return seats.filter(function (seat) { return seat !== 'player' && seat !== 'enemy'; });
+    }
+
     function renderBoard(viewState) {
       view = viewState;
-      // v12 H6: 3人身份场第三席 (ally) — game.mode==='identity3' 时才存在
-      // game.ally / 显示 #allyZone; 1v1 duelTable 不带 .is-identity3 class,
-      // #allyZone 保持 [hidden] (CSS display:none), 零回归。
-      var identity3 = !!(view.game && view.game.mode === 'identity3');
-      if (els.duelTable) els.duelTable.classList.toggle('is-identity3', identity3);
-      if (els.allyZone) els.allyZone.hidden = !identity3;
+      // v12 H6: 1v1 duelTable 不带 .is-identityN class, 备席 zone 保持
+      // [hidden] (CSS display:none), 零回归。
+      var seats = (view.game && view.game.seats) || [];
+      var extraSeats = extraSeatsOf(view.game);
+      if (els.duelTable) {
+        els.duelTable.classList.toggle('is-identity3', seats.length === 3);
+        els.duelTable.classList.toggle('is-identity4', seats.length === 4);
+        els.duelTable.classList.toggle('is-identity5', seats.length === 5);
+      }
+      ['ally', 'ally2', 'ally3'].forEach(function (seat) {
+        var zone = els[seat + 'Zone'];
+        if (zone) zone.hidden = seats.indexOf(seat) < 0;
+      });
       renderHero('player');
       renderHero('enemy');
-      if (identity3) renderHero('ally');
+      extraSeats.forEach(function (seat) { if (view.game[seat]) renderHero(seat); });
       renderHand();
       renderLog();
       renderStatus();
       renderPhaseTrack();
       renderZones();
       els.enemyHandBacks.innerHTML = miniBacks(view.game.enemy.hand.length);
-      if (identity3 && els.allyHandBacks) els.allyHandBacks.innerHTML = miniBacks(view.game.ally.hand.length);
+      extraSeats.forEach(function (seat) {
+        if (els[seat + 'HandBacks'] && view.game[seat]) {
+          els[seat + 'HandBacks'].innerHTML = miniBacks(view.game[seat].hand.length);
+        }
+      });
     }
 
     function renderLogWithView(viewState) {
