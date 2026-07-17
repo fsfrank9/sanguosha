@@ -1174,6 +1174,9 @@
           roles: roles,
           seats: seats,
           firstActor: firstActor,
+          // v13 K1: 'identity3' 为身份场模式标签 (历史命名), 覆盖 3-5 人档 —
+          // 引擎/UI 所有 mode==='identity3' 判断语义均为"身份场规则生效",
+          // 与具体席数无关; 席数判断一律走 game.seats.length。
           mode: seats.length >= 3 ? 'identity3' : 'duel',
           // v12 H5: 身份→阵营映射随局携带 (胜负判定/内奸预留)。
           roleSides: clone(ROLE_SIDES),
