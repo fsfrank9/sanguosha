@@ -196,9 +196,15 @@
     return distanceBetween(game, actor, targetActor) <= weaponRange(game[actor]);
   }
 
-  function firstActorFromRoles(roles, fallback) {
-    if (roles.player === '主公') return 'player';
-    if (roles.enemy === '主公') return 'enemy';
+  // v13 L1 (硬缺陷修复): 此前只查 player/enemy 两个字面键 — 身份轮转后
+  // 主公可落任意座席 (ally/ally2/ally3), 先手会错判回 fallback。改为按
+  // seats 座次序扫描 (兼容旧 2 参调用: seats 传数组之外的值时走缺省环)。
+  function firstActorFromRoles(roles, seats, fallback) {
+    var order = Array.isArray(seats) && seats.length ? seats : ['player', 'enemy'];
+    if (!Array.isArray(seats) && typeof seats === 'string' && fallback === undefined) fallback = seats;
+    for (var i = 0; i < order.length; i += 1) {
+      if (roles && roles[order[i]] === '主公') return order[i];
+    }
     return fallback || 'player';
   }
 

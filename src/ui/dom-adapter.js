@@ -1,4 +1,6 @@
       import { SanguoshaEngine } from '../engine/game-engine.js';
+      // v13 L1: 身份轮转直接读预设表 (与引擎同源, 构成恒一致)。
+      import { IDENTITY_PRESETS } from '../data/identity.js';
       import { createResponsePanels } from './panels/response-panels.js';
       import { createPromptPanels } from './panels/prompt-panels.js';
       import { createModePanels } from './panels/mode-panels.js';
@@ -34,6 +36,13 @@
       var enemyPhaseDelay = 700;
       var playerRole = '主公';
       var enemyRole = '反贼';
+      // v13 L1: 身份场我方身份选择 — '主公'(缺省)/'忠臣'/'反贼'/'内奸'/
+      // '随机' (随机轮转偏移, 身份概率与预设构成一致)。
+      var identityPlayerRole = '主公';
+      var IDENTITY_ROLE_BTN_IDS = {
+        '主公': 'roleLordBtn', '忠臣': 'roleLoyalBtn', '反贼': 'roleRebelBtn',
+        '内奸': 'roleRenegadeBtn', '随机': 'roleRandomBtn'
+      };
       var els = {};
 
       var lobbyPanels = createLobbyPanels({
@@ -217,6 +226,10 @@
           'ally3LordBadge', 'ally3RebelBadge', 'ally3LoyalistBadge', 'ally3RenegadeBadge',
           'matchModePanel', 'modeDuelBtn', 'modeIdentity3Btn',
           'modeIdentity4Btn', 'modeIdentity5Btn',
+          // v13 L1: 身份场可选身份面板 + 三席内奸徽章 (轮转后内奸可落任意席)。
+          'identityRolePanel', 'roleLordBtn', 'roleLoyalBtn', 'roleRebelBtn',
+          'roleRenegadeBtn', 'roleRandomBtn',
+          'playerRenegadeBadge', 'enemyRenegadeBadge', 'allyRenegadeBadge',
           'allyHeroPickRow', 'allyHeroSelect',
           'ally2HeroPickRow', 'ally2HeroSelect', 'ally3HeroPickRow', 'ally3HeroSelect',
           // v12 H6: identity3 单目标牌/主动技 座席点选模式面板。
@@ -295,6 +308,14 @@
         }
         // v9 PR-E24: renderPendingChoice 每次重建候选 DOM, 重新套用 staged 高亮.
         _reapplyStagedHighlight();
+        // v13 L2: 阵亡旁观接管 — 玩家于自己回合内阵亡后不会再点"结束回合",
+        // 任何触发渲染的路径 (技能/决斗结算/濒死收尾) 检测到亡席滞留回合即
+        // 自动接管驱动至下一存活座席 (maybeStartEnemyTurn 幂等, enemyThinking
+        // 防重入; 存活玩家回合恒 no-op)。
+        if (game && game.turn === 'player' && game.player && game.player.hp <= 0
+            && game.phase !== 'gameover' && !enemyThinking && !Engine.getPendingChoice(game)) {
+          maybeStartEnemyTurn();
+        }
       }
 
       // v9 PR-E24: render 重建 pending 面板候选后, 据 stagedModalChoice.selector
@@ -598,6 +619,8 @@
 
       function usePlayerCard(cardId) {
         if (!game || game.turn !== 'player' || enemyThinking) return;
+        // v13 L2: 亡席玩家 (旁观) 一律不再接受出牌输入。
+        if (game.player && game.player.hp <= 0) return;
         if (activeCardSkillConfig()) {
           toggleSkillCard(cardId);
           return;
@@ -646,6 +669,8 @@
 
       function confirmDiscardSelection() {
         if (!game || game.turn !== 'player' || game.phase !== 'discard') return;
+        // v13 L2: 亡席玩家 (旁观) 不再操作弃牌。
+        if (game.player && game.player.hp <= 0) return;
         var result = Engine.discardSelected(game, 'player', selectedDiscardIds);
         selectedDiscardIds = [];
         if (!result.ok) {
@@ -661,6 +686,8 @@
 
       function usePlayerSkill(skillId) {
         if (!game || game.turn !== 'player' || game.phase !== 'play' || enemyThinking) return;
+        // v13 L2: 亡席玩家 (旁观) 不再发动技能。
+        if (game.player && game.player.hp <= 0) return;
         // v12 H 复核修复: 发动任何技能前清理悬空座席点选 (见 enterCardSkillMode)。
         modePanels.cancelSeatPicker();
         if (cardSkillConfig(skillId)) {
@@ -721,9 +748,20 @@
         // (守护测试锁定了 enemyStep 必须逐动作调 aiTakeAction, 不得整回合
         // 批量结算)。
         var actor = game && game.turn;
-        if (!game || game.phase === 'gameover' || actor === 'player') {
+        // v13 L2: 阵亡旁观 — 玩家于自己回合内阵亡 (苦肉/决斗反噬等) 后,
+        // play 阶段推进原本只靠"结束回合"按钮 (亡者不会再点), 会卡死。
+        // 亡席玩家的回合按 AI 回合同款驱动跑完 (跳过出牌动作)。
+        var playerDeadTurn = !!(game && actor === 'player' && game.player
+          && game.player.hp <= 0 && game.phase !== 'gameover');
+        if (!game || game.phase === 'gameover' || (actor === 'player' && !playerDeadTurn)) {
           enemyThinking = false;
           render();
+          return;
+        }
+        if (playerDeadTurn && game.phase === 'play') {
+          Engine.finishPlayPhase(game);
+          render();
+          window.setTimeout(enemyStep, enemyPhaseDelay);
           return;
         }
         // v9 PR-E25: 电脑回合中出现待玩家决策的 pendingChoice (如被【杀】要不要
@@ -784,7 +822,10 @@
       function maybeStartEnemyTurn() {
         // v12 H6: game.turn === 'enemy' → !== 'player' (泛化到 identity3 的
         // 任意非玩家座席, 1v1 中 !== 'player' 与 === 'enemy' 完全等价)。
-        if (game && game.turn !== 'player' && game.phase !== 'gameover' && !enemyThinking) {
+        // v13 L2: 亡席玩家滞留的回合也当 AI 回合驱动 (阵亡旁观续跑)。
+        var deadPlayerTurn = game && game.turn === 'player' && game.player && game.player.hp <= 0;
+        if (game && (game.turn !== 'player' || deadPlayerTurn)
+            && game.phase !== 'gameover' && !enemyThinking) {
           enemyThinking = true;
           render();
           window.setTimeout(enemyStep, enemyPhaseDelay);
@@ -821,6 +862,41 @@
       // 身份判定区 (身份为固定预设, 由 Engine.newGame 的 seats 预设自动
       // 分配)。v13 K3: 增 'identity4'/'identity5' — 逐档显示第四/五席下拉。
       var IDENTITY_MODES = ['identity3', 'identity4', 'identity5'];
+
+      // v13 L1: 身份场身份选择 UI — 按钮激活态 + 3 人档隐藏内奸按钮。
+      function updateIdentityRoleUI() {
+        Object.keys(IDENTITY_ROLE_BTN_IDS).forEach(function (role) {
+          var btn = els[IDENTITY_ROLE_BTN_IDS[role]];
+          if (btn) btn.classList.toggle('is-active', identityPlayerRole === role);
+        });
+        if (els.roleRenegadeBtn) els.roleRenegadeBtn.hidden = matchMode === 'identity3';
+      }
+
+      function setIdentityRole(role) {
+        identityPlayerRole = role;
+        playerRole = role; // 选将提示文案 ("您是{身份}，请选将") 同步
+        updateIdentityRoleUI();
+        renderHeroPickGrid();
+      }
+
+      // v13 L1: 预设阵型内轮转 — 玩家席取所选身份在预设中的下标为偏移,
+      // 其余身份沿座次环顺延 (构成不变); '随机' = 随机偏移 (身份概率与
+      // 预设构成一致, 5 人档反贼 2/5)。返回逐席 roles 表。
+      function computeIdentityRoles(seatNames) {
+        var preset = IDENTITY_PRESETS[seatNames.length] || IDENTITY_PRESETS[3];
+        var offset;
+        if (identityPlayerRole === '随机') {
+          offset = Math.floor(Math.random() * preset.length);
+        } else {
+          offset = Math.max(0, preset.indexOf(identityPlayerRole));
+        }
+        var rotated = {};
+        for (var ri = 0; ri < seatNames.length; ri += 1) {
+          rotated[seatNames[ri]] = preset[(ri + offset) % preset.length];
+        }
+        return rotated;
+      }
+
       function setMatchMode(mode) {
         var prev = matchMode;
         matchMode = IDENTITY_MODES.indexOf(mode) >= 0 ? mode : 'duel';
@@ -833,10 +909,16 @@
         if (els.ally2HeroPickRow) els.ally2HeroPickRow.hidden = matchMode !== 'identity4' && matchMode !== 'identity5';
         if (els.ally3HeroPickRow) els.ally3HeroPickRow.hidden = matchMode !== 'identity5';
         if (els.roleDraftPanel) els.roleDraftPanel.hidden = identityMode;
+        // v13 L1: 身份选择面板随身份场显示; 3 人档无内奸 — 已选内奸时回退主公。
+        if (els.identityRolePanel) els.identityRolePanel.hidden = !identityMode;
+        if (matchMode === 'identity3' && identityPlayerRole === '内奸') identityPlayerRole = '主公';
+        updateIdentityRoleUI();
         if (prev === matchMode) return; // 同模式重复点击 → 不重置选将/身份
         if (identityMode) {
-          // 身份场身份固定: 我方恒主公 (座次预设首位), 选将顺序照旧玩家先选。
-          playerRole = '主公';
+          // v13 L1: 身份可选 — 我方身份取自 identityRolePanel 选择 (缺省
+          // 主公, 与 v12 固定预设行为一致); 选将顺序恒玩家先选 (AI 席武将
+          // 走下拉无"选将顺序"语义)。
+          playerRole = identityPlayerRole;
           enemyRole = '反贼';
           updateDraftUI();
           resetPickSequence();
@@ -861,7 +943,9 @@
 
       function resetPickSequence() {
         pickStep = 0;
-        pickOrder = playerRole === '主公' ? ['player', 'enemy'] : ['enemy', 'player'];
+        // v13 L1: 身份场恒玩家先选 (playerRole 可为忠/反/内, "主公先选"
+        // 约定仅对 1v1 的随机主公/反贼有意义); duel 行为逐字不变。
+        pickOrder = (matchMode !== 'duel' || playerRole === '主公') ? ['player', 'enemy'] : ['enemy', 'player'];
         currentPickSide = pickOrder[0];
         if (els.playerHeroSelect) els.playerHeroSelect.value = '';
         if (els.enemyHeroSelect) els.enemyHeroSelect.value = '';
@@ -873,7 +957,9 @@
           playerVal: els.playerHeroSelect ? els.playerHeroSelect.value : '',
           enemyVal: els.enemyHeroSelect ? els.enemyHeroSelect.value : '',
           playerRole: playerRole,
-          enemyRole: enemyRole
+          enemyRole: enemyRole,
+          // v13 L1: 身份场提示文案泛化 ("您是{身份}" / 敌方席不再写死反贼)。
+          identityMode: matchMode !== 'duel'
         });
       }
 
@@ -1010,6 +1096,9 @@
             enemyHero: enemyHero,
             startWithFirstTurn: true
           };
+          // v13 L1: 可选身份 — 预设阵型内轮转出逐席 roles (玩家=所选身份,
+          // 主公可落任意 AI 座席; 引擎 firstActorFromRoles 全环扫描先手)。
+          gameOptions.roles = computeIdentityRoles(gameOptions.seats);
           var extraDefaults = { ally: 'guanyu', ally2: 'zhaoyun', ally3: 'machao' };
           extraSeatNames.forEach(function (seat) {
             var select = els[seat + 'HeroSelect'];
@@ -1307,6 +1396,11 @@
         if (els.modeIdentity3Btn) els.modeIdentity3Btn.addEventListener('click', function () { setMatchMode('identity3'); });
         if (els.modeIdentity4Btn) els.modeIdentity4Btn.addEventListener('click', function () { setMatchMode('identity4'); });
         if (els.modeIdentity5Btn) els.modeIdentity5Btn.addEventListener('click', function () { setMatchMode('identity5'); });
+        // v13 L1: 身份场我方身份选择按钮。
+        Object.keys(IDENTITY_ROLE_BTN_IDS).forEach(function (role) {
+          var btn = els[IDENTITY_ROLE_BTN_IDS[role]];
+          if (btn) btn.addEventListener('click', function () { setIdentityRole(role); });
+        });
         // v9 PR-E9: 选将网格 — card click → 设当前 pick side 的 hero.
         // (tab 在非当前 side 时 hidden, 不可点; 不再绑 click.)
         if (els.heroPickGrid) els.heroPickGrid.addEventListener('click', function (event) {

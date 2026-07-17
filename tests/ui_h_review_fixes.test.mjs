@@ -127,15 +127,20 @@ test('U3: 借刀 — 持刀者仅一名可达受害者 → 自动完成不报错
   assert.ok(!game.log.some((l) => l.includes('无效受害')), '受害者自动落在合法的 enemy, 不报错');
 });
 
-// ───── U4: 黄天玩家按钮已移除 (固定预设下死代码) ─────
+// ───── U4: 黄天玩家按钮 — v13 L1 随可选身份回归 (原"永不出现"守护改正向) ─────
 
-test('U4: identity3 玩家 (恒主公) 技能栏永不出现黄天按钮 (死代码已移除)', () => {
+test('U4: 黄天按钮 — 玩家主公时不出现; 玩家忠臣(群) + AI 主公张角时出现 (v13 L1)', () => {
   const game = start3p('machao', 'caocao', 'zhangjiao'); // ally 张角(持黄天), player 群势力马超
   game.player.hand = [c('shan', { id: 'give-shan' })];
   UI.render();
-  assert.equal(game.roles.player, '主公', '固定预设: 玩家恒主公');
-  assert.ok($('playerSkillBar').innerHTML.indexOf('黄天') < 0, '技能栏无黄天按钮 (玩家作主公不可能是群势力给牌方)');
-  assert.ok($('playerSkillBar').innerHTML.indexOf('data-skill-id="huangtian"') < 0, '无黄天技能按钮');
+  assert.equal(game.roles.player, '主公', '缺省预设: 玩家主公');
+  assert.ok($('playerSkillBar').innerHTML.indexOf('data-skill-id="huangtian"') < 0,
+    '玩家为主公 → 无黄天按钮 (自己就是主公, 无给牌方语义)');
+  // v13 L1 可选身份: 玩家轮转为忠臣, AI 张角为主公 → 按钮可达。
+  game.roles = { player: '忠臣', enemy: '反贼', ally: '主公' };
+  UI.render();
+  assert.ok($('playerSkillBar').innerHTML.indexOf('data-skill-id="huangtian"') >= 0,
+    '玩家群势力忠臣 + AI 主公张角 → 黄天·交牌按钮出现');
 });
 
 // ───── U5: 铁索 identity3 可选第三席 ─────

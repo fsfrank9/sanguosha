@@ -121,9 +121,18 @@
           if (els.randomEnemyHeroBtn) els.randomEnemyHeroBtn.hidden = (currentPickSide !== 'enemy');
           if (els.heroPickPrompt) {
             var sideRole = currentPickSide === 'player' ? state.playerRole : state.enemyRole;
-            els.heroPickPrompt.textContent = currentPickSide === 'player'
-              ? (sideRole === '主公' ? '您是主公，请选将' : '您是反贼，请选将')
-              : (sideRole === '主公' ? '请为对手 (主公) 选将' : '请为对手 (反贼) 选将');
+            // v13 L1: 身份场可选身份 — 我方提示泛化为任意身份 ('随机' 专属
+            // 文案); 敌方席在身份场不再写死反贼 (实际身份随轮转)。duel 双态
+            // 文案逐字保留。
+            if (state.identityMode) {
+              els.heroPickPrompt.textContent = currentPickSide === 'player'
+                ? (sideRole === '随机' ? '身份随机，请选将' : '您是' + sideRole + '，请选将')
+                : '请为敌方座席选将';
+            } else {
+              els.heroPickPrompt.textContent = currentPickSide === 'player'
+                ? (sideRole === '主公' ? '您是主公，请选将' : '您是反贼，请选将')
+                : (sideRole === '主公' ? '请为对手 (主公) 选将' : '请为对手 (反贼) 选将');
+            }
           }
         }
 
@@ -182,20 +191,44 @@
           return '<button class="mini-card skill-button' + statusClass + '" data-skill-id="' + escapeHtml(skill.id) + '"' + dataAttrs + ' ' + (active ? '' : 'disabled') + ' title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
         }
 
-        // v12 H 复核修复: 黄天 (张角主公技) 玩家主动交牌按钮已移除 —
-        // 该按钮要求"玩家是群势力非主公 + 场上另有持黄天的主公", 但当前
-        // 3 人身份预设 IDENTITY_PRESETS[3] 固定 玩家席=主公 (UI 从不覆盖),
-        // 玩家永远是唯一可能的主公, "另一名主公"永不存在 → 按钮对人类玩家
-        // 100% 不可达 (死代码)。黄天的引擎逻辑完整且 AI 座席正常发动 (给
-        // 主公张角), 玩家作为主公张角时亦能作为受赠方受益; 玩家主动交牌一侧
-        // 需"可选身份"(玩家非主公) 支持, 留待 v13 身份可选后再接 UI 按钮。
+        // v13 L1: 黄天玩家主动交牌按钮回归 — v12 H 复核曾以"固定预设玩家
+        // 恒主公 → 按钮 100% 不可达"为由移除 (死代码), 可选身份落地后
+        // "玩家为群势力非主公 + 场上有持黄天的非敌对 AI 主公"真实可达。
+        // 黄天是"全场型主公技"(不在群势力英雄自身 skills 表), 独立渲染;
+        // 点击经既有 data-skill-id 分发 → usePlayerSkill('huangtian') →
+        // cardSkillConfig 选牌框架 (孤儿配置就此接通)。敌对身份 (反贼/
+        // 内奸) 不显示 — 引擎 triggerHuangtianActiveSkill 亦按 isHostileSeat
+        // 拒绝, 此处口径与引擎一致 (忠臣与主公同阵营才非敌对)。
+        function huangtianAidButtonHtml(state, game, enemyThinking) {
+          if (!game || game.mode !== 'identity3' || !game.roles || !game.roleSides) return '';
+          if (!state || state.camp !== '群') return '';
+          if (game.roles.player === '主公') return '';
+          if (game.roleSides[game.roles.player] !== 'lordSide') return '';
+          if (state.flags && state.flags.huangtianUsed) return '';
+          var lordSeat = (game.seats || []).find(function (seat) {
+            var st = game[seat];
+            return seat !== 'player' && st && st.hp > 0
+              && game.roles[seat] === '主公'
+              && (st.skills || []).some(function (s) { return s.id === 'huangtian'; });
+          });
+          if (!lordSeat) return '';
+          var hasGivable = (state.hand || []).some(function (c) { return c.type === 'shan' || c.type === 'shandian'; });
+          var active = game.turn === 'player' && game.phase === 'play'
+            && !enemyThinking && !game.winner && hasGivable && state.hp > 0;
+          return '<button class="mini-card skill-button" data-skill-id="huangtian" '
+            + (active ? '' : 'disabled')
+            + ' title="黄天：每回合限一次，将一张【闪】或【闪电】交给主公张角">黄天·交牌</button>';
+        }
 
         function renderPlayerSkillBar(ctx) {
           if (!els.playerSkillBar) return;
           var state = ctx.state;
-          els.playerSkillBar.innerHTML = (state.skills || []).map(function (skill) {
+          var html = (state.skills || []).map(function (skill) {
             return skillButtonHtml(skill, state, ctx.game, ctx.enemyThinking);
-          }).join('') || '<span class="mini-card">无技能</span>';
+          }).join('');
+          // v13 L1: 黄天全场型按钮附加在英雄自身技能之后 (条件不满足时为空串)。
+          html += huangtianAidButtonHtml(state, ctx.game, ctx.enemyThinking);
+          els.playerSkillBar.innerHTML = html || '<span class="mini-card">无技能</span>';
         }
 
         return {
