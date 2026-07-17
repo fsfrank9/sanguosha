@@ -461,11 +461,22 @@
       }
       // All responders exhausted, no save → die. H5: 身份场按阵营判胜，1v1 保持对手获胜。
       log(game, actorName(game, dyingActor) + '没有人救援，死亡。');
+      // v13 M1: 死亡翻明 — 官方 flow__death.md "亮出身份牌…（2）亮出身份
+      // 牌后：检测是否满足游戏结束的条件": 须先翻明再判胜负, 且无条件
+      // 执行 (settleDeath 只在非终局死亡时跑, 直接终局的死亡不能漏翻)。
+      if (game.hiddenRoles && game.roleRevealed && !game.roleRevealed[dyingActor]) {
+        game.roleRevealed[dyingActor] = true;
+        log(game, actorName(game, dyingActor) + '亮出身份牌：' + ((game.roles || {})[dyingActor] || '未知') + '。');
+      }
       var killerActor = saved.source;
       var winner = determineWinner(game, dyingActor);
       if (winner) {
         game.phase = 'gameover';
         game.winner = winner;
+        // v13 M1: 终局全席翻明 — 胜负已定身份公开 (UI 徽章/归属文案读真值)。
+        if (game.hiddenRoles && game.roleRevealed) {
+          (game.seats || []).forEach(function (revealSeat) { game.roleRevealed[revealSeat] = true; });
+        }
         log(game, (winner === 'lordSide' ? '主忠方' : winner === 'rebelSide' ? '反贼方' : winner === 'renegade' ? '内奸' : actorName(game, winner)) + '获胜！');
       }
       game.pauseState.dying = null;
@@ -589,8 +600,10 @@
       //     他人)。v12 H5: 身份场 AI 用【桃】救同阵营濒死者 (忠救主等);
       //     无身份信息 / 敌对 → 照旧不救。玩家走 ask 路径。
       if (responder !== dyingActor) {
+        // v13 M2: 救援立场走感知路由 — 暗置下只救 已翻明同阵营/主公
+        // (公开) 或推断为同侧者; 明置恒等直读。
         var sameSide = StateRuntime.sideOf(game, responder) !== null
-          && !StateRuntime.isHostileSeat(game, responder, dyingActor);
+          && !StateRuntime.perceivedHostile(game, responder, dyingActor);
         if (sameSide && taoCards.length) {
           return executeDyingRescue(game, responder, dyingActor, 'tao', taoCards[0].id);
         }
@@ -620,6 +633,7 @@
         var taoHeal = 1 + (taoRecoverBonus ? taoRecoverBonus(game, responder, dyingActor) : 0);
         dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + taoHeal);
         log(game, actorName(game, responder) + '对' + actorName(game, dyingActor) + '使用【桃】（濒死救援），回复 ' + taoHeal + ' 点体力。');
+        StateRuntime.recordStance(game, { type: 'rescue', source: responder, beneficiary: dyingActor }); // v13 M3 立场遥测 (自救不记)
         return { healed: true };
       }
       if (kind === 'jiu') {
@@ -632,6 +646,7 @@
         discardCard(game, card);
         dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + 1);
         log(game, actorName(game, responder) + '濒死时饮下【酒】（使用方法Ⅱ），回复 1 点体力。');
+        StateRuntime.recordStance(game, { type: 'rescue', source: responder, beneficiary: dyingActor }); // v13 M3 立场遥测 (自救不记)
         return { healed: true };
       }
       // v8 PR-C3: 急救 — 华佗回合外把红色牌当桃 (条件: hasSkill jijiu +
@@ -653,6 +668,7 @@
         var jijiuHeal = 1 + (taoRecoverBonus ? taoRecoverBonus(game, responder, dyingActor) : 0);
         dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + jijiuHeal);
         log(game, actorName(game, responder) + '发动【急救】，将【' + card.name + '】当【桃】对' + actorName(game, dyingActor) + '使用，回复 ' + jijiuHeal + ' 点体力。');
+        StateRuntime.recordStance(game, { type: 'rescue', source: responder, beneficiary: dyingActor }); // v13 M3 立场遥测 (自救不记)
         return { healed: true };
       }
       // 未知 kind

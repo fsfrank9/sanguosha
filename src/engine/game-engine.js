@@ -992,6 +992,8 @@
           if (consumeResponse(game, aider, spec.type, reason + '（' + spec.label + '）')) {
             log(game, actorName(game, aider) + '响应【' + spec.label + '】，代'
               + actorName(game, lordActor) + '打出' + (spec.type === 'sha' ? '【杀】' : '【闪】') + '。');
+            // v13 M3: 求助响应立场遥测 (帮主公 = 强主忠信号)。
+            StateRuntime.recordStance(game, { type: 'aid', source: aider, beneficiary: lordActor });
             return true;
           }
         }
@@ -1021,6 +1023,7 @@
           if (wantsAid) {
             aoePaid = consumeResponse(game, 'player', 'sha', '【' + aoeSaved.title + '】（激将）', decision.cardId || null);
             if (aoePaid) log(game, actorName(game, 'player') + '响应【激将】，代' + actorName(game, lordActor) + '打出【杀】。');
+            if (aoePaid) StateRuntime.recordStance(game, { type: 'aid', source: 'player', beneficiary: lordActor }); // v13 M3 遥测
           }
           if (!aoePaid) aoePaid = tryLordAidSync(game, lordActor, 'jijiang', '【' + aoeSaved.title + '】');
           if (aoePaid) {
@@ -1091,6 +1094,7 @@
           if (wantsAid) {
             aoePaid = consumeResponse(game, 'player', 'shan', '【' + aoeSaved.title + '】（护驾）', decision.cardId || null);
             if (aoePaid) log(game, actorName(game, 'player') + '响应【护驾】，代' + actorName(game, lordActor) + '打出【闪】。');
+            if (aoePaid) StateRuntime.recordStance(game, { type: 'aid', source: 'player', beneficiary: lordActor }); // v13 M3 遥测
           }
           if (!aoePaid) aoePaid = tryLordAidSync(game, lordActor, 'hujia', '【' + aoeSaved.title + '】');
           if (aoePaid) {
@@ -1182,6 +1186,12 @@
           mode: seats.length >= 3 ? 'identity3' : 'duel',
           // v12 H5: 身份→阵营映射随局携带 (胜负判定/内奸预留)。
           roleSides: clone(ROLE_SIDES),
+          // v13 M1: 暗身份 — 官方 glossary__card.md:11 "除了主公外, 一名
+          // 角色的身份牌在其因死亡而亮出前对其他角色不可见"。缺省明置
+          // (options.hiddenRoles 未传) = v12 以来的简化口径, 零回归;
+          // 仅身份场可开。roleRevealed 逐席可见性表在建席后初始化。
+          hiddenRoles: !!(options.hiddenRoles && seats.length >= 3),
+          roleRevealed: null,
           player: makePlayer(clone(HERO_CATALOG[options.playerHero] || HEROES.player)),
           enemy: makePlayer(clone(HERO_CATALOG[options.enemyHero] || HEROES.enemy))
         };
@@ -1191,6 +1201,12 @@
             var heroKey = options[seat + 'Hero'];
             game[seat] = makePlayer(clone(HERO_CATALOG[heroKey] || HEROES.enemy));
           }
+        }
+        // v13 M1: 身份可见性初始化 — 明置模式全席公开 (恒等旧行为);
+        // 暗置模式仅主公公开, 其余随死亡翻明 (damage-dying) / 终局全翻。
+        game.roleRevealed = {};
+        for (var rvi = 0; rvi < seats.length; rvi += 1) {
+          game.roleRevealed[seats[rvi]] = !game.hiddenRoles || roles[seats[rvi]] === '主公';
         }
         // v13 K5 (review 修复): 官方 glossary__value.md:23 — "若游戏人数
         // 不小于5，主公的体力上限+1" (开局体力随之 +1)。4 人及以下不加;
@@ -1480,8 +1496,10 @@
           return seat;
         }
         var candidates = legalTargetsForCard(game, actor, card).filter(function (seat) { return seat !== actor; });
+        // v13 M2: 执行期缺省目标走感知路由 — 决斗/拆/顺/乐/兵/转化在 AI
+        // 不显式传 target 时由此解析, 须与评分层同一信息面 (明置恒等)。
         var hostileCandidates = candidates.filter(function (seat) {
-          return StateRuntime.isHostileSeat(game, actor, seat);
+          return StateRuntime.perceivedHostile(game, actor, seat);
         });
         var pool = hostileCandidates.length ? hostileCandidates : candidates;
         return pool.indexOf(opponent(actor)) >= 0 ? opponent(actor) : (pool[0] || null);
@@ -1784,7 +1802,7 @@
           // (此前 opponent(actor) 纯二元函数, 4/5 席非 player/enemy 座席缺省
           // 会错指玩家席; 1v1 池恒为 [对手], 行为不变)。UI 座席点选与 AI
           // 路径均显式传 targets, 该缺省仅兜底直调。
-          var tiesuoDefault = StateRuntime.hostileSeats(game, actor).slice(0, 1);
+          var tiesuoDefault = StateRuntime.perceivedHostileSeats(game, actor).slice(0, 1); // v13 M2 感知路由
           var targets = Array.from(options.targets || tiesuoDefault).filter(function (side, index, array) {
             return resolveSeatOption(game, side) && game[side].hp > 0 && array.indexOf(side) === index;
           }).slice(0, 2);

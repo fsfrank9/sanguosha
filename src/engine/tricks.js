@@ -179,6 +179,7 @@
           continue;
         }
         consumeWuxie(game, responder, chain.reason);
+        recordWuxieStance(game, responder, chain); // v13 M3 (翻转前记录)
         chain.wuxied = !chain.wuxied;
         chain.lastWuxieBy = responder;
         chain.queue = null;  // 新净状态 → 重建队列, 所有座席重新获得响应机会
@@ -187,6 +188,35 @@
 
       // 队列耗尽 (无人再响应) → 结算
       return settleWuxieChain(game);
+    }
+
+    // v13 M3: 无懈立场遥测 — 打出无懈瞬间按当时净状态记录受益/受害方向
+    // (stakes 映射与 ai 域 aiWuxieStance 提取一致, 变更须两处同步; 消费方
+    // 为 state.js inferredLeaning 的暗身份推断)。net = chain.wuxied
+    // (翻转前): 打击型 消=保护受害者/反消=恢复打击; 增益型反向。
+    function recordWuxieStance(game, responder, chain) {
+      var ctx = chain.ctx || {};
+      var trick = chain.trickName;
+      var beneficial = null;
+      var victim = null;
+      if (trick === 'wuzhong') beneficial = ctx.wzTargetActor || ctx.actor;
+      else if (trick === 'taoyuan-target') beneficial = ctx.targets && ctx.targets[ctx.idx];
+      else if (trick === 'wugu-target') beneficial = ctx.order && ctx.order[ctx.idx];
+      else if (trick === 'delayed-judge') victim = ctx.ownerActor;
+      else if (trick === 'aoe-target') victim = ctx.order && ctx.order[ctx.idx];
+      else if (trick === 'tiesuo-target') victim = ctx.targets && ctx.targets[ctx.idx];
+      else victim = ctx.targetActor || ctx.delayedSide || null;
+      var entry = null;
+      if (victim) {
+        entry = chain.wuxied
+          ? { type: 'wuxie', source: responder, against: victim }
+          : { type: 'wuxie', source: responder, beneficiary: victim };
+      } else if (beneficial) {
+        entry = chain.wuxied
+          ? { type: 'wuxie', source: responder, beneficiary: beneficial }
+          : { type: 'wuxie', source: responder, against: beneficial };
+      }
+      if (entry) StateRuntime.recordStance(game, entry);
     }
 
     function settleWuxieChain(game) {
@@ -212,6 +242,7 @@
           chain.idx += 1;
           return advanceWuxieChain(game);
         }
+        recordWuxieStance(game, 'player', chain); // v13 M3 (翻转前记录)
         chain.wuxied = !chain.wuxied;
         chain.lastWuxieBy = 'player';
         chain.queue = null;

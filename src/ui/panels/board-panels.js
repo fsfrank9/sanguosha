@@ -49,16 +49,24 @@
         //   用户反馈: 之前只显主公不显反贼, 信息不对称.
         // v12 H6: 忠臣徽章 — 3人身份场第三席身份标签, 同一 role 三态互斥显示.
         var role = view.game && view.game.roles && view.game.roles[actor];
+        // v13 M1: 暗身份 — 官方 glossary__card.md:11 除主公外身份牌在死亡
+        // 亮出前对其他角色不可见: 未翻明的非玩家席不显示具体身份徽章,
+        // 改显 "?" 徽章 (玩家恒见自己身份; 明置模式 roleRevealed 全 true,
+        // 行为恒等)。
+        var roleHidden = !!(view.game && view.game.hiddenRoles && actor !== 'player'
+          && view.game.roleRevealed && !view.game.roleRevealed[actor]);
         var lordBadge = els[actor + 'LordBadge'];
-        if (lordBadge) lordBadge.hidden = role !== '主公';
+        if (lordBadge) lordBadge.hidden = roleHidden || role !== '主公';
         var rebelBadge = els[actor + 'RebelBadge'];
-        if (rebelBadge) rebelBadge.hidden = role !== '反贼';
+        if (rebelBadge) rebelBadge.hidden = roleHidden || role !== '反贼';
         var loyalistBadge = els[actor + 'LoyalistBadge'];
-        if (loyalistBadge) loyalistBadge.hidden = role !== '忠臣';
+        if (loyalistBadge) loyalistBadge.hidden = roleHidden || role !== '忠臣';
         // v13 K3: 内奸徽章 — 4/5 人身份场 (player/enemy/ally 无此节点,
         // guard 跳过; 身份四态互斥显示)。
         var renegadeBadge = els[actor + 'RenegadeBadge'];
-        if (renegadeBadge) renegadeBadge.hidden = role !== '内奸';
+        if (renegadeBadge) renegadeBadge.hidden = roleHidden || role !== '内奸';
+        var secretBadge = els[actor + 'SecretBadge'];
+        if (secretBadge) secretBadge.hidden = !roleHidden;
         if (els[actor + 'Ribbon']) els[actor + 'Ribbon'].textContent = state.camp;
         if (actor === 'player') {
           lobbyPanels.renderPlayerSkillBar({

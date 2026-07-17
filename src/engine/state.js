@@ -158,6 +158,113 @@
     });
   }
 
+  // ───── v13 M: 暗身份 — 可见性/立场遥测/推断/感知路由 ─────────────────
+  // 官方 glossary__card.md:11 "除了主公外, 一名角色的身份牌在其因死亡而
+  // 亮出前对其他角色不可见"。规则层 (胜负/奖惩/求助资格/救援加成) 仍读
+  // 真实身份 (结算发生在公开事件后或判定对象恒为公开主公); AI 知识层
+  // (目标评估/立场判断) 一律经下方 perceived* 路由 — 明置模式恒等直读
+  // (零回归), 暗置模式只允许 自己/已翻明 直读, 其余走行为推断。
+
+  function isRoleRevealed(game, seat) {
+    if (!game || !game.hiddenRoles) return true; // 明置模式全公开
+    if (!game.roleRevealed) return true;
+    return !!game.roleRevealed[seat];
+  }
+
+  // v13 M3: 立场遥测 (纯记账, 规则层零读取) — 救援/无懈方向/求助响应。
+  // entry: { type: 'rescue'|'wuxie'|'aid', source, beneficiary? , against? }
+  // 环形上限 60 (与 aggressionLog 同口径)。
+  function recordStance(game, entry) {
+    if (!game || !entry || !entry.source) return;
+    if (entry.beneficiary === entry.source || entry.against === entry.source) return; // 自利不算立场证据
+    if (!game.stanceLog) game.stanceLog = [];
+    game.stanceLog.push(entry);
+    if (game.stanceLog.length > 60) game.stanceLog.shift();
+  }
+
+  function lordSeatOf(game) {
+    var seats = normalizeSeats(game);
+    for (var i = 0; i < seats.length; i += 1) {
+      if (game.roles && game.roles[seats[i]] === '主公') return seats[i];
+    }
+    return null;
+  }
+
+  // v13 M3: 行为推断 — seat 的阵营倾向分 (>0 反贼倾向, <0 主忠倾向)。
+  // 证据面: aggressionLog (伤害方向: 打主公/已翻明席) + stanceLog (救援/
+  // 无懈/求助的受益方向)。纯读取无缓存 (双 log 环形上限 60, 扫描可忽略)。
+  function inferredLeaning(game, seat) {
+    var lord = lordSeatOf(game);
+    var score = 0;
+    var agg = game.aggressionLog || [];
+    for (var a = 0; a < agg.length; a += 1) {
+      var hit = agg[a];
+      if (hit.source === seat) {
+        if (hit.target === lord) {
+          score += hit.amount * 3; // 对主公出伤害 → 强反贼信号
+        } else if (isRoleRevealed(game, hit.target)) {
+          var hitSide = sideOf(game, hit.target);
+          if (hitSide === 'lordSide') score += hit.amount * 2;
+          else if (hitSide === 'rebelSide') score -= hit.amount * 2;
+        }
+      } else if (hit.target === seat && hit.source === lord) {
+        score += hit.amount; // 主公针对谁, 谁嫌疑微增
+      }
+    }
+    var st = game.stanceLog || [];
+    for (var s = 0; s < st.length; s += 1) {
+      var ev = st[s];
+      if (ev.source !== seat) continue;
+      var w = ev.type === 'aid' ? 4 : ev.type === 'rescue' ? 3 : 2;
+      var helped = ev.beneficiary || null;
+      var harmed = ev.against || null;
+      var helpedSide = helped ? (helped === lord ? 'lordSide' : (isRoleRevealed(game, helped) ? sideOf(game, helped) : null)) : null;
+      var harmedSide = harmed ? (harmed === lord ? 'lordSide' : (isRoleRevealed(game, harmed) ? sideOf(game, harmed) : null)) : null;
+      if (helpedSide === 'lordSide') score -= w;
+      else if (helpedSide === 'rebelSide') score += w;
+      if (harmedSide === 'lordSide') score += w;
+      else if (harmedSide === 'rebelSide') score -= w;
+    }
+    return score;
+  }
+
+  // v13 M2/M3: viewer 视角的座席阵营感知 — 自己/已翻明 → 真值;
+  // 暗置 → 推断 (证据不足返回 null = 未知)。明置模式恒真值。
+  var INFER_THRESHOLD = 2;
+  function perceivedSideOf(game, viewer, seat) {
+    if (seat === viewer || isRoleRevealed(game, seat)) return sideOf(game, seat);
+    var lean = inferredLeaning(game, seat);
+    if (lean >= INFER_THRESHOLD) return 'rebelSide';
+    if (lean <= -INFER_THRESHOLD) return 'lordSide';
+    return null;
+  }
+
+  // v13 M2: 感知敌对 — AI 知识层的 isHostileSeat 替身。暗置下未知座席
+  // 按"无身份信息 → 敌对"缺省 (与 1v1 兜底同口径, 保持进攻性; 反贼间
+  // 互殴直至证据出现属官方暗身份局的真实信息态)。viewer 为内奸时全敌对
+  // (骑墙偏好在 aiPickHostileTarget 打分层)。
+  function perceivedHostile(game, viewer, seat) {
+    if (seat === viewer) return false;
+    if (!game || !game.hiddenRoles) return isHostileSeat(game, viewer, seat);
+    if (isRoleRevealed(game, seat)) return isHostileSeat(game, viewer, seat);
+    var mySide = sideOf(game, viewer); // 自己身份自知
+    if (!mySide || mySide === 'renegade') return true;
+    var guessed = perceivedSideOf(game, viewer, seat);
+    if (!guessed || guessed === 'renegade') return true;
+    return guessed !== mySide;
+  }
+
+  function perceivedHostileSeats(game, viewer) {
+    var hostile = aliveSeats(game).filter(function (seat) { return perceivedHostile(game, viewer, seat); });
+    if (hostile.length) return hostile;
+    return aliveSeats(game).filter(function (seat) { return seat !== viewer; });
+  }
+
+  function perceivedHostileFirstPool(game, viewer, candidates) {
+    var hostiles = (candidates || []).filter(function (seat) { return perceivedHostile(game, viewer, seat); });
+    return hostiles.length ? hostiles : (candidates || []);
+  }
+
   function hasSkill(state, skillId) {
     return !!(state.skills || []).some(function (skill) { return skill.id === skillId; });
   }
@@ -262,6 +369,15 @@
     isHostileSeat: isHostileSeat,
     hostileSeats: hostileSeats,
     hostileFirstPool: hostileFirstPool,
+    // v13 M: 暗身份 — 可见性/遥测/推断/感知路由 (AI 知识层统一入口)。
+    isRoleRevealed: isRoleRevealed,
+    recordStance: recordStance,
+    lordSeatOf: lordSeatOf,
+    inferredLeaning: inferredLeaning,
+    perceivedSideOf: perceivedSideOf,
+    perceivedHostile: perceivedHostile,
+    perceivedHostileSeats: perceivedHostileSeats,
+    perceivedHostileFirstPool: perceivedHostileFirstPool,
     seatsInShaRangeOf: seatsInShaRangeOf,
     opponent: opponent,
     hasSkill: hasSkill,

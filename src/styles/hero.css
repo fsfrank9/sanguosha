@@ -217,6 +217,34 @@
       display: none !important;
     }
 
+    /* v13 M1: 暗身份"?"徽章 — 官方 glossary__card.md:11 除主公外身份牌
+       死亡亮出前不可见。独立规则块同上守护测试理由; 灰色系示未知。 */
+    .secret-badge {
+      position: absolute;
+      z-index: 3;
+      top: 6px;
+      left: 6px;
+      width: 26px;
+      height: 26px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 2px solid #fff4d0;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 1;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .45);
+      pointer-events: none;
+      user-select: none;
+      background: radial-gradient(circle at 35% 25%, #9aa3ad, #4a5158 72%);
+    }
+
+    .secret-badge[hidden] {
+      display: none !important;
+    }
+
     /* v12 H6: identity3 单目标牌/主动技 座席点选模式 — 合法目标座席的英雄卡
        高亮, 沿用 .hero.is-chained 的金色描边惯例 (box-shadow 环, 非新视觉). */
     .hero.is-target-selectable {

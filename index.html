@@ -147,6 +147,9 @@
           <button type="button" class="btn small" id="roleRebelBtn">反贼</button>
           <button type="button" class="btn small" id="roleRenegadeBtn">内奸</button>
           <button type="button" class="btn small" id="roleRandomBtn">随机</button>
+          <!-- v13 M1: 暗身份开关 — 官方 glossary__card.md:11 除主公外身份
+               死亡前不可见; 缺省关 (明置, v12 简化口径零回归)。 -->
+          <button type="button" class="btn small" id="hiddenRolesToggleBtn" aria-pressed="false">暗身份·关</button>
         </div>
         <div class="role-draft-panel" id="roleDraftPanel">
           <span class="badge">身份判定</span>
@@ -219,6 +222,7 @@
           <span class="rebel-badge" id="enemyRebelBadge" hidden aria-label="反贼">反</span>
           <span class="loyalist-badge" id="enemyLoyalistBadge" hidden aria-label="忠臣">忠</span>
           <span class="renegade-badge" id="enemyRenegadeBadge" hidden aria-label="内奸">内</span>
+          <span class="secret-badge" id="enemySecretBadge" hidden aria-label="身份未知">？</span>
           <div class="camp-ribbon" id="enemyRibbon">魏</div>
           <div class="hero-head">
             <div>
@@ -258,6 +262,7 @@
           <span class="rebel-badge" id="allyRebelBadge" hidden aria-label="反贼">反</span>
           <span class="loyalist-badge" id="allyLoyalistBadge" hidden aria-label="忠臣">忠</span>
           <span class="renegade-badge" id="allyRenegadeBadge" hidden aria-label="内奸">内</span>
+          <span class="secret-badge" id="allySecretBadge" hidden aria-label="身份未知">？</span>
           <div class="camp-ribbon" id="allyRibbon">蜀</div>
           <div class="hero-head">
             <div>
@@ -297,6 +302,7 @@
           <span class="rebel-badge" id="ally2RebelBadge" hidden aria-label="反贼">反</span>
           <span class="loyalist-badge" id="ally2LoyalistBadge" hidden aria-label="忠臣">忠</span>
           <span class="renegade-badge" id="ally2RenegadeBadge" hidden aria-label="内奸">内</span>
+          <span class="secret-badge" id="ally2SecretBadge" hidden aria-label="身份未知">？</span>
           <div class="camp-ribbon" id="ally2Ribbon">群</div>
           <div class="hero-head">
             <div>
@@ -333,6 +339,7 @@
           <span class="rebel-badge" id="ally3RebelBadge" hidden aria-label="反贼">反</span>
           <span class="loyalist-badge" id="ally3LoyalistBadge" hidden aria-label="忠臣">忠</span>
           <span class="renegade-badge" id="ally3RenegadeBadge" hidden aria-label="内奸">内</span>
+          <span class="secret-badge" id="ally3SecretBadge" hidden aria-label="身份未知">？</span>
           <div class="camp-ribbon" id="ally3Ribbon">群</div>
           <div class="hero-head">
             <div>

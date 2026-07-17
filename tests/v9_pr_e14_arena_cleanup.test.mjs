@@ -112,9 +112,11 @@ test('v9 PR-E14: dom-adapter 缓存 playerRebelBadge / enemyRebelBadge', () => {
 test('v9 PR-E14: renderHero 据 roles[actor] === "反贼" 切换 rebelBadge.hidden', () => {
   const fn = adapter.match(/function renderHero\(actor\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /rebelBadge\.hidden\s*=\s*role\s*!==\s*['"]反贼['"]/);
+  // v13 M1: 暗身份模式下徽章额外受 roleHidden 门控 (roleHidden || role !== ...);
+  // 语义不变 — 明置模式 roleHidden 恒 false, 仍按 role 切换。
+  assert.match(fn[0], /rebelBadge\.hidden\s*=\s*roleHidden\s*\|\|\s*role\s*!==\s*['"]反贼['"]/);
   // lord 与 rebel 互斥
-  assert.match(fn[0], /lordBadge\.hidden\s*=\s*role\s*!==\s*['"]主公['"]/);
+  assert.match(fn[0], /lordBadge\.hidden\s*=\s*roleHidden\s*\|\|\s*role\s*!==\s*['"]主公['"]/);
 });
 
 // ───── 6. top-actions 移出 header + absolute 浮顶 ─────────────────────
