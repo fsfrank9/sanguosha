@@ -1046,6 +1046,7 @@
           if (paid) {
             log(game, actorName(game, 'player') + '响应【激将】，代' + actorName(game, lordActor) + '打出【杀】。');
             chain.aidPaid += 1;
+            StateRuntime.recordStance(game, { type: 'aid', source: 'player', beneficiary: lordActor }); // v13 M3 遥测
           }
         }
         if (!paid) {
@@ -1117,6 +1118,7 @@
           log(game, actorName(game, 'player') + '响应【护驾】，代' + actorName(game, lordActor) + '打出【闪】。');
           remaining -= 1;
           hujiaPaidThis = true;
+          StateRuntime.recordStance(game, { type: 'aid', source: 'player', beneficiary: lordActor }); // v13 M3 遥测
         }
         // v12 H 复核修复: 无双第二张 — 玩家刚代打一张且仍有闪可代 → 再次
         // 询问 (与激将侧对称)。此前只 AI 座席接力, 玩家手上还有第二张真闪

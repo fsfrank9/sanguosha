@@ -156,7 +156,7 @@ test('零回归: 开关关闭 (缺省) → hiddenRoles=false, 问号全隐, 身�
 
 let passed = 0;
 for (const [name, fn] of tests) {
-  try { passed += 1; fn(); console.log(`✓ ${name}`); }
+  try { fn(); passed += 1; console.log(`✓ ${name}`); }
   catch (error) { console.error(`✗ ${name}`); throw error; }
 }
 console.log(`${passed}/${tests.length} 个 M 阶段 UI 用例通过。`);
