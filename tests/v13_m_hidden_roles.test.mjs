@@ -141,6 +141,17 @@ test('M2 守护: 引擎各文件直读计数锁定 (白名单外零残留)', () 
   }
 });
 
+test('M2 守护: 直读别名赋值零匹配 (防 var f = StateRuntime.isHostileSeat 绕过)', () => {
+  // 计数锁只匹配 `StateRuntime.fn(` 调用形态 — 别名赋值后调用可绕过。
+  // 本锚点封掉赋值形态 (当前全文件零匹配, 零误伤成本的加固)。
+  const files = ['ai.js', 'skills.js', 'sha-flow.js', 'tricks.js', 'game-engine.js', 'damage-dying.js'];
+  for (const file of files) {
+    assert.doesNotMatch(srcText(file),
+      /=\s*StateRuntime\.(isHostileSeat|hostileSeats|hostileFirstPool)\b/,
+      `${file} 不得将直读函数赋值给别名`);
+  }
+});
+
 test('M2 守护: ai.js 唯一直读位于黄天主公检查 (锚定上下文)', () => {
   const ai = srcText('ai.js');
   const idx = ai.indexOf('StateRuntime.isHostileSeat(');
@@ -193,13 +204,17 @@ test('M2: 零全知 — 未翻明座席身份互换, AI 感知与目标决策不
     hostileAlly2: StateRuntime.perceivedHostile(g, 'enemy', 'ally2'),
     pick: Engine.aiPickHostileTarget(g, 'enemy', ['ally', 'ally2']),
   });
-  game.ally2.hp = 2; // 血线差挑出确定目标 (排除并列首选噪声)
+  // 等资源候选 (血线/手牌/装备全同, reset 已归一): 评分并列时严格大于
+  // 比较保留顺位首候选 — pick 仅可能被身份泄漏分移动 (+8 已翻明反贼 /
+  // +4 推断反贼)。若感知层误直读暗置身份, 泄漏分跟着真实身份走, 互换
+  // 后 pick 必从 ally 翻到 ally2 (或反向), 本 deepEqual 即失败。收官
+  // review: 此前用血线差 (+12) 挑确定目标, 反而盖过 ±8 泄漏信号。
   const before = snapshot(game);
   assert.equal(before.sideAlly, null, '无证据 → 阵营未知');
   assert.equal(before.sideAlly2, null);
   assert.equal(before.hostileAlly, true, '未知 → 敌对缺省');
   assert.equal(before.hostileAlly2, true);
-  assert.equal(before.pick, 'ally2', '低血线者被选中');
+  assert.equal(before.pick, 'ally', '等资源并列 → 顺位首候选');
   // 互换两暗置座席的真实身份 (忠↔反) — 全知 AI 会改变判断, 零全知不会。
   const tmp = game.roles.ally;
   game.roles.ally = game.roles.ally2;
