@@ -1,10 +1,13 @@
-# 三国杀 · 1v1 规则合规版
+# 三国杀 · 规则合规版（1v1 + 3 人身份场）
 
-纯 HTML/CSS/JavaScript 实现的三国杀 1v1。原生 ES 模块 + GitHub Pages 静态托管:`src/` 就是浏览器加载的源码本身,根 `index.html` 是手写的模块入口——没有打包步骤、没有 npm 运行时依赖。
+纯 HTML/CSS/JavaScript 实现的三国杀。原生 ES 模块 + GitHub Pages 静态托管:`src/` 就是浏览器加载的源码本身,根 `index.html` 是手写的模块入口——没有打包步骤、没有 npm 运行时依赖。
 
-**当前版本 `v13-J 清账与全局合规盘点`**:玩家实测 4 例定点缺陷修复(出牌暂存-确认/延时锦囊无懈时机迁至判定生效前 + 判定阶段 LIFO/藤甲仁王盾免疫短路与八卦先行/桃收口为仅自己已受伤)、v12 记录在案三项偏差清零(遗计逐席分牌/火攻成本挂起重选/天香真 ask 伤害流暂停框架),之上完成**第三轮全量合规审计**(8 并行维度对照官方缓存 + 逐条对抗性复核):22 条确认缺陷修复 20 条(铁索无懈窗口/南蛮万箭逐目标无懈/青龙锁目标/来源武器效果随天香转移过期/反间先猜后给/离间过空城/突袭官方语义/不屈入濒死责任链/传导起算序等)、2 条如实降级,详见 [`docs/audit/2026-07-16-third-round-compliance-audit.md`](docs/audit/2026-07-16-third-round-compliance-audit.md)。
+**一览**:
 
-承接 **v12-I AI 进阶**:在 H 阶段双模式(1v1 + 3 人身份场)之上完成 AI 决策升级——**整回合深度模拟**(top-5 候选在私有克隆世界用真实引擎流程续跑"我方剩余回合 + 下家整回合"再互比,嵌套决策短路为纯启发保持线性复杂度)、**可见信息诚实计数**(对手手牌估计不再直读暗牌:未知池占比 × 手牌数 + 转化技折算 + 响应空窗推断)、**多人目标评估**(敌意记账、反贼集火主公、收割与击杀奖励)与启发式状态机(处决线/压血线/留桃/闪电不自残/弃牌保响应牌)。座席级 `aiProfile` 保留 v11 冻结旧路径:**固定种子基准对弈 v12 对 v11 胜率 61.0%(验收段)/ 四独立段 700 局合计 57.6%,≥55% 验收线达成**(常驻门禁 tests/v12_i_benchmark)。53 个已实现技能、71 名武将,承接 F 域模块架构与全座席牌守恒 census。
+- **双模式**:1v1 对弈 + 3 人身份场(主/忠/反,座次环结算)。
+- **内容**:71 名武将 / 53 个已接入技能 / 标准+军争核心 39 张牌,全部数据驱动;结算对照 `official-skill-cache/` 官方规则集,历经三轮全量合规审计。
+- **AI**:整回合深度模拟 + 可见信息诚实计数(不读暗牌)+ 多人目标评估;对 v11 冻结基线 700 局胜率 57.6%(≥55% 门禁 `tests/v12_i_benchmark` 常驻)。
+- **当前版本 `v13-J`**:玩家实测 4 缺陷修复 + 第三轮全量合规审计(22 确认 → 20 修复 + 2 如实降级),详见 [`docs/audit/2026-07-16-third-round-compliance-audit.md`](docs/audit/2026-07-16-third-round-compliance-audit.md);下一阶段(K 5 人身份场与内奸)见 [v13 路线图](docs/plans/2026-07-16-sanguosha-v13-roadmap.md)。
 
 ## 运行
 
@@ -32,10 +35,10 @@ python3 -m http.server 8000
 ```bash
 npm test              # 全量回归(逐文件执行 tests/*.mjs, 失败即停)
 npm run build:check   # 仓库结构完整性检查
-npm run verify        # build:check + 全量测试(CI 门禁同款)
+npm run verify        # build:check + 全量测试(CI 门禁同款, ~30s)
 ```
 
-测试无框架、无依赖:每个文件用 `node:assert/strict` 直跑。引擎层是行为测试(含全场牌数守恒回归),UI 层用 `tests/helpers/fake-dom.mjs` 零依赖 DOM 垫片做全链路行为测试。
+测试无框架、无依赖:每个文件用 `node:assert/strict` 直跑。引擎层是行为测试(含全场牌数守恒回归),UI 层用 `tests/helpers/fake-dom.mjs` 零依赖 DOM 垫片做全链路行为测试;另有架构守护测试(裸区域操作/裸装备判断/AI 零全知等零容忍红线)。
 
 ## 仓库结构
 
@@ -55,62 +58,41 @@ tests/                行为测试 + 架构守护测试(零依赖直跑)
 tools/build.mjs       结构完整性检查(--check)
 official-skill-cache/ 官方规格副本(audit harness 数据源)
 docs/
-  history.md          版本演进史(v4 → 两轮审计的浓缩档案)
+  history.md          版本演进史(v4 → v13-J 的逐版档案)
   plans/              各版本计划与执行记录
-  audit/              代码审计纪要
+  audit/              合规审计纪要(三轮)
 ```
 
 ## 内容现状
 
-- 武将 71 名 / 技能条目 128 条 / 唯一技能 ID 123 个。
-- 已接入引擎逻辑的技能 53 个(主动/交互 11 个:制衡、苦肉、仁德、反间、观星、青囊、洛神、结姻、激将、黄天、离间;风包 9 技:据守、烈弓、狂骨、神速、红颜、天香、雷击、鬼道、不屈);未实现技能在 UI 中明确标记,不会"看起来有但触发不了"。多人专属技随 H 身份场激活:激将/护驾(主公技,同势力代打)、黄天(张角主公技)、离间(貂蝉)——1v1 中无同势力队友/凑不齐目标,保持惰性;蛊惑(多人质疑机制)留待评估;流离/同疾 reserved hook 保持座次环扫描。
-- 标准 + 军争核心牌组 39 张牌全部数据驱动;濒死/判定/响应窗口/无懈链/铁索传导等结算对照 `official-skill-cache/gltjk-sanguosha-rules` 官方规则集。
-- 技能逐项的引擎接入说明见 [`docs/history.md`](docs/history.md)。
+- 武将 71 名 / 技能条目 128 条 / 唯一技能 ID 123 个;已接入引擎 53 个(含主动/交互 11 个与风包 9 技),未实现技能在 UI 中明确标记,不会"看起来有但触发不了"。
+- 多人专属技(激将/护驾/黄天/离间)随 3 人身份场激活,1v1 中保持惰性;蛊惑留待多人评估。
+- 逐技能接入说明与历次修正见 [`docs/history.md`](docs/history.md) 与 `docs/audit/`。
 
 ## 版本演进
 
-详细历史见 [`docs/history.md`](docs/history.md),各版本计划见 `docs/plans/`:
+详细历史见 [`docs/history.md`](docs/history.md),各版本计划与执行记录见 `docs/plans/`:
 
-| 版本 | 主题 | 计划文档 |
+| 版本 | 主题 | 计划/记录 |
 |------|------|----------|
-| v4 | 安全拆源 + SkillRuntime hook seam(Phase 4A–4T) | `2026-04-29-sanguosha-v4-architecture.md` |
-| v5 | 原生 ES 模块 + GitHub Pages 迁移 | `2026-05-13-sanguosha-v5-architecture.md` |
-| v6 | 数据驱动基础设施 + per-skill spec audit | `2026-05-13-sanguosha-v6-logic-correctness.md` |
-| v7 | 牌规则合规(16 PR) | `2026-05-14-sanguosha-v7-card-rule-compliance.md` |
-| v8 | 标准包技能扩充 + AI lookahead | `2026-05-14-sanguosha-v8-ui-integration.md` |
-| v9 | UI 全面改版(cream 卷轴风) | `2026-05-14-sanguosha-v9-ui-overhaul.md` |
-| v10 | 响应框架 + dispatch 注册表 | `2026-05-28-sanguosha-v10-stabilize-and-expand.md` |
-| 审计×2 | 两轮规则合规审计修复(#105–#113, #115–#123) | `docs/audit/` + `docs/history.md` |
-| v11 | 守恒硬化 + 域拆分 + 技能 31→40 + AI 期望值决策(#125–#150) | `2026-06-09-sanguosha-v11-roadmap.md`(含收尾盘点) |
-
-## v12(收官)
-
-路线图见 [`docs/plans/2026-07-05-sanguosha-v12-roadmap.md`](docs/plans/2026-07-05-sanguosha-v12-roadmap.md)。**如实进度**(修复批核对后,四阶段收官):
-
-1. **F 结构减重:收官,验收线双达标** — F1 技能域、F2 判定区、F3 PLAY_HANDLERS、F4 大厅面板、F5 牌结算链(杀链 sha-flow.js + 锦囊结算入 tricks.js)、F6 战场渲染域(board-panels.js)全部拆出;game-engine 1941 行(≤2200 ✓)/ dom-adapter 1135 行(≤1200 ✓)。
-2. **G 扩展包技能:收官** — 风包 9/11 技能接入(G1 据守/烈弓/狂骨 + G2 神速/红颜/天香/雷击/鬼道/不屈),fixture 扩至 8 将 11 技;验收"≥50"差 1 技为黄天(按计划随 H 激活即跨线),蛊惑留待多人评估。
-3. **H 多人模式:收官(含 UI)** — H1-H7 全部落地:座次环结算(无懈队列/AOE逐席/决斗跨座/铁索环/闪电环/桃园五谷座次)、全牌类显式目标 + 座席级合法目标矩阵、identity3 距离规则(顺手/兵粮≤1)、身份死亡结算(弃置所有牌+奖惩+回合终止)、主公技激活(激将/护驾/黄天)+ 离间(技能 49→53,跨 G"≥50"验收线)、AI 阵营立场;H6 三席 UI:对战模式选择、第三席渲染、座席点选(选牌→高亮→点选)、激将/护驾求助面板。全程 1v1 行为零回归(既有测试零改动)。
-4. **I AI 进阶:收官,验收线达成** — I0 profile 基建(v12 缺省/v11 冻结 + 特性门消融)、I1 整回合深度模拟(胜率主引擎,独立贡献 ~+6-7pt)、I2 可见信息诚实计数(去全知作弊 + 响应空窗推断,信息税约 -2pt 被 I1 净覆盖)、I3 多人目标评估(敌意记账/胜负手/收割)、I4 启发式状态机(处决线/血线收敛/留桃/闪电/弃牌保留值)。验收:v12 对 v11 固定种子自对弈,验收新鲜段 **61.0%**、四独立段 700 局合计 **57.6%**(≥55% ✓,tests/v12_i_benchmark 常驻门禁);全量 verify 全绿(仅两个 v8 公式文档化测试钉至 v11 profile,语义不减)。
-
-## v13 进度
-
-路线图见 [`docs/plans/2026-07-16-sanguosha-v13-roadmap.md`](docs/plans/2026-07-16-sanguosha-v13-roadmap.md)。
-
-1. **J 清账与全局合规盘点:收官** — J0 玩家实测 4 缺陷修复 + 第三轮全量
-   合规审计(22 确认 → 20 修复 + 2 降级,纪要见 `docs/audit/`);J1 遗计
-   逐席分牌;J2 火攻成本挂起重选;J3 天香 ask(伤害流暂停框架 + 伤害落点
-   回调);J4 工程卫生(风包 gid 因环境网络策略如实降级,verify ~30s 分层
-   预案不动)。1v1 与 3 人身份场双红线保持,verify 全绿。
-2. **K 5 人身份场与内奸 / L 可选身份 / M 暗身份与推断 AI / N 内容评估** —
-   待启动(`IDENTITY_PRESETS[5]`/内奸阵营/`aggressionLog` 数据面已预留)。
+| v4 | 安全拆源 + SkillRuntime hook seam | `2026-04-29-…-v4-architecture.md` |
+| v5 | 原生 ES 模块 + GitHub Pages 迁移 | `2026-05-13-…-v5-architecture.md` |
+| v6 | 数据驱动基础设施 + per-skill spec audit | `2026-05-13-…-v6-logic-correctness.md` |
+| v7 | 牌规则合规(16 PR) | `2026-05-14-…-v7-card-rule-compliance.md` |
+| v8 | 标准包技能扩充 + AI lookahead | `2026-05-14-…-v8-ui-integration.md` |
+| v9 | UI 全面改版(cream 卷轴风) | `2026-05-14-…-v9-ui-overhaul.md` |
+| v10 | 响应框架 + dispatch 注册表 | `2026-05-28-…-v10-stabilize-and-expand.md` |
+| 审计×2 | 两轮规则合规审计修复 | `docs/audit/` + `docs/history.md` |
+| v11 | 守恒硬化 + 域拆分 + 技能 31→40 + AI 期望值 | `2026-06-09-…-v11-roadmap.md` |
+| v12 | F 结构减重 / G 风包 / H 3 人身份场 / I AI 进阶 | `2026-07-05-…-v12-roadmap.md` |
+| v13-J | 清账 + 第三轮全量合规审计(进行中: J 收官) | `2026-07-16-…-v13-roadmap.md` + `docs/audit/` |
 
 ## 官方资料对照与缓存
 
 官网资料分两层,避免重复拉取、也避免在公开仓库提交大段官网原文:
 
-- `tests/fixtures/official_standard_skills.json`:官网标准包武将/技能名紧凑 fixture(校验 catalog 一致性,恒 27 将)。
-- `tests/fixtures/official_standard_skill_specs.json`:可提交的结构化实现规格(来源 URL + `sourceTextRef` 摘要,不含原文)。
-- `tests/fixtures/official_wind_skills.json` / `official_wind_skill_specs.json`:风包独立 fixture(pack='风',8 将 11 技,含 `implementationStatus` 如实标记;gid 为临时编号、官方页面爬取待补,见文件内 `gidPolicy`/`rawCachePolicy`)。
+- `tests/fixtures/official_*_skills.json`:官网武将/技能名紧凑 fixture(标准包恒 27 将;风包 8 将 11 技,含 `implementationStatus` 如实标记,gid 为临时编号、核对进度见文件内 `gidPolicy`)。
+- `tests/fixtures/official_*_skill_specs.json`:可提交的结构化实现规格(来源 URL + `sourceTextRef` 摘要,不含原文)。
 - `.cache/sanguosha-official/`:本地原文缓存,已 gitignore 不入库。
 
 继续实现技能时按 cache-first 流程:先读本地缓存与已提交 specs,缓存缺失/过期才重新请求官网。
