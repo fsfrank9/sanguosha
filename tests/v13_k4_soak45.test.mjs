@@ -162,7 +162,36 @@ for (const roster of ROSTERS5) {
   });
 }
 
-// 终局可达门禁: 固定种子确定性 — 全部 8 局须在回合上限内决出胜负
+// ── v13 L: 可选身份轮转 roles 下的自对弈 (玩家席等价 AI) — 验证 AI 主公
+// 先手 (firstActorFromRoles 全环扫描) + 玩家非主公身份全程/中途阵亡后
+// 引擎续跑到终局。roles 为预设阵型内轮转 (构成不变)。
+const ROSTERS_L = [
+  { seed: 47301, seats: ['player', 'enemy', 'ally', 'ally2'],
+    roles: { player: '反贼', enemy: '忠臣', ally: '内奸', ally2: '主公' },
+    heroes: { playerHero: 'guanyu', enemyHero: 'lvmeng', allyHero: 'diaochan', ally2Hero: 'liubei' } },
+  { seed: 47302, seats: ['player', 'enemy', 'ally', 'ally2', 'ally3'],
+    roles: { player: '忠臣', enemy: '反贼', ally: '内奸', ally2: '主公', ally3: '反贼' },
+    heroes: { playerHero: 'zhouyu', enemyHero: 'zhangfei', allyHero: 'lvbu', ally2Hero: 'sunquan', ally3Hero: 'huangzhong' } },
+  { seed: 47303, seats: ['player', 'enemy', 'ally', 'ally2', 'ally3'],
+    roles: { player: '内奸', enemy: '主公', ally: '反贼', ally2: '忠臣', ally3: '反贼' },
+    heroes: { playerHero: 'simayi', enemyHero: 'caocao', allyHero: 'ganning', ally2Hero: 'guojia', ally3Hero: 'huaxiong' } }
+];
+
+for (const roster of ROSTERS_L) {
+  test(`L 可选身份自对弈 (seed=${roster.seed}: 玩家=${roster.roles.player}, ${roster.seats.length} 席)`, () => {
+    const summary = runSelfPlaySoak({
+      seed: roster.seed,
+      seats: roster.seats.slice(),
+      roles: roster.roles,
+      startWithFirstTurn: true,
+      ...roster.heroes
+    });
+    outcomes.push({ seed: roster.seed, ...summary });
+    console.log(`  (log) seed=${roster.seed} ${summary.gameover ? `第 ${summary.turns} 回合终局, winner=${summary.winner}` : `${summary.turns} 回合上限未终局`}, 共 ${summary.steps} 步`);
+  });
+}
+
+// 终局可达门禁: 固定种子确定性 — 全部 11 局须在回合上限内决出胜负
 // (弱于胜率门禁, 与路线图 K4 验收措辞一致: 零挂起/守恒/胜负可达)。
 test('K4 终局可达: 全部固定种子在回合上限内决出胜负', () => {
   const undecided = outcomes.filter((o) => !o.gameover);

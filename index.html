@@ -136,6 +136,18 @@
           <button type="button" class="btn small" id="modeIdentity4Btn" data-match-mode="identity4">4人身份场</button>
           <button type="button" class="btn small" id="modeIdentity5Btn" data-match-mode="identity5">5人身份场</button>
         </div>
+        <!-- v13 L1: 身份场可选身份 — 预设阵型内轮转 (构成不变: 玩家选定
+             身份后其余身份沿座次环顺延, 主公可落任意 AI 座席并先手);
+             随机 = 随机轮转偏移 (身份出现概率与预设构成一致)。3 人档无
+             内奸按钮。1v1 不显示 (沿用 roleDraftPanel 随机主公/反贼)。 -->
+        <div class="role-draft-panel" id="identityRolePanel" hidden>
+          <span class="badge">我方身份</span>
+          <button type="button" class="btn small is-active" id="roleLordBtn">主公</button>
+          <button type="button" class="btn small" id="roleLoyalBtn">忠臣</button>
+          <button type="button" class="btn small" id="roleRebelBtn">反贼</button>
+          <button type="button" class="btn small" id="roleRenegadeBtn">内奸</button>
+          <button type="button" class="btn small" id="roleRandomBtn">随机</button>
+        </div>
         <div class="role-draft-panel" id="roleDraftPanel">
           <span class="badge">身份判定</span>
           <span class="badge" id="playerRoleBadge">我方：待定</span>
@@ -174,14 +186,16 @@
         <!-- v12 H6: 第三席 (ally) 武将下拉 — 仅身份场显示 (默认 hidden,
              1v1 零回归); 身份固定为忠臣, 随 newGame seats 预设自动分配。
              v13 K3: 第四/五席同款下拉 (identity4/identity5 逐档显示)。 -->
+        <!-- v13 L1: 席位 label 中性化 — 可选身份后各席身份随轮转变化,
+             不再写死忠臣/内奸字样 (身份看牌桌徽章)。 -->
         <div class="hero-select-panel setup-grid" id="allyHeroPickRow" hidden>
-          <label class="setup-side">第三席（忠臣）武将 <select id="allyHeroSelect"></select></label>
+          <label class="setup-side">第三席武将 <select id="allyHeroSelect"></select></label>
         </div>
         <div class="hero-select-panel setup-grid" id="ally2HeroPickRow" hidden>
           <label class="setup-side">第四席武将 <select id="ally2HeroSelect"></select></label>
         </div>
         <div class="hero-select-panel setup-grid" id="ally3HeroPickRow" hidden>
-          <label class="setup-side">第五席（内奸）武将 <select id="ally3HeroSelect"></select></label>
+          <label class="setup-side">第五席武将 <select id="ally3HeroSelect"></select></label>
         </div>
         <!-- v9 PR-E11: 顺序选将完成后自动进入游戏 (handleHeroPickCardClick
              pickStep>=2 → newGame). 此 fallback 按钮 hidden, 仅留绑定. -->
@@ -204,6 +218,7 @@
           <span class="lord-badge" id="enemyLordBadge" hidden aria-label="主公">主</span>
           <span class="rebel-badge" id="enemyRebelBadge" hidden aria-label="反贼">反</span>
           <span class="loyalist-badge" id="enemyLoyalistBadge" hidden aria-label="忠臣">忠</span>
+          <span class="renegade-badge" id="enemyRenegadeBadge" hidden aria-label="内奸">内</span>
           <div class="camp-ribbon" id="enemyRibbon">魏</div>
           <div class="hero-head">
             <div>
@@ -233,7 +248,7 @@
            结构 (判定区 | 英雄 | 装备区), 不新造视觉语言。 -->
       <section class="ally-zone" id="allyZone" hidden>
         <div class="zone-panel">
-          <div class="zone-title">队友判定区 <span class="badge">延时锦囊</span></div>
+          <div class="zone-title">第三席判定区 <span class="badge">延时锦囊</span></div>
           <div class="judge-area" id="allyJudgeArea"><span class="mini-card">空</span></div>
         </div>
 
@@ -242,13 +257,14 @@
           <span class="lord-badge" id="allyLordBadge" hidden aria-label="主公">主</span>
           <span class="rebel-badge" id="allyRebelBadge" hidden aria-label="反贼">反</span>
           <span class="loyalist-badge" id="allyLoyalistBadge" hidden aria-label="忠臣">忠</span>
+          <span class="renegade-badge" id="allyRenegadeBadge" hidden aria-label="内奸">内</span>
           <div class="camp-ribbon" id="allyRibbon">蜀</div>
           <div class="hero-head">
             <div>
               <div class="hero-name" id="allyName">诸葛亮</div>
               <span class="badge" id="allyCamp">蜀 · 卧龙</span>
             </div>
-            <span class="badge" id="allyTurnBadge">队友</span>
+            <span class="badge" id="allyTurnBadge">电脑</span>
           </div>
           <p class="quote" id="allyQuote"></p>
           <div class="hp-row" id="allyHp"></div>
@@ -259,9 +275,9 @@
         </article>
 
         <div class="zone-panel">
-          <div class="zone-title">队友装备区 <span class="badge">武器 / 防具 / 坐骑</span></div>
+          <div class="zone-title">第三席装备区 <span class="badge">武器 / 防具 / 坐骑</span></div>
           <div class="equipment-area" id="allyEquipmentArea"><span class="mini-card">未装备</span></div>
-          <div class="panel-title" style="margin-top:12px">队友手牌</div>
+          <div class="panel-title" style="margin-top:12px">第三席手牌</div>
           <div class="small-card-row" id="allyHandBacks"></div>
         </div>
       </section>
@@ -412,6 +428,7 @@
           <span class="lord-badge" id="playerLordBadge" hidden aria-label="主公">主</span>
           <span class="rebel-badge" id="playerRebelBadge" hidden aria-label="反贼">反</span>
           <span class="loyalist-badge" id="playerLoyalistBadge" hidden aria-label="忠臣">忠</span>
+          <span class="renegade-badge" id="playerRenegadeBadge" hidden aria-label="内奸">内</span>
           <div class="camp-ribbon" id="playerRibbon">蜀</div>
           <div class="hero-head">
             <div>

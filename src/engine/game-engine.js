@@ -1156,7 +1156,9 @@
             roles[seats[ri]] = options[seats[ri] + 'Role'] || preset[ri] || '反贼';
           }
         }
-        var firstActor = options.firstActor || firstActorFromRoles(roles, seats[0] || 'player');
+        // v13 L1: firstActorFromRoles 按 seats 全环扫描主公 (轮转后主公可落
+        // 任意座席, AI 主公先手)。
+        var firstActor = options.firstActor || firstActorFromRoles(roles, seats, seats[0] || 'player');
         var game = {
           version: '3.0.0',
           random: random,

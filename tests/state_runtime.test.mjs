@@ -26,7 +26,13 @@ test('state runtime preserves roles, skill lookup, distance, range, limits, and 
 
   assert.equal(StateRuntime.opponent('player'), 'enemy');
   assert.equal(StateRuntime.opponent('enemy'), 'player');
-  assert.equal(StateRuntime.firstActorFromRoles({ player: '反贼', enemy: '主公' }, 'player'), 'enemy');
+  // v13 L1: firstActorFromRoles 改 (roles, seats, fallback) 3 参 — 按座次
+  // 序扫描主公 (轮转后主公可落任意座席); 旧 2 参调用兼容。
+  assert.equal(StateRuntime.firstActorFromRoles({ player: '反贼', enemy: '主公' }, ['player', 'enemy'], 'player'), 'enemy');
+  assert.equal(StateRuntime.firstActorFromRoles({ player: '反贼', enemy: '主公' }, 'player'), 'enemy', '旧 2 参调用兼容');
+  assert.equal(
+    StateRuntime.firstActorFromRoles({ player: '忠臣', enemy: '反贼', ally: '主公' }, ['player', 'enemy', 'ally'], 'player'),
+    'ally', '主公在第三席 → 先手 ally (L1 修复前错判 fallback)');
   assert.equal(StateRuntime.actorName(game, 'player'), '马超');
 
   assert.equal(StateRuntime.hasSkill(game.player, 'mashu'), true);

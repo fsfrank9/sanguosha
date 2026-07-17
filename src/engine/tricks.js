@@ -559,7 +559,9 @@
     var WUGU_QUEUE_HOOKS = {
       list: function (ctx) { return ctx.order; },
       shouldStop: function (game, ctx) { return !ctx.pool.length; }, // 牌已分完
-      shouldSkip: function (game, ctx, picker) { return !game[picker]; },
+      // v13 L2: 补 hp 二次校验与其余三套 hooks 对齐 (order 建队列时已过滤
+      // 存活, 结算期间中途死亡当前不可达 — 防御性收口消除回归窗口)。
+      shouldSkip: function (game, ctx, picker) { return !game[picker] || game[picker].hp <= 0; },
       wuxieReason: function (game, ctx, picker) {
         return '【五谷丰登】（' + actorName(game, picker) + '）';
       },
