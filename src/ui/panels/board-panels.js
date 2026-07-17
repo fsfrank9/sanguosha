@@ -201,10 +201,14 @@
           text = playerWon
             ? '你平定了这场乱世对决。点击“新开一局”再战。'
             : winnerLabel + '赢下了这一局。调整出牌顺序再来一次。';
-        } else if (view.game.player && view.game.player.hp <= 0) {
-          // v13 L2: 阵亡旁观 — 身份场玩家死亡而胜负未分, AI 续跑至终局
-          // (1v1 玩家死亡即终局, 不入此分支)。终局归属仍按玩家真实身份
-          // (seatWon), 忠臣阵亡后主公方获胜照样显示"胜利"。
+        } else if (view.game.player && view.game.player.hp <= 0
+            && !(view.game.pauseState && view.game.pauseState.dying)) {
+          // v13 L2 (review 修复): 阵亡旁观 — 玩家死亡而胜负未分, AI 续跑至
+          // 终局。濒死救援结算期间 (pauseState.dying, 含 1v1 玩家 hp=0 挂起
+          // 用桃/酒自救的 ask 窗口) 不入此分支 — 此时"选择自救"仍有意义,
+          // 提前宣告阵亡会误导玩家放弃可赢的自救。濒死链耗尽真死后
+          // pauseState.dying 已清而 hp<=0, 旁观横幅照常; 1v1 真死即终局走
+          // 上方 isGameOver 分支。终局归属按玩家真实身份 (seatWon)。
           title = '你已阵亡 · 旁观中';
           text = '战局仍在继续，其余角色将自动对决至终局；胜负按你的真实身份结算。';
         } else if (discardNeeded) {
