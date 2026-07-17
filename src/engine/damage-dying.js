@@ -385,7 +385,14 @@
       // 先行救援的机会。1v1 中不屈结果不变 (队列另一人是 AI 攻击方, 恒
       // 不救援)。
       var turnActor = game.turn || dyingActor;
-      var responderQueue = seatsFrom(game, turnActor, true).filter(function (seat) { return !!game[seat]; });
+      // v13 K2: 队列排除已阵亡座席 (濒死者本人 hp<=0 仍须入队) — 此前只查
+      // 座席存在, 亡席在环上"陪跑"(手牌已清空恒 skipped, 功能无害), 4/5 席
+      // 多人阵亡后显式过滤, 防未来救援逻辑变化时死灰复燃。
+      var responderQueue = seatsFrom(game, turnActor, true).filter(function (seat) {
+        var seatState = game[seat];
+        if (!seatState) return false;
+        return seat === dyingActor || seatState.hp > 0;
+      });
       game.pauseState.dying = {
         actor: dyingActor,
         source: sourceActor,
@@ -459,7 +466,7 @@
       if (winner) {
         game.phase = 'gameover';
         game.winner = winner;
-        log(game, (winner === 'lordSide' ? '主忠方' : winner === 'rebelSide' ? '反贼方' : actorName(game, winner)) + '获胜！');
+        log(game, (winner === 'lordSide' ? '主忠方' : winner === 'rebelSide' ? '反贼方' : winner === 'renegade' ? '内奸' : actorName(game, winner)) + '获胜！');
       }
       game.pauseState.dying = null;
       // v12 H5: 对局继续 (身份场非终局死亡) → 阵亡结算 (弃置所有牌 + 奖惩)。
@@ -520,9 +527,20 @@
       if (!Array.isArray(game.seats) || game.seats.length < 3) return opponent(deadActor);
       var alive = aliveSeats(game).filter(function (seat) { return seat !== deadActor; });
       var lord = game.seats.find(function (seat) { return roles[seat] === '主公'; });
-      if (deadActor === lord || (lord && alive.indexOf(lord) < 0)) return 'rebelSide';
-      var rebelsAlive = alive.some(function (seat) { return roles[seat] === '反贼'; });
-      if (!rebelsAlive) return 'lordSide';
+      if (deadActor === lord || (lord && alive.indexOf(lord) < 0)) {
+        // v13 K1: 主公阵亡 — 场上仅剩内奸存活 → 内奸单独获胜; 否则反贼方胜
+        // (官方: 内奸胜利条件为最终一对一击杀主公, 即主公死亡时其余身份全灭)。
+        var onlyRenegadeAlive = alive.length > 0 && alive.every(function (seat) {
+          return roles[seat] === '内奸';
+        });
+        return onlyRenegadeAlive ? 'renegade' : 'rebelSide';
+      }
+      // v13 K1: 主公方获胜收紧 — 反贼与内奸须全部阵亡 (仅反贼全灭而内奸
+      // 存活时对局继续)。3 人档无内奸, 行为与 v12 恒等。
+      var threatsAlive = alive.some(function (seat) {
+        return roles[seat] === '反贼' || roles[seat] === '内奸';
+      });
+      if (!threatsAlive) return 'lordSide';
       return null;
     }
 

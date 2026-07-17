@@ -123,13 +123,16 @@ test('3b. 击杀反贼摸三张, 反贼全灭 → 主忠方胜 (winner=lordSide)
 });
 
 test('3c. 4 座席局: 击杀一名反贼摸三张, 仍有反贼存活时对局继续', () => {
+  // v13 K1: 4 席档有了官方预设 (主/忠/反/内), 本用例意图是"杀一反贼另一
+  // 反贼存活", 改为逐席显式 Role 不再依赖预设巧合 (旧 fallback enemy=反贼)。
   const game = Engine.newGame({
     seed: 36006,
     seats: ['player', 'enemy', 'ally', 'rebel2'],
     playerHero: 'liubei', enemyHero: 'caocao', allyHero: 'guanyu', rebel2Hero: 'zhangfei',
-    rebel2Role: '反贼'
+    enemyRole: '反贼', allyRole: '忠臣', rebel2Role: '反贼'
   });
   assert.equal(game.roles.rebel2, '反贼', '第四席显式反贼');
+  assert.equal(game.roles.enemy, '反贼', '第二席显式反贼');
   resetSeats(game);
   game.turn = 'player';
   game.phase = 'play';

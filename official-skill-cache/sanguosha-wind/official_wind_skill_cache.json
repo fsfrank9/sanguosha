@@ -7,7 +7,7 @@
     "retrieval": "pending-crawl: 风包详情页尚未爬取; 条目由官方实体版规则文本人工转写。",
     "parser": "manual-transcription",
     "copyrightPolicy": "local gitignored development cache; do not commit official prose",
-    "gidPolicy": "provisional-local: gid 216-223 为本地临时编号 (顺接标准包缓存 214-215), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。v13 J4 (2026-07-16) 核对尝试: 本执行环境网络策略拦截 www.sanguosha.com (代理 403), 无法爬取官方索引页 — 如实记录降级, 临时编号保留, 待可直连官网的环境回填。"
+    "gidPolicy": "provisional-local: gid 216-223 为本地临时编号 (顺接标准包缓存 214-215), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。v13 J4 (2026-07-16) 核对尝试: 本执行环境网络策略拦截 www.sanguosha.com (代理 403), 无法爬取官方索引页 — 如实记录降级, 临时编号保留, 待可直连官网的环境回填。J 尾批 (2026-07-17) 重试: 同一网络策略仍拦截 (CONNECT 403), 降级状态不变。"
   },
   "includeFullSkillText": false,
   "containsOfficialText": false,

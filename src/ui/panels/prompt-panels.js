@@ -323,8 +323,10 @@
             '火攻：目标现展示【' + (pending.revealed && pending.revealed.name || '') + '】（'
             + suitLabel(pending.revealed && pending.revealed.suit) + '），重选要弃置的同花色手牌，或不弃置（无伤结算）。';
         }
-        if (els.huogongCostChoices) {
-          els.huogongCostChoices.innerHTML = (pending.cards || []).map(function (card) {
+        // v13 K3 (缺陷修复): 写入唯一 id 的重选容器 — 原 huogongCostChoices
+        // 与 huogongModePanel 内同名, 真实浏览器下候选渲染进隐藏的旧面板。
+        if (els.huogongCostRepickChoices) {
+          els.huogongCostRepickChoices.innerHTML = (pending.cards || []).map(function (card) {
             return promptCardChoice(card, {
               dataAttrs: { huogongCostCardId: card.id },
               title: '弃置这张同花色手牌',
@@ -698,7 +700,9 @@
       render();
     });
     // v13 J2: 火攻成本重选 — 点候选 stage 后 hand-confirm 提交; 不弃置按钮直提。
-    if (els.huogongCostChoices) els.huogongCostChoices.addEventListener('click', function (event) {
+    // v13 K3: 监听挂唯一 id 容器 (原 huogongCostChoices 为 huogongModePanel
+    // 的节点, 重选面板打开时旧面板 hidden, 候选实际不可点)。
+    if (els.huogongCostRepickChoices) els.huogongCostRepickChoices.addEventListener('click', function (event) {
       var btn = event.target.closest('[data-huogong-cost-card-id]');
       if (!btn) return;
       var cardId = btn.getAttribute('data-huogong-cost-card-id');

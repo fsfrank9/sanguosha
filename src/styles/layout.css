@@ -293,6 +293,18 @@
       grid-template-rows: minmax(90px, .8fr) minmax(90px, .8fr) minmax(130px, .85fr) minmax(90px, .8fr) minmax(160px, 1.1fr);
     }
 
+    /* v13 K3: 4/5 人身份场 — 非玩家席按预置槽位继续纵向堆叠 (敌方 →
+       第三/四/五席 → 中央 → 玩家 → 手牌), 行模板逐档显式给出 (与
+       is-identity3 同理, 防隐式行挤压 hand-dock); 行高最小值随席数收紧,
+       整桌仍锁 100vh 内滚动。座席环横排压缩留作后续排版打磨 (K3 记录)。 */
+    .duel-table.is-identity4 {
+      grid-template-rows: minmax(76px, .7fr) minmax(76px, .7fr) minmax(76px, .7fr) minmax(120px, .85fr) minmax(80px, .75fr) minmax(150px, 1fr);
+    }
+
+    .duel-table.is-identity5 {
+      grid-template-rows: minmax(66px, .65fr) minmax(66px, .65fr) minmax(66px, .65fr) minmax(66px, .65fr) minmax(110px, .8fr) minmax(74px, .7fr) minmax(140px, .95fr);
+    }
+
     .arena-zone {
       display: grid;
       grid-template-columns: minmax(260px, .92fr) minmax(300px, 1.08fr);

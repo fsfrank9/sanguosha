@@ -478,9 +478,12 @@
 
     // v12 H6: 单目标牌类型表 — 杀 (isShaCard 覆盖 sha/fire_sha/thunder_sha) +
     // 决斗/拆/顺/火攻/乐/兵/借刀/无中。铁索 (至多 2 目标) 与南蛮/万箭/
-    // 桃园/五谷/酒 等 AOE/自身/无目标牌不在此列, identity3 下沿用引擎缺省
+    // 桃园/五谷 等 AOE/无目标牌不在此列, identity3 下沿用引擎缺省
     // (照旧, 与 1v1 相同路径)。v13 J0-4: 桃收口为恒对自己, 不再座席点选。
-    var SEAT_TARGET_CARD_TYPES = ['juedou', 'guohe', 'shunshou', 'huogong', 'lebusishu', 'bingliang', 'jiedao', 'wuzhong'];
+    // v13 K2/K3 (座席泛化桶销账): 酒放开他指 (card__basic.md:58 "包括你在
+    // 内的一名角色") — 入表走座席点选 (合法目标含自己, 点自己英雄卡即
+    // 自饮); 1v1 不进座席点选, 直出自饮不变。
+    var SEAT_TARGET_CARD_TYPES = ['juedou', 'guohe', 'shunshou', 'huogong', 'lebusishu', 'bingliang', 'jiedao', 'wuzhong', 'jiu'];
 
     function isSeatTargetCard(card) {
       return !!card && (Engine.isShaCard(card) || SEAT_TARGET_CARD_TYPES.indexOf(card.type) >= 0);
@@ -738,7 +741,8 @@
       // v12 H 复核修复: 多目标 (铁索) 的"确定"提前完成 + "重铸"附加动作。
       if (els.seatTargetConfirmBtn) els.seatTargetConfirmBtn.addEventListener('click', function () { finishSeatPicker(); render(); });
       if (els.seatTargetExtraBtn) els.seatTargetExtraBtn.addEventListener('click', function () { seatPickerExtraAction(); render(); });
-      ['player', 'enemy', 'ally'].forEach(function (seat) {
+      // v13 K3: 座席点选绑定扩容至 4/5 人档预置槽位 (缺席节点 guard 跳过)。
+      ['player', 'enemy', 'ally', 'ally2', 'ally3'].forEach(function (seat) {
         var heroEl = els[seat + 'Hero'];
         if (!heroEl) return;
         heroEl.addEventListener('click', function () { clickSeatForPicker(seat); });

@@ -430,19 +430,63 @@
       return advanceAOETargets(game);
     });
 
-    // v13 审计三轮: 铁索连环 (使用分支) 补无懈窗口 — 普通锦囊, 官方无
-    // 豁免条款; 逐目标 (至多 2 名) 独立开窗。重铸不是"使用", 不开窗。
-    function advanceTiesuoTargets(game, ctx) {
-      while (ctx.idx < ctx.targets.length) {
-        var side = ctx.targets[ctx.idx];
-        if (!game[side] || game[side].hp <= 0) { ctx.idx += 1; continue; }
+    // v13 K2 (审计三轮评审建议落地): 逐目标无懈驱动泛化 — aoe/tiesuo/
+    // taoyuan/wugu 四份同型"座席队列 + 逐目标无懈开窗"循环骨架收敛为单一
+    // 驱动, 消除四处复制的漂移风险。差异保留为 hooks (差异矩阵见
+    // docs/audit 三轮纪要 backlog 表):
+    //   list(q)              目标数组访问器 (字段名各异: order/targets, 保持
+    //                        ctx 形状不变 — resolver/测试依赖字段名)
+    //   shouldStop(game, q)  队列级整体终止 (仅五谷 pool 耗尽); 缺省无
+    //   shouldSkip(game, q, seat)  单目标跳过判定 (死亡/满血/保护/藤甲各异)
+    //   wuxieReason(game, q, seat) 无懈开窗提示文案
+    //   wuxieKind            WUXIE_CONTINUATIONS 注册名 (kind 与 ctx 不变)
+    //   needsWuxieDedup      AOE 专属 wuxieCheckedIdx 语义: AOE 的效果体在
+    //                        驱动内 (开窗后同 idx 重入需去重); 其余三者效果
+    //                        体在 continuation 内 (开窗即让位, 无重入), 无需
+    //   effect(game, q, seat)  仅 needsWuxieDedup 驱动使用: 开窗后重入时的
+    //                        逐目标效果体; 返回 'continue' = 本目标同步完成
+    //                        (idx 推进由效果体自行负责), 其余返回值 (挂起/
+    //                        提前退出) 原样透传
+    //   onDrain(game, q)     队列耗尽收尾 — finishTrickUse 调用时点的差异
+    //                        (驱动内 vs 调用方包裹) 是行为差异, 原样保留
+    // gameover 提前终止对 tiesuo/taoyuan/wugu 为惰性分支 (三者效果体不产生
+    // 伤害, 队列期间不可能终局), 仅 AOE 实际可达 — 与重构前行为一致。
+    function advanceTargetQueue(game, q, hooks) {
+      var list = hooks.list(q);
+      while (q.idx < list.length) {
+        if (game.phase === 'gameover') break;
+        if (hooks.shouldStop && hooks.shouldStop(game, q)) break;
+        var seat = list[q.idx];
+        if (hooks.shouldSkip(game, q, seat)) { q.idx += 1; continue; }
+        if (hooks.needsWuxieDedup && q.wuxieCheckedIdx === q.idx) {
+          var effectResult = hooks.effect(game, q, seat);
+          if (effectResult !== 'continue') return effectResult;
+          continue;
+        }
+        if (hooks.needsWuxieDedup) q.wuxieCheckedIdx = q.idx;
         return checkWuxieAndContinue(
-          game, side,
-          '【铁索连环】（' + actorName(game, side) + '）',
-          'tiesuo-target', ctx
+          game, seat, hooks.wuxieReason(game, q, seat), hooks.wuxieKind, q
         );
       }
-      return finishTrickUse(game, ctx.actor, ctx.card, success('铁索连环结算完成。'), ctx.options);
+      return hooks.onDrain(game, q);
+    }
+
+    // v13 审计三轮: 铁索连环 (使用分支) 补无懈窗口 — 普通锦囊, 官方无
+    // 豁免条款; 逐目标 (至多 2 名) 独立开窗。重铸不是"使用", 不开窗。
+    var TIESUO_QUEUE_HOOKS = {
+      list: function (ctx) { return ctx.targets; },
+      shouldSkip: function (game, ctx, side) { return !game[side] || game[side].hp <= 0; },
+      wuxieReason: function (game, ctx, side) {
+        return '【铁索连环】（' + actorName(game, side) + '）';
+      },
+      wuxieKind: 'tiesuo-target',
+      onDrain: function (game, ctx) {
+        return finishTrickUse(game, ctx.actor, ctx.card, success('铁索连环结算完成。'), ctx.options);
+      }
+    };
+
+    function advanceTiesuoTargets(game, ctx) {
+      return advanceTargetQueue(game, ctx, TIESUO_QUEUE_HOOKS);
     }
 
     registerWuxieContinuation('tiesuo-target', function (game, ctx, wuxied) {
@@ -475,25 +519,25 @@
     });
 
     // H1b: 桃园结义 逐目标无懈驱动。targets = 受伤角色 (按 [actor, opponent]
-    // 顺序)。每名目标独立开无懈窗口, responder = opponent(目标) (即另一方可
-    // 抵消该目标的回复)。全部目标结算后 finishTrickUse 触发集智等 onCardUse。
-    function advanceTaoyuanTargets(game, ctx) {
-      while (ctx.idx < ctx.targets.length) {
-        var target = ctx.targets[ctx.idx];
-        if (!game[target] || game[target].hp >= game[target].maxHp) {
-          ctx.idx += 1; // 期间已被治满 (理论不出现) → 跳过
-          continue;
-        }
-        // v13 审计三轮: 首询者 = 当前目标座席 (座次环泛化; 此前二元
-        // opponent(target), 3p 下首询锚点错跳。1v1 队列跳过来源后恒为
-        // 对方单人, 逐步行为不变)。
-        return checkWuxieAndContinue(
-          game, target,
-          '【桃园结义】（' + actorName(game, target) + '）',
-          'taoyuan-target', ctx
-        );
+    // 顺序)。每名目标独立开无懈窗口 (v13 审计三轮: 首询者 = 当前目标座席,
+    // 座次环泛化)。全部目标结算后 finishTrickUse 触发集智等 onCardUse。
+    var TAOYUAN_QUEUE_HOOKS = {
+      list: function (ctx) { return ctx.targets; },
+      shouldSkip: function (game, ctx, target) {
+        // 期间已被治满 (理论不出现) → 跳过
+        return !game[target] || game[target].hp >= game[target].maxHp;
+      },
+      wuxieReason: function (game, ctx, target) {
+        return '【桃园结义】（' + actorName(game, target) + '）';
+      },
+      wuxieKind: 'taoyuan-target',
+      onDrain: function (game, ctx) {
+        return finishTrickUse(game, ctx.actor, ctx.card, success('桃园结义结算完成。'), ctx.options);
       }
-      return finishTrickUse(game, ctx.actor, ctx.card, success('桃园结义结算完成。'), ctx.options);
+    };
+
+    function advanceTaoyuanTargets(game, ctx) {
+      return advanceTargetQueue(game, ctx, TAOYUAN_QUEUE_HOOKS);
     }
 
     registerWuxieContinuation('taoyuan-target', function (game, ctx, wuxied) {
@@ -510,21 +554,21 @@
 
     // H1b-2: 五谷丰登 逐目标无懈驱动。ctx = { sourceActor, wuguCardId, pool,
     // order, idx, options }。对每名 picker (order[idx]) 先开无懈窗口
-    // (responder = opponent(picker), 另一方可抵消该 picker 的获得); 被无懈
-    // 则跳过其选牌, 否则进入 wuguPickForCurrent 选牌 (auto 立即 / ask 暂停)。
+    // (v13 审计三轮: 首询者 = 当前 picker 座席, 座次环泛化); 被无懈则跳过
+    // 其选牌, 否则进入 wuguPickForCurrent 选牌 (auto 立即 / ask 暂停)。
+    var WUGU_QUEUE_HOOKS = {
+      list: function (ctx) { return ctx.order; },
+      shouldStop: function (game, ctx) { return !ctx.pool.length; }, // 牌已分完
+      shouldSkip: function (game, ctx, picker) { return !game[picker]; },
+      wuxieReason: function (game, ctx, picker) {
+        return '【五谷丰登】（' + actorName(game, picker) + '）';
+      },
+      wuxieKind: 'wugu-target',
+      onDrain: function (game, ctx) { return finishWugu(game, ctx); }
+    };
+
     function advanceWuguTargets(game, ctx) {
-      while (ctx.idx < ctx.order.length) {
-        if (!ctx.pool.length) break; // 牌已分完
-        var picker = ctx.order[ctx.idx];
-        if (!game[picker]) { ctx.idx += 1; continue; }
-        // v13 审计三轮: 首询者 = 当前 picker 座席 (座次环泛化, 同桃园)。
-        return checkWuxieAndContinue(
-          game, picker,
-          '【五谷丰登】（' + actorName(game, picker) + '）',
-          'wugu-target', ctx
-        );
-      }
-      return finishWugu(game, ctx);
+      return advanceTargetQueue(game, ctx, WUGU_QUEUE_HOOKS);
     }
 
     registerWuxieContinuation('wugu-target', function (game, ctx, wuxied) {
@@ -1007,109 +1051,115 @@
         return advanceAOETargets(game);
       }
 
-      function advanceAOETargets(game) {
-        var aoe = game.pauseState && game.pauseState.aoe;
-        if (!aoe) return fail('AOE 结算状态丢失。');
+      // v13 K2: AOE 驱动改走 advanceTargetQueue 泛化骨架。效果体 (八卦先行/
+      // 玩家 ask/consumeResponse/激将护驾/伤害) 保持在驱动侧 (needsWuxieDedup
+      // 语义: 无懈开窗后同 idx 重入本函数), 语句与重构前逐行一致。
+      function aoeEffectForCurrent(game, aoe, targetActor) {
         var responseType = aoe.responseType;
         var title = aoe.title;
-        while (aoe.idx < aoe.order.length) {
-          if (game.phase === 'gameover') break;
-          var targetActor = aoe.order[aoe.idx];
+        // v13 J0-3: 八卦阵先行 — 需打出【闪】的座席 (万箭) 先给判定机会
+        // (全座席统一; 此前玩家座席在窗口后/真闪后才试), 红判定即化解。
+        // 【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦。
+        if (responseType === 'shan' && tryBaguaDodge(game, targetActor, false)) {
+          log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
+          aoe.idx += 1;
+          return 'continue';
+        }
+        // v10 V4: 万箭齐发 (responseType='shan') + 玩家为目标 + shanResponse=ask +
+        // 有闪可响应 → 暂停, 让玩家自选闪 / 不出. 引擎默认仍走自动响应.
+        if (responseType === 'shan' && targetActor === 'player') {
+          var aoeTarget = game.player;
+          if (aoeTarget.skillPreferences && aoeTarget.skillPreferences.shanResponse === 'ask'
+              && hasShanResponseAvailable(aoeTarget)) {
+            aoe.idx += 1;  // 玩家座席结果由 resolver 收尾, 游标先行越过
+            return requestPlayerResponse(game, {
+              kind: 'wanjian-response',
+              actor: 'player',
+              pauseKey: 'wanjianResponse',
+              source: { sourceActor: aoe.sourceActor, title: title, card: aoe.card },
+              options: listShanResponseOptions(aoeTarget),
+              meta: { sourceActor: aoe.sourceActor, sourceName: title },
+              logMessage: '等待' + actorName(game, 'player') + '决定是否打出【闪】响应【' + title + '】。',
+              statusMessage: '等待玩家响应【' + title + '】。'
+            });
+          }
+        }
+        aoe.idx += 1;
+        if (consumeResponse(game, targetActor, responseType, '【' + title + '】')) {
+          log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
+        } else {
+          // v12 H7: 激将/护驾 — 主公座席打不出所需牌时求助同势力:
+          // AI 主公 + 玩家可代打 → 挂起询问; 其余 → AI 座席同步接力。
+          var aoeAidSkill = responseType === 'sha' ? 'jijiang' : 'hujia';
+          if (targetActor !== 'player' && lordAidPlayerCanAid
+              && lordAidPlayerCanAid(game, targetActor, aoeAidSkill)) {
+            return requestPlayerResponse(game, {
+              kind: aoeAidSkill + '-aid',
+              actor: 'player',
+              pauseKey: 'lordAidAOE',
+              source: { lordActor: targetActor, title: title, responseType: responseType, sourceActor: aoe.sourceActor, card: aoe.card },
+              options: responseType === 'sha' ? listShaResponseOptions(game.player) : listShanResponseOptions(game.player),
+              meta: { lordActor: targetActor, sourceName: title, aidSkill: aoeAidSkill },
+              logMessage: '等待' + actorName(game, 'player') + '决定是否响应【' + (aoeAidSkill === 'jijiang' ? '激将' : '护驾') + '】。',
+              statusMessage: '等待玩家护主响应。'
+            });
+          }
+          if (tryLordAidSync && tryLordAidSync(game, targetActor, aoeAidSkill, '【' + title + '】')) {
+            log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
+          } else {
+            damage(game, targetActor, 1, aoe.sourceActor, '【' + title + '】', aoe.card);
+            // 濒死救援等选择挂起 → 保留 aoe 队列, 选择排空后续跑剩余座席
+            if (game.pendingChoice) {
+              return success('【' + title + '】等待濒死结算…');
+            }
+          }
+        }
+        return 'continue';
+      }
+
+      var AOE_QUEUE_HOOKS = {
+        list: function (aoe) { return aoe.order; },
+        // v13 审计三轮: 逐目标无懈窗口 — 官方多目标牌逐目标结算,
+        // "生效前"响应 (无懈) 对每名目标独立重现 (flow__use.md; 与桃园/
+        // 五谷同型)。有效性检测 (藤甲) 在前、生效前响应在后 (flow__use.md
+        // 步骤序)。wuxieCheckedIdx 防同一目标重复开窗; 被抵消由
+        // 'aoe-target' 延续推进游标。
+        needsWuxieDedup: true,
+        shouldSkip: function (game, aoe, targetActor) {
           var targetState = game[targetActor];
           // 结算时点已死亡的座席不再是目标 (期间可能因铁索传导等倒下)
-          if (!targetState || targetState.hp <= 0) {
-            aoe.idx += 1;
-            continue;
-          }
+          if (!targetState || targetState.hp <= 0) return true;
           // v12 H1: 座席级目标保护 (谦逊类 onCardTarget) — 被保护座席跳过。
           // 现有钩子均不覆盖南蛮/万箭 (行为不变), 为同疾等 3p 技能预留。
           var aoeProtection = cardTargetProtection(game, aoe.sourceActor, targetActor, aoe.card);
           if (aoeProtection) {
             log(game, aoeProtection.message);
-            aoe.idx += 1;
-            continue;
+            return true;
           }
           // v13 J0-3 (PR #165 缺陷 3): 藤甲 — 锁定技"南蛮入侵/万箭齐发对你
           // 无效" (gltjk card__equipment.md): 免疫座席直接跳过, 不开响应
           // 询问、不进伤害层事后防止。
           if (hasEquipmentEffect(targetState, 'tengjiaImmuneNormalShaAOE')) {
-            log(game, actorName(game, targetActor) + '的【藤甲】令【' + title + '】无效。');
-            aoe.idx += 1;
-            continue;
+            log(game, actorName(game, targetActor) + '的【藤甲】令【' + aoe.title + '】无效。');
+            return true;
           }
-          // v13 审计三轮: 逐目标无懈窗口 — 官方多目标牌逐目标结算,
-          // "生效前"响应 (无懈) 对每名目标独立重现 (flow__use.md; 与桃园/
-          // 五谷同型)。有效性检测 (藤甲) 在前、生效前响应在后 (flow__use.md
-          // 步骤序)。wuxieCheckedIdx 防同一目标重复开窗; 被抵消由
-          // 'aoe-target' 延续推进游标。
-          if (aoe.wuxieCheckedIdx !== aoe.idx) {
-            aoe.wuxieCheckedIdx = aoe.idx;
-            return checkWuxieAndContinue(
-              game, targetActor,
-              '【' + title + '】（' + actorName(game, targetActor) + '）',
-              'aoe-target', aoe
-            );
-          }
-          // v13 J0-3: 八卦阵先行 — 需打出【闪】的座席 (万箭) 先给判定机会
-          // (全座席统一; 此前玩家座席在窗口后/真闪后才试), 红判定即化解。
-          // 【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦。
-          if (responseType === 'shan' && tryBaguaDodge(game, targetActor, false)) {
-            log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
-            aoe.idx += 1;
-            continue;
-          }
-          // v10 V4: 万箭齐发 (responseType='shan') + 玩家为目标 + shanResponse=ask +
-          // 有闪可响应 → 暂停, 让玩家自选闪 / 不出. 引擎默认仍走自动响应.
-          if (responseType === 'shan' && targetActor === 'player') {
-            var aoeTarget = game.player;
-            if (aoeTarget.skillPreferences && aoeTarget.skillPreferences.shanResponse === 'ask'
-                && hasShanResponseAvailable(aoeTarget)) {
-              aoe.idx += 1;  // 玩家座席结果由 resolver 收尾, 游标先行越过
-              return requestPlayerResponse(game, {
-                kind: 'wanjian-response',
-                actor: 'player',
-                pauseKey: 'wanjianResponse',
-                source: { sourceActor: aoe.sourceActor, title: title, card: aoe.card },
-                options: listShanResponseOptions(aoeTarget),
-                meta: { sourceActor: aoe.sourceActor, sourceName: title },
-                logMessage: '等待' + actorName(game, 'player') + '决定是否打出【闪】响应【' + title + '】。',
-                statusMessage: '等待玩家响应【' + title + '】。'
-              });
-            }
-          }
-          aoe.idx += 1;
-          if (consumeResponse(game, targetActor, responseType, '【' + title + '】')) {
-            log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
-          } else {
-            // v12 H7: 激将/护驾 — 主公座席打不出所需牌时求助同势力:
-            // AI 主公 + 玩家可代打 → 挂起询问; 其余 → AI 座席同步接力。
-            var aoeAidSkill = responseType === 'sha' ? 'jijiang' : 'hujia';
-            if (targetActor !== 'player' && lordAidPlayerCanAid
-                && lordAidPlayerCanAid(game, targetActor, aoeAidSkill)) {
-              return requestPlayerResponse(game, {
-                kind: aoeAidSkill + '-aid',
-                actor: 'player',
-                pauseKey: 'lordAidAOE',
-                source: { lordActor: targetActor, title: title, responseType: responseType, sourceActor: aoe.sourceActor, card: aoe.card },
-                options: responseType === 'sha' ? listShaResponseOptions(game.player) : listShanResponseOptions(game.player),
-                meta: { lordActor: targetActor, sourceName: title, aidSkill: aoeAidSkill },
-                logMessage: '等待' + actorName(game, 'player') + '决定是否响应【' + (aoeAidSkill === 'jijiang' ? '激将' : '护驾') + '】。',
-                statusMessage: '等待玩家护主响应。'
-              });
-            }
-            if (tryLordAidSync && tryLordAidSync(game, targetActor, aoeAidSkill, '【' + title + '】')) {
-              log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
-            } else {
-              damage(game, targetActor, 1, aoe.sourceActor, '【' + title + '】', aoe.card);
-              // 濒死救援等选择挂起 → 保留 aoe 队列, 选择排空后续跑剩余座席
-              if (game.pendingChoice) {
-                return success('【' + title + '】等待濒死结算…');
-              }
-            }
-          }
+          return false;
+        },
+        wuxieReason: function (game, aoe, targetActor) {
+          return '【' + aoe.title + '】（' + actorName(game, targetActor) + '）';
+        },
+        wuxieKind: 'aoe-target',
+        effect: aoeEffectForCurrent,
+        onDrain: function (game, aoe) {
+          game.pauseState.aoe = null;
+          return success(aoe.title + '结算完成。');
         }
-        game.pauseState.aoe = null;
-        return success(title + '结算完成。');
+      };
+
+      function advanceAOETargets(game) {
+        var aoe = game.pauseState && game.pauseState.aoe;
+        if (!aoe) return fail('AOE 结算状态丢失。');
+        return advanceTargetQueue(game, aoe, AOE_QUEUE_HOOKS);
       }
 
       // v10 V4: 万箭齐发 闪响应 — 玩家 decision 决定 化解 / damage(1).

@@ -1174,6 +1174,9 @@
           roles: roles,
           seats: seats,
           firstActor: firstActor,
+          // v13 K1: 'identity3' 为身份场模式标签 (历史命名), 覆盖 3-5 人档 —
+          // 引擎/UI 所有 mode==='identity3' 判断语义均为"身份场规则生效",
+          // 与具体席数无关; 席数判断一律走 game.seats.length。
           mode: seats.length >= 3 ? 'identity3' : 'duel',
           // v12 H5: 身份→阵营映射随局携带 (胜负判定/内奸预留)。
           roleSides: clone(ROLE_SIDES),
@@ -1185,6 +1188,17 @@
           if (!game[seat]) {
             var heroKey = options[seat + 'Hero'];
             game[seat] = makePlayer(clone(HERO_CATALOG[heroKey] || HEROES.enemy));
+          }
+        }
+        // v13 K5 (review 修复): 官方 glossary__value.md:23 — "若游戏人数
+        // 不小于5，主公的体力上限+1" (开局体力随之 +1)。4 人及以下不加;
+        // 5 人档 v13 K 起现役, 该规则首次可达。
+        if (seats.length >= 5) {
+          for (var lordSi = 0; lordSi < seats.length; lordSi += 1) {
+            if (roles[seats[lordSi]] === '主公' && game[seats[lordSi]]) {
+              game[seats[lordSi]].maxHp += 1;
+              game[seats[lordSi]].hp += 1;
+            }
           }
         }
         game.deck = buildDeck(game, random);
@@ -1414,12 +1428,12 @@
         }
         if (isShaCard(card)) return canReachWithSha(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
         if (card.type === 'tao') return false; // v13 J0-4: 出牌阶段【桃】目标恒为自己
-        // v13 审计三轮: 【酒】使用方法Ⅰ矩阵自洽 — 本实现为"仅自己"变体
-        // (与执行路径 playJiuCardHandler 一致; 此前矩阵对他人误报合法)。
-        // 已知分歧如实记录: gltjk card__basic.md:58 (军争/国-标) 写"包括你
-        // 在内的一名角色" (可指定他人, 借刀驱使的杀可吃增益), 指定他人的
-        // 完整实现留待 K 阶段座席泛化桶, 见 docs/audit 三轮纪要 backlog。
-        if (card.type === 'jiu') return false;
+        // v13 K2 (座席泛化桶销账): 【酒】使用方法Ⅰ按官方语义放开他指 —
+        // gltjk card__basic.md:58 (军争/国-标) "使用目标: 包括你在内的一名
+        // 角色"。"每回合限一次"归属使用时机行 (限使用者出牌阶段的使用
+        // 次数, 不限目标被喂次数), 故他指不查目标的 jiuUsedThisTurn;
+        // 目标保护 (谦逊/空城类 onCardTarget) 照常约束。
+        if (card.type === 'jiu') return !cardTargetProtection(game, actor, seat, card);
         if (card.type === 'wuzhong') return true;
         if (card.type === 'shandian') return false; // 闪电只对自己使用
         if (card.type === 'lebusishu' || card.type === 'bingliang') {
@@ -1600,11 +1614,23 @@
       function playJiuCardHandler(game, actor, card, options, self) {
           // v7 PR-8: 标记已用 + shaBonus = 1（不累加，spec "下一张【杀】"
           // 即下一次结算 +1，不是叠加多次酒）
+          // v13 K2 (座席泛化桶销账): 官方使用方法Ⅰ"包括你在内的一名角色" —
+          // options.target 可指定他人 (借刀驱使的杀可吃增益), 缺省自己。
+          // jiuUsedThisTurn 恒挂使用者 (限次归属使用时机行); shaBonus 挂
+          // 目标 (playSha 按"谁在打杀"读自己的 shaBonus, 天然衔接);
+          // "此回合内"过期语义由 completeTurn 统一清全席 shaBonus 兜底。
+          var jiuTargetActor = resolveSeatOption(game, options && options.target) || actor;
+          if (jiuTargetActor !== actor && !isLegalCardTarget(game, actor, card, jiuTargetActor)) {
+            putCard(game, card, { zone: 'hand', actor: actor });
+            return fail('无效的【酒】目标。');
+          }
           discardCard(game, card);
           if (!self.flags) self.flags = {};
           self.flags.jiuUsedThisTurn = true;
-          self.shaBonus = 1;
-          log(game, actorName(game, actor) + '饮下【酒】，本回合下一张【杀】伤害 +1。');
+          game[jiuTargetActor].shaBonus = 1;
+          log(game, actorName(game, actor) + (jiuTargetActor === actor
+            ? '饮下【酒】，本回合下一张【杀】伤害 +1。'
+            : '对' + actorName(game, jiuTargetActor) + '使用【酒】，其于本回合内使用的下一张【杀】伤害 +1。'));
           return success('下一张杀伤害提升。');
       }
 
@@ -1752,7 +1778,12 @@
             drawCards(game, actor, 1);
             return success('铁索连环重铸完成。');
           }
-          var targets = Array.from(options.targets || [opponent(actor)]).filter(function (side, index, array) {
+          // v13 K2: 缺省目标去二元化 — 无显式 targets 时取敌对座席池首位
+          // (此前 opponent(actor) 纯二元函数, 4/5 席非 player/enemy 座席缺省
+          // 会错指玩家席; 1v1 池恒为 [对手], 行为不变)。UI 座席点选与 AI
+          // 路径均显式传 targets, 该缺省仅兜底直调。
+          var tiesuoDefault = StateRuntime.hostileSeats(game, actor).slice(0, 1);
+          var targets = Array.from(options.targets || tiesuoDefault).filter(function (side, index, array) {
             return resolveSeatOption(game, side) && game[side].hp > 0 && array.indexOf(side) === index;
           }).slice(0, 2);
           if (!targets.length) {
@@ -2069,10 +2100,24 @@
         return fail('未知阶段。');
       }
 
+      // v13 K2/K5: 【酒】"此回合内"过期收口 — shaBonus 可经他指挂在任意
+      // 座席 (官方: 目标于使用酒的那个回合内的下一张杀), 回合结束统一
+      // 清全席未消费加成, 防跨多回合存活 (resetEndOfTurnState 只复位
+      // 回合结束者本席)。酒是 shaBonus 唯一写入方, 全清即"此回合内"语义。
+      function clearAllShaBonus(game) {
+        seatList(game).forEach(function (seat) {
+          if (game[seat]) game[seat].shaBonus = 0;
+        });
+      }
+
       function completeTurn(game, ending) {
         // v12 H5: 阵亡角色的回合终止 — 不再触发其回合结束时机 (闭月/据守等)。
         if (game[ending] && game[ending].hp <= 0) {
           log(game, actorName(game, ending) + '的回合因阵亡终止。');
+          // v13 K5 (review 修复): 阵亡早退同样是"回合结束" — 不清会让
+          // 酒他指的加成泄漏到后续回合 (使用者饮酒喂人后本回合内反伤
+          // 阵亡等场景)。
+          clearAllShaBonus(game);
           return startTurn(game, nextSeat(game, ending));
         }
         SkillRuntime.runHook(skillRegistry, 'onTurnEnd', {
@@ -2080,6 +2125,7 @@
           actor: ending
         });
         resetEndOfTurnState(game[ending]);
+        clearAllShaBonus(game);
         log(game, actorName(game, ending) + '结束回合。');
         return startTurn(game, nextSeat(game, ending));
       }
@@ -2192,6 +2238,28 @@
         var original = hit.card;
         var playable = canPlayCardAs(game, actor, original, asType);
         if (!playable.ok) return playable;
+        // v13 K2 (结算加压自审): 转化牌目标此前硬编码 opponent(actor) —
+        // 4/5 席身份场中非 player/enemy 座席发动国色/奇袭会把乐/拆错误
+        // 指向二元 opponent() 解出的座席。改为与普通乐/拆同路:
+        // resolveTrickTargetActor (显式 options.target 优先, 缺省敌对座席池,
+        // 1v1 恒对手零回归); 目标解析前置于牌移出区域之前, 失败零副作用。
+        var asTargetActor = null;
+        if (asType === 'lebusishu') {
+          asTargetActor = resolveTrickTargetActor(game, actor, virtualLebusishuFromCard(original), options);
+          if (!asTargetActor) return fail('无效的【乐不思蜀】目标。');
+        } else if (asType === 'guohe') {
+          asTargetActor = resolveTrickTargetActor(game, actor, virtualGuoheFromCard(original), options);
+          if (!asTargetActor) return fail('无效的【过河拆桥】目标。');
+        } else if (asType === 'sha') {
+          // v13 K5 (review 修复): 杀转化同样前置解析 — playSha 的距离/保护
+          // 校验失败时不退牌, 而此处来源牌已 removeOwnCardFromAnyZone 移出
+          // (守恒破坏窗口); 且 canPlayCard 只保证 ∃ 合法目标, 缺省
+          // defaultHostileTarget 取敌对池首位未必可达 (3p+ 距离差异)。
+          // resolveTrickTargetActor 对杀走 isLegalCardTarget (含距离/保护),
+          // 显式非法目标与缺省不可达池首位都在移牌前拒绝。
+          asTargetActor = resolveTrickTargetActor(game, actor, virtualShaFromCard(original), options);
+          if (!asTargetActor) return fail('无效的【杀】目标。');
+        }
         // Remove from whichever zone the source card lived in. The slot is
         // cleared if it came from equipment (relevant for 关羽 卸下武器当杀).
         removeOwnCardFromAnyZone(self, cardId, game);
@@ -2201,21 +2269,25 @@
           // 时直接置入判定区, 无懈窗口移至判定阶段生效前 (delayed-judge)。
           var virtualLebu = virtualLebusishuFromCard(original);
           virtualLebu.delayedSource = actor;
-          putCard(game, virtualLebu, { zone: 'judgeArea', actor: opponent(actor) });
-          log(game, actorName(game, actor) + '将【乐不思蜀】置入' + actorName(game, opponent(actor)) + '的判定区。');
+          putCard(game, virtualLebu, { zone: 'judgeArea', actor: asTargetActor });
+          log(game, actorName(game, actor) + '将【乐不思蜀】置入' + actorName(game, asTargetActor) + '的判定区。');
           return success('延时锦囊已放置。');
         }
         if (asType === 'guohe') {
           // v11 C3 (批次 27): 奇袭 黑牌当拆 — 与普通过河拆桥一致: 先弃置来源
           // 实体牌 (discardCard 经 physicalCardOf 落原牌), 再走无懈链 →
           // guohe continuation (1v1 两选项 pick / options.targetZone 照常)。
-          var virtualGuohe = virtualGuoheFromCard(original);
-          discardCard(game, virtualGuohe);
-          return checkWuxieAndContinue(game, opponent(actor), '【过河拆桥】', 'guohe', {
-            actor: actor, card: virtualGuohe, options: options || {}
+          var virtualGuoheCard = virtualGuoheFromCard(original);
+          discardCard(game, virtualGuoheCard);
+          return checkWuxieAndContinue(game, asTargetActor, '【过河拆桥】', 'guohe', {
+            actor: actor, card: virtualGuoheCard, options: options || {}, targetActor: asTargetActor
           });
         }
-        return playSha(game, actor, virtualShaFromCard(original));
+        // v13 K2/K5: options 透传 + 前置解析出的合法目标显式传入 (缺省与
+        // 显式路径均已过 isLegalCardTarget, playSha 内部校验恒通过,
+        // 1v1 行为不变)。
+        return playSha(game, actor, virtualShaFromCard(original),
+          Object.assign({}, options, { target: asTargetActor }));
       }
 
       // v8 PR-C1: 国色把方片视为乐不思蜀 — 构造虚拟卡 (保留原 suit / rank /

@@ -164,7 +164,9 @@
           // 审计二轮 PR-8: 贯石斧自选两张 + 火攻展示牌自选 面板
           'guanshiDiscardPanel', 'guanshiDiscardHint', 'guanshiDiscardChoices', 'guanshiConfirmBtn', 'guanshiDeclineBtn',
           'huogongShowPanel', 'huogongShowHint', 'huogongShowChoices',
-          'huogongCostPanel', 'huogongCostHint', 'huogongCostChoices', 'huogongCostDeclineBtn',
+          // v13 K3 (缺陷修复): 重选候选容器改唯一 id (原与 huogongModePanel
+          // 的 huogongCostChoices 重复, 真实浏览器下重选候选渲染进死节点)。
+          'huogongCostPanel', 'huogongCostHint', 'huogongCostRepickChoices', 'huogongCostDeclineBtn',
           'tianxiangAskPanel', 'tianxiangAskHint', 'tianxiangCostChoices', 'tianxiangTargetChoices',
           'tianxiangConfirmBtn', 'tianxiangDeclineBtn',
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
@@ -204,8 +206,19 @@
           'allyHandCount', 'allyState', 'allyTurnBadge', 'allyRibbon',
           'allyEquipmentArea', 'allyJudgeArea', 'allyHandBacks',
           'allyLordBadge', 'allyRebelBadge',
+          // v13 K3: 4/5 人身份场第四/五席 (ally2/ally3) 预置槽位 + 内奸徽章。
+          'ally2Zone', 'ally2Hero', 'ally2Name', 'ally2Camp', 'ally2Quote', 'ally2Hp',
+          'ally2HandCount', 'ally2State', 'ally2TurnBadge', 'ally2Ribbon',
+          'ally2EquipmentArea', 'ally2JudgeArea', 'ally2HandBacks',
+          'ally2LordBadge', 'ally2RebelBadge', 'ally2LoyalistBadge', 'ally2RenegadeBadge',
+          'ally3Zone', 'ally3Hero', 'ally3Name', 'ally3Camp', 'ally3Quote', 'ally3Hp',
+          'ally3HandCount', 'ally3State', 'ally3TurnBadge', 'ally3Ribbon',
+          'ally3EquipmentArea', 'ally3JudgeArea', 'ally3HandBacks',
+          'ally3LordBadge', 'ally3RebelBadge', 'ally3LoyalistBadge', 'ally3RenegadeBadge',
           'matchModePanel', 'modeDuelBtn', 'modeIdentity3Btn',
+          'modeIdentity4Btn', 'modeIdentity5Btn',
           'allyHeroPickRow', 'allyHeroSelect',
+          'ally2HeroPickRow', 'ally2HeroSelect', 'ally3HeroPickRow', 'ally3HeroSelect',
           // v12 H6: identity3 单目标牌/主动技 座席点选模式面板。
           'seatTargetModePanel', 'seatTargetModeHint', 'seatTargetCancelBtn',
           'seatTargetConfirmBtn', 'seatTargetExtraBtn',
@@ -527,7 +540,9 @@
 
       function resolveNormalPlayerCard(cardId) {
         if (!game) return;
-        // v12 H6: identity3 单目标牌 (杀/决斗/拆/顺/火攻/乐/兵/借刀/桃/无中)
+        // v12 H6: identity3 单目标牌 (杀/决斗/拆/顺/火攻/乐/兵/借刀/无中/酒)
+        // (v13 K5 注释对齐: 权威白名单见 mode-panels SEAT_TARGET_CARD_TYPES —
+        // 桃已于 J0-4 收口为恒对自己不再座席点选; 酒随 K2/K3 他指入表)
         // → 座席点选模式 (选中场上高亮座席后再结算), 取代 1v1 的"点牌即出"。
         // 1v1 (game.mode !== 'identity3') 或非单目标牌类型时 tryEnterSeatTargetMode
         // 直接返回 false, 落回下方既有路径 (零改动)。
@@ -782,32 +797,45 @@
         var currentEnemy = els.enemyHeroSelect.value || 'caocao';
         lobbyPanels.fillHeroSelect(els.playerHeroSelect, currentPlayer, 'liubei');
         lobbyPanels.fillHeroSelect(els.enemyHeroSelect, currentEnemy, 'caocao');
-        // v12 H6: 第三席 (忠臣) 武将下拉 — 只在 identity3 模式显示, 但选项
+        // v12 H6: 第三席 (忠臣) 武将下拉 — 只在身份场模式显示, 但选项
         // 常驻填充 (切模式时无需重填); 默认关羽 (与双方默认 liubei/caocao
-        // 均不同名)。
+        // 均不同名)。v13 K3: 第四/五席同款 (默认 赵云/马超, 五席互异)。
         if (els.allyHeroSelect) {
           var currentAlly = els.allyHeroSelect.value || 'guanyu';
           lobbyPanels.fillHeroSelect(els.allyHeroSelect, currentAlly, 'guanyu');
+        }
+        if (els.ally2HeroSelect) {
+          var currentAlly2 = els.ally2HeroSelect.value || 'zhaoyun';
+          lobbyPanels.fillHeroSelect(els.ally2HeroSelect, currentAlly2, 'zhaoyun');
+        }
+        if (els.ally3HeroSelect) {
+          var currentAlly3 = els.ally3HeroSelect.value || 'machao';
+          lobbyPanels.fillHeroSelect(els.ally3HeroSelect, currentAlly3, 'machao');
         }
         ensureDistinctHeroes('player');
         renderHeroPickGrid();
       }
 
       // v12 H6: 对战模式切换 — 'duel' (默认, 旧 1v1 流程逐字不变) /
-      // 'identity3' (3人身份场)。identity3 下: 显示第三席武将下拉; 隐藏
-      // 身份判定区 (身份为固定预设 我=主公/敌=反贼/第三席=忠臣, 不可重抽,
-      // 由 Engine.newGame 的 seats 预设自动分配)。
+      // 'identity3' (3人身份场)。身份场下: 显示对应席位武将下拉; 隐藏
+      // 身份判定区 (身份为固定预设, 由 Engine.newGame 的 seats 预设自动
+      // 分配)。v13 K3: 增 'identity4'/'identity5' — 逐档显示第四/五席下拉。
+      var IDENTITY_MODES = ['identity3', 'identity4', 'identity5'];
       function setMatchMode(mode) {
         var prev = matchMode;
-        matchMode = mode === 'identity3' ? 'identity3' : 'duel';
-        var identity3 = matchMode === 'identity3';
-        if (els.modeDuelBtn) els.modeDuelBtn.classList.toggle('is-active', !identity3);
-        if (els.modeIdentity3Btn) els.modeIdentity3Btn.classList.toggle('is-active', identity3);
-        if (els.allyHeroPickRow) els.allyHeroPickRow.hidden = !identity3;
-        if (els.roleDraftPanel) els.roleDraftPanel.hidden = identity3;
+        matchMode = IDENTITY_MODES.indexOf(mode) >= 0 ? mode : 'duel';
+        var identityMode = matchMode !== 'duel';
+        if (els.modeDuelBtn) els.modeDuelBtn.classList.toggle('is-active', !identityMode);
+        if (els.modeIdentity3Btn) els.modeIdentity3Btn.classList.toggle('is-active', matchMode === 'identity3');
+        if (els.modeIdentity4Btn) els.modeIdentity4Btn.classList.toggle('is-active', matchMode === 'identity4');
+        if (els.modeIdentity5Btn) els.modeIdentity5Btn.classList.toggle('is-active', matchMode === 'identity5');
+        if (els.allyHeroPickRow) els.allyHeroPickRow.hidden = !identityMode;
+        if (els.ally2HeroPickRow) els.ally2HeroPickRow.hidden = matchMode !== 'identity4' && matchMode !== 'identity5';
+        if (els.ally3HeroPickRow) els.ally3HeroPickRow.hidden = matchMode !== 'identity5';
+        if (els.roleDraftPanel) els.roleDraftPanel.hidden = identityMode;
         if (prev === matchMode) return; // 同模式重复点击 → 不重置选将/身份
-        if (identity3) {
-          // identity3 身份固定: 我方恒主公 (座次预设首位), 选将顺序照旧玩家先选。
+        if (identityMode) {
+          // 身份场身份固定: 我方恒主公 (座次预设首位), 选将顺序照旧玩家先选。
           playerRole = '主公';
           enemyRole = '反贼';
           updateDraftUI();
@@ -967,28 +995,38 @@
         ensureDistinctHeroes('player');
         var playerHero = els.playerHeroSelect ? els.playerHeroSelect.value : 'liubei';
         var enemyHero = els.enemyHeroSelect ? els.enemyHeroSelect.value : 'caocao';
-        if (matchMode === 'identity3') {
-          // v12 H6: 3人身份场 — seats 座次预设 (我=主公/敌=反贼/第三席=忠臣),
-          // 第三席武将取下拉值; 与前两席同名时取第一个不冲突的选项 (三席
+        if (matchMode !== 'duel') {
+          // v12 H6: 身份场 — seats 座次预设 (我=主公/敌=反贼/第三席=忠臣...),
+          // 各席武将取下拉值; 与已选席位同名时取第一个不冲突的选项 (全席
           // 武将互异, 与 1v1 "不能同名对战" 同一约束)。
-          var allyHero = els.allyHeroSelect ? els.allyHeroSelect.value : 'guanyu';
-          if ((allyHero === playerHero || allyHero === enemyHero) && els.allyHeroSelect) {
-            var allyFallback = Array.from(els.allyHeroSelect.options).find(function (option) {
-              return option.value && option.value !== playerHero && option.value !== enemyHero;
-            });
-            if (allyFallback) {
-              els.allyHeroSelect.value = allyFallback.value;
-              allyHero = allyFallback.value;
-            }
-          }
-          game = Engine.newGame({
+          // v13 K3: identity4/identity5 追加第四/五席 (ally2/ally3)。
+          var seatCount = matchMode === 'identity5' ? 5 : matchMode === 'identity4' ? 4 : 3;
+          var extraSeatNames = ['ally', 'ally2', 'ally3'].slice(0, seatCount - 2);
+          var chosen = [playerHero, enemyHero];
+          var gameOptions = {
             seed: Date.now(),
-            seats: ['player', 'enemy', 'ally'],
+            seats: ['player', 'enemy'].concat(extraSeatNames),
             playerHero: playerHero,
             enemyHero: enemyHero,
-            allyHero: allyHero,
             startWithFirstTurn: true
+          };
+          var extraDefaults = { ally: 'guanyu', ally2: 'zhaoyun', ally3: 'machao' };
+          extraSeatNames.forEach(function (seat) {
+            var select = els[seat + 'HeroSelect'];
+            var hero = select ? select.value : extraDefaults[seat];
+            if (!hero || chosen.indexOf(hero) >= 0) {
+              var fallback = select && Array.from(select.options).find(function (option) {
+                return option.value && chosen.indexOf(option.value) < 0;
+              });
+              if (fallback) {
+                select.value = fallback.value;
+                hero = fallback.value;
+              }
+            }
+            chosen.push(hero);
+            gameOptions[seat + 'Hero'] = hero;
           });
+          game = Engine.newGame(gameOptions);
         } else {
           game = Engine.newGame({ seed: Date.now(), playerHero: playerHero, enemyHero: enemyHero, playerRole: playerRole, enemyRole: enemyRole, startWithFirstTurn: true });
         }
@@ -1264,9 +1302,11 @@
         responsePanels.bind();
         // v12 H6/H7: 激将/护驾 求助响应面板 (候选 stage 两步 + 不响应)。
         lordAidPanels.bind();
-        // v12 H6: 对战模式切换按钮 — duel / identity3。
+        // v12 H6: 对战模式切换按钮 — duel / identity3。v13 K3: + 4/5 人档。
         if (els.modeDuelBtn) els.modeDuelBtn.addEventListener('click', function () { setMatchMode('duel'); });
         if (els.modeIdentity3Btn) els.modeIdentity3Btn.addEventListener('click', function () { setMatchMode('identity3'); });
+        if (els.modeIdentity4Btn) els.modeIdentity4Btn.addEventListener('click', function () { setMatchMode('identity4'); });
+        if (els.modeIdentity5Btn) els.modeIdentity5Btn.addEventListener('click', function () { setMatchMode('identity5'); });
         // v9 PR-E9: 选将网格 — card click → 设当前 pick side 的 hero.
         // (tab 在非当前 side 时 hidden, 不可点; 不再绑 click.)
         if (els.heroPickGrid) els.heroPickGrid.addEventListener('click', function (event) {

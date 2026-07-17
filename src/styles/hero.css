@@ -181,9 +181,39 @@
       background: radial-gradient(circle at 35% 25%, #ffd873, #a3760f 72%);
     }
 
+    /* v13 K3: 内奸徽章 — 4/5 人身份场第四/五席身份标签。同 loyalist 的
+       独立规则块理由 (守护测试锁定共享块选择器列表); 紫色系区分四身份。 */
+    .renegade-badge {
+      position: absolute;
+      z-index: 3;
+      top: 6px;
+      left: 6px;
+      width: 26px;
+      height: 26px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 2px solid #fff4d0;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 1;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .45);
+      pointer-events: none;
+      user-select: none;
+      background: radial-gradient(circle at 35% 25%, #c08de0, #5c2a80 72%);
+    }
+
     .lord-badge[hidden],
     .rebel-badge[hidden],
     .loyalist-badge[hidden] {
+      display: none !important;
+    }
+
+    /* v13 K3: 独立规则块 — 守护测试锁定上方组选择器与 display:none 的
+       文本距离, 并入会破坏 v9 PR-E4 断言 (同 loyalist 当年的处理)。 */
+    .renegade-badge[hidden] {
       display: none !important;
     }
 

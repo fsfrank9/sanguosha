@@ -30,7 +30,13 @@ test('v10 V4: playAOE shan 路径走 requestPlayerResponse(kind:wanjian-response
   assert.ok(entry);
   assert.match(entry[0], /game\.pauseState\.aoe\s*=\s*\{/);
   assert.match(entry[0], /return advanceAOETargets\(game\)/);
-  const fn = engineSrc.match(/function advanceAOETargets\(game\)\s*\{[\s\S]*?\n {6}\}/);
+  // v13 K2: 驱动泛化 (advanceTargetQueue) — 玩家 ask 暂停分支随效果体迁入
+  // aoeEffectForCurrent (advanceAOETargets 改为委托泛化驱动), 守护契约
+  // (AOE shan 路径走 requestPlayerResponse 三件套) 不变, 断言跟随定位。
+  const driver = engineSrc.match(/function advanceAOETargets\(game\)\s*\{[\s\S]*?\n {6}\}/);
+  assert.ok(driver);
+  assert.match(driver[0], /advanceTargetQueue\(game,\s*aoe,\s*AOE_QUEUE_HOOKS\)/);
+  const fn = engineSrc.match(/function aoeEffectForCurrent\(game, aoe, targetActor\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /requestPlayerResponse\(game,\s*\{/);
   assert.match(fn[0], /kind:\s*'wanjian-response'/);
