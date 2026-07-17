@@ -540,7 +540,9 @@
 
       function resolveNormalPlayerCard(cardId) {
         if (!game) return;
-        // v12 H6: identity3 单目标牌 (杀/决斗/拆/顺/火攻/乐/兵/借刀/桃/无中)
+        // v12 H6: identity3 单目标牌 (杀/决斗/拆/顺/火攻/乐/兵/借刀/无中/酒)
+        // (v13 K5 注释对齐: 权威白名单见 mode-panels SEAT_TARGET_CARD_TYPES —
+        // 桃已于 J0-4 收口为恒对自己不再座席点选; 酒随 K2/K3 他指入表)
         // → 座席点选模式 (选中场上高亮座席后再结算), 取代 1v1 的"点牌即出"。
         // 1v1 (game.mode !== 'identity3') 或非单目标牌类型时 tryEnterSeatTargetMode
         // 直接返回 false, 落回下方既有路径 (零改动)。

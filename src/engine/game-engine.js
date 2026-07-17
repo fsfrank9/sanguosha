@@ -1190,6 +1190,17 @@
             game[seat] = makePlayer(clone(HERO_CATALOG[heroKey] || HEROES.enemy));
           }
         }
+        // v13 K5 (review 修复): 官方 glossary__value.md:23 — "若游戏人数
+        // 不小于5，主公的体力上限+1" (开局体力随之 +1)。4 人及以下不加;
+        // 5 人档 v13 K 起现役, 该规则首次可达。
+        if (seats.length >= 5) {
+          for (var lordSi = 0; lordSi < seats.length; lordSi += 1) {
+            if (roles[seats[lordSi]] === '主公' && game[seats[lordSi]]) {
+              game[seats[lordSi]].maxHp += 1;
+              game[seats[lordSi]].hp += 1;
+            }
+          }
+        }
         game.deck = buildDeck(game, random);
         seatList(game).forEach(function (seat) { drawCards(game, seat, 4); });
         log(game, '乱世开局：' + actorName(game, firstActor) + '为主公先手。');
@@ -2239,6 +2250,15 @@
         } else if (asType === 'guohe') {
           asTargetActor = resolveTrickTargetActor(game, actor, virtualGuoheFromCard(original), options);
           if (!asTargetActor) return fail('无效的【过河拆桥】目标。');
+        } else if (asType === 'sha') {
+          // v13 K5 (review 修复): 杀转化同样前置解析 — playSha 的距离/保护
+          // 校验失败时不退牌, 而此处来源牌已 removeOwnCardFromAnyZone 移出
+          // (守恒破坏窗口); 且 canPlayCard 只保证 ∃ 合法目标, 缺省
+          // defaultHostileTarget 取敌对池首位未必可达 (3p+ 距离差异)。
+          // resolveTrickTargetActor 对杀走 isLegalCardTarget (含距离/保护),
+          // 显式非法目标与缺省不可达池首位都在移牌前拒绝。
+          asTargetActor = resolveTrickTargetActor(game, actor, virtualShaFromCard(original), options);
+          if (!asTargetActor) return fail('无效的【杀】目标。');
         }
         // Remove from whichever zone the source card lived in. The slot is
         // cleared if it came from equipment (relevant for 关羽 卸下武器当杀).
@@ -2263,9 +2283,11 @@
             actor: actor, card: virtualGuoheCard, options: options || {}, targetActor: asTargetActor
           });
         }
-        // v13 K2: options 透传 — 杀转化 (武圣等) 支持显式 options.target
-        // (缺省 defaultHostileTarget 座席泛化池, 1v1 行为不变)。
-        return playSha(game, actor, virtualShaFromCard(original), options);
+        // v13 K2/K5: options 透传 + 前置解析出的合法目标显式传入 (缺省与
+        // 显式路径均已过 isLegalCardTarget, playSha 内部校验恒通过,
+        // 1v1 行为不变)。
+        return playSha(game, actor, virtualShaFromCard(original),
+          Object.assign({}, options, { target: asTargetActor }));
       }
 
       // v8 PR-C1: 国色把方片视为乐不思蜀 — 构造虚拟卡 (保留原 suit / rank /

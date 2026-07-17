@@ -65,6 +65,21 @@ test('K1: 5 人档预设 — 主/忠/反/反/内 逐席开局', () => {
   }
 });
 
+test('K1/K5: 主公体力上限 — 5 人局 +1 (官方 glossary__value.md:23), 4 人及以下不加', () => {
+  // 张角 maxHp=3: 5 人局主公应为 4/4 开局。
+  const game5 = Engine.newGame({ seed: 15012, seats: SEATS5, playerHero: 'zhangjiao' });
+  assert.equal(game5.roles.player, '主公');
+  assert.equal(game5.player.maxHp, 4, '5 人局主公体力上限 +1');
+  assert.equal(game5.player.hp, 4, '开局体力随之 +1');
+  assert.equal(game5.enemy.maxHp, game5.enemy.hp, '非主公席不受影响');
+
+  const game4 = Engine.newGame({ seed: 15013, seats: SEATS4, playerHero: 'zhangjiao' });
+  assert.equal(game4.player.maxHp, 3, '4 人局不加 (官方: 人数不小于 5 才 +1)');
+
+  const game3 = Engine.newGame({ seed: 15014, seats: ['player', 'enemy', 'ally'], playerHero: 'zhangjiao' });
+  assert.equal(game3.player.maxHp, 3, '3 人局不加 (v12 行为零回归)');
+});
+
 test('K1: 逐席 Role 覆盖仍然生效 (显式 options 优先于预设)', () => {
   const game = Engine.newGame({ seed: 15004, seats: SEATS4, ally2Role: '反贼' });
   assert.equal(game.roles.ally2, '反贼', '显式覆盖第 4 席');
