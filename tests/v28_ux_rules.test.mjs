@@ -98,9 +98,9 @@ test('1v1 选将流程包含身份判定：随机主公/反贼，主公先选，
   assert.match(html, /id="heroPickPrompt"/, 'hero-pick prompt (PR-E11) should show current picker');
   assert.match(html, /您是主公/, 'UI should address player as 主公 in prompt');
   assert.match(html, /function assignRandomRoles/, 'random role assignment should be implemented');
-  // v13 L1: 身份场恒玩家先选 (可选身份后 playerRole 可为忠/反/内), duel
-  // 分支"主公先选"语义逐字保留 — 断言跟随新表达式定位。
-  assert.match(html, /pickOrder\s*=\s*\(matchMode\s*!==\s*'duel'\s*\|\|\s*playerRole\s*===\s*'主公'\)/, 'duel pick order should still start from lord side');
+  // v13 L1→二批-4: 身份场改号位序 (自己优先+号位升序), duel 分支
+  // "主公先选"语义仍逐字保留 — 断言跟随新表达式定位。
+  assert.match(html, /pickOrder\s*=\s*\(playerRole\s*===\s*'主公'\)\s*\?\s*\['player',\s*'enemy'\]/, 'duel pick order should still start from lord side');
   assert.match(html, /function handleHeroPickCardClick/, 'card-click should advance the sequence');
   assert.match(html, /pickStep\s*\+=\s*1/, 'pickStep should increment per pick');
 });

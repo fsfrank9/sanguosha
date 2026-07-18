@@ -88,7 +88,7 @@ function test(name, fn) { tests.push([name, fn]); }
 test('模式切换: 点 3人身份场 → 第三席下拉显示 + 身份判定区隐藏 + 按钮态切换', () => {
   $('lobby1v1Btn').click();
   $('modeIdentity3Btn').click();
-  assert.equal($('allyHeroPickRow').hidden, false, '第三席武将下拉显示');
+  assert.equal($('allyHeroPickRow').hidden, true, 'v13 二批-4: 格子选将覆盖全席位, 下拉行退役恒隐');
   assert.equal($('roleDraftPanel').hidden, true, '身份判定区隐藏 (身份固定预设)');
   assert.ok($('modeIdentity3Btn').classList.contains('is-active'), 'identity3 按钮激活');
   assert.ok(!$('modeDuelBtn').classList.contains('is-active'), 'duel 按钮取消激活');

@@ -899,6 +899,7 @@
 
       function setIdentityRole(role) {
         identityPlayerRole = role;
+        rollIdentitySeating(); // v13 二批-4: 身份变更重掷号位
         playerRole = role; // 选将提示文案 ("您是{身份}，请选将") 同步
         updateIdentityRoleUI();
         renderHeroPickGrid();
@@ -930,7 +931,7 @@
         if (els.modeIdentity3Btn) els.modeIdentity3Btn.classList.toggle('is-active', matchMode === 'identity3');
         if (els.modeIdentity4Btn) els.modeIdentity4Btn.classList.toggle('is-active', matchMode === 'identity4');
         if (els.modeIdentity5Btn) els.modeIdentity5Btn.classList.toggle('is-active', matchMode === 'identity5');
-        if (els.allyHeroPickRow) els.allyHeroPickRow.hidden = !identityMode;
+        if (els.allyHeroPickRow) els.allyHeroPickRow.hidden = true; // v13 二批-4: 格子选将覆盖全席位, 下拉行退役
         if (els.ally2HeroPickRow) els.ally2HeroPickRow.hidden = matchMode !== 'identity4' && matchMode !== 'identity5';
         if (els.ally3HeroPickRow) els.ally3HeroPickRow.hidden = matchMode !== 'identity5';
         if (els.roleDraftPanel) els.roleDraftPanel.hidden = identityMode;
@@ -965,15 +966,46 @@
       var currentPickSide = 'player';
       var pickStep = 0;
       var pickOrder = ['player', 'enemy'];
+      // v13 UI修缮二批-4: 身份场号位制 — 进选将前掷定逐席身份 (含随机
+      // 偏移), 主公=1号位, 沿座次环顺延; 选将顺序 = 自己优先, 其余按
+      // 号位升序; newGame 消费同一份 roles (所见即所得)。
+      var pendingIdentityRoles = null;
+      var seatNumberBySeat = null;
+      function identitySeatNames() {
+        return matchMode === 'identity5' ? ['player', 'enemy', 'ally', 'ally2', 'ally3']
+          : matchMode === 'identity4' ? ['player', 'enemy', 'ally', 'ally2']
+          : ['player', 'enemy', 'ally'];
+      }
+      function rollIdentitySeating() {
+        if (matchMode === 'duel') { pendingIdentityRoles = null; seatNumberBySeat = null; return; }
+        var seats = identitySeatNames();
+        pendingIdentityRoles = computeIdentityRoles(seats);
+        var lordIdx = 0;
+        for (var i = 0; i < seats.length; i += 1) {
+          if (pendingIdentityRoles[seats[i]] === '主公') { lordIdx = i; break; }
+        }
+        seatNumberBySeat = {};
+        for (var n = 0; n < seats.length; n += 1) {
+          seatNumberBySeat[seats[(lordIdx + n) % seats.length]] = n + 1;
+        }
+      }
 
       function resetPickSequence() {
         pickStep = 0;
-        // v13 L1: 身份场恒玩家先选 (playerRole 可为忠/反/内, "主公先选"
-        // 约定仅对 1v1 的随机主公/反贼有意义); duel 行为逐字不变。
-        pickOrder = (matchMode !== 'duel' || playerRole === '主公') ? ['player', 'enemy'] : ['enemy', 'player'];
+        // v13 L1→二批-4: 身份场 = 自己优先 + 其余按号位升序 (主公=1号位
+        // 沿座次环, rollIdentitySeating 掷定); duel 行为逐字不变。
+        if (matchMode !== 'duel') {
+          rollIdentitySeating(); // 恒重掷 — 模式/席数切换后旧表作废 (k3 抓获: 4→5 档陈旧 4 席表)
+          var others = identitySeatNames().filter(function (seat) { return seat !== 'player'; });
+          others.sort(function (a, b) { return seatNumberBySeat[a] - seatNumberBySeat[b]; });
+          pickOrder = ['player'].concat(others);
+        } else {
+          pickOrder = (playerRole === '主公') ? ['player', 'enemy'] : ['enemy', 'player'];
+        }
         currentPickSide = pickOrder[0];
-        if (els.playerHeroSelect) els.playerHeroSelect.value = '';
-        if (els.enemyHeroSelect) els.enemyHeroSelect.value = '';
+        identitySeatNames().concat(['enemy']).forEach(function (seat) {
+          if (els[seat + 'HeroSelect']) els[seat + 'HeroSelect'].value = '';
+        });
       }
 
       function renderHeroPickGrid() {
@@ -984,17 +1016,22 @@
           playerRole: playerRole,
           enemyRole: enemyRole,
           // v13 L1: 身份场提示文案泛化 ("您是{身份}" / 敌方席不再写死反贼)。
-          identityMode: matchMode !== 'duel'
+          identityMode: matchMode !== 'duel',
+          // v13 二批-4: 号位制提示 ("请为N号位选将", 主公席标注)。
+          seatNumber: seatNumberBySeat && seatNumberBySeat[currentPickSide],
+          seatIsLord: !!(pendingIdentityRoles && pendingIdentityRoles[currentPickSide] === '主公')
         });
       }
 
       function handleHeroPickCardClick(heroId) {
         if (!heroId) return;
-        var targetSelect = currentPickSide === 'player' ? els.playerHeroSelect : els.enemyHeroSelect;
+        var targetSelect = els[currentPickSide + 'HeroSelect'];
         if (!targetSelect) return;
-        // v9 PR-E11: 不能选对方已锁定的 hero
-        var otherSelect = currentPickSide === 'player' ? els.enemyHeroSelect : els.playerHeroSelect;
-        if (otherSelect && otherSelect.value === heroId) return;
+        // v9 PR-E11→二批-4: 不能选任何已锁定席位的 hero (全场互异)。
+        var taken = pickOrder.some(function (seat) {
+          return seat !== currentPickSide && els[seat + 'HeroSelect'] && els[seat + 'HeroSelect'].value === heroId;
+        });
+        if (taken) return;
         targetSelect.value = heroId;
         ensureDistinctHeroes(currentPickSide);
         pickStep += 1;
@@ -1149,7 +1186,7 @@
           };
           // v13 L1: 可选身份 — 预设阵型内轮转出逐席 roles (玩家=所选身份,
           // 主公可落任意 AI 座席; 引擎 firstActorFromRoles 全环扫描先手)。
-          gameOptions.roles = computeIdentityRoles(gameOptions.seats);
+          gameOptions.roles = pendingIdentityRoles || computeIdentityRoles(gameOptions.seats); // v13 二批-4: 号位所见即所得
           // v13 M1: 暗身份透传 (缺省 false = 明置零回归; duel 分支不传)。
           gameOptions.hiddenRoles = hiddenRolesEnabled;
           var extraDefaults = { ally: 'guanyu', ally2: 'zhaoyun', ally3: 'machao' };
