@@ -62,6 +62,8 @@ test('tao heals but never above max hp', () => {
 test('wuzhong draws two cards', () => {
   const game = Engine.newGame({ seed: 4 });
   game.player.hand = [{ id: 'wz', type: 'wuzhong', name: '无中生有' }];
+  game.enemy.hand = []; // v13 N2: 牌堆配方扩容后 seed 4 敌方摸到无懈会拦截 — 清手保持本例意图 (验证摸二)
+
   const deckBefore = game.deck.length;
   const result = Engine.playCard(game, 'player', 'wz');
   assert.equal(result.ok, true);

@@ -56,6 +56,11 @@
       ['nanman', 3], ['wanjian', 2], ['wuxie', 6], ['huogong', 3], ['tiesuo', 6],
       ['lebusishu', 3], ['bingliang', 2], ['shandian', 2],
       ['zhuge', 2], ['qinggang', 1], ['cixiong', 1], ['qinglong', 1], ['zhangba', 1], ['guanshi', 1], ['fangtian', 1], ['qilin', 1],
+      // v13 N2: 寒冰/古锭/朱雀/银月 v8 起规则齐全 (PR-B1~B4) 却漏出配方,
+      // 实战不可达 — 军争盘点销账, 各 ×1 沿用唯一武器约定 (官方缓存无
+      // 牌数表, 数量为项目约定非官方主张; 银月为 SP 目, 随catalog 保持
+      // 目录⇄牌堆一致)。
+      ['hanbing', 1], ['guding', 1], ['zhuque', 1], ['yinyue', 1],
       ['bagua', 2], ['renwang', 1], ['tengjia', 1], ['baiyin', 1], ['minus_horse', 4], ['plus_horse', 4]
     ];
     var deck = [];
