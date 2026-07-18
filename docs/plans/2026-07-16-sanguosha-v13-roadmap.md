@@ -494,6 +494,15 @@ N 阶段收官后, 用户对照官方/第三方客户端实测提出 6 项体验
   经 grid-template-areas 同行多列 (3p 两列/4p 三列/5p 四列), 行数
   回落不再逐席压扁。id 约定 (*EquipmentArea/*JudgeArea) 全保留,
   制衡装备选牌按钮路径不变。
-- **门禁**: verify 全绿; 新增 ui_v13_polish 11 例; 守护断言 6 处随
+- **门禁**: verify 全绿; 新增 ui_v13_polish 16 例; 守护断言 7 处随
   行为更新均附注释 (drawer 占位反转/lobby 绑定正则×2/hero 类名/
-  miniBacks 隐私口径收窄/铁索两级确认)。
+  miniBacks 隐私口径收窄/铁索两级确认/zone-panel 移除反转)。
+- **收官 review** (sonnet×2 并行, 均实跑复现): 单卡化维度零功能缺陷
+  (id 集合 diff 全对齐/装备槽键名与引擎一致/圆标类型槽安全/grid
+  未定位项排查/zhiheng 选牌路径实测), 1 条 Low — .zone-panel/
+  .zone-title 孤儿 CSS 清除 (守护反转)。确认流维度抓获 5 条 —
+  [H1] 苦肉暂存劫持手牌确认 (点手牌清技暂存); [H2] 暂存漏进弃牌
+  阶段卡死确认 (结束回合清暂存); [H3] 暂存跨局残留 (newGame/
+  showSetup 复位); [M4] 分入口后 setup 成死胡同 (补"返回大厅");
+  [L5] 身份场选将提示被 duel 随机身份覆盖 (showSetup 按家族分流)。
+  5 条修复各配回归用例钉死。

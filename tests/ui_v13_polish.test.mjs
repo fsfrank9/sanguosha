@@ -127,6 +127,82 @@ test('修缮1: 苦肉 — 点技能仅暂存, 确定才发动; 取消可撤', ()
   assert.equal(game.player.hand.length, 2, '摸两张');
 });
 
+// ───── 1-review: 苦肉暂存泄漏三件套 + 入口回退 (收官 review 抓获) ─────
+
+test('修缮1 review-H1: 苦肉暂存后点手牌 → 暂存撤销, 确定打出所点牌 (不被劫持)', () => {
+  const game = startDuel('huanggai', 'caocao');
+  game.turn = 'player';
+  game.phase = 'play';
+  drainToPlayerIdle();
+  game.player.hand = [c('tao', { id: 'rv-tao' })];
+  game.player.hp = game.player.maxHp - 1;
+  game.deck = [c('shan', { id: 'rv-d1' }), c('shan', { id: 'rv-d2' })];
+  UI.render();
+  const hpBefore = game.player.hp;
+  $('playerSkillBar').dispatchClick({ 'data-skill-id': 'kurou' });
+  $('playerHand').dispatchClick({ 'data-card-id': 'rv-tao' });
+  $('handConfirmBtn').click();
+  assert.equal(game.player.hp, hpBefore + 1, '确定打出桃 (回血), 苦肉未被误发');
+  assert.equal(game.player.hand.length, 0, '桃已打出');
+});
+
+test('修缮1 review-H2: 苦肉暂存后结束回合 → 暂存清空, 弃牌确认不被卡死', () => {
+  const game = startDuel('huanggai', 'caocao');
+  game.turn = 'player';
+  game.phase = 'play';
+  drainToPlayerIdle();
+  game.player.hand = [];
+  for (let i = 0; i < 6; i += 1) game.player.hand.push(c('shan', { id: 'rv2-' + i }));
+  game.player.hp = 4;
+  game.deck = [c('shan', { id: 'rv2-d1' }), c('shan', { id: 'rv2-d2' })];
+  UI.render();
+  const hpBefore = game.player.hp;
+  $('playerSkillBar').dispatchClick({ 'data-skill-id': 'kurou' });
+  $('handDiscardBtn').click();
+  assert.equal(game.phase, 'discard', '进入弃牌阶段 (6 手牌 > 4 上限)');
+  $('playerHand').dispatchClick({ 'data-card-id': 'rv2-0' });
+  $('playerHand').dispatchClick({ 'data-card-id': 'rv2-1' });
+  $('handConfirmBtn').click();
+  assert.equal(game.player.hp, hpBefore, '苦肉未被误发');
+  assert.notEqual(game.phase, 'discard', '弃牌已提交, 阶段推进');
+});
+
+test('修缮1 review-H3: 苦肉暂存后重开 → 新局首个确定不误发 (暂存不跨局)', () => {
+  const game1 = startDuel('huanggai', 'caocao');
+  game1.turn = 'player';
+  game1.phase = 'play';
+  drainToPlayerIdle();
+  UI.render();
+  $('playerSkillBar').dispatchClick({ 'data-skill-id': 'kurou' });
+  $('drawerRestartBtn').click(); // 重开 → showSetup 清暂存
+  const game2 = startDuel('huanggai', 'caocao');
+  game2.turn = 'player';
+  game2.phase = 'play';
+  drainToPlayerIdle();
+  UI.render();
+  const hpBefore = game2.player.hp;
+  $('handConfirmBtn').click();
+  assert.equal(game2.player.hp, hpBefore, '新局首个确定不发动上局残留苦肉');
+});
+
+test('修缮4 review-M4: setup 屏有返回大厅按钮 (分入口后的家族切换回退口)', () => {
+  assert.match(html, /id="setupBackBtn"[^>]*>返回大厅</);
+  $('lobby1v1Btn').click();
+  assert.equal($('setupScreen').hidden, false);
+  $('setupBackBtn').click();
+  assert.equal($('lobbyScreen').hidden, false, '返回大厅');
+  assert.equal($('setupScreen').hidden, true);
+});
+
+test('修缮4 review-L5: 身份场入口选将提示与身份面板同步 (不被随机身份覆盖)', () => {
+  $('lobbyIdentityBtn').click();
+  $('roleLordBtn').click();
+  $('lobbyIdentityBtn').click(); // 再次进入 setup — 不得把提示随机成反贼
+  const prompt = String($('heroPickPrompt').textContent || '');
+  assert.ok(prompt.indexOf('反贼') < 0 || prompt.indexOf('主公') >= 0,
+    '身份场家族提示不被 duel 随机身份覆盖: ' + prompt);
+});
+
 // ───── 6: 角色卡单卡化 ─────
 
 test('修缮6: 静态标记 — 每席单卡 (equip-column/judge-dots/hand-corner), 牌背行与旧分区面板撤销', () => {

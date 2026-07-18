@@ -113,8 +113,11 @@
     <section class="setup-screen" id="setupScreen" hidden>
       <section class="setup-card">
         <div class="panel-title">
-          <span>一级界面 · 选择武将</span>
-          <span class="badge">双方英雄池一致，不能同名对战</span>
+          <span>选择武将</span>
+          <span style="display:flex;gap:8px;align-items:center">
+            <span class="badge">双方英雄池一致，不能同名对战</span>
+            <button type="button" class="btn small" id="setupBackBtn">返回大厅</button>
+          </span>
         </div>
         <!-- v12 H6: 对战模式选择 — 1v1 单挑 / 3人身份场。默认 1v1 (与旧版
              行为逐字一致); 切到身份场后显示对应席位武将下拉, 且身份判定区

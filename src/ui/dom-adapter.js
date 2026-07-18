@@ -227,7 +227,7 @@
           'ally3HandCount', 'ally3State', 'ally3TurnBadge', 'ally3Ribbon',
           'ally3EquipmentArea', 'ally3JudgeArea', 'ally3HandBadge',
           'ally3LordBadge', 'ally3RebelBadge', 'ally3LoyalistBadge', 'ally3RenegadeBadge',
-          'matchModePanel', 'modeDuelBtn', 'modeIdentity3Btn',
+          'matchModePanel', 'setupBackBtn', 'modeDuelBtn', 'modeIdentity3Btn',
           'modeIdentity4Btn', 'modeIdentity5Btn',
           // v13 L1: 身份场可选身份面板 + 三席内奸徽章 (轮转后内奸可落任意席)。
           'identityRolePanel', 'roleLordBtn', 'roleLoyalBtn', 'roleRebelBtn',
@@ -1077,6 +1077,7 @@
 
       function showSetup() {
         enemyThinking = false;
+        stagedModalChoice = null; // v13 UI修缮1 review-H3: 重开/退出路径同样清暂存
         hideTiesuoPanel();
         hideTargetZonePanel();
         hideHuogongPanel();
@@ -1091,7 +1092,16 @@
         populateHeroSelects();
         // v9 PR-E11: 入 setup 自动随机身份 (assignRandomRoles 内部已重置
         // 选将状态 + renderHeroPickGrid). 用户可点 "随机主公/反贼" 重抽.
-        assignRandomRoles();
+        // v13 UI修缮4 review-L5: 仅 1v1 家族随机 — 身份场家族改走
+        // setIdentityRole 同步 (assignRandomRoles 会把选将提示文案随机成
+        // 主公/反贼, 与身份面板选中态错位)。
+        if (matchMode === 'duel') {
+          assignRandomRoles();
+        } else {
+          setIdentityRole(identityPlayerRole);
+          resetPickSequence();
+          renderHeroPickGrid();
+        }
         applySetupFamily(matchMode === 'duel' ? 'duel' : 'identity');
       }
 
@@ -1111,6 +1121,7 @@
       function newGame() {
         enemyThinking = false;
         selectedDiscardIds = [];
+        stagedModalChoice = null; // v13 UI修缮1 review-H3: 暂存不跨局残留
         hideTiesuoPanel();
         hideTargetZonePanel();
         hideHuogongPanel();
@@ -1384,6 +1395,7 @@
           if (!game || game.turn !== 'player' || game.phase === 'gameover') return;
           selectedHandCardId = null;
           selectedDiscardIds = [];
+          stagedModalChoice = null; // v13 UI修缮1 review-H2: 直发技暂存不得漏进弃牌阶段 (卡死弃牌确认)
           hideTiesuoPanel();
           hideTargetZonePanel();
           hideHuogongPanel();
@@ -1415,6 +1427,9 @@
           // v9 PR-E16: play 阶段无 pending / 无 skill-select / 非 discard 时,
           // 点 hand-card 仅 set selectedHandCardId + 高亮. 用户必须按 #handConfirmBtn
           // 才真正 usePlayerCard. 其余模式 (discard / skill / response) 走原 immediate 流程.
+          // v13 UI修缮1 review-H1: 点手牌撤销未确认的直发技暂存 (苦肉) —
+          // 否则"确定"会先击发技能而非打出所点的牌 (暂存劫持)。
+          if (stagedModalChoice && stagedModalChoice.kind === 'skill') stagedModalChoice = null;
           if (_shouldSelectFirst()) {
             selectedHandCardId = (selectedHandCardId === cardId) ? null : cardId;
             render();
@@ -1468,6 +1483,9 @@
           handleHeroPickCardClick(btn.getAttribute('data-hero-id'));
         });
         // v9 PR-E8: lobby 1V1 → setup; KOF/炼狱 placeholder.
+        // v13 UI修缮4 review-M4: setup 屏返回大厅 (分入口后 setup 内无法
+        // 切换玩法家族, 须给回退口)。
+        if (els.setupBackBtn) els.setupBackBtn.addEventListener('click', showLobby);
         // v13 UI修缮4: 一级入口分流 — 1v1 直进单挑 setup; 身份场入口进
         // 人数/身份选择 (缺省 5 人档, 官方主流场)。
         if (els.lobby1v1Btn) els.lobby1v1Btn.addEventListener('click', function () {
