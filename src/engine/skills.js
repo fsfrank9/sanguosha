@@ -770,12 +770,15 @@
           log(game, actorName(game, holder) + '选择不发动【鬼才】。');
           return { declinedGuicai: true };
         }
-        // v13 张角修缮-3: 同一判定已有改判询问挂起时不再叠问 (双改判者同场
-        // 时后到者退让 — 单快照架构不支持对同一在途判定的连环改判)。
+        // v13 张角修缮-3 (评审收口): 同一判定已有改判询问挂起时后到者彻底
+        // 退让 — 含 auto 路径: 否则 AI 在玩家询问面板背后换牌, 面板展示的
+        // 原判定牌变陈旧误导玩家 (对抗验证实证: 面板显红桃、实际已被换成
+        // 黑桃, 玩家据此放弃改判而吃伤)。单快照架构亦不支持连环改判。
         var guicaiAlreadyAsking = game.pendingChoice
           && (game.pendingChoice.kind === 'guicai-replace' || game.pendingChoice.kind === 'guidao-replace')
           && game.pendingChoice.judgementActor === judgementActor;
-        if (pref === 'ask' && context.pausable && !guicaiAlreadyAsking) {
+        if (guicaiAlreadyAsking) return { deferredGuicai: true };
+        if (pref === 'ask' && context.pausable) {
           // Set pendingChoice; processJudgeArea will detect this and snapshot
           // its iteration state. resolveGuicaiReplaceChoice takes the
           // replacement from holder.hand and resumes from the saved trick.
@@ -1846,7 +1849,12 @@
           var targetActor = decision.auto
             ? leijiAutoTarget(game, actor, candidates, null)
             : StateRuntime.resolveSeatOption(game, decision.target);
-          if (!targetActor || candidates.indexOf(targetActor) < 0) return fail('无效的【雷击】目标。');
+          // 评审收口: 非法目标按本文件惯例重挂, 玩家可重选 (UI 只发合法座席,
+          // 此路径护引擎 API 直调)。
+          if (!targetActor || candidates.indexOf(targetActor) < 0) {
+            setPendingChoice(game, pending);
+            return fail('无效的【雷击】目标。');
+          }
           var executed = executeLeijiJudgement(game, actor, targetActor);
           if (executed && executed.suspendedForLeijiJudgement) return success('等待改判选择。');
           return success('【雷击】结算完成。');
@@ -1878,11 +1886,13 @@
             return { declinedGuidao: true };
           }
           var blackCards = guidaoBlackHand(holderState);
-          // v13 张角修缮-3: 同一判定已有改判询问挂起时不再叠问 (同鬼才 hook)。
+          // v13 张角修缮-3 (评审收口): 同一判定已有改判询问挂起时后到者彻底
+          // 退让, 含 auto 路径 (同鬼才 hook — 防 AI 在玩家询问面板背后换牌)。
           var guidaoAlreadyAsking = game.pendingChoice
             && (game.pendingChoice.kind === 'guicai-replace' || game.pendingChoice.kind === 'guidao-replace')
             && game.pendingChoice.judgementActor === judgementActor;
-          if (pref === 'ask' && context.pausable && !guidaoAlreadyAsking) {
+          if (guidaoAlreadyAsking) return { deferredGuidao: true };
+          if (pref === 'ask' && context.pausable) {
             setPendingChoice(game, {
               kind: 'guidao-replace',
               actor: holder,
