@@ -561,3 +561,14 @@ N 阶段收官后, 用户对照官方/第三方客户端实测提出 6 项体验
 维护)。返回大厅闭环; showLobby 防御性隐藏图鉴屏。ui_hero_browser
 5 例 (入口/开合/全量内容/状态标注/分组)。其余导航项 (排行榜/设置/
 素材/福利) 维持 disabled。
+
+## 武将图鉴续批执行记录 (2026-07-18, 用户反馈 2 项)
+
+- **1 导航光标**: .lobby-nav-item 基类写死 cursor:not-allowed —
+  已启用的「武将」仍顶禁止光标。改按 :disabled 区分 (基类 pointer +
+  hover 提亮, :disabled 才 not-allowed+降透明)。
+- **2 阵营筛选**: 图鉴与选将界面各加 全部/魏/蜀/吴/群 chip 行 —
+  图鉴按分组过滤 (汇总保持全量口径); 选将网格按将过滤 (纯浏览辅助,
+  点选/随机/互斥逻辑不受影响), 每次进选将归"全部"; chip 激活态
+  经 _syncCampFilterChips 同步 (fake-dom 无 querySelectorAll 时
+  优雅降级)。ui_hero_browser 5→8 例。

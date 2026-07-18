@@ -79,6 +79,52 @@ test('图鉴: 四势力分组标题齐备', () => {
   $('heroBrowserBackBtn').click();
 });
 
+test('续批-1: nav 光标按 disabled 区分 — 基类 pointer, :disabled 才 not-allowed', () => {
+  const css = fs.readFileSync(new URL('../src/styles/entry.css', import.meta.url), 'utf8');
+  const base = css.match(/\.lobby-nav-item\s*\{[\s\S]*?\n\s{4}\}/);
+  assert.ok(base);
+  assert.match(base[0], /cursor:\s*pointer/);
+  assert.doesNotMatch(base[0], /not-allowed/);
+  assert.match(css, /\.lobby-nav-item:disabled\s*\{[\s\S]{0,120}not-allowed/);
+  assert.match(css, /\.lobby-nav-item:not\(:disabled\):hover/);
+});
+
+test('续批-2: 图鉴阵营筛选 — 点蜀只剩蜀分组, 汇总保持全量, 全部恢复', () => {
+  $('lobbyHeroesBtn').click();
+  const summaryAll = String($('heroBrowserSummary').textContent);
+  $('heroBrowserFilter').dispatchClick({ 'data-camp': '蜀' });
+  const grid = String($('heroBrowserGrid').innerHTML);
+  assert.ok(grid.indexOf('hb-camp--蜀') >= 0, '蜀分组在');
+  for (const camp of ['魏', '吴', '群']) {
+    assert.ok(grid.indexOf('hb-camp--' + camp) < 0, camp + ' 分组被滤掉');
+  }
+  assert.equal(String($('heroBrowserSummary').textContent), summaryAll, '汇总保持全量口径');
+  $('heroBrowserFilter').dispatchClick({ 'data-camp': 'all' });
+  const gridAll = String($('heroBrowserGrid').innerHTML);
+  for (const camp of ['魏', '蜀', '吴', '群']) {
+    assert.ok(gridAll.indexOf('hb-camp--' + camp) >= 0, camp + ' 分组恢复');
+  }
+  $('heroBrowserBackBtn').click();
+});
+
+test('续批-2: 选将阵营筛选 — 点吴只剩吴武将, 选择照常, 重进归全部', () => {
+  $('lobby1v1Btn').click();
+  $('heroPickCampFilter').dispatchClick({ 'data-camp': '吴' });
+  let grid = String($('heroPickGrid').innerHTML);
+  assert.ok(grid.indexOf('hero-pick-card--camp-吴') >= 0, '吴武将在');
+  assert.ok(grid.indexOf('hero-pick-card--camp-魏') < 0, '魏被滤掉');
+  // 筛选下选择照常 (点吴将 → 锁定进 select)
+  $('heroPickGrid').dispatchClick({ 'data-hero-id': 'sunquan' });
+  // duel 先选方随机 (主公先选) — 断言任一侧锁定即可。
+  assert.ok($('playerHeroSelect').value === 'sunquan' || $('enemyHeroSelect').value === 'sunquan',
+    '筛选下点选生效');
+  // 重进选将 → 筛选归全部
+  $('setupBackBtn').click();
+  $('lobby1v1Btn').click();
+  grid = String($('heroPickGrid').innerHTML);
+  assert.ok(grid.indexOf('hero-pick-card--camp-魏') >= 0, '重进归全部 (魏可见)');
+});
+
 let passed = 0;
 for (const [name, fn] of tests) {
   try { fn(); passed += 1; console.log(`✓ ${name}`); }

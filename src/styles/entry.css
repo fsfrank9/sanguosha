@@ -156,6 +156,8 @@
       gap: 10px;
     }
 
+    /* v13 图鉴续批-1: 光标/不透明度按 :disabled 区分 — 「武将」已启用,
+       不能再顶着禁止光标 (旧规则把 not-allowed 写在基类上)。 */
     .lobby-nav-item {
       display: flex;
       flex-direction: column;
@@ -166,11 +168,21 @@
       border-radius: 10px;
       background: rgba(0, 0, 0, .32);
       color: var(--muted);
-      cursor: not-allowed;
+      cursor: pointer;
       font-size: 12px;
       font-weight: 700;
       letter-spacing: .12em;
+    }
+
+    .lobby-nav-item:disabled {
+      cursor: not-allowed;
       opacity: .7;
+    }
+
+    .lobby-nav-item:not(:disabled):hover {
+      border-color: rgba(255, 214, 138, .55);
+      color: #ffd68a;
+      background: rgba(0, 0, 0, .5);
     }
 
     .lobby-nav-item span {
@@ -237,3 +249,17 @@
 .hb-skill__status.is-done { border: 1px solid rgba(120, 220, 140, .55); color: #8fe3a3; }
 .hb-skill__status.is-pending { border: 1px solid rgba(160, 160, 160, .5); color: #a8a8a8; }
 .hb-skill__status.is-active-skill { border: 1px solid rgba(255, 214, 138, .5); color: #ffd68a; }
+
+/* v13 图鉴续批-2: 阵营筛选 chips (图鉴 + 选将共用) */
+.camp-filter {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0 4px;
+}
+.camp-filter .btn.is-active {
+  border-color: rgba(255, 214, 138, .8);
+  color: #ffd68a;
+  background: rgba(255, 214, 138, .12);
+}
