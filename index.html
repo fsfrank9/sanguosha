@@ -117,6 +117,14 @@
       <div class="hero-browser__head">
         <span class="panel-title"><span>武将图鉴</span></span>
         <span class="badge" id="heroBrowserSummary"></span>
+        <!-- v13 图鉴续批-2: 阵营筛选 -->
+        <div class="camp-filter" id="heroBrowserFilter">
+          <button type="button" class="btn small is-active" data-camp="all">全部</button>
+          <button type="button" class="btn small" data-camp="魏">魏</button>
+          <button type="button" class="btn small" data-camp="蜀">蜀</button>
+          <button type="button" class="btn small" data-camp="吴">吴</button>
+          <button type="button" class="btn small" data-camp="群">群</button>
+        </div>
         <button type="button" class="btn small" id="heroBrowserBackBtn">返回大厅</button>
       </div>
       <div class="hero-browser__grid" id="heroBrowserGrid"></div>
@@ -180,6 +188,14 @@
               <span class="hero-pick-tab__label">敌方</span>
               <span class="hero-pick-tab__value" id="heroPickEnemyValue">未选</span>
             </button>
+          </div>
+          <!-- v13 图鉴续批-2: 选将阵营筛选 (浏览辅助, 不影响选择/随机逻辑) -->
+          <div class="camp-filter" id="heroPickCampFilter">
+            <button type="button" class="btn small is-active" data-camp="all">全部</button>
+            <button type="button" class="btn small" data-camp="魏">魏</button>
+            <button type="button" class="btn small" data-camp="蜀">蜀</button>
+            <button type="button" class="btn small" data-camp="吴">吴</button>
+            <button type="button" class="btn small" data-camp="群">群</button>
           </div>
           <div class="hero-pick__grid" id="heroPickGrid" aria-live="polite"></div>
           <div class="hero-pick__random-row">

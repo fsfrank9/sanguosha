@@ -79,10 +79,13 @@
 
         function heroPickGridHtml(state) {
           var currentPickSide = state.currentPickSide;
+          var campFilter = state.campFilter || 'all'; // v13 续批-2: 阵营筛选 (纯浏览)
           var playerVal = state.playerVal || '';
           var enemyVal = state.enemyVal || '';
           var allPicked = state.allPicked || []; // v13 三批-3: 全席位已选清单
-          return sortedHeroes().map(function (hero) {
+          return sortedHeroes().filter(function (hero) {
+            return campFilter === 'all' || hero.camp === campFilter;
+          }).map(function (hero) {
             var classes = ['hero-pick-card', 'hero-pick-card--camp-' + (hero.camp || '?')];
             var isPlayerPicked = hero.id === playerVal && playerVal !== '';
             var isEnemyPicked = hero.id === enemyVal && enemyVal !== '';
@@ -248,18 +251,25 @@
     function renderHeroBrowser(state) {
       var implemented = state.implementedIds || [];
       var active = state.activeIds || [];
-      var camps = ['魏', '蜀', '吴', '群'];
+      var campFilter = state.campFilter || 'all'; // v13 续批-2: 阵营筛选
+      var camps = ['魏', '蜀', '吴', '群'].filter(function (camp) {
+        return campFilter === 'all' || camp === campFilter;
+      });
       var heroes = Object.keys(Engine.HERO_CATALOG).map(function (id) { return Engine.HERO_CATALOG[id]; });
       var totalSkills = 0;
       var doneSkills = 0;
+      heroes.forEach(function (hero) {
+        (hero.skills || []).forEach(function (skill) {
+          totalSkills += 1;
+          if (implemented.indexOf(skill.id) >= 0) doneSkills += 1;
+        });
+      });
       var body = camps.map(function (camp) {
         var group = heroes.filter(function (hero) { return hero.camp === camp; });
         if (!group.length) return '';
         var cards = group.map(function (hero) {
           var skills = (hero.skills || []).map(function (skill) {
-            totalSkills += 1;
             var done = implemented.indexOf(skill.id) >= 0;
-            if (done) doneSkills += 1;
             var tags = '<span class="hb-skill__status ' + (done ? 'is-done' : 'is-pending') + '">'
               + (done ? '已实现' : '未实现') + '</span>'
               + (done && active.indexOf(skill.id) >= 0 ? '<span class="hb-skill__status is-active-skill">主动</span>' : '');

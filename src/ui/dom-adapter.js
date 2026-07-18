@@ -251,6 +251,7 @@
           // v9 PR-E8: 一级 lobby
           'lobbyScreen', 'lobbyKofBtn', 'lobby1v1Btn', 'lobbyIdentityBtn', 'lobbyHellBtn',
           'lobbyHeroesBtn', 'heroBrowserScreen', 'heroBrowserGrid', 'heroBrowserSummary', 'heroBrowserBackBtn',
+          'heroBrowserFilter', 'heroPickCampFilter',
           // v9 PR-E9: 选将网格 — 替代旧 <select> 下拉
           'heroPick', 'heroPickPrompt', 'heroPickPlayerTab', 'heroPickEnemyTab',
           'heroPickPlayerValue', 'heroPickEnemyValue', 'heroPickGrid',
@@ -973,6 +974,9 @@
       // 偏移), 主公=1号位, 沿座次环顺延; 选将顺序 = 自己优先, 其余按
       // 号位升序; newGame 消费同一份 roles (所见即所得)。
       var pendingIdentityRoles = null;
+      // v13 图鉴续批-2: 阵营筛选态 (纯浏览辅助; 选将筛选随 resetPickSequence 归"全部")
+      var heroBrowserCamp = 'all';
+      var heroPickCamp = 'all';
       var seatNumberBySeat = null;
       function identitySeatNames() {
         return matchMode === 'identity5' ? ['player', 'enemy', 'ally', 'ally2', 'ally3']
@@ -995,6 +999,8 @@
 
       function resetPickSequence() {
         pickStep = 0;
+        heroPickCamp = 'all'; // v13 续批-2: 每次进选将筛选归"全部"
+        _syncCampFilterChips(els.heroPickCampFilter, 'all');
         // v13 L1→二批-4: 身份场 = 自己优先 + 其余按号位升序 (主公=1号位
         // 沿座次环, rollIdentitySeating 掷定); duel 行为逐字不变。
         if (matchMode !== 'duel') {
@@ -1023,6 +1029,7 @@
           // v13 二批-4: 号位制提示 ("请为N号位选将", 主公席标注)。
           seatNumber: seatNumberBySeat && seatNumberBySeat[currentPickSide],
           // v13 三批-3: 全部已锁定席位武将 (当前席位除外) — 网格置灰。
+          campFilter: heroPickCamp, // v13 续批-2
           allPicked: pickOrder.filter(function (seat) { return seat !== currentPickSide; })
             .map(function (seat) { return els[seat + 'HeroSelect'] ? els[seat + 'HeroSelect'].value : ''; })
             .filter(Boolean),
@@ -1158,6 +1165,15 @@
         if (els.frameMenuBtn) els.frameMenuBtn.hidden = !show;
         if (els.frameShareBtn) els.frameShareBtn.hidden = !show;
       }
+      // v13 图鉴续批-2: 筛选 chip 激活态同步。
+      function _syncCampFilterChips(container, camp) {
+        if (!container || !container.querySelectorAll) return;
+        var chips = container.querySelectorAll('[data-camp]');
+        for (var i = 0; i < chips.length; i += 1) {
+          chips[i].classList.toggle('is-active', chips[i].getAttribute('data-camp') === camp);
+        }
+      }
+
       function showLobby() {
         if (els.lobbyScreen) els.lobbyScreen.hidden = false;
         if (els.heroBrowserScreen) els.heroBrowserScreen.hidden = true;
@@ -1536,14 +1552,36 @@
         if (els.lobbyHeroesBtn) els.lobbyHeroesBtn.addEventListener('click', function () {
           if (els.lobbyScreen) els.lobbyScreen.hidden = true;
           if (els.heroBrowserScreen) els.heroBrowserScreen.hidden = false;
+          heroBrowserCamp = 'all';
+          _syncCampFilterChips(els.heroBrowserFilter, heroBrowserCamp);
           lobbyPanels.renderHeroBrowser({
             implementedIds: IMPLEMENTED_SKILL_IDS,
-            activeIds: ACTIVE_SKILL_IDS
+            activeIds: ACTIVE_SKILL_IDS,
+            campFilter: heroBrowserCamp
           });
         });
         if (els.heroBrowserBackBtn) els.heroBrowserBackBtn.addEventListener('click', function () {
           if (els.heroBrowserScreen) els.heroBrowserScreen.hidden = true;
           showLobby();
+        });
+        // v13 图鉴续批-2: 阵营筛选 chips (图鉴 + 选将两处, 委托绑定)。
+        if (els.heroBrowserFilter) els.heroBrowserFilter.addEventListener('click', function (event) {
+          var chip = event.target.closest('[data-camp]');
+          if (!chip) return;
+          heroBrowserCamp = chip.getAttribute('data-camp');
+          _syncCampFilterChips(els.heroBrowserFilter, heroBrowserCamp);
+          lobbyPanels.renderHeroBrowser({
+            implementedIds: IMPLEMENTED_SKILL_IDS,
+            activeIds: ACTIVE_SKILL_IDS,
+            campFilter: heroBrowserCamp
+          });
+        });
+        if (els.heroPickCampFilter) els.heroPickCampFilter.addEventListener('click', function (event) {
+          var chip = event.target.closest('[data-camp]');
+          if (!chip) return;
+          heroPickCamp = chip.getAttribute('data-camp');
+          _syncCampFilterChips(els.heroPickCampFilter, heroPickCamp);
+          renderHeroPickGrid();
         });
         // v13 UI修缮4: 一级入口分流 — 1v1 直进单挑 setup; 身份场入口进
         // 人数/身份选择 (缺省 5 人档, 官方主流场)。
