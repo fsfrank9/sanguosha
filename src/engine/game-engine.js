@@ -351,10 +351,24 @@
 
       // L2: 决斗/南蛮/万箭/火攻 等锦囊在使用时已进入弃牌堆, 伤害结算收尾时
       // 不可重复弃置 (否则弃牌堆出现双份); 仍在结算中的牌 (如【杀】) 正常弃置。
+      // v13 N2: 多目标 AOE 逐席结算 (南蛮/万箭) 中来源牌可能已被先结算
+      // 席位的技能获得 (奸雄从弃牌堆取回) — 后续席位收尾时牌"不在弃牌堆"
+      // 并非仍在结算中, 而是已归属某席; 补弃会造成同一对象双区并存
+      // (守恒红线, k4 soak seed 47201/47303 抓获)。已归属席位的牌不弃。
+      // 注: 铁索传导不在此列 — advanceChainTransmit 传 sourceCard=null
+      // (opus 复核核实), AOE 是唯一同 sourceCard 多席结算路径。
       function discardSourceCardIfPending(game, card) {
         if (!card) return;
         var physical = physicalCardOf(card);
         if (physical && game.discard.indexOf(physical) !== -1) return;
+        if (physical && (game.seats || []).some(function (seat) {
+          var st = game[seat];
+          if (!st) return false;
+          if ((st.hand || []).indexOf(physical) !== -1) return true;
+          var eq = st.equipment || {};
+          return eq.weapon === physical || eq.armor === physical
+            || eq.horseMinus === physical || eq.horsePlus === physical;
+        })) return;
         discardCard(game, card);
       }
 
