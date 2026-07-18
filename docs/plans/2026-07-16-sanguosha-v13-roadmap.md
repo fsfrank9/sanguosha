@@ -572,3 +572,40 @@ N 阶段收官后, 用户对照官方/第三方客户端实测提出 6 项体验
   点选/随机/互斥逻辑不受影响), 每次进选将归"全部"; chip 激活态
   经 _syncCampFilterChips 同步 (fake-dom 无 querySelectorAll 时
   优雅降级)。ui_hero_browser 5→8 例。
+
+## 张角修缮执行记录 (2026-07-18, 用户实测 4 症状)
+
+用户实测: 雷击闪一打出就自动发动 / 判定后鬼道也自动发动 / "黑桃不
+命中" / 鬼道描述应为"替换"却像鬼才"打出去代替"。诊断: 前三症状同根 —
+雷击玩家侧无询问分支直发; 内嵌判定不可挂起 (judge() 仅 processJudgeArea
+传 pausable), 玩家鬼道 ask 落 auto 兜底, 把自己雷击的黑桃判定换成
+最低分黑牌 (梅花) → "黑桃不命中"。第四症状为 heroes.js 描述过简
+(官方风包 spec: 鬼道=打出黑色牌替换判定牌, 与鬼才同构本非错, 错在
+描述未写"替换")。
+
+- **1 雷击询问化 (leiji-ask)**: 官方"可以"=可选发动。玩家侧默认挂
+  pendingChoice (闪结算同步走完后延迟询问, 沿 J3 deferred-ask 惯例;
+  FIFO 队列保证与后续触发技相对序), 面板列存活其他座席候选,
+  暂存-确认提交, decline/auto 兜底 (auto=旧敌先池直发, soak 决策表
+  三处补 `leiji-ask → {auto:true}` 保种子口径); 显式 leiji='auto'
+  偏好保留旧直发。AI 席位照旧直发。
+- **2 玩家改判禁 auto 兜底**: 鬼道/鬼才 (同构加固) 玩家持有者在不可
+  挂起判定时机 (八卦/刚烈/铁骑内嵌判定) 明示跳过 + 日志, 不再替玩家
+  烧牌乱换; 显式 'auto' 偏好保留旧口径。guicai_cross_actor 旧 auto
+  断言随行为反转。
+- **3 雷击判定可挂起 (pauseState.leiji)**: 张角核心配合 (判定非黑桃
+  → 鬼道补黑桃) 需要改判窗口 — executeLeijiJudgement 拆
+  judge(pausable) + finishLeijiJudgement, 挂起快照落独立
+  pauseState.leiji; 鬼才/鬼道 resolver 顶部共用雷击分支
+  (resolveJudgementReplaceForLeiji) 完成替换与伤害结算。附带加固:
+  同一判定已有改判询问时后到 hook 退让 (双改判者叠问, 单快照架构
+  不支持连环改判 — 原判定阶段路径同样受益)。
+- **4 AI 鬼道雷击护栏**: 此前无脑最低分黑牌替换 — AI 张角会亲手换掉
+  自己雷击的黑桃判定。改为仅"原判定非黑桃 + 手有黑桃 + 目标无红颜"
+  时以黑桃替换补命中。
+- **5 描述修正**: 雷击 "使用或打出闪时，可令一名其他角色判定，黑桃
+  则其受2点雷伤。"; 鬼道 "判定牌生效前，可打出黑色手牌替换之。"
+- **门禁**: v13_zhangjiao_repair 15 例 (询问/decline/target/auto/
+  雷击×鬼道链/AI 护栏/玩家跳过); ui_g2 面板 +3 例 (含雷击→鬼道链
+  全 UI 路径); 真浏览器 probe-leiji 三场景全绿 (面板真实可见/暂存-
+  确认/decline/链式改判命中); 全量 sweep + verify 全绿。

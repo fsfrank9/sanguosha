@@ -925,6 +925,7 @@
       var triggerShensuPrepare = SkillDomain.triggerShensuPrepare;
       var resolveShensuOptionsChoice = SkillDomain.resolveShensuOptionsChoice;
       var resolveGuidaoReplaceChoice = SkillDomain.resolveGuidaoReplaceChoice;
+      var resolveLeijiAskChoice = SkillDomain.resolveLeijiAskChoice;
       var triggerLuoshenPrepare = SkillDomain.triggerLuoshenPrepare;
       var getGuanxingPreview = SkillDomain.getGuanxingPreview;
       var resolveFankuiPickChoice = SkillDomain.resolveFankuiPickChoice;
@@ -944,6 +945,8 @@
       registerResponseKind('guicai-replace', resolveGuicaiReplaceChoice);
       // v12 G2: 鬼道 (鬼才同构改判) 与 神速 (回合开始选项)
       registerResponseKind('guidao-replace', resolveGuidaoReplaceChoice);
+      // v13 张角修缮: 雷击改为闪结算后挂起询问 (玩家选目标/放弃), AI 仍走自动
+      registerResponseKind('leiji-ask', resolveLeijiAskChoice);
       registerResponseKind('shensu-options', resolveShensuOptionsChoice);
       registerResponseKind('yiji-distribute', resolveYijiDistributeChoice);
       registerResponseKind('guanxing-reorder', resolveGuanxingChoice);

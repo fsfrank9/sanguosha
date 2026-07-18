@@ -73,6 +73,26 @@
         els.guicaiPromptPanel.hidden = true;
       }
     }
+    // v13 张角修缮: 雷击 ask — 闪结算完后挂起, 选一名其他角色判定或不发动。
+    // 点座席候选 stage (高亮), hand-confirm 提交; 不发动直提 decline。
+    if (els.leijiAskPanel) {
+      if (kind === 'leiji-ask' && pending.actor === 'player') {
+        els.leijiAskPanel.hidden = false;
+        if (els.leijiAskHint) {
+          els.leijiAskHint.textContent =
+            '雷击：你使用/打出了【闪】，可令一名其他角色进行判定——黑桃则其受到 2 点雷电伤害，或不发动。';
+        }
+        if (els.leijiAskChoices) {
+          els.leijiAskChoices.innerHTML = (pending.candidates || []).map(function (entry) {
+            return '<button class="mini-card leiji-target-choice" data-leiji-target="' +
+              escapeHtml(entry.seat) + '" title="令其进行雷击判定">' +
+              escapeHtml(entry.name) + '</button>';
+          }).join('') || '<span class="mini-card">没有可指定的角色</span>';
+        }
+      } else {
+        els.leijiAskPanel.hidden = true;
+      }
+    }
     if (els.yijiPromptPanel) {
       if (kind === 'yiji-distribute' && pending.actor === 'player') {
         els.yijiPromptPanel.hidden = false;
@@ -574,6 +594,18 @@
     });
     if (els.guicaiDeclineBtn) els.guicaiDeclineBtn.addEventListener('click', function () {
       var result = Engine.resolvePendingChoice(getGame(), { cardId: null });
+      if (!result.ok) renderLog();
+      render();
+    });
+    // v13 张角修缮: 雷击 ask — 点座席候选 stage, hand-confirm 提交; 不发动直提。
+    if (els.leijiAskChoices) els.leijiAskChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-leiji-target]');
+      if (!btn) return;
+      var seat = btn.getAttribute('data-leiji-target');
+      stage({ target: seat }, '[data-leiji-target="' + seat + '"]');
+    });
+    if (els.leijiDeclineBtn) els.leijiDeclineBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), { decline: true });
       if (!result.ok) renderLog();
       render();
     });

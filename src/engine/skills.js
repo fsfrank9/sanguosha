@@ -770,7 +770,12 @@
           log(game, actorName(game, holder) + '选择不发动【鬼才】。');
           return { declinedGuicai: true };
         }
-        if (pref === 'ask' && context.pausable) {
+        // v13 张角修缮-3: 同一判定已有改判询问挂起时不再叠问 (双改判者同场
+        // 时后到者退让 — 单快照架构不支持对同一在途判定的连环改判)。
+        var guicaiAlreadyAsking = game.pendingChoice
+          && (game.pendingChoice.kind === 'guicai-replace' || game.pendingChoice.kind === 'guidao-replace')
+          && game.pendingChoice.judgementActor === judgementActor;
+        if (pref === 'ask' && context.pausable && !guicaiAlreadyAsking) {
           // Set pendingChoice; processJudgeArea will detect this and snapshot
           // its iteration state. resolveGuicaiReplaceChoice takes the
           // replacement from holder.hand and resumes from the saved trick.
@@ -789,6 +794,13 @@
             })
           });
           return { suspendedForGuicai: true };
+        }
+        // v13 张角修缮-2: 玩家鬼才不落 auto — 不可挂起的判定时机 (八卦/刚烈/
+        // 铁骑等内嵌判定) 无法开面板时明示跳过, 不替玩家烧手牌乱换 (与鬼道
+        // 同款加固)。显式 guicai='auto' 保留旧口径。
+        if (holder === 'player' && pref !== 'auto') {
+          log(game, actorName(game, holder) + '的【鬼才】时机不可挂起，本次跳过。');
+          return { skippedGuicai: true };
         }
         // Auto path (pref === 'auto', AI default, or non-pausable judgement):
         // v8 PR-D2: 不再 hand[0], 改 lowest-score 手牌 (scoreCardForAI). 鬼才
@@ -1329,6 +1341,11 @@
         var holderState = game[holder];
         var judgementActorState = game[judgementActor];
         if (!holderState || !judgementActorState) return fail('未知角色。');
+        // v13 张角修缮-3: 雷击内嵌判定的挂起走独立快照 (pauseState.leiji)。
+        var leijiResolved = resolveJudgementReplaceForLeiji(game, pending, decision, {
+          requireBlack: false, skillLabel: '鬼才', playVerb: '用', replaceVerb: '代替'
+        });
+        if (leijiResolved) return leijiResolved;
         var saved = game.pauseState && game.pauseState.judgeArea;
         if (!saved || saved.actor !== judgementActor) return fail('找不到挂起的判定。');
         var originalCard = saved.currentJudgementCard;
@@ -1695,6 +1712,98 @@
         // 归目标 (红颜小乔判雷击 黑桃视为红桃 → 永不命中, 由 judge() 视同
         // 层自然覆盖)。auto/decline 偏好 (铁骑惯例); options.target 可显式
         // 指定 (供 future ask 面板)。
+        function leijiCandidates(game, actor) {
+          return StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && game[seat].hp > 0;
+          });
+        }
+
+        function leijiAutoTarget(game, actor, candidates, requested) {
+          var pool = StateRuntime.perceivedHostileFirstPool(game, actor, candidates);
+          return (requested && requested !== actor && candidates.indexOf(requested) >= 0)
+            ? requested
+            : (pool.indexOf(opponent(actor)) >= 0 ? opponent(actor) : pool[0]);
+        }
+
+        function executeLeijiJudgement(game, actor, targetActor) {
+          var target = game[targetActor];
+          if (!target || target.hp <= 0) return null;
+          log(game, actorName(game, actor) + '发动【雷击】，令' + actorName(game, targetActor) + '进行判定。');
+          // v13 张角修缮-3: 雷击判定可挂起 — 改判 (鬼才/鬼道) 的 ask 面板得以
+          // 打开 (张角核心配合: 雷击判定非黑桃时用鬼道补成黑桃)。雷击判定不在
+          // 判定阶段主循环内, 挂起快照落 pauseState.leiji (而非 judgeArea),
+          // 由改判 resolver 的雷击分支 (resolveJudgementReplaceForLeiji) 完成
+          // 伤害结算。已有 pendingChoice 时不可挂起 (改判 hook 落 skip/auto)。
+          var canPause = !game.pendingChoice;
+          var leijiJudge = judge(game, targetActor, '【雷击】', { pausable: canPause });
+          var pendingKind = game.pendingChoice && game.pendingChoice.kind;
+          if ((pendingKind === 'guicai-replace' || pendingKind === 'guidao-replace')
+              && game.pendingChoice.judgementActor === targetActor) {
+            if (!game.pauseState) game.pauseState = {};
+            game.pauseState.leiji = {
+              sourceActor: actor,
+              targetActor: targetActor,
+              currentJudgementCard: leijiJudge
+            };
+            return { suspendedForLeijiJudgement: true };
+          }
+          return finishLeijiJudgement(game, actor, targetActor, leijiJudge);
+        }
+
+        function finishLeijiJudgement(game, actor, targetActor, leijiJudge) {
+          var target = game[targetActor];
+          var hit = !!(leijiJudge && leijiJudge.suit === 'spade');
+          resolveJudgementCard(game, targetActor, target, '【雷击】', leijiJudge);
+          if (hit) {
+            log(game, '【雷击】判定为黑桃，' + actorName(game, targetActor) + '受到 2 点雷电伤害。');
+            damage(game, targetActor, 2, actor, '【雷击】', null, 'thunder');
+          } else {
+            log(game, '【雷击】判定未中。');
+          }
+          return { triggeredLeiji: true };
+        }
+
+        // v13 张角修缮-3: 雷击内嵌判定的改判续跑 — 鬼才/鬼道 resolver 共用
+        // 分支。挂起快照在 pauseState.leiji; 替换/放弃后在此完成雷击伤害
+        // 结算。返回 null = 无雷击挂起, 调用方继续走判定阶段 (judgeArea) 分支。
+        function resolveJudgementReplaceForLeiji(game, pending, decision, opts) {
+          var saved = game.pauseState && game.pauseState.leiji;
+          var judgementActor = pending.judgementActor || pending.actor;
+          if (!saved || saved.targetActor !== judgementActor) return null;
+          var holder = pending.actor;
+          var holderState = game[holder];
+          if (!holderState) return fail('未知角色。');
+          var originalCard = saved.currentJudgementCard;
+          var resolvedCard = originalCard;
+          if (decision.cardId) {
+            var chosen = (holderState.hand || []).find(function (c) { return c.id === decision.cardId; });
+            if (!chosen) {
+              setPendingChoice(game, pending);
+              return fail('找不到这张牌。');
+            }
+            if (opts.requireBlack && chosen.color !== 'black') {
+              setPendingChoice(game, pending);
+              return fail('【' + opts.skillLabel + '】只能打出黑色牌。');
+            }
+            var replacement = takeCard(game, decision.cardId, { zone: 'hand', actor: holder });
+            if (!replacement) {
+              setPendingChoice(game, pending);
+              return fail('找不到这张牌。');
+            }
+            // 同 judge-area 分支: 原判定牌还原红颜视图后弃置, 替换牌补施视图。
+            if (originalCard) discardCard(game, restoreHongyanJudgementView(originalCard));
+            resolvedCard = replacement;
+            applyHongyanJudgementView(game, judgementActor, resolvedCard);
+            log(game, actorName(game, holder) + '发动【' + opts.skillLabel + '】，' + opts.playVerb + '【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）' + opts.replaceVerb + actorName(game, judgementActor) + '的判定牌。');
+          } else {
+            log(game, actorName(game, holder) + '选择不发动【' + opts.skillLabel + '】。');
+          }
+          game.pauseState.leiji = null;
+          finishLeijiJudgement(game, saved.sourceActor, judgementActor, resolvedCard);
+          if (game.phase === 'gameover') return success('游戏结束。');
+          return success('【雷击】判定结算完成。');
+        }
+
         function triggerLeijiShanUsed(context) {
           var game = context.game;
           var actor = context.actor;
@@ -1705,28 +1814,42 @@
             log(game, actorName(game, actor) + '选择不发动【雷击】。');
             return null;
           }
-          var requested = StateRuntime.resolveSeatOption(game, context.options && context.options.target);
-          var candidates = StateRuntime.aliveSeats(game).filter(function (seat) {
-            return seat !== actor && game[seat].hp > 0;
-          });
+          var candidates = leijiCandidates(game, actor);
           if (!candidates.length) return null;
-          var pool = StateRuntime.perceivedHostileFirstPool(game, actor, candidates);
-          var targetActor = (requested && requested !== actor && candidates.indexOf(requested) >= 0)
-            ? requested
-            : (pool.indexOf(opponent(actor)) >= 0 ? opponent(actor) : pool[0]);
-          var target = game[targetActor];
-          if (!target || target.hp <= 0) return null;
-          log(game, actorName(game, actor) + '发动【雷击】，令' + actorName(game, targetActor) + '进行判定。');
-          var leijiJudge = judge(game, targetActor, '【雷击】');
-          var hit = !!(leijiJudge && leijiJudge.suit === 'spade');
-          resolveJudgementCard(game, targetActor, target, '【雷击】', leijiJudge);
-          if (hit) {
-            log(game, '【雷击】判定为黑桃，' + actorName(game, targetActor) + '受到 2 点雷电伤害。');
-            damage(game, targetActor, 2, actor, '【雷击】', null, 'thunder');
-          } else {
-            log(game, '【雷击】判定未中。');
+          // v13 张角修缮-1: 官方"可以"= 可选发动 — 玩家缺省询问 (延迟到当前
+          // 结算同步走完: 这里只挂 pendingChoice, 既有队列/轮询机制会在结算
+          // 后暂停等玩家; 显式 leiji='auto' 保留旧直发口径)。AI 席位照旧
+          // 直发 (敌先池目标)。
+          if (actor === 'player' && pref !== 'auto') {
+            setPendingChoice(game, {
+              kind: 'leiji-ask',
+              actor: actor,
+              candidates: candidates.map(function (seat) {
+                return { seat: seat, name: actorName(game, seat) };
+              })
+            });
+            return { suspendedForLeiji: true };
           }
-          return { triggeredLeiji: true };
+          var requested = StateRuntime.resolveSeatOption(game, context.options && context.options.target);
+          return executeLeijiJudgement(game, actor, leijiAutoTarget(game, actor, candidates, requested));
+        }
+
+        // v13 张角修缮-1: 雷击询问 resolver — decline 跳过; target 显式指定;
+        // auto (soak 驱动) 沿用旧敌先池目标。
+        function resolveLeijiAskChoice(game, pending, decision) {
+          var actor = pending.actor;
+          var candidates = leijiCandidates(game, actor);
+          if (!decision || decision.decline || (!decision.target && !decision.auto) || !candidates.length) {
+            log(game, actorName(game, actor) + '选择不发动【雷击】。');
+            return success('已跳过【雷击】。');
+          }
+          var targetActor = decision.auto
+            ? leijiAutoTarget(game, actor, candidates, null)
+            : StateRuntime.resolveSeatOption(game, decision.target);
+          if (!targetActor || candidates.indexOf(targetActor) < 0) return fail('无效的【雷击】目标。');
+          var executed = executeLeijiJudgement(game, actor, targetActor);
+          if (executed && executed.suspendedForLeijiJudgement) return success('等待改判选择。');
+          return success('【雷击】结算完成。');
         }
 
         // 鬼道 (张角) — gltjk wind spec: "当一名角色的判定牌生效前, 你可以
@@ -1755,7 +1878,11 @@
             return { declinedGuidao: true };
           }
           var blackCards = guidaoBlackHand(holderState);
-          if (pref === 'ask' && context.pausable) {
+          // v13 张角修缮-3: 同一判定已有改判询问挂起时不再叠问 (同鬼才 hook)。
+          var guidaoAlreadyAsking = game.pendingChoice
+            && (game.pendingChoice.kind === 'guicai-replace' || game.pendingChoice.kind === 'guidao-replace')
+            && game.pendingChoice.judgementActor === judgementActor;
+          if (pref === 'ask' && context.pausable && !guidaoAlreadyAsking) {
             setPendingChoice(game, {
               kind: 'guidao-replace',
               actor: holder,
@@ -1771,6 +1898,24 @@
               })
             });
             return { suspendedForGuidao: true };
+          }
+          // v13 张角修缮-2: 玩家鬼道永不 auto — 非可挂起判定时机 (八卦/
+          // 刚烈/铁骑/雷击内嵌判定) 无法开面板时明示跳过, 而不是替玩家拿
+          // 最低分黑牌乱换 (用户实测: 自己的雷击黑桃判定被自己的鬼道自动
+          // 换成梅花 → "黑桃不命中")。显式 guidao='auto' 保留旧口径。
+          if (holder === 'player' && pref !== 'auto') {
+            log(game, actorName(game, holder) + '的【鬼道】时机不可挂起，本次跳过。');
+            return { skippedGuidao: true };
+          }
+          // v13 张角修缮-3: 雷击判定的 AI 鬼道 — 只在能把非黑桃改成黑桃时发动
+          // (原判定已黑桃则不动; 目标有红颜则黑桃视为红桃恒不命中, 白弃不发;
+          // 此前无脑最低分黑牌替换, AI 张角会亲手换掉自己雷击的黑桃判定)。
+          if (context.reason === '【雷击】') {
+            if (originalCard.suit === 'spade') return null;
+            if (hasSkill(game[judgementActor], 'hongyan')) return null;
+            var guidaoSpades = blackCards.filter(function (c) { return c.suit === 'spade'; });
+            if (!guidaoSpades.length) return null;
+            blackCards = guidaoSpades;
           }
           var sortedGuidao = blackCards
             .map(function (card) { return { card: card, score: scoreCardForAI(game, holder, card) }; })
@@ -1791,6 +1936,11 @@
           var holderState = game[holder];
           var judgementActorState = game[judgementActor];
           if (!holderState || !judgementActorState) return fail('未知角色。');
+          // v13 张角修缮-3: 雷击内嵌判定的挂起走独立快照 (pauseState.leiji)。
+          var leijiResolved = resolveJudgementReplaceForLeiji(game, pending, decision, {
+            requireBlack: true, skillLabel: '鬼道', playVerb: '打出', replaceVerb: '替换'
+          });
+          if (leijiResolved) return leijiResolved;
           var saved = game.pauseState && game.pauseState.judgeArea;
           if (!saved || saved.actor !== judgementActor) return fail('找不到挂起的判定。');
           var originalCard = saved.currentJudgementCard;
@@ -2254,6 +2404,7 @@
           triggerShensuPrepare: triggerShensuPrepare,
           resolveShensuOptionsChoice: resolveShensuOptionsChoice,
           resolveGuidaoReplaceChoice: resolveGuidaoReplaceChoice,
+          resolveLeijiAskChoice: resolveLeijiAskChoice,
           triggerGuanxingPreview: triggerGuanxingPreview,
           triggerLuoshenPrepare: triggerLuoshenPrepare,
           getGuanxingPreview: getGuanxingPreview,
