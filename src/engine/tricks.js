@@ -1103,6 +1103,12 @@
         if (responseType === 'shan' && tryBaguaDodge(game, targetActor, false)) {
           log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
           aoe.idx += 1;
+          // v13 张角修缮评审收口: 八卦"视为闪"同样走 onShanUsed → 雷击可挂
+          // leiji-ask — 与伤害路径同款守卫, 挂起时保留 aoe 队列由
+          // resumeAOETargets 排空后续跑, 不越过挂起先结算后续座席。
+          if (game.pendingChoice) {
+            return success('【' + title + '】等待响应结算…');
+          }
           return 'continue';
         }
         // v10 V4: 万箭齐发 (responseType='shan') + 玩家为目标 + shanResponse=ask +
@@ -1153,6 +1159,12 @@
               return success('【' + title + '】等待濒死结算…');
             }
           }
+        }
+        // v13 张角修缮评审收口: 闪化解路径 (consumeResponse 打出闪 →
+        // onShanUsed → 雷击挂 leiji-ask) 此前缺伤害路径同款守卫, AOE 循环
+        // 会越过挂起先结算后续座席 — 统一挂起即暂停。
+        if (game.pendingChoice) {
+          return success('【' + title + '】等待响应结算…');
         }
         return 'continue';
       }

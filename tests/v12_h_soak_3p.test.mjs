@@ -64,6 +64,8 @@ function decisionForPendingChoice(pending) {
       return { option: 'draw' };
     case 'yaowu-reward':
       return { choice: 'draw' };
+    case 'leiji-ask':
+      return { auto: true };
     case 'huogong-show':
       return { cardId: pending.cardIds && pending.cardIds[0] };
     case 'wugu-pick':

@@ -167,6 +167,78 @@ test('鬼道复用鬼才面板: 点"不发动" → 原判定生效（面板 decl
   assert.equal($('guicaiPromptPanel').hidden, true, '面板关闭');
 });
 
+// ───── v13 张角修缮: 雷击询问面板 (kind: leiji-ask) ─────────────────────
+
+// 敌方杀 → 玩家闪 (shanResponse=auto 自动打出, 剥离响应面板) → leiji-ask。
+function armLeijiAsk(game, judgeCard) {
+  game.player.skillPreferences.shanResponse = 'auto';
+  game.turn = 'enemy';
+  game.enemy.hand = [c('sha', { id: 'ui-lj-atk' })];
+  game.player.hand.push(c('shan', { id: 'ui-lj-shan' }));
+  game.deck.push(judgeCard);
+  Engine.playCard(game, 'enemy', 'ui-lj-atk');
+  UI.render();
+}
+
+test('雷击面板: 玩家出闪后挂 leiji-ask → 面板可见 → 点座席暂存 + 确定 → 判定黑桃命中', () => {
+  const game = startGameViaUI('zhangjiao', 'liubei');
+  armLeijiAsk(game, c('sha', { id: 'ui-lj-judge', suit: 'spade', rank: '4' }));
+
+  assert.equal(game.pendingChoice && game.pendingChoice.kind, 'leiji-ask', '闪结算后挂雷击询问');
+  assert.equal($('leijiAskPanel').hidden, false, '雷击面板可见');
+  assert.match($('leijiAskHint').textContent, /雷击/, '提示带技能名');
+  assert.match($('leijiAskChoices').innerHTML, /data-leiji-target="enemy"/, '座席候选渲染');
+
+  const enemyHpBefore = game.enemy.hp;
+  $('leijiAskChoices').dispatchClick({ 'data-leiji-target': 'enemy' });
+  assert.ok(game.pendingChoice, '点候选只暂存, 未提交');
+  $('handConfirmBtn').click();
+
+  assert.equal(game.pendingChoice, null, '确定后提交');
+  assert.equal(game.enemy.hp, enemyHpBefore - 2, '判定黑桃 → 2 点雷电伤害');
+  assert.equal($('leijiAskPanel').hidden, true, '面板关闭');
+});
+
+test('雷击面板: 点"不发动" → 不判定, 面板关闭', () => {
+  const game = startGameViaUI('zhangjiao', 'liubei');
+  armLeijiAsk(game, c('sha', { id: 'ui-lj-judge2', suit: 'spade', rank: '4' }));
+  assert.equal($('leijiAskPanel').hidden, false);
+
+  const enemyHpBefore = game.enemy.hp;
+  const deckLenBefore = game.deck.length;
+  $('leijiDeclineBtn').click();
+
+  assert.equal(game.pendingChoice, null);
+  assert.equal(game.enemy.hp, enemyHpBefore, '未判定不掉血');
+  assert.equal(game.deck.length, deckLenBefore, '判定牌未消耗');
+  assert.equal($('leijiAskPanel').hidden, true, '面板关闭');
+  assert.ok(game.log.some((line) => line.indexOf('选择不发动【雷击】') >= 0));
+});
+
+test('雷击→鬼道链: 判定红桃 → 鬼道面板 (复用鬼才面板, 事由【雷击】) → 打出黑桃替换 → 命中', () => {
+  const game = startGameViaUI('zhangjiao', 'liubei');
+  game.player.hand = [c('sha', { id: 'ui-lj-spade', suit: 'spade', color: 'black', rank: '9' })];
+  armLeijiAsk(game, c('sha', { id: 'ui-lj-judge3', suit: 'heart', color: 'red', rank: '4' }));
+
+  $('leijiAskChoices').dispatchClick({ 'data-leiji-target': 'enemy' });
+  $('handConfirmBtn').click();
+
+  assert.equal(game.pendingChoice && game.pendingChoice.kind, 'guidao-replace', '判定后挂鬼道改判询问');
+  assert.equal(game.pendingChoice.reason, '【雷击】', '事由为雷击');
+  assert.equal($('guicaiPromptPanel').hidden, false, '鬼道复用鬼才面板弹出');
+  assert.match($('guicaiPromptHint').textContent, /鬼道/, '提示标注鬼道');
+
+  const enemyHpBefore = game.enemy.hp;
+  $('guicaiCandidates').dispatchClick({ 'data-guicai-card-id': 'ui-lj-spade' });
+  $('handConfirmBtn').click();
+
+  assert.equal(game.pendingChoice, null, '改判已提交');
+  assert.equal(game.enemy.hp, enemyHpBefore - 2, '黑桃替换 → 雷击命中 2 点雷伤');
+  assert.ok(game.discard.some((card) => card.id === 'ui-lj-judge3'), '原判定牌进弃牌堆');
+  assert.ok(game.discard.some((card) => card.id === 'ui-lj-spade'), '替换牌进弃牌堆');
+  assert.equal($('guicaiPromptPanel').hidden, true, '面板关闭');
+});
+
 for (const [name, fn] of tests) {
   try { fn(); console.log(`✓ ${name}`); }
   catch (error) { console.error(`✗ ${name}`); throw error; }

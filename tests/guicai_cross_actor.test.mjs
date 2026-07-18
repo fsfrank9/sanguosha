@@ -75,33 +75,31 @@ test('player 司马懿 resolves replacement on opponent\'s judgement: heart repl
   assert.equal(game.player.hand.some(card => card.id === 'heart-rep'), false);
 });
 
-// ─── Non-pausable judgement: bagua armor judgement falls back to auto ────
+// ─── Non-pausable judgement: player 鬼才 skips (v13 张角修缮-2) ─────────
 
-test('鬼才 auto-fires (hand[0]) when non-pausable bagua judgement runs (player 司马懿 wears bagua, opp 杀)', () => {
+test('鬼才 skips with log on non-pausable bagua judgement (player 司马懿, no auto hand burn)', () => {
   // Player 司马懿 with bagua armor, takes a black 杀 from opponent.
-  // bagua judgement is non-pausable (it runs inside playSha). 鬼才 must
-  // not set a dangling pendingChoice — it auto-fires from hand[0].
+  // bagua judgement is non-pausable (it runs inside playSha). v13 张角修缮:
+  // 玩家鬼才不再落 auto 烧手牌 — 明示跳过 (显式 guicai='auto' 才保留旧口径,
+  // 见 v13_zhangjiao_repair R15)。
   const game = buildGame('simayi', 'liubei');
   game.turn = 'enemy';
   game.phase = 'play';
   game.player.equipment.armor = c('bagua', { id: 'bagua-armor' });
-  // Player hand has heart card (red); auto-fire takes hand[0].
   game.player.hand = [c('tao', { id: 'replacement-heart', suit: 'heart', color: 'red', rank: '5' })];
-  // Opponent plays a black sha. Bagua armor will judge — if red, dodge.
-  // Stack deck so judgement card is black, then 鬼才 auto-fires using the
-  // heart replacement → bagua sees red → dodge.
+  // Opponent plays a black sha; bagua judges black (spade) → no dodge.
   game.enemy.hand = [c('sha', { id: 'attack-sha', suit: 'spade', color: 'black' })];
   game.deck = [c('sha', { id: 'bagua-judge-orig', suit: 'spade', color: 'black', rank: '7' })];
 
   const before = game.player.hp;
   Engine.playCard(game, 'enemy', 'attack-sha');
 
-  // pendingChoice must NOT be set (non-pausable judgement, auto-fire path).
+  // pendingChoice must NOT be set (non-pausable judgement, skip path).
   assert.equal(Engine.getPendingChoice(game), null, 'no dangling pendingChoice from bagua judge');
-  // 鬼才 took the heart card → bagua judges red → 杀 dodged.
-  assert.equal(game.player.hp, before, 'sha was dodged via 鬼才 + bagua chain');
-  assert.equal(game.player.hand.some(card => card.id === 'replacement-heart'), false,
-    'replacement card consumed by 鬼才 auto-fire');
+  assert.ok(game.log.some(line => line.includes('【鬼才】时机不可挂起，本次跳过')), 'skip is logged');
+  assert.equal(game.player.hand.some(card => card.id === 'replacement-heart'), true,
+    'hand card NOT auto-burned');
+  assert.equal(game.player.hp, before - 1, 'spade bagua judge stands → sha hits');
 });
 
 // ─── Decline preference still works ─────────────────────────────────

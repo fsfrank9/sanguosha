@@ -569,6 +569,12 @@
           <div class="guicai-candidates pending-prompt-panel__choices" id="guicaiCandidates" aria-live="polite"></div>
           <button class="btn small" id="guicaiDeclineBtn">不发动</button>
         </div>
+        <!-- v13 张角修缮: 雷击 ask — 使用/打出闪结算完后选判定目标, 或不发动 -->
+        <div class="leiji-ask-panel pending-prompt-panel" id="leijiAskPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="leijiAskHint">雷击：可令一名其他角色进行判定（黑桃则受 2 点雷电伤害），或不发动</span>
+          <div class="leiji-ask-choices pending-prompt-panel__choices" id="leijiAskChoices" aria-live="polite"></div>
+          <button class="btn small" id="leijiDeclineBtn">不发动</button>
+        </div>
         <div class="yiji-prompt-panel pending-prompt-panel" id="yijiPromptPanel" hidden>
           <span class="badge pending-prompt-panel__hint" id="yijiPromptHint">遗计：勾选要交给对方的牌</span>
           <div class="yiji-candidates pending-prompt-panel__choices" id="yijiCandidates" aria-live="polite"></div>

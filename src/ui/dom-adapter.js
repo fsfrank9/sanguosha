@@ -168,6 +168,8 @@
           'zhihengModePanel',
           'zhihengConfirmBtn', 'zhihengCancelBtn', 'zhihengHint', 'roleDraftPanel',
           'guicaiPromptPanel', 'guicaiPromptHint', 'guicaiOriginalCard', 'guicaiCandidates', 'guicaiDeclineBtn',
+          // v13 张角修缮: 雷击 ask 面板 — 闪结算完后选判定目标
+          'leijiAskPanel', 'leijiAskHint', 'leijiAskChoices', 'leijiDeclineBtn',
           'yijiPromptPanel', 'yijiPromptHint', 'yijiCandidates', 'yijiKeepAllBtn', 'yijiConfirmBtn',
           'fanjianPromptPanel', 'fanjianPromptHint',
           'fanjianSpadeBtn', 'fanjianHeartBtn', 'fanjianClubBtn', 'fanjianDiamondBtn',
@@ -1286,6 +1288,9 @@
         // 两个 kind (鬼道复用鬼才面板 DOM, 见 prompt-panels.js) — 一条 dispatch
         // 记录按 panelId 命中, 对两个 kind 同样生效, 无需重复注册。
         { panelId: 'guicaiPromptPanel',     confirmBtnId: null,                     cancelBtnId: 'guicaiDeclineBtn' },
+        // v13 张角修缮: 雷击 ask — 点座席候选 stage 后 hand-confirm 提交,
+        // cancel = 不发动。
+        { panelId: 'leijiAskPanel',         confirmBtnId: null,                     cancelBtnId: 'leijiDeclineBtn' },
         // v12 G2: 神速 — 四动作全部由面板自身按钮处理 (不发动/仅一 直接
         // resolve; 仅二/一+二 先进子步骤选装备, 专属确认按钮提交), 共享
         // Cancel 沿用"不发动"作为安全退出 (随时合法, 引擎当空选处理)。
