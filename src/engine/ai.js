@@ -269,10 +269,11 @@
       else if (trick === 'tiesuo-target') victim = ctx.targets && ctx.targets[ctx.idx];
       else victim = ctx.targetActor || ctx.delayedSide || (ctx.actor ? opponent(ctx.actor) : null);
       var interested;
+      // v13 M2: 立场判断走感知路由 (明置恒等直读; 暗置按已翻明/推断)。
       if (beneficial) {
-        interested = StateRuntime.isHostileSeat(game, responder, beneficial); // 敌方受益 → 想消
+        interested = StateRuntime.perceivedHostile(game, responder, beneficial); // 敌方受益 → 想消
       } else if (victim) {
-        interested = victim === responder || !StateRuntime.isHostileSeat(game, responder, victim); // 友方受害 → 想消
+        interested = victim === responder || !StateRuntime.perceivedHostile(game, responder, victim); // 友方受害 → 想消
       } else {
         interested = true; // 未建模 (闪电等) → 保持旧行为
       }
@@ -338,7 +339,8 @@
       for (var i = 0; i < ledger.length; i += 1) {
         var entry = ledger[i];
         if (entry.source !== seat) continue;
-        if (entry.target === viewer || !StateRuntime.isHostileSeat(g, viewer, entry.target)) {
+        // v13 M2: "打到我方"按感知阵营判 (暗置下用已翻明/推断信息)。
+        if (entry.target === viewer || !StateRuntime.perceivedHostile(g, viewer, entry.target)) {
           total += entry.amount || 0;
         }
       }
@@ -355,16 +357,37 @@
         return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : candidates[0];
       }
       var roles = g.roles || {};
-      var mySide = StateRuntime.sideOf(g, actor);
+      var mySide = StateRuntime.sideOf(g, actor); // 自己身份自知 (暗置下亦合法)
+      // v13 M3: 内奸骑墙初版 — 按感知阵营聚合两侧战力, 优先打压强势侧
+      // (血线/资源均衡, 接 K4 记录的"全敌对无骑墙"简化)。明置下感知 =
+      // 真值, 骑墙在开放身份场同样生效。
+      var renegadeLean = null;
+      if (mySide === 'renegade') {
+        var lordSum = 0;
+        var rebelSum = 0;
+        StateRuntime.aliveSeats(g).forEach(function (seat) {
+          if (seat === actor) return;
+          var perceived = StateRuntime.perceivedSideOf(g, actor, seat);
+          if (perceived === 'lordSide') lordSum += aiSeatScore(g, seat);
+          else if (perceived === 'rebelSide') rebelSum += aiSeatScore(g, seat);
+        });
+        if (lordSum !== rebelSum) renegadeLean = lordSum > rebelSum ? 'lordSide' : 'rebelSide';
+      }
       var best = null;
       candidates.forEach(function (seat) {
         var st = g[seat];
         if (!st) return;
         var score = 0;
+        // 主公身份恒公开 (官方: 除主公外暗置), 直读合法。
         if (mySide === 'rebelSide' && roles[seat] === '主公') score += 50; // 主公倒下即反贼胜
         if (st.hp <= 1) score += 30;
         else if (st.hp === 2) score += 12;
-        if (roles[seat] === '反贼') score += 8; // 击杀反贼摸三张
+        // v13 M2: 击杀反贼奖励 — 已翻明反贼直读 (+8 旧口径); 暗置未翻明
+        // 但推断为反贼 → 折半 (+4, 信念非事实)。明置恒走直读分支零回归。
+        if (StateRuntime.isRoleRevealed(g, seat) && roles[seat] === '反贼') score += 8; // 击杀反贼摸三张
+        else if (g.hiddenRoles && StateRuntime.perceivedSideOf(g, actor, seat) === 'rebelSide') score += 4;
+        // v13 M3: 内奸打压强势侧。
+        if (renegadeLean && StateRuntime.perceivedSideOf(g, actor, seat) === renegadeLean) score += 15;
         score -= aiEstimateShanCountFor(g, actor, seat) * 8;
         score -= aiEstimateTaoCountFor(g, actor, seat) * 6;
         score += Math.min(20, aiHostilityToward(g, actor, seat) * 4);
@@ -377,7 +400,8 @@
     // v12 H5: AI 启发式评估的"对手"从 opponent() 二元假设改为阵营敌对
     // 主目标。v12 I3: 多候选按目标评分挑选 (1v1 恒为对手)。
     function aiPrimaryFoe(game, actor) {
-      var candidates = StateRuntime.hostileSeats(game, actor);
+      // v13 M2: 感知敌对路由 (明置恒等 hostileSeats)。
+      var candidates = StateRuntime.perceivedHostileSeats(game, actor);
       if (!candidates.length) return opponent(actor);
       return aiPickHostileTarget(game, actor, candidates) || opponent(actor);
     }
@@ -389,8 +413,9 @@
     // v12 I3: 多候选按目标评分挑选 (集火/收割/胜负手)。
     function aiShaTargetSeat(game, actor, card) {
       if (!legalTargetsForCard) return opponent(actor);
+      // v13 M2: 感知敌对路由 (明置恒等直读)。
       var candidates = legalTargetsForCard(game, actor, card).filter(function (seat) {
-        return StateRuntime.isHostileSeat(game, actor, seat);
+        return StateRuntime.perceivedHostile(game, actor, seat);
       });
       return aiPickHostileTarget(game, actor, candidates);
     }
@@ -578,7 +603,8 @@
           if (seat === actor) return;
           var st = g[seat];
           if (!st || st.hp <= 0) return;
-          if (StateRuntime.isHostileSeat(g, actor, seat)) {
+          // v13 M2: 阵营聚合按感知路由 (明置恒等直读)。
+          if (StateRuntime.perceivedHostile(g, actor, seat)) {
             hostileSum += aiSeatScore(g, seat);
             hostileCount += 1;
           } else {
@@ -658,7 +684,8 @@
       var seats = StateRuntime.seatList(g);
       if (seats.length > 2 && aiProfileOf(g, actor) !== 'v11') {
         oppSha = 0;
-        StateRuntime.hostileSeats(g, actor).forEach(function (seat) {
+        // v13 M2: 感知敌对路由 (明置恒等直读)。
+        StateRuntime.perceivedHostileSeats(g, actor).forEach(function (seat) {
           oppSha += aiFoeEstimate(g, actor, seat, 'sha');
         });
       } else {
@@ -868,7 +895,8 @@
 
       // v12 H7: 离间 (貂蝉) — 场上有两名敌对男性时弃最低分牌挑起决斗。
       if (hasSkill(self, 'lijian') && !self.flags.lijianUsed && self.hand.length > 1) {
-        var lijianMales = StateRuntime.hostileSeats(game, actor).filter(function (seat) {
+        // v13 M2: 感知敌对路由 (明置恒等直读)。
+        var lijianMales = StateRuntime.perceivedHostileSeats(game, actor).filter(function (seat) {
           return game[seat] && game[seat].hp > 0 && game[seat].gender === 'male';
         });
         if (lijianMales.length >= 2) {
@@ -974,7 +1002,8 @@
       } else {
         var cardOptions;
         // v12 H5: 铁索缺省横置敌对座席 (至多 2 名); 1v1 恒为 [对手]。
-        if (card.type === 'tiesuo') cardOptions = { mode: 'chain', targets: StateRuntime.hostileSeats(game, actor).slice(0, 2) };
+        // v13 M2: 感知敌对路由 (明置恒等直读)。
+        if (card.type === 'tiesuo') cardOptions = { mode: 'chain', targets: StateRuntime.perceivedHostileSeats(game, actor).slice(0, 2) };
         // v12 H5: 杀显式目标 — playSha 缺省目标不做距离校验 (信息由显式
         // 指定承担), AI 传入自己确认过"可达且敌对"的座席。
         if (isShaType(card.type)) {

@@ -39,6 +39,8 @@
       // v13 L1: 身份场我方身份选择 — '主公'(缺省)/'忠臣'/'反贼'/'内奸'/
       // '随机' (随机轮转偏移, 身份概率与预设构成一致)。
       var identityPlayerRole = '主公';
+      // v13 M1: 暗身份开关 (缺省关 = 明置零回归; 仅身份场生效)。
+      var hiddenRolesEnabled = false;
       var IDENTITY_ROLE_BTN_IDS = {
         '主公': 'roleLordBtn', '忠臣': 'roleLoyalBtn', '反贼': 'roleRebelBtn',
         '内奸': 'roleRenegadeBtn', '随机': 'roleRandomBtn'
@@ -230,6 +232,9 @@
           'identityRolePanel', 'roleLordBtn', 'roleLoyalBtn', 'roleRebelBtn',
           'roleRenegadeBtn', 'roleRandomBtn',
           'playerRenegadeBadge', 'enemyRenegadeBadge', 'allyRenegadeBadge',
+          // v13 M1: 暗身份 — 开关按钮 + 四 AI 席"?"徽章。
+          'hiddenRolesToggleBtn',
+          'enemySecretBadge', 'allySecretBadge', 'ally2SecretBadge', 'ally3SecretBadge',
           'allyHeroPickRow', 'allyHeroSelect',
           'ally2HeroPickRow', 'ally2HeroSelect', 'ally3HeroPickRow', 'ally3HeroSelect',
           // v12 H6: identity3 单目标牌/主动技 座席点选模式面板。
@@ -1099,6 +1104,8 @@
           // v13 L1: 可选身份 — 预设阵型内轮转出逐席 roles (玩家=所选身份,
           // 主公可落任意 AI 座席; 引擎 firstActorFromRoles 全环扫描先手)。
           gameOptions.roles = computeIdentityRoles(gameOptions.seats);
+          // v13 M1: 暗身份透传 (缺省 false = 明置零回归; duel 分支不传)。
+          gameOptions.hiddenRoles = hiddenRolesEnabled;
           var extraDefaults = { ally: 'guanyu', ally2: 'zhaoyun', ally3: 'machao' };
           extraSeatNames.forEach(function (seat) {
             var select = els[seat + 'HeroSelect'];
@@ -1400,6 +1407,13 @@
         Object.keys(IDENTITY_ROLE_BTN_IDS).forEach(function (role) {
           var btn = els[IDENTITY_ROLE_BTN_IDS[role]];
           if (btn) btn.addEventListener('click', function () { setIdentityRole(role); });
+        });
+        // v13 M1: 暗身份开关 (随 identityRolePanel 容器显隐, 无需单独控显)。
+        if (els.hiddenRolesToggleBtn) els.hiddenRolesToggleBtn.addEventListener('click', function () {
+          hiddenRolesEnabled = !hiddenRolesEnabled;
+          els.hiddenRolesToggleBtn.classList.toggle('is-active', hiddenRolesEnabled);
+          els.hiddenRolesToggleBtn.textContent = hiddenRolesEnabled ? '暗身份·开' : '暗身份·关';
+          els.hiddenRolesToggleBtn.setAttribute('aria-pressed', hiddenRolesEnabled ? 'true' : 'false');
         });
         // v9 PR-E9: 选将网格 — card click → 设当前 pick side 的 hero.
         // (tab 在非当前 side 时 hidden, 不可点; 不再绑 click.)

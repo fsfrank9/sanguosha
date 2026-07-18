@@ -9,9 +9,9 @@
 //       分支已把剩余在途牌入弃牌堆 (v12 H5);
 //   (b) AI 火攻预览目标与结算目标不一致 → ai.js 已改 aiShaTargetSeat
 //       预解析同一目标 (v12 H5)。
-// 内奸 AI 现状 (K4 复核记录): isHostileSeat 对内奸全敌对预留直接生效 —
-// 内奸的"友方"聚合恒为空, 无骑墙/摇摆策略, 为已知简化, 深化留 M 阶段
-// (身份价值评估), 见路线图 K4 与 docs/audit 纪要。
+// 内奸 AI 现状 (K4 复核记录, v13 M3 已销账): isHostileSeat 对内奸全敌对
+// 预留仍生效 (敌对判定层), 骑墙已在目标评分层实现 — aiPickHostileTarget
+// 按感知阵营聚合两侧战力, +15 打压强势侧 (见 v13_m_hidden_roles 用例)。
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
 import { collectCardCensus } from './helpers/card-conservation.mjs';

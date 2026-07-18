@@ -74,7 +74,8 @@
       function defaultHostileTarget(game, actor) {
         // v12 H5: 阵营感知 — 缺省目标只落在敌对座席上 (1v1 双方异阵营,
         // 候选恒为 [对手], 行为不变); 无身份信息时视所有非己座席为敌对。
-        var candidates = StateRuntime.hostileSeats(game, actor);
+        // v13 M2: 感知敌对路由 (明置恒等直读)。
+        var candidates = StateRuntime.perceivedHostileSeats(game, actor);
         return candidates.indexOf(opponent(actor)) >= 0 ? opponent(actor) : candidates[0];
       }
 

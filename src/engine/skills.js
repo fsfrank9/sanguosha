@@ -318,7 +318,8 @@
         var allies = StateRuntime.aliveSeats(game).filter(function (seat) {
           return seat !== actor
             && StateRuntime.sideOf(game, seat) !== null
-            && !StateRuntime.isHostileSeat(game, actor, seat);
+            // v13 M2: 感知路由 (暗置下按已翻明/推断判友方, 明置恒等)。
+            && !StateRuntime.perceivedHostile(game, actor, seat);
         });
         if (!allies.length) return;
         var needy = allies.sort(function (a, b) { return game[a].hp - game[b].hp; })[0];
@@ -1673,7 +1674,7 @@
           // StateRuntime.seatsInShaRangeOf, 消除漂移风险)。
           var candidates = StateRuntime.seatsInShaRangeOf(game, targetActor);
           if (!candidates.length) return null;
-          var pool = StateRuntime.hostileFirstPool(game, targetActor, candidates);
+          var pool = StateRuntime.perceivedHostileFirstPool(game, targetActor, candidates);
           var transferee = pool.indexOf(opponent(targetActor)) >= 0 ? opponent(targetActor) : pool[0];
           var lethal = state.hp - amount <= 0;
           if (pref !== 'always' && !(amount >= 2 || lethal)) return null;
@@ -1709,7 +1710,7 @@
             return seat !== actor && game[seat].hp > 0;
           });
           if (!candidates.length) return null;
-          var pool = StateRuntime.hostileFirstPool(game, actor, candidates);
+          var pool = StateRuntime.perceivedHostileFirstPool(game, actor, candidates);
           var targetActor = (requested && requested !== actor && candidates.indexOf(requested) >= 0)
             ? requested
             : (pool.indexOf(opponent(actor)) >= 0 ? opponent(actor) : pool[0]);
@@ -1920,7 +1921,7 @@
             return game[seat] && game[seat].hp > 0 && (game[seat].hand || []).length > 0;
           });
           if (!candidates.length) return;
-          var pool = StateRuntime.hostileFirstPool(game, actor, candidates);
+          var pool = StateRuntime.perceivedHostileFirstPool(game, actor, candidates);
           var picks = pool.slice(0, 2);
           if (picks.length < 2 && pref !== 'always') return;
           picks.forEach(function (seat) {
