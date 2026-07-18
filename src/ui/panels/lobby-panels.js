@@ -81,13 +81,17 @@
           var currentPickSide = state.currentPickSide;
           var playerVal = state.playerVal || '';
           var enemyVal = state.enemyVal || '';
+          var allPicked = state.allPicked || []; // v13 三批-3: 全席位已选清单
           return sortedHeroes().map(function (hero) {
             var classes = ['hero-pick-card', 'hero-pick-card--camp-' + (hero.camp || '?')];
             var isPlayerPicked = hero.id === playerVal && playerVal !== '';
             var isEnemyPicked = hero.id === enemyVal && enemyVal !== '';
+            // v13 三批-3: 任何席位 (含三/四/五席) 已选武将均置灰锁定。
+            var isTaken = allPicked.indexOf(hero.id) >= 0;
             if (isPlayerPicked) classes.push('is-player-selected');
-            if (isEnemyPicked) classes.push('is-enemy-selected');
-            var locked = (currentPickSide === 'player' && isEnemyPicked)
+            if (isEnemyPicked || (isTaken && !isPlayerPicked)) classes.push('is-enemy-selected');
+            var locked = isTaken
+                      || (currentPickSide === 'player' && isEnemyPicked)
                       || (currentPickSide === 'enemy' && isPlayerPicked);
             if (locked) classes.push('is-locked');
             return '<button type="button" class="' + classes.join(' ') + '" data-hero-id="' + escapeHtml(hero.id) + '"' + (locked ? ' disabled' : '') + '>'
@@ -118,7 +122,12 @@
             els.heroPickEnemyTab.classList.toggle('is-active', currentPickSide === 'enemy');
           }
           if (els.randomPlayerHeroBtn) els.randomPlayerHeroBtn.hidden = (currentPickSide !== 'player');
-          if (els.randomEnemyHeroBtn) els.randomEnemyHeroBtn.hidden = (currentPickSide !== 'enemy');
+          // v13 三批-2: 随机钮泛化 — 任意非玩家席位均显示。
+          if (els.randomEnemyHeroBtn) {
+            els.randomEnemyHeroBtn.hidden = (currentPickSide === 'player');
+            els.randomEnemyHeroBtn.textContent = state.identityMode && currentPickSide !== 'enemy'
+              ? '随机本席武将' : '随机对方武将';
+          }
           if (els.heroPickPrompt) {
             var sideRole = currentPickSide === 'player' ? state.playerRole : state.enemyRole;
             // v13 L1: 身份场可选身份 — 我方提示泛化为任意身份 ('随机' 专属

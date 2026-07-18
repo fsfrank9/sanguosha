@@ -21,9 +21,14 @@
           els.wuxieResponsePanel.hidden = false;
           if (els.wuxieResponseHint) {
             var wxReason = pending.reason || '锦囊';
+            // v13 三批-6: 目标是他人时明示"帮 X 解围" — 无懈本可救队友,
+            // 旧文案恒写"对方使用X"看不出这是替他人挡的机会。
+            var wxHelpOther = pending.targetActor && pending.targetActor !== 'player' && pending.targetName;
             els.wuxieResponseHint.textContent = pending.chainWuxied
               ? '对方对' + wxReason + '打出【无懈可击】，是否再【无懈】反制？'
-              : '对方使用' + wxReason + '，是否打出【无懈可击】抵消？';
+              : (wxHelpOther
+                ? wxReason + '即将对 ' + pending.targetName + ' 生效，你可打出【无懈可击】为其解围（也可跳过不帮）。'
+                : '对方使用' + wxReason + '，是否打出【无懈可击】抵消？');
           }
           if (els.wuxieResponseChoices) {
             var wuxieOpts = pending.options || [];
