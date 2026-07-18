@@ -34,8 +34,9 @@ test('v9 PR-E11: 暴露 resetPickSequence fn — 清空 selects + 重置 pickSte
   // pickOrder 按 playerRole 计算 (主公先选)
   assert.match(fn[0], /pickOrder\s*=[\s\S]*?playerRole\s*===\s*['"]主公['"]/);
   // 清空 select.value
-  assert.match(fn[0], /playerHeroSelect[\s\S]{0,80}value\s*=\s*['"]['"]/);
-  assert.match(fn[0], /enemyHeroSelect[\s\S]{0,80}value\s*=\s*['"]['"]/);
+  // v13 二批-4: 清值改逐席循环 (身份场全席位), 断言跟随。
+  assert.match(fn[0], /HeroSelect'\]\.value\s*=\s*''/);
+  assert.match(fn[0], /concat\(\['enemy'\]\)/); // v13 二批-4: enemy 清值并入逐席循环
 });
 
 test('v9 PR-E11: assignRandomRoles 内部调用 resetPickSequence + renderHeroPickGrid (重抽身份触发重置)', () => {
@@ -69,8 +70,9 @@ test('v9 PR-E11: handleHeroPickCardClick 推进 pickStep, 完成时自动 newGam
 test('v9 PR-E11: handleHeroPickCardClick 阻止选择对方已锁的 hero (otherSelect.value === heroId)', () => {
   const fn = adapter.match(/function handleHeroPickCardClick\([\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
-  // guard: otherSelect.value === heroId 时早 return
-  assert.match(fn[0], /otherSelect[\s\S]{0,200}===\s*heroId/);
+  // v13 二批-4: 互斥泛化 — 任何已锁席位 (taken 扫描) 均不可重选。
+  assert.match(fn[0], /taken\b[\s\S]{0,300}return/);
+  assert.match(fn[0], /===\s*heroId/);
 });
 
 test('v9 PR-E11: handleHeroPickCardClick 未完成时仅推进 currentPickSide = pickOrder[pickStep]', () => {

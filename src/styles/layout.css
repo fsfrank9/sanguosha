@@ -247,7 +247,7 @@
     .duel-table {
       position: relative;        /* v9 PR-E2: 中央 overlay 锚 */
       display: grid;
-      grid-template-rows: minmax(110px, .85fr) minmax(150px, .9fr) minmax(110px, .85fr) minmax(180px, 1.2fr);
+      grid-template-rows: auto minmax(150px, .95fr) minmax(110px, .85fr) minmax(180px, 1.2fr);
       gap: 8px;
       height: calc(100vh - 36px);
       min-height: 0;
@@ -257,13 +257,24 @@
     /* v13 UI修缮6: 席位单卡化 — 旧"判定区|英雄|装备区"三列并入一张角色
        卡 (equip-column/judge-dots/hand-corner 落卡内), 席位容器退化为单列。
        玩家席保留 技能面板|英雄卡 双列。 */
+    /* v13 UI修缮二批-2: 对手角色卡恒定尺寸 — 不随人数缩放 (官方口径:
+       任何人数下其他玩家的卡都是同一规格, 以 5 人场规格为准)。卡片
+       定宽定高, 席位行内容自适应不拉伸。 */
     .opponent-zone {
-      display: grid;
-      grid-template-columns: 1fr;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
       gap: 8px;
-      align-items: stretch;
       min-height: 0;
+      overflow: visible;
+    }
+    .opponent-zone .hero.seat-card,
+    .ally-zone .hero.seat-card {
+      width: 236px;
+      min-height: 168px;
+      max-height: 208px;
       overflow: hidden;
+      flex: none;
     }
 
     .player-zone {
@@ -280,12 +291,12 @@
        hidden 属性显示。列模板照搬 .opponent-zone (判定区 | 英雄 | 装备区),
        复用同一视觉语言而非新造。 */
     .ally-zone {
-      display: grid;
-      grid-template-columns: 1fr; /* v13 UI修缮6: 单卡化 */
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
       gap: 8px;
-      align-items: stretch;
       min-height: 0;
-      overflow: hidden;
+      overflow: visible;
     }
 
     .ally-zone[hidden] {
@@ -306,7 +317,7 @@
         "arena arena"
         "player player"
         "dock dock";
-      grid-template-rows: minmax(120px, .85fr) minmax(130px, .85fr) minmax(100px, .8fr) minmax(160px, 1.05fr);
+      grid-template-rows: auto minmax(130px, .9fr) minmax(100px, .8fr) minmax(160px, 1.05fr);
     }
 
     /* v13 K3: 4/5 人身份场 — 非玩家席按预置槽位继续纵向堆叠 (敌方 →
@@ -320,7 +331,7 @@
         "arena arena arena"
         "player player player"
         "dock dock dock";
-      grid-template-rows: minmax(120px, .85fr) minmax(126px, .85fr) minmax(96px, .78fr) minmax(150px, 1fr);
+      grid-template-rows: auto minmax(126px, .9fr) minmax(96px, .78fr) minmax(150px, 1fr);
     }
 
     .duel-table.is-identity5 {
@@ -330,7 +341,7 @@
         "arena arena arena arena"
         "player player player player"
         "dock dock dock dock";
-      grid-template-rows: minmax(120px, .85fr) minmax(120px, .82fr) minmax(92px, .76fr) minmax(146px, .98fr);
+      grid-template-rows: auto minmax(120px, .88fr) minmax(92px, .76fr) minmax(146px, .98fr);
     }
 
     .duel-table.is-identity3 #enemyBoard,

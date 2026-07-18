@@ -60,7 +60,7 @@ function test(name, fn) { tests.push([name, fn]); }
 test('模式切换: 4人/5人身份场按钮 → 对应席位下拉逐档显示, 切回 1v1 全隐', () => {
   $('lobby1v1Btn').click();
   $('modeIdentity4Btn').click();
-  assert.equal($('allyHeroPickRow').hidden, false, '第三席下拉显示');
+  assert.equal($('allyHeroPickRow').hidden, true, 'v13 二批-4: 下拉行退役恒隐');
   assert.equal($('ally2HeroPickRow').hidden, false, '第四席下拉显示');
   assert.equal($('ally3HeroPickRow').hidden, true, '第五席下拉隐藏 (4 人档)');
   assert.ok($('modeIdentity4Btn').classList.contains('is-active'));

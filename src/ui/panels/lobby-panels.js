@@ -125,9 +125,12 @@
             // 文案); 敌方席在身份场不再写死反贼 (实际身份随轮转)。duel 双态
             // 文案逐字保留。
             if (state.identityMode) {
+              // v13 二批-4: 号位制 — 自己显身份+号位, 其他席按号位报导
+              // (主公=1号位公开标注, 其余暗身份不泄漏)。
+              var numText = state.seatNumber ? state.seatNumber + '号位' : '';
               els.heroPickPrompt.textContent = currentPickSide === 'player'
-                ? (sideRole === '随机' ? '身份随机，请选将' : '您是' + sideRole + '，请选将')
-                : '请为敌方座席选将';
+                ? (sideRole === '随机' ? '身份随机' : '您是' + sideRole) + (numText ? '（' + numText + '）' : '') + '，请选将'
+                : '请为' + (numText || '下一') + (state.seatIsLord ? '（主公）' : '') + '选将';
             } else {
               els.heroPickPrompt.textContent = currentPickSide === 'player'
                 ? (sideRole === '主公' ? '您是主公，请选将' : '您是反贼，请选将')

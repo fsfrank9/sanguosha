@@ -145,7 +145,7 @@ test('v9 PR-E9: renderHeroPickGrid 从 Engine.HERO_CATALOG 取数据生成 card'
 test('v9 PR-E9: handleHeroPickCardClick 更新对应 <select>.value + 重渲染', () => {
   const fn = adapter.match(/function handleHeroPickCardClick\([\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /els\.playerHeroSelect|els\.enemyHeroSelect/);
+  assert.match(fn[0], /els\[currentPickSide \+ 'HeroSelect'\]/);
   assert.match(fn[0], /\.value\s*=\s*heroId/);
   assert.match(fn[0], /renderHeroPickGrid\(\)/);
 });

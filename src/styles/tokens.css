@@ -61,3 +61,13 @@
     select {
       font: inherit;
     }
+
+/* ───── v13 UI修缮二批: [hidden] 全局兜底 ─────
+   根因: 任何带显式 display 的类 (.setup-grid 的 grid 等) 都会覆盖 UA
+   样式表的 [hidden]{display:none}, 元素 hidden=true 仍然可见 (真浏览器
+   实测: 1v1 选将屏残留第三/四/五席行; fake-dom 只读属性测不出)。
+   全局 !important 兜底一次性修复整类; 唯一例外 side-drawer — 它用
+   transform+visibility 做滑出动画, 特意保持 display (见 layout.css)。 */
+[hidden]:not(.side-drawer) {
+  display: none !important;
+}
