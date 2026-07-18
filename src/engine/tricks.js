@@ -160,7 +160,14 @@
             meta: {
               reason: chain.reason,
               chainWuxied: chain.wuxied,
-              trickName: chain.trickName
+              trickName: chain.trickName,
+              // v13 三批-6: 目标名直达 — 面板据此提示"可为他人解围"
+              // (逐目标窗口 ctx 携带 currentTarget/targetActor/victimActor 之一)。
+              targetActor: (chain.ctx && (chain.ctx.currentTarget || chain.ctx.targetActor || chain.ctx.victimActor)) || null,
+              targetName: (function () {
+                var t = chain.ctx && (chain.ctx.currentTarget || chain.ctx.targetActor || chain.ctx.victimActor);
+                return t ? actorName(game, t) : null;
+              })()
             },
             logMessage: '等待' + actorName(game, 'player') + '决定是否打出【无懈可击】响应' + chain.reason + '。',
             statusMessage: '等待玩家无懈响应。'

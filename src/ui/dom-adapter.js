@@ -932,8 +932,8 @@
         if (els.modeIdentity4Btn) els.modeIdentity4Btn.classList.toggle('is-active', matchMode === 'identity4');
         if (els.modeIdentity5Btn) els.modeIdentity5Btn.classList.toggle('is-active', matchMode === 'identity5');
         if (els.allyHeroPickRow) els.allyHeroPickRow.hidden = true; // v13 二批-4: 格子选将覆盖全席位, 下拉行退役
-        if (els.ally2HeroPickRow) els.ally2HeroPickRow.hidden = matchMode !== 'identity4' && matchMode !== 'identity5';
-        if (els.ally3HeroPickRow) els.ally3HeroPickRow.hidden = matchMode !== 'identity5';
+        if (els.ally2HeroPickRow) els.ally2HeroPickRow.hidden = true; // v13 三批-1: 下拉行全席位退役
+        if (els.ally3HeroPickRow) els.ally3HeroPickRow.hidden = true;
         if (els.roleDraftPanel) els.roleDraftPanel.hidden = identityMode;
         // v13 L1: 身份选择面板随身份场显示; 3 人档无内奸 — 已选内奸时回退主公。
         if (els.identityRolePanel) els.identityRolePanel.hidden = !identityMode;
@@ -1019,6 +1019,10 @@
           identityMode: matchMode !== 'duel',
           // v13 二批-4: 号位制提示 ("请为N号位选将", 主公席标注)。
           seatNumber: seatNumberBySeat && seatNumberBySeat[currentPickSide],
+          // v13 三批-3: 全部已锁定席位武将 (当前席位除外) — 网格置灰。
+          allPicked: pickOrder.filter(function (seat) { return seat !== currentPickSide; })
+            .map(function (seat) { return els[seat + 'HeroSelect'] ? els[seat + 'HeroSelect'].value : ''; })
+            .filter(Boolean),
           seatIsLord: !!(pendingIdentityRoles && pendingIdentityRoles[currentPickSide] === '主公')
         });
       }
@@ -1073,11 +1077,14 @@
       function randomizeHero(side) {
         // v9 PR-E11: 顺序选将 — 只允许随机当前 side, 走 handleHeroPickCardClick
         // 统一流程 (含 pickStep 推进 + 完成 auto-start).
+        // v13 三批-2: 泛化到任意席位 (身份场为三/四/五席继续随机), 排除
+        // 全部已锁定席位的武将 (不再只查双边)。
         if (side !== currentPickSide) return;
-        var select = side === 'player' ? els.playerHeroSelect : els.enemyHeroSelect;
-        var otherSelect = side === 'player' ? els.enemyHeroSelect : els.playerHeroSelect;
-        var other = otherSelect ? otherSelect.value : '';
-        var pool = optionValues(select).filter(function (value) { return value && value !== other; });
+        var select = els[currentPickSide + 'HeroSelect'] || els.playerHeroSelect;
+        var taken = pickOrder.map(function (seat) {
+          return seat !== currentPickSide && els[seat + 'HeroSelect'] ? els[seat + 'HeroSelect'].value : '';
+        }).filter(Boolean);
+        var pool = optionValues(select).filter(function (value) { return value && taken.indexOf(value) < 0; });
         if (!pool.length) return;
         var picked = pool[Math.floor(Math.random() * pool.length)];
         handleHeroPickCardClick(picked);
@@ -1412,7 +1419,7 @@
       function bindEvents() {
         if (els.startGameBtn) els.startGameBtn.addEventListener('click', newGame);
         if (els.randomPlayerHeroBtn) els.randomPlayerHeroBtn.addEventListener('click', function () { randomizeHero('player'); });
-        if (els.randomEnemyHeroBtn) els.randomEnemyHeroBtn.addEventListener('click', function () { randomizeHero('enemy'); });
+        if (els.randomEnemyHeroBtn) els.randomEnemyHeroBtn.addEventListener('click', function () { randomizeHero(currentPickSide); });
         if (els.randomRolesBtn) els.randomRolesBtn.addEventListener('click', assignRandomRoles);
         if (els.playerHeroSelect) els.playerHeroSelect.addEventListener('change', function () { ensureDistinctHeroes('player'); });
         if (els.enemyHeroSelect) els.enemyHeroSelect.addEventListener('change', function () { ensureDistinctHeroes('enemy'); });

@@ -66,7 +66,12 @@
     var deck = [];
     recipe.forEach(function (pair) {
       for (var i = 0; i < pair[1]; i += 1) {
-        deck.push(makeCard(game, pair[0]));
+        var card = makeCard(game, pair[0]);
+        // v13 三批-5: 坐骑逐份轮配官方实名 (赤兔/的卢等) — 引擎按 type
+        // 结算, 名字纯展示; 份数超变体表时循环复用。
+        var variants = CARD_CATALOG[pair[0]] && CARD_CATALOG[pair[0]].nameVariants;
+        if (variants && variants.length) card.name = variants[i % variants.length];
+        deck.push(card);
       }
     });
     return shuffle(deck, random);

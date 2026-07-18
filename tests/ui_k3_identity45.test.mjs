@@ -61,13 +61,13 @@ test('模式切换: 4人/5人身份场按钮 → 对应席位下拉逐档显示,
   $('lobby1v1Btn').click();
   $('modeIdentity4Btn').click();
   assert.equal($('allyHeroPickRow').hidden, true, 'v13 二批-4: 下拉行退役恒隐');
-  assert.equal($('ally2HeroPickRow').hidden, false, '第四席下拉显示');
+  assert.equal($('ally2HeroPickRow').hidden, true, 'v13 三批-1: 下拉行全席位退役恒隐');
   assert.equal($('ally3HeroPickRow').hidden, true, '第五席下拉隐藏 (4 人档)');
   assert.ok($('modeIdentity4Btn').classList.contains('is-active'));
   assert.ok(!$('modeIdentity3Btn').classList.contains('is-active'));
 
   $('modeIdentity5Btn').click();
-  assert.equal($('ally3HeroPickRow').hidden, false, '第五席下拉显示 (5 人档)');
+  assert.equal($('ally3HeroPickRow').hidden, true, 'v13 三批-1: 5 人档下拉行同样退役恒隐');
   assert.ok($('modeIdentity5Btn').classList.contains('is-active'));
   assert.ok(!$('modeIdentity4Btn').classList.contains('is-active'));
 

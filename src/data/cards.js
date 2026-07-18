@@ -39,8 +39,11 @@
         renwang: { name: '仁王盾', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '盾', desc: '黑色【杀】对你无效。' },
         tengjia: { name: '藤甲', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '藤', desc: '普通杀/南蛮/万箭无效，火焰伤害 +1。' },
         baiyin: { name: '白银狮子', family: 'equipment', slot: 'armor', group: 'defense', label: '防具', symbol: '狮', desc: '受到多点伤害时防止至 1，失去后回复 1。' },
-        minus_horse: { name: '-1 马', family: 'equipment', slot: 'horseMinus', group: 'buff', label: '坐骑', symbol: '进', desc: '你计算与其他角色距离 -1。' },
-        plus_horse: { name: '+1 马', family: 'equipment', slot: 'horsePlus', group: 'buff', label: '坐骑', symbol: '守', desc: '其他角色计算与你距离 +1。' }
+        // v13 三批-5: 官方坐骑有实名 (赤兔/的卢等), "+1马/-1马"只是功能
+        // 描述 — nameVariants 供组堆逐份轮配实名 (官方: 所有同类坐骑效果
+        // 相同, 见 card__equipment spec); name 保底为功能名 (测试直造用)。
+        minus_horse: { name: '-1 马', family: 'equipment', slot: 'horseMinus', group: 'buff', label: '坐骑', symbol: '进', desc: '你计算与其他角色距离 -1。', nameVariants: ['赤兔', '大宛', '紫骍'] },
+        plus_horse: { name: '+1 马', family: 'equipment', slot: 'horsePlus', group: 'buff', label: '坐骑', symbol: '守', desc: '其他角色计算与你距离 +1。', nameVariants: ['的卢', '爪黄飞电', '骅骝', '绝影'] }
       };
 
       var CARD_INFO = CARD_CATALOG;
