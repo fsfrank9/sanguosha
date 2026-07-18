@@ -57,16 +57,20 @@ test('v9 PR-E16: dom-adapter 缓存 handConfirmBtn / handCancelBtn / handDiscard
   });
 });
 
-test('v9 PR-E16: dom-adapter 含 selectedHandCardId state + _shouldSelectFirst 判断', () => {
+test('v9 PR-E16 (v13 二批-1 硬保证): 出牌阶段点手牌恒只暂存 — 直出分支仅弃牌/技能选牌', () => {
+  // v13 UI修缮二批: _shouldSelectFirst 条件式暂存已删 — 旧 fallback 在
+  // pendingChoice 残留等幽灵态下 usePlayerCard 直出。现在结构上不存在
+  // 出牌阶段的直接打出路径。
   assert.match(adapter, /var selectedHandCardId\s*=\s*null/);
-  assert.match(adapter, /function _shouldSelectFirst\(\)/);
-});
-
-test('v9 PR-E16: playerHand click 在 _shouldSelectFirst 为 true 时仅 set selectedHandCardId (不立即 usePlayerCard)', () => {
-  const handlerBlock = adapter.match(/playerHand\.addEventListener\('click',\s*function[\s\S]*?\}\);/);
+  assert.doesNotMatch(adapter, /function _shouldSelectFirst/);
+  const handlerBlock = adapter.match(/playerHand\.addEventListener\('click',\s*function[\s\S]*?\n        \}\);/);
   assert.ok(handlerBlock);
-  assert.match(handlerBlock[0], /_shouldSelectFirst\(\)/);
+  assert.match(handlerBlock[0], /needsDiscard[\s\S]*usePlayerCard\(cardId\); \/\/ 弃牌模式/);
+  assert.match(handlerBlock[0], /activeCardSkillConfig\(\)[\s\S]*usePlayerCard\(cardId\); \/\/ 技能选牌模式/);
   assert.match(handlerBlock[0], /selectedHandCardId\s*=\s*\(selectedHandCardId\s*===\s*cardId\)\s*\?\s*null\s*:\s*cardId/);
+  // 兜底直出调用不存在: 除两个模式注释行外无其他 usePlayerCard(cardId)
+  const directUses = (handlerBlock[0].match(/usePlayerCard\(cardId\)/g) || []).length;
+  assert.equal(directUses, 2, '仅弃牌/技能两处受控直用');
 });
 
 test('v9 PR-E16: handDiscardBtn 绑定结束回合逻辑 (含 Engine.finishPlayPhase / endTurn)', () => {

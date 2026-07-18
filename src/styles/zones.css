@@ -106,9 +106,10 @@
 .hero.seat-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   padding-bottom: 26px; /* 底角角标/圆标让位 */
 }
+.hero.seat-card .hp-row { flex-wrap: nowrap; overflow: hidden; }
 .equip-column {
   flex-direction: column;
   flex-wrap: nowrap;
@@ -116,12 +117,15 @@
   min-height: 0;
 }
 .equip-slot {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1.5;
+  gap: 5px;
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border: 1px solid rgba(255, 214, 138, .32);
   border-radius: 4px;
   background: linear-gradient(180deg, rgba(28, 24, 18, .92), rgba(14, 12, 9, .92));

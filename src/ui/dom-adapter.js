@@ -1289,17 +1289,6 @@
           '.pending-prompt-panel:not([hidden]), .scroll-modal:not([hidden])');
       }
 
-      // 何时点 hand-card 触发"选中-后-确认"模式 (而非直接 usePlayerCard).
-      function _shouldSelectFirst() {
-        if (!game || game.turn !== 'player' || enemyThinking) return false;
-        if (game.phase !== 'play') return false;
-        if (Engine.needsDiscard(game, 'player')) return false;
-        if (activeCardSkillConfig()) return false;
-        if (Engine.getPendingChoice(game)) return false;
-        if (_firstVisibleDispatch()) return false;
-        return true;
-      }
-
       function _handConfirm() {
         // v9 PR-E23/E24: 已 stage 面板候选 → 此时提交.
         if (stagedModalChoice) {
@@ -1430,12 +1419,21 @@
           // v13 UI修缮1 review-H1: 点手牌撤销未确认的直发技暂存 (苦肉) —
           // 否则"确定"会先击发技能而非打出所点的牌 (暂存劫持)。
           if (stagedModalChoice && stagedModalChoice.kind === 'skill') stagedModalChoice = null;
-          if (_shouldSelectFirst()) {
-            selectedHandCardId = (selectedHandCardId === cardId) ? null : cardId;
-            render();
+          // v13 UI修缮二批-1 (硬保证): 玩家出牌阶段点手牌永远只暂存 —
+          // 旧 fallback 在 pendingChoice 残留/enemyThinking 粘滞等幽灵态下
+          // 会 usePlayerCard 直出 (用户实测"点了就直接用"的通路)。直出
+          // 分支仅保留 弃牌选牌 与 技能选牌 两种明确模式。
+          if (game && Engine.needsDiscard(game, 'player') && game.phase === 'discard') {
+            usePlayerCard(cardId); // 弃牌模式: 点牌 = 勾选待弃
             return;
           }
-          usePlayerCard(cardId);
+          if (activeCardSkillConfig()) {
+            usePlayerCard(cardId); // 技能选牌模式 (制衡/仁德等): 点牌 = 勾选
+            return;
+          }
+          if (!game || game.turn !== 'player' || game.phase !== 'play') return; // 非本方出牌阶段: 忽略
+          selectedHandCardId = (selectedHandCardId === cardId) ? null : cardId;
+          render();
         });
         // v6.1: 制衡 may include equipment-area cards; clicking them in
         // zhiheng select mode toggles selection just like a hand card.
