@@ -104,10 +104,22 @@
       <nav class="lobby-screen__nav" aria-label="底部导航">
         <button type="button" class="lobby-nav-item" disabled><span aria-hidden="true">🏆</span>排行榜</button>
         <button type="button" class="lobby-nav-item" disabled><span aria-hidden="true">⚙</span>设置</button>
-        <button type="button" class="lobby-nav-item" disabled><span aria-hidden="true">🥷</span>武将</button>
+        <button type="button" class="lobby-nav-item" id="lobbyHeroesBtn"><span aria-hidden="true">🥷</span>武将</button>
         <button type="button" class="lobby-nav-item" disabled><span aria-hidden="true">🎁</span>素材</button>
         <button type="button" class="lobby-nav-item" disabled><span aria-hidden="true">⭐</span>福利</button>
       </nav>
+    </section>
+
+    <!-- v13 武将图鉴: 首页「武将」入口 — 全武将技能描述 + 实现状态标注。
+         内容由 lobby-panels renderHeroBrowser 按 HERO_CATALOG ×
+         IMPLEMENTED/ACTIVE_SKILL_IDS 动态渲染。 -->
+    <section class="hero-browser-screen" id="heroBrowserScreen" hidden>
+      <div class="hero-browser__head">
+        <span class="panel-title"><span>武将图鉴</span></span>
+        <span class="badge" id="heroBrowserSummary"></span>
+        <button type="button" class="btn small" id="heroBrowserBackBtn">返回大厅</button>
+      </div>
+      <div class="hero-browser__grid" id="heroBrowserGrid"></div>
     </section>
 
     <section class="setup-screen" id="setupScreen" hidden>

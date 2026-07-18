@@ -176,3 +176,64 @@
     .lobby-nav-item span {
       font-size: 20px;
     }
+
+/* ───── v13 武将图鉴 (首页「武将」入口) ───── */
+.hero-browser-screen {
+  padding: 18px 22px;
+  height: calc(100vh - 36px);
+  overflow-y: auto;
+}
+.hero-browser__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.hero-browser__head .panel-title { margin: 0; }
+.hero-browser__head #heroBrowserBackBtn { margin-left: auto; }
+.hb-camp__title {
+  color: var(--gold);
+  font-weight: 900;
+  margin: 16px 0 8px;
+}
+.hb-camp__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+.hb-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(33, 20, 15, .5), rgba(14, 10, 8, .6));
+}
+.hb-card__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.hb-card__name { font-weight: 900; font-size: 15px; color: #f4e3bd; }
+.hb-card__title { font-size: 12px; color: #bfae8c; }
+.hb-card__hp { font-size: 11px; color: #d98d8d; margin-left: auto; }
+.hb-card__pack {
+  font-size: 10px;
+  border: 1px solid rgba(122, 180, 255, .5);
+  color: #9cc4f5;
+  border-radius: 3px;
+  padding: 0 4px;
+}
+.hb-card__skills { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.hb-skill { font-size: 12px; line-height: 1.5; }
+.hb-skill__name { font-weight: 700; color: #ffd68a; margin-right: 6px; }
+.hb-skill__desc { display: block; color: #cbbfa6; }
+.hb-skill__status {
+  font-size: 10px;
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-right: 4px;
+  vertical-align: 1px;
+}
+.hb-skill__status.is-done { border: 1px solid rgba(120, 220, 140, .55); color: #8fe3a3; }
+.hb-skill__status.is-pending { border: 1px solid rgba(160, 160, 160, .5); color: #a8a8a8; }
+.hb-skill__status.is-active-skill { border: 1px solid rgba(255, 214, 138, .5); color: #ffd68a; }
