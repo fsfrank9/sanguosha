@@ -243,7 +243,47 @@
           els.playerSkillBar.innerHTML = html || '<span class="mini-card">无技能</span>';
         }
 
-        return {
+        // v13 武将图鉴: 全武将 × 技能实现状态 (数据源 HERO_CATALOG +
+    // skill-status)。纯静态内容, 每次打开重渲染。
+    function renderHeroBrowser(state) {
+      var implemented = state.implementedIds || [];
+      var active = state.activeIds || [];
+      var camps = ['魏', '蜀', '吴', '群'];
+      var heroes = Object.keys(Engine.HERO_CATALOG).map(function (id) { return Engine.HERO_CATALOG[id]; });
+      var totalSkills = 0;
+      var doneSkills = 0;
+      var body = camps.map(function (camp) {
+        var group = heroes.filter(function (hero) { return hero.camp === camp; });
+        if (!group.length) return '';
+        var cards = group.map(function (hero) {
+          var skills = (hero.skills || []).map(function (skill) {
+            totalSkills += 1;
+            var done = implemented.indexOf(skill.id) >= 0;
+            if (done) doneSkills += 1;
+            var tags = '<span class="hb-skill__status ' + (done ? 'is-done' : 'is-pending') + '">'
+              + (done ? '已实现' : '未实现') + '</span>'
+              + (done && active.indexOf(skill.id) >= 0 ? '<span class="hb-skill__status is-active-skill">主动</span>' : '');
+            return '<li class="hb-skill"><span class="hb-skill__name">' + escapeHtml(skill.name) + '</span>'
+              + tags + '<span class="hb-skill__desc">' + escapeHtml(skill.desc || '') + '</span></li>';
+          }).join('');
+          return '<article class="hb-card" data-hero-id="' + escapeHtml(hero.id) + '">'
+            + '<div class="hb-card__head"><span class="hb-card__name">' + escapeHtml(hero.name) + '</span>'
+            + '<span class="hb-card__title">' + escapeHtml(hero.title || '') + '</span>'
+            + '<span class="hb-card__hp">' + hero.maxHp + ' 勾玉</span>'
+            + (hero.pack === 'wind' ? '<span class="hb-card__pack">风</span>' : '') + '</div>'
+            + '<ul class="hb-card__skills">' + skills + '</ul></article>';
+        }).join('');
+        return '<section class="hb-camp hb-camp--' + camp + '"><h3 class="hb-camp__title">' + camp
+          + '（' + group.length + ' 名）</h3><div class="hb-camp__cards">' + cards + '</div></section>';
+      }).join('');
+      if (els.heroBrowserGrid) els.heroBrowserGrid.innerHTML = body;
+      if (els.heroBrowserSummary) {
+        els.heroBrowserSummary.textContent = heroes.length + ' 名武将 · 技能已实现 ' + doneSkills + '/' + totalSkills;
+      }
+    }
+
+    return {
+      renderHeroBrowser: renderHeroBrowser,
           heroPackLabel: heroPackLabel,
           heroSortKey: heroSortKey,
           fillHeroSelect: fillHeroSelect,

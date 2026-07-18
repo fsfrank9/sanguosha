@@ -1,6 +1,8 @@
       import { SanguoshaEngine } from '../engine/game-engine.js';
       // v13 L1: 身份轮转直接读预设表 (与引擎同源, 构成恒一致)。
       import { IDENTITY_PRESETS } from '../data/identity.js';
+      // v13 武将图鉴: 实现状态标注数据源。
+      import { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS } from '../data/skill-status.js';
       import { createResponsePanels } from './panels/response-panels.js';
       import { createPromptPanels } from './panels/prompt-panels.js';
       import { createModePanels } from './panels/mode-panels.js';
@@ -248,6 +250,7 @@
           'exitConfirmModal', 'exitConfirmBackdrop', 'exitConfirmYesBtn', 'exitConfirmNoBtn',
           // v9 PR-E8: 一级 lobby
           'lobbyScreen', 'lobbyKofBtn', 'lobby1v1Btn', 'lobbyIdentityBtn', 'lobbyHellBtn',
+          'lobbyHeroesBtn', 'heroBrowserScreen', 'heroBrowserGrid', 'heroBrowserSummary', 'heroBrowserBackBtn',
           // v9 PR-E9: 选将网格 — 替代旧 <select> 下拉
           'heroPick', 'heroPickPrompt', 'heroPickPlayerTab', 'heroPickEnemyTab',
           'heroPickPlayerValue', 'heroPickEnemyValue', 'heroPickGrid',
@@ -1157,6 +1160,7 @@
       }
       function showLobby() {
         if (els.lobbyScreen) els.lobbyScreen.hidden = false;
+        if (els.heroBrowserScreen) els.heroBrowserScreen.hidden = true;
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = true;
         _toggleCornerButtons(false);
@@ -1528,6 +1532,19 @@
         // v13 UI修缮4 review-M4: setup 屏返回大厅 (分入口后 setup 内无法
         // 切换玩法家族, 须给回退口)。
         if (els.setupBackBtn) els.setupBackBtn.addEventListener('click', showLobby);
+        // v13 武将图鉴: 首页「武将」入口 → 图鉴屏; 返回大厅。
+        if (els.lobbyHeroesBtn) els.lobbyHeroesBtn.addEventListener('click', function () {
+          if (els.lobbyScreen) els.lobbyScreen.hidden = true;
+          if (els.heroBrowserScreen) els.heroBrowserScreen.hidden = false;
+          lobbyPanels.renderHeroBrowser({
+            implementedIds: IMPLEMENTED_SKILL_IDS,
+            activeIds: ACTIVE_SKILL_IDS
+          });
+        });
+        if (els.heroBrowserBackBtn) els.heroBrowserBackBtn.addEventListener('click', function () {
+          if (els.heroBrowserScreen) els.heroBrowserScreen.hidden = true;
+          showLobby();
+        });
         // v13 UI修缮4: 一级入口分流 — 1v1 直进单挑 setup; 身份场入口进
         // 人数/身份选择 (缺省 5 人档, 官方主流场)。
         if (els.lobby1v1Btn) els.lobby1v1Btn.addEventListener('click', function () {
