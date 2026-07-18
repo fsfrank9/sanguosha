@@ -60,11 +60,10 @@ test('v9 PR-E13: zones.css .log-overlay display:none (整个隐藏, 数据仍在
   assert.match(block[0], /display:\s*none/);
 });
 
-test('v9 PR-E13: zones.css .zone-panel 背景半透明 (.32 / .42, 从原 .78/.82 降)', () => {
-  const block = zonesCss.match(/\.zone-panel\s*\{[\s\S]*?\n\s{4}\}/);
-  assert.ok(block);
-  assert.match(block[0], /rgba\(33,\s*20,\s*15,\s*\.32\)/);
-  assert.match(block[0], /rgba\(14,\s*10,\s*8,\s*\.42\)/);
+test('v9 PR-E13 (v13 UI修缮6 反转): .zone-panel/.zone-title 已随单卡化移除', () => {
+  // v13 UI修缮6: 判定/装备分区面板并入角色卡, 两规则孤儿化后删除。
+  assert.doesNotMatch(zonesCss, /\.zone-panel\s*\{/);
+  assert.doesNotMatch(zonesCss, /\.zone-title\s*\{/);
 });
 
 // ───── 回归 ────────────────────────────────────────────────────────────

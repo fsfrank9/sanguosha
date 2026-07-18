@@ -254,10 +254,12 @@
       overflow: hidden;
     }
 
-    .opponent-zone,
-    .player-zone {
+    /* v13 UI修缮6: 席位单卡化 — 旧"判定区|英雄|装备区"三列并入一张角色
+       卡 (equip-column/judge-dots/hand-corner 落卡内), 席位容器退化为单列。
+       玩家席保留 技能面板|英雄卡 双列。 */
+    .opponent-zone {
       display: grid;
-      grid-template-columns: minmax(260px, 360px) 1fr minmax(220px, 300px);
+      grid-template-columns: 1fr;
       gap: 8px;
       align-items: stretch;
       min-height: 0;
@@ -265,7 +267,12 @@
     }
 
     .player-zone {
-      grid-template-columns: minmax(220px, 300px) 1fr minmax(260px, 360px);
+      display: grid;
+      grid-template-columns: minmax(260px, 420px) 1fr;
+      gap: 8px;
+      align-items: stretch;
+      min-height: 0;
+      overflow: hidden;
     }
 
     /* v12 H6: 3人身份场第三席 (ally) — 默认 display:none (1v1 零回归,
@@ -274,7 +281,7 @@
        复用同一视觉语言而非新造。 */
     .ally-zone {
       display: grid;
-      grid-template-columns: minmax(220px, 300px) 1fr minmax(220px, 300px);
+      grid-template-columns: 1fr; /* v13 UI修缮6: 单卡化 */
       gap: 8px;
       align-items: stretch;
       min-height: 0;
@@ -289,8 +296,17 @@
        需要显式 grid-template-rows (否则 ally-zone 撑开的隐式行会挤压
        hand-dock 回退到内容自适应高度)。1v1 (无 .is-identity3 class) 完全
        不受影响, 沿用上方 4 行模板。 */
+    /* v13 UI修缮6: 多人场解压 — AI 席位单卡后并排成一行 (官方: 对手
+       环列于桌面上方), 行数回落, 每席卡不再被压扁。grid-template-areas
+       + 按 id 指位, 与 DOM 源顺序解耦。 */
     .duel-table.is-identity3 {
-      grid-template-rows: minmax(90px, .8fr) minmax(90px, .8fr) minmax(130px, .85fr) minmax(90px, .8fr) minmax(160px, 1.1fr);
+      grid-template-columns: 1fr 1fr;
+      grid-template-areas:
+        "seat-enemy seat-ally"
+        "arena arena"
+        "player player"
+        "dock dock";
+      grid-template-rows: minmax(120px, .85fr) minmax(130px, .85fr) minmax(100px, .8fr) minmax(160px, 1.05fr);
     }
 
     /* v13 K3: 4/5 人身份场 — 非玩家席按预置槽位继续纵向堆叠 (敌方 →
@@ -298,12 +314,43 @@
        is-identity3 同理, 防隐式行挤压 hand-dock); 行高最小值随席数收紧,
        整桌仍锁 100vh 内滚动。座席环横排压缩留作后续排版打磨 (K3 记录)。 */
     .duel-table.is-identity4 {
-      grid-template-rows: minmax(76px, .7fr) minmax(76px, .7fr) minmax(76px, .7fr) minmax(120px, .85fr) minmax(80px, .75fr) minmax(150px, 1fr);
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-areas:
+        "seat-enemy seat-ally seat-ally2"
+        "arena arena arena"
+        "player player player"
+        "dock dock dock";
+      grid-template-rows: minmax(120px, .85fr) minmax(126px, .85fr) minmax(96px, .78fr) minmax(150px, 1fr);
     }
 
     .duel-table.is-identity5 {
-      grid-template-rows: minmax(66px, .65fr) minmax(66px, .65fr) minmax(66px, .65fr) minmax(66px, .65fr) minmax(110px, .8fr) minmax(74px, .7fr) minmax(140px, .95fr);
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      grid-template-areas:
+        "seat-enemy seat-ally seat-ally2 seat-ally3"
+        "arena arena arena arena"
+        "player player player player"
+        "dock dock dock dock";
+      grid-template-rows: minmax(120px, .85fr) minmax(120px, .82fr) minmax(92px, .76fr) minmax(146px, .98fr);
     }
+
+    .duel-table.is-identity3 #enemyBoard,
+    .duel-table.is-identity4 #enemyBoard,
+    .duel-table.is-identity5 #enemyBoard { grid-area: seat-enemy; }
+    .duel-table.is-identity3 #allyZone,
+    .duel-table.is-identity4 #allyZone,
+    .duel-table.is-identity5 #allyZone { grid-area: seat-ally; }
+    .duel-table.is-identity4 #ally2Zone,
+    .duel-table.is-identity5 #ally2Zone { grid-area: seat-ally2; }
+    .duel-table.is-identity5 #ally3Zone { grid-area: seat-ally3; }
+    .duel-table.is-identity3 #centerArena,
+    .duel-table.is-identity4 #centerArena,
+    .duel-table.is-identity5 #centerArena { grid-area: arena; }
+    .duel-table.is-identity3 #playerBoard,
+    .duel-table.is-identity4 #playerBoard,
+    .duel-table.is-identity5 #playerBoard { grid-area: player; }
+    .duel-table.is-identity3 #playerHandDock,
+    .duel-table.is-identity4 #playerHandDock,
+    .duel-table.is-identity5 #playerHandDock { grid-area: dock; }
 
     .arena-zone {
       display: grid;

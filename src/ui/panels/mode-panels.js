@@ -47,6 +47,8 @@
       var game = getGame();
       pendingTiesuoCardId = null;
       if (els.tiesuoModePanel) els.tiesuoModePanel.hidden = true;
+      // v13 UI修缮1: 关面板同时清掉未确认的铁索暂存 (与 target/huogong 同约定)。
+      if (getStaged() && getStaged().kind === 'tiesuo') setStaged(null);
     }
 
     function showTargetZonePanel(cardId) {
@@ -393,12 +395,14 @@
     function renderSeatPickerControls() {
       if (!seatPicker) return;
       var game = getGame();
-      var canConfirm = seatPicker.picked.length >= seatPicker.min;
+      var canConfirm = seatPicker.picked.length >= seatPicker.min || !!seatPicker.extraStaged;
       // v13 J0-1: 满足最少目标数即显示"确定" (单目标也要确认)。
+      // v13 UI修缮1: 附加动作暂存态同样经"确定"提交。
       if (els.seatTargetConfirmBtn) els.seatTargetConfirmBtn.hidden = !canConfirm;
       if (els.seatTargetExtraBtn) {
         els.seatTargetExtraBtn.hidden = !seatPicker.extraAction;
         if (seatPicker.extraAction) els.seatTargetExtraBtn.textContent = seatPicker.extraAction.label;
+        els.seatTargetExtraBtn.classList.toggle('is-staged', !!seatPicker.extraStaged);
       }
       if (els.seatTargetModeHint) {
         var base = seatPicker.hintText || '选择目标：点击场上高亮的角色';
@@ -441,19 +445,29 @@
     }
 
     function finishSeatPicker() {
-      if (!seatPicker || seatPicker.picked.length < seatPicker.min) return;
+      if (!seatPicker) return;
+      // v13 UI修缮1: 附加动作 (重铸) 已暂存 → 确认时执行。
+      if (seatPicker.extraStaged) {
+        var extraHandler = seatPicker.extraAction && seatPicker.extraAction.handler;
+        cancelSeatPicker();
+        if (extraHandler) extraHandler();
+        return;
+      }
+      if (seatPicker.picked.length < seatPicker.min) return;
       var picked = seatPicker.picked.slice();
       var onComplete = seatPicker.onComplete;
       cancelSeatPicker();
       onComplete(picked);
     }
 
-    // 附加按钮 (铁索"重铸") — 执行 extraAction.handler 后退出点选。
+    // 附加按钮 (铁索"重铸") — v13 UI修缮1: 改暂存, 与座席暂存互斥,
+    // 须按"确定"(finishSeatPicker) 才执行 (此前点即打出)。再点取消暂存。
     function seatPickerExtraAction() {
       if (!seatPicker || !seatPicker.extraAction) return;
-      var handler = seatPicker.extraAction.handler;
-      cancelSeatPicker();
-      handler();
+      seatPicker.extraStaged = !seatPicker.extraStaged;
+      if (seatPicker.extraStaged) seatPicker.picked = [];
+      renderSeatPickerControls();
+      render();
     }
 
     // 点击一个座席的英雄卡 (由 dom-adapter 的 hero 元素 click 绑定调用)。
@@ -462,6 +476,7 @@
     function clickSeatForPicker(seat) {
       if (!seatPicker) return;
       if (seatPicker.legalSeats.indexOf(seat) < 0) return;
+      seatPicker.extraStaged = false; // v13 UI修缮1: 点座席与"重铸"暂存互斥
       var pickedIdx = seatPicker.picked.indexOf(seat);
       if (pickedIdx >= 0) {
         seatPicker.picked.splice(pickedIdx, 1); // 再点取消暂存
@@ -665,10 +680,19 @@
 
     function bindModePanels() {
       var game = getGame();
-      if (els.tiesuoRecastBtn) els.tiesuoRecastBtn.addEventListener('click', function () { resolveTiesuo({ mode: 'recast' }); });
-      if (els.tiesuoChainEnemyBtn) els.tiesuoChainEnemyBtn.addEventListener('click', function () { resolveTiesuo({ mode: 'chain', targets: ['enemy'] }); });
-      if (els.tiesuoChainSelfBtn) els.tiesuoChainSelfBtn.addEventListener('click', function () { resolveTiesuo({ mode: 'chain', targets: ['player'] }); });
-      if (els.tiesuoChainBothBtn) els.tiesuoChainBothBtn.addEventListener('click', function () { resolveTiesuo({ mode: 'chain', targets: ['player', 'enemy'] }); });
+      // v13 UI修缮1: 铁索 1v1 面板四选项改 stage-then-confirm — 此前点选项
+      // 即打出, 是全 UI 唯一"最终生效不过确定"的出牌路径 (官方每张牌都要
+      // 确认)。点选项只暂存 + 高亮, #handConfirmBtn 才 resolveTiesuo。
+      function stageTiesuo(btn, options) {
+        setStaged({ kind: 'tiesuo', options: options });
+        _highlightStaged(btn);
+        if (els.handHint) els.handHint.textContent = '已选择铁索方式，点「确定」打出';
+        render();
+      }
+      if (els.tiesuoRecastBtn) els.tiesuoRecastBtn.addEventListener('click', function () { stageTiesuo(els.tiesuoRecastBtn, { mode: 'recast' }); });
+      if (els.tiesuoChainEnemyBtn) els.tiesuoChainEnemyBtn.addEventListener('click', function () { stageTiesuo(els.tiesuoChainEnemyBtn, { mode: 'chain', targets: ['enemy'] }); });
+      if (els.tiesuoChainSelfBtn) els.tiesuoChainSelfBtn.addEventListener('click', function () { stageTiesuo(els.tiesuoChainSelfBtn, { mode: 'chain', targets: ['player'] }); });
+      if (els.tiesuoChainBothBtn) els.tiesuoChainBothBtn.addEventListener('click', function () { stageTiesuo(els.tiesuoChainBothBtn, { mode: 'chain', targets: ['player', 'enemy'] }); });
       if (els.tiesuoCancelBtn) els.tiesuoCancelBtn.addEventListener('click', function () { hideTiesuoPanel(); render(); });
       if (els.targetHandBtn) els.targetHandBtn.addEventListener('click', function () { resolveTargetZone('hand'); });
       if (els.targetEquipmentBtn) els.targetEquipmentBtn.addEventListener('click', function () { resolveTargetZone('equipment'); });

@@ -22,18 +22,20 @@ test('v9 PR-E5: index.html 含 <aside class="side-drawer" id="sideDrawer" hidden
   assert.match(html, /<aside class="side-drawer" id="sideDrawer" hidden/);
 });
 
-test('v9 PR-E5: 抽屉含 6 项 (退出/重开/等待/背景/变速/帮助)', () => {
-  // 4 active + 3 placeholder + 1 close = 6 实际可见项 + close
+test('v9 PR-E5 (v13 UI修缮3 收窄): 抽屉仅含已实现项 (退出/重开/帮助), 占位项清零', () => {
+  // v13 UI修缮3: 等待/背景/变速 三个 disabled 占位按钮按用户反馈移除 —
+  // 抽屉不再展示未实现功能。
   ['drawerExitBtn', 'drawerRestartBtn', 'drawerHelpBtn', 'drawerCloseBtn'].forEach(function (id) {
     const re = new RegExp('id="' + id + '"');
     assert.match(html, re, '应含 ' + id);
   });
-  // placeholder 项: 至少 3 个 is-placeholder + disabled
   const placeholders = (html.match(/side-drawer__item\s+is-placeholder/g) || []).length;
-  assert.ok(placeholders >= 3, '至少 3 个 placeholder 项 (等待/背景/变速)');
-  // 文本标签都在
-  ['退出', '重开', '等待', '背景', '变速', '帮助'].forEach(function (label) {
+  assert.equal(placeholders, 0, '抽屉占位项清零 (未实现功能不上菜单)');
+  ['退出', '重开', '帮助'].forEach(function (label) {
     assert.match(html, new RegExp(label), '应含标签: ' + label);
+  });
+  ['等待', '背景', '变速'].forEach(function (label) {
+    assert.doesNotMatch(html, new RegExp('side-drawer__label">' + label), '占位标签已移除: ' + label);
   });
 });
 

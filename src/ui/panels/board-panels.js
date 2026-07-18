@@ -21,13 +21,6 @@
         return html;
       }
 
-      function miniBacks(count) {
-        if (!count) return '<span class="mini-card">无手牌</span>';
-        var html = '';
-        for (var i = 0; i < count; i += 1) html += '<span class="mini-card">牌</span>';
-        return html;
-      }
-
       function renderHero(actor) {
         var state = view.game[actor];
         els[actor + 'Name'].textContent = state.name;
@@ -35,6 +28,9 @@
         els[actor + 'Quote'].textContent = state.quote;
         els[actor + 'Hp'].innerHTML = hpMarkup(state);
         els[actor + 'HandCount'].textContent = state.hand.length;
+        // v13 UI修缮6: 手牌数角标 (官方: 卡角小方块数字; 敌方手牌隐私 —
+        // 仅数字, 不再渲染牌背行)。
+        if (els[actor + 'HandBadge']) els[actor + 'HandBadge'].textContent = state.hand.length;
         els[actor + 'Hero'].setAttribute('data-camp', state.camp);
         els[actor + 'Hero'].classList.toggle('is-chained', !!state.chained);
         // v12 H6: identity3 单目标牌/主动技 座席点选模式 — 合法目标座席
@@ -299,12 +295,41 @@
         }).join('');
       }
 
-      function equipmentCards(equipment) {
-        var cards = [];
-        ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
-          if (equipment && equipment[slot]) cards.push(equipment[slot]);
-        });
-        return zoneCards(cards, '未装备');
+      // v13 UI修缮6: 装备槽列 — 官方展示序 武器/防具/+1马/-1马, 四个定位
+      // 小方块从上到下, 空槽淡显占位 (对照截图: 官方每席一张角色卡, 装备
+      // 以小长方块纵列)。
+      var EQUIP_SLOT_SPECS = [
+        { slot: 'weapon', label: '武' },
+        { slot: 'armor', label: '防' },
+        { slot: 'horsePlus', label: '+1' },
+        { slot: 'horseMinus', label: '-1' }
+      ];
+      function equipmentSlotColumn(equipment) {
+        return EQUIP_SLOT_SPECS.map(function (spec) {
+          var card = equipment && equipment[spec.slot];
+          if (!card) {
+            return '<span class="equip-slot is-empty" data-slot="' + spec.slot + '">'
+              + '<i class="equip-slot__tag">' + spec.label + '</i></span>';
+          }
+          var suit = suitLabel(card.suit);
+          var rank = card.rank ? String(card.rank).toUpperCase() : '';
+          var meta = (suit || rank)
+            ? ' <span class="mini-card-suit ' + suitColorClass(card.suit) + '">'
+              + escapeHtml(suit) + (suit && rank ? ' ' : '') + escapeHtml(rank) + '</span>'
+            : '';
+          return '<span class="equip-slot" data-slot="' + spec.slot + '">'
+            + '<i class="equip-slot__tag">' + spec.label + '</i>'
+            + escapeHtml(card.name) + meta + '</span>';
+        }).join('');
+      }
+
+      // v13 UI修缮6: 延时锦囊圆标 — 名首字 (乐/兵/闪), 按放置顺序, 类型
+      // 着色 (title 悬浮全名)。
+      function judgeDotsMarkup(judgeArea) {
+        return (judgeArea || []).map(function (card) {
+          return '<span class="judge-dot judge-dot--' + escapeHtml(card.type) + '" title="'
+            + escapeHtml(card.name) + '">' + escapeHtml(String(card.name).charAt(0)) + '</span>';
+        }).join('');
       }
 
       // v6.1: player-side equipment rendered as clickable buttons when in
@@ -324,19 +349,21 @@
       }
 
       function renderZones() {
+        // v13 UI修缮6: 全席位统一装备槽列 + 判定圆标 (制衡选牌模式下玩家
+        // 装备仍渲染为可点按钮, 交互不变)。
         if (els.playerEquipmentArea) {
           els.playerEquipmentArea.innerHTML = view.skillSelectMode === 'zhiheng'
             ? playerEquipmentForZhiheng(view.game.player.equipment)
-            : equipmentCards(view.game.player.equipment);
+            : equipmentSlotColumn(view.game.player.equipment);
         }
-        if (els.enemyEquipmentArea) els.enemyEquipmentArea.innerHTML = equipmentCards(view.game.enemy.equipment);
-        if (els.playerJudgeArea) els.playerJudgeArea.innerHTML = zoneCards(view.game.player.judgeArea, '空');
-        if (els.enemyJudgeArea) els.enemyJudgeArea.innerHTML = zoneCards(view.game.enemy.judgeArea, '空');
+        if (els.enemyEquipmentArea) els.enemyEquipmentArea.innerHTML = equipmentSlotColumn(view.game.enemy.equipment);
+        if (els.playerJudgeArea) els.playerJudgeArea.innerHTML = judgeDotsMarkup(view.game.player.judgeArea);
+        if (els.enemyJudgeArea) els.enemyJudgeArea.innerHTML = judgeDotsMarkup(view.game.enemy.judgeArea);
         // v12 H6 / v13 K3: 身份场第三/四/五席装备/判定区 (1v1 无该席, 不渲染).
         extraSeatsOf(view.game).forEach(function (seat) {
           if (!view.game[seat]) return;
-          if (els[seat + 'EquipmentArea']) els[seat + 'EquipmentArea'].innerHTML = equipmentCards(view.game[seat].equipment);
-          if (els[seat + 'JudgeArea']) els[seat + 'JudgeArea'].innerHTML = zoneCards(view.game[seat].judgeArea, '空');
+          if (els[seat + 'EquipmentArea']) els[seat + 'EquipmentArea'].innerHTML = equipmentSlotColumn(view.game[seat].equipment);
+          if (els[seat + 'JudgeArea']) els[seat + 'JudgeArea'].innerHTML = judgeDotsMarkup(view.game[seat].judgeArea);
         });
       }
 
@@ -396,12 +423,8 @@
       renderStatus();
       renderPhaseTrack();
       renderZones();
-      els.enemyHandBacks.innerHTML = miniBacks(view.game.enemy.hand.length);
-      extraSeats.forEach(function (seat) {
-        if (els[seat + 'HandBacks'] && view.game[seat]) {
-          els[seat + 'HandBacks'].innerHTML = miniBacks(view.game[seat].hand.length);
-        }
-      });
+      // v13 UI修缮6: AI 手牌背行撤销 — 手牌数以角标呈现 (renderHero 内
+      // HandBadge), 隐私口径不变 (恒不显示牌面)。
     }
 
     function renderLogWithView(viewState) {

@@ -137,8 +137,12 @@ test('v9 PR-E18: 启动入口为 showLobby (splash 已删)', () => {
   assert.doesNotMatch(adapter, /bindEvents\(\);\s*showSplash\(\);/);
 });
 
-test('v9 PR-E8: lobby1v1Btn click → showSetup; KOF/炼狱 placeholder alert', () => {
-  assert.match(adapter, /els\.lobby1v1Btn\.addEventListener\('click',\s*showSetup\)/);
+test('v9 PR-E8 (v13 UI修缮4 分入口): lobby1v1Btn 预选 duel 入 setup; 身份场独立入口; KOF/炼狱 placeholder', () => {
+  // v13 UI修缮4: 一级入口分流 — lobby1v1Btn 先 setMatchMode('duel') 再
+  // showSetup; 新增 lobbyIdentityBtn (缺省 identity5)。旧"直绑 showSetup"
+  // 正则随行为更新。
+  assert.match(adapter, /els\.lobby1v1Btn\.addEventListener\('click',\s*function\s*\(\)\s*\{\s*setMatchMode\('duel'\);\s*showSetup\(\);/);
+  assert.match(adapter, /els\.lobbyIdentityBtn\.addEventListener\('click',\s*function\s*\(\)\s*\{\s*if\s*\(matchMode === 'duel'\)\s*setMatchMode\('identity5'\);\s*showSetup\(\);/);
   assert.match(adapter, /els\.lobbyKofBtn[\s\S]{0,200}KOF[\s\S]{0,80}待开发/);
   assert.match(adapter, /els\.lobbyHellBtn[\s\S]{0,200}炼狱[\s\S]{0,80}待开发/);
 });

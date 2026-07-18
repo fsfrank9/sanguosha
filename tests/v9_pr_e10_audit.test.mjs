@@ -78,8 +78,8 @@ test('v9 PR-E10/E18: 入口流程 init → showLobby (splash 已删, 启动直�
   assert.match(adapter, /bindEvents\(\);[\s\S]{0,200}showLobby\(\)/);
 });
 
-test('v9 PR-E10: lobby1v1Btn click → showSetup', () => {
-  assert.match(adapter, /els\.lobby1v1Btn\.addEventListener\('click',\s*showSetup\)/);
+test('v9 PR-E10 (v13 UI修缮4 分入口): lobby1v1Btn 预选 duel 再入 setup', () => {
+  assert.match(adapter, /els\.lobby1v1Btn\.addEventListener\('click',\s*function\s*\(\)\s*\{\s*setMatchMode\('duel'\);\s*showSetup\(\);/);
 });
 
 test('v9 PR-E10: startGameBtn click → newGame (旧逻辑不破)', () => {

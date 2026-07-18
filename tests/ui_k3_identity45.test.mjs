@@ -17,9 +17,18 @@ function c(type, overrides = {}) {
 
 // identityN 开局 (真实 lobby → 模式切换 → 选将 → startGame), 然后整形成
 // 确定性局面 (清各席手牌/装备/判定区, 玩家回合出牌阶段)。
+// v13 UI修缮5: 暗身份默认开 — 本文件断言明置徽章 (暗置覆盖在 ui_m), 显式关闭。
+// fake-dom 不解析初始标记: 原始按钮无 aria, 先点一次同步再判读。
+function forceOpenRoles() {
+  const btn = $('hiddenRolesToggleBtn');
+  if (btn.getAttribute('aria-pressed') == null) btn.click();
+  if (btn.getAttribute('aria-pressed') === 'true') btn.click();
+}
+
 function startIdentityViaUI(modeBtnId, heroBySelect = {}) {
   $('lobby1v1Btn').click();
   $(modeBtnId).click();
+  forceOpenRoles();
   $('playerHeroSelect').value = heroBySelect.player || 'liubei';
   $('enemyHeroSelect').value = heroBySelect.enemy || 'caocao';
   $('allyHeroSelect').value = heroBySelect.ally || 'guanyu';

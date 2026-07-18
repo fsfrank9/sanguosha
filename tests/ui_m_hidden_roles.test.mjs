@@ -22,7 +22,10 @@ function c(type, overrides = {}) {
 // 显式置位, 避免用例间顺序耦合。
 function ensureHiddenToggle(on) {
   const btn = $('hiddenRolesToggleBtn');
-  const active = btn.classList.contains('is-active');
+  // v13 UI修缮5: 模块缺省已为"开", 但 fake-dom 不解析初始标记 — 原始按钮
+  // 无 class/aria。先点一次让 DOM 视图与模块态同步, 再按 aria 判读。
+  if (btn.getAttribute('aria-pressed') == null) btn.click();
+  const active = btn.getAttribute('aria-pressed') === 'true';
   if (active !== on) btn.click();
 }
 
@@ -61,10 +64,10 @@ function test(name, fn) { tests.push([name, fn]); }
 
 // ───── M1: setup 开关三态同步 ─────
 
-test('M1: index.html 静态锚点 — 开关初始态 (关/aria-pressed=false) + 4 问号徽章', () => {
+test('M1: index.html 静态锚点 — 开关初始态 (开/aria-pressed=true, v13 UI修缮5 官方缺省) + 4 问号徽章', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /id="hiddenRolesToggleBtn"[^>]*aria-pressed="false"[^>]*>暗身份·关</,
-    '开关初始文案与 aria 态 (fake-dom 不解析标记, 静态锁定)');
+  assert.match(html, /id="hiddenRolesToggleBtn"[^>]*aria-pressed="true"[^>]*>暗身份·开</,
+    '开关初始文案与 aria 态 — 暗身份默认开启 (fake-dom 不解析标记, 静态锁定)');
   for (const seat of ['enemy', 'ally', 'ally2', 'ally3']) {
     assert.match(html, new RegExp(`<span class="secret-badge" id="${seat}SecretBadge" hidden`),
       seat + ' 问号徽章节点 (默认 hidden)');

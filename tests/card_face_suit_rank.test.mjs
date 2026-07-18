@@ -56,13 +56,12 @@ test('v8 PR-0: 红色花色用红色，黑色花色用浅色 (suit-red / suit-bl
   assert.doesNotMatch(cssSource, /\.suit-black\s*\{[^}]*color:\s*#[fF][fF]0000/);
 });
 
-test('v8 PR-0: 对手手牌仍走 miniBacks（隐私保护，不显示 suit/rank）', () => {
-  assert.match(adapterSource, /enemyHandBacks\.innerHTML\s*=\s*miniBacks\(/);
-  // miniBacks 函数本身不应该读 card.suit / card.rank
-  const miniBacksMatch = adapterSource.match(/function miniBacks\([^)]*\)\s*\{[^}]*\}/s);
-  assert.ok(miniBacksMatch, 'miniBacks 函数应存在');
-  assert.doesNotMatch(miniBacksMatch[0], /\.suit/);
-  assert.doesNotMatch(miniBacksMatch[0], /\.rank/);
+test('v8 PR-0 (v13 UI修缮6 收窄): 对手手牌隐私 — 仅角标数字, 无牌背行/牌面渲染', () => {
+  // v13 UI修缮6: miniBacks 牌背行撤销, AI 手牌只render HandBadge 数字 —
+  // 隐私口径更严 (连"有几张背"都合并为一个数字, 恒无 suit/rank/name)。
+  assert.match(adapterSource, /HandBadge'\]\.textContent\s*=\s*state\.hand\.length/);
+  assert.doesNotMatch(adapterSource, /enemyHandBacks/, '牌背行已撤销');
+  assert.doesNotMatch(adapterSource, /function miniBacks/, 'miniBacks 已随行撤销');
 });
 
 console.log('\nCard face suit/rank tests passed.');
