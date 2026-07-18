@@ -40,7 +40,7 @@
       // '随机' (随机轮转偏移, 身份概率与预设构成一致)。
       var identityPlayerRole = '主公';
       // v13 M1: 暗身份开关 (缺省关 = 明置零回归; 仅身份场生效)。
-      var hiddenRolesEnabled = false;
+      var hiddenRolesEnabled = true; // v13 UI修缮5: 暗身份为官方缺省, 默认开启 (开关保留)
       var IDENTITY_ROLE_BTN_IDS = {
         '主公': 'roleLordBtn', '忠臣': 'roleLoyalBtn', '反贼': 'roleRebelBtn',
         '内奸': 'roleRenegadeBtn', '随机': 'roleRandomBtn'
@@ -93,6 +93,7 @@
       var showGuanxingPanelFromPending = modePanels.showGuanxingPanelFromPending;
       var hideGuanxingPanel = modePanels.hideGuanxingPanel;
       var resolveTargetCard = modePanels.resolveTargetCard;
+      var resolveTiesuo = modePanels.resolveTiesuo;
       var resolveHuogong = modePanels.resolveHuogong;
       var resolveConversion = modePanels.resolveConversion;
       // v11 B2: 提示类面板装配 (ctx 语义同 responsePanels)。
@@ -151,7 +152,7 @@
           'setupScreen', 'duelTable', 'enemyHero', 'playerHero', 'enemyName', 'playerName',
           'enemyCamp', 'playerCamp', 'enemyQuote', 'playerQuote', 'enemyHp', 'playerHp',
           'enemyHandCount', 'playerHandCount', 'enemyState', 'playerState', 'statusTitle',
-          'statusText', 'deckInfo', 'playerHand', 'enemyHandBacks', 'battleLog', 'handHint',
+          'statusText', 'deckInfo', 'playerHand', 'enemyHandBadge', 'playerHandBadge', 'battleLog', 'handHint',
           'enemyTurnBadge', 'playerTurnBadge', 'statusBanner', 'playerSkillBar', 'phaseTrack',
           'playerHeroSelect', 'enemyHeroSelect', 'playerEquipmentArea', 'enemyEquipmentArea',
           'playerJudgeArea', 'enemyJudgeArea', 'confirmDiscardBtn', 'enemyRibbon', 'playerRibbon',
@@ -215,16 +216,16 @@
           // v12 H6: 3人身份场第三席 (ally) — 座次布局 + 大厅模式/第三席选将。
           'allyZone', 'allyHero', 'allyName', 'allyCamp', 'allyQuote', 'allyHp',
           'allyHandCount', 'allyState', 'allyTurnBadge', 'allyRibbon',
-          'allyEquipmentArea', 'allyJudgeArea', 'allyHandBacks',
+          'allyEquipmentArea', 'allyJudgeArea', 'allyHandBadge',
           'allyLordBadge', 'allyRebelBadge',
           // v13 K3: 4/5 人身份场第四/五席 (ally2/ally3) 预置槽位 + 内奸徽章。
           'ally2Zone', 'ally2Hero', 'ally2Name', 'ally2Camp', 'ally2Quote', 'ally2Hp',
           'ally2HandCount', 'ally2State', 'ally2TurnBadge', 'ally2Ribbon',
-          'ally2EquipmentArea', 'ally2JudgeArea', 'ally2HandBacks',
+          'ally2EquipmentArea', 'ally2JudgeArea', 'ally2HandBadge',
           'ally2LordBadge', 'ally2RebelBadge', 'ally2LoyalistBadge', 'ally2RenegadeBadge',
           'ally3Zone', 'ally3Hero', 'ally3Name', 'ally3Camp', 'ally3Quote', 'ally3Hp',
           'ally3HandCount', 'ally3State', 'ally3TurnBadge', 'ally3Ribbon',
-          'ally3EquipmentArea', 'ally3JudgeArea', 'ally3HandBacks',
+          'ally3EquipmentArea', 'ally3JudgeArea', 'ally3HandBadge',
           'ally3LordBadge', 'ally3RebelBadge', 'ally3LoyalistBadge', 'ally3RenegadeBadge',
           'matchModePanel', 'modeDuelBtn', 'modeIdentity3Btn',
           'modeIdentity4Btn', 'modeIdentity5Btn',
@@ -246,7 +247,7 @@
           'sideDrawer', 'drawerExitBtn', 'drawerRestartBtn', 'drawerHelpBtn', 'drawerCloseBtn',
           'exitConfirmModal', 'exitConfirmBackdrop', 'exitConfirmYesBtn', 'exitConfirmNoBtn',
           // v9 PR-E8: 一级 lobby
-          'lobbyScreen', 'lobbyKofBtn', 'lobby1v1Btn', 'lobbyHellBtn',
+          'lobbyScreen', 'lobbyKofBtn', 'lobby1v1Btn', 'lobbyIdentityBtn', 'lobbyHellBtn',
           // v9 PR-E9: 选将网格 — 替代旧 <select> 下拉
           'heroPick', 'heroPickPrompt', 'heroPickPlayerTab', 'heroPickEnemyTab',
           'heroPickPlayerValue', 'heroPickEnemyValue', 'heroPickGrid',
@@ -691,6 +692,11 @@
 
       function usePlayerSkill(skillId) {
         if (!game || game.turn !== 'player' || game.phase !== 'play' || enemyThinking) return;
+        // v13 UI修缮1: 换按其他技能时撤销未确认的直发技暂存 (苦肉)。
+        if (stagedModalChoice && stagedModalChoice.kind === 'skill'
+            && stagedModalChoice.skillId !== skillId) {
+          stagedModalChoice = null;
+        }
         // v13 L2: 亡席玩家 (旁观) 不再发动技能。
         if (game.player && game.player.hp <= 0) return;
         // v12 H 复核修复: 发动任何技能前清理悬空座席点选 (见 enterCardSkillMode)。
@@ -737,6 +743,20 @@
           return;
         }
         hideGuanxingPanel();
+        // v13 UI修缮1: 直发型主动技 (苦肉自伤) 改 stage-then-confirm — 此前
+        // 点技能按钮即掉血, 是唯一零确认的主动结算入口。再点同技能取消暂存。
+        if (skillId === 'kurou') {
+          var stagedNow = stagedModalChoice;
+          if (stagedNow && stagedNow.kind === 'skill' && stagedNow.skillId === skillId) {
+            stagedModalChoice = null;
+            if (els.handHint) els.handHint.textContent = '';
+          } else {
+            stagedModalChoice = { kind: 'skill', skillId: skillId };
+            if (els.handHint) els.handHint.textContent = '已选择发动【苦肉】(失去 1 点体力摸两张)，点「确定」发动';
+          }
+          render();
+          return;
+        }
         var cardIds = [];
         var playerHpBefore = game.player.hp;
         var result = Engine.useSkill(game, 'player', skillId, cardIds);
@@ -1041,6 +1061,20 @@
         renderHeroPickGrid();
       }
 
+      // v13 UI修缮4: 一级界面分入口 — 1v1 与身份场各自入口, 进入 setup 后
+      // 身份场内选 3/4/5 人 (官方节奏); 对应家族外的模式按钮隐藏。重开
+      // (drawerRestartBtn) 按当前模式家族保持入口语境。模式切换逻辑本身
+      // (setMatchMode) 不变 — 隐藏按钮仍可被程序驱动 (测试兼容)。
+      function applySetupFamily(family) {
+        var identityIds = ['modeIdentity3Btn', 'modeIdentity4Btn', 'modeIdentity5Btn'];
+        if (els.modeDuelBtn) els.modeDuelBtn.hidden = family !== 'duel';
+        identityIds.forEach(function (id) {
+          if (els[id]) els[id].hidden = family !== 'identity';
+        });
+        // 单选无可选 → 1v1 入口整行隐藏; 身份场入口显示人数行。
+        if (els.matchModePanel) els.matchModePanel.hidden = family === 'duel';
+      }
+
       function showSetup() {
         enemyThinking = false;
         hideTiesuoPanel();
@@ -1058,6 +1092,7 @@
         // v9 PR-E11: 入 setup 自动随机身份 (assignRandomRoles 内部已重置
         // 选将状态 + renderHeroPickGrid). 用户可点 "随机主公/反贼" 重抽.
         assignRandomRoles();
+        applySetupFamily(matchMode === 'duel' ? 'duel' : 'identity');
       }
 
       // v9 PR-E19: 角落 widget (菜单 / 分享) 仅游戏内显示 —
@@ -1271,6 +1306,16 @@
             var pr = Engine.resolvePendingChoice(game, staged.payload);
             if (!pr.ok) renderLog();
             render();
+          } else if (staged.kind === 'tiesuo') {
+            // v13 UI修缮1: 铁索 1v1 面板选项经确定提交。
+            resolveTiesuo(staged.options);
+          } else if (staged.kind === 'skill') {
+            // v13 UI修缮1: 直发型主动技 (苦肉) 经确定提交 — 消除零确认自伤。
+            var skillHpBefore = game && game.player.hp;
+            var skillResult = Engine.useSkill(game, 'player', staged.skillId, []);
+            if (!skillResult.ok) game.log.push(skillResult.message);
+            if (game && game.player.hp < skillHpBefore) flashHero('player');
+            render();
           }
           return;
         }
@@ -1423,7 +1468,16 @@
           handleHeroPickCardClick(btn.getAttribute('data-hero-id'));
         });
         // v9 PR-E8: lobby 1V1 → setup; KOF/炼狱 placeholder.
-        if (els.lobby1v1Btn) els.lobby1v1Btn.addEventListener('click', showSetup);
+        // v13 UI修缮4: 一级入口分流 — 1v1 直进单挑 setup; 身份场入口进
+        // 人数/身份选择 (缺省 5 人档, 官方主流场)。
+        if (els.lobby1v1Btn) els.lobby1v1Btn.addEventListener('click', function () {
+          setMatchMode('duel');
+          showSetup();
+        });
+        if (els.lobbyIdentityBtn) els.lobbyIdentityBtn.addEventListener('click', function () {
+          if (matchMode === 'duel') setMatchMode('identity5');
+          showSetup();
+        });
         if (els.lobbyKofBtn) els.lobbyKofBtn.addEventListener('click', function () {
           if (window.alert) window.alert('KOF 模式 — 待开发 (v10+ 计划)');
         });
@@ -1447,10 +1501,22 @@
           closeSideDrawer();
           showSetup();
         });
+        // v13 UI修缮2: 帮助文案随功能现状更新 (身份场/暗身份/出牌确认)。
         if (els.drawerHelpBtn) els.drawerHelpBtn.addEventListener('click', function () {
           closeSideDrawer();
           if (window.alert) {
-            window.alert('三国杀 1v1 · 在线版 (v9 UI 重制中)\\n源码: github.com/fsfrank9/sanguosha');
+            window.alert([
+              '三国杀 · 在线版',
+              '',
+              '模式: 1v1 对战 / 身份场 (3·4·5 人, 主公·忠臣·反贼·内奸)。',
+              '身份场可自选身份或随机; 暗身份默认开启 — 除主公外身份牌在',
+              '死亡亮出前对其他角色不可见, 可在开局设置中关闭。',
+              '出牌: 点选手牌暂存, 再点「确定」打出; 需要指定目标的牌会',
+              '弹出目标选择, 同样先暂存后确认。',
+              '菜单: 退出回大厅 / 重开回选将。',
+              '',
+              '源码: github.com/fsfrank9/sanguosha'
+            ].join('\n'));
           }
         });
         if (els.drawerCloseBtn) els.drawerCloseBtn.addEventListener('click', closeSideDrawer);

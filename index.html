@@ -31,18 +31,6 @@
         <span class="side-drawer__icon" aria-hidden="true">☘</span>
         <span class="side-drawer__label">重开</span>
       </button>
-      <button class="side-drawer__item is-placeholder" type="button" disabled title="待实现">
-        <span class="side-drawer__icon" aria-hidden="true">⏳</span>
-        <span class="side-drawer__label">等待</span>
-      </button>
-      <button class="side-drawer__item is-placeholder" type="button" disabled title="待实现">
-        <span class="side-drawer__icon" aria-hidden="true">🎨</span>
-        <span class="side-drawer__label">背景</span>
-      </button>
-      <button class="side-drawer__item is-placeholder" type="button" disabled title="待实现">
-        <span class="side-drawer__icon" aria-hidden="true">⚡</span>
-        <span class="side-drawer__label">变速</span>
-      </button>
       <button class="side-drawer__item" id="drawerHelpBtn" type="button">
         <span class="side-drawer__icon" aria-hidden="true">ℹ</span>
         <span class="side-drawer__label">帮助</span>
@@ -102,6 +90,11 @@
           <span class="lobby-mode-card__title">1V1 对战</span>
           <span class="lobby-mode-card__sub">单挑 · 准备-判定-摸牌-出牌-弃牌-结束 全流程</span>
         </button>
+        <button type="button" class="lobby-mode-card lobby-mode-card--active" id="lobbyIdentityBtn">
+          <span class="lobby-mode-card__icon" aria-hidden="true">👑</span>
+          <span class="lobby-mode-card__title">身份场</span>
+          <span class="lobby-mode-card__sub">3·4·5 人 · 主忠反内 · 暗身份 · 进入后选人数与身份</span>
+        </button>
         <button type="button" class="lobby-mode-card lobby-mode-card--placeholder" id="lobbyHellBtn" disabled>
           <span class="lobby-mode-card__icon" aria-hidden="true">💀</span>
           <span class="lobby-mode-card__title">炼狱 KOF</span>
@@ -149,7 +142,7 @@
           <button type="button" class="btn small" id="roleRandomBtn">随机</button>
           <!-- v13 M1: 暗身份开关 — 官方 glossary__card.md:11 除主公外身份
                死亡前不可见; 缺省关 (明置, v12 简化口径零回归)。 -->
-          <button type="button" class="btn small" id="hiddenRolesToggleBtn" aria-pressed="false">暗身份·关</button>
+          <button type="button" class="btn small is-active" id="hiddenRolesToggleBtn" aria-pressed="true">暗身份·开</button>
         </div>
         <div class="role-draft-panel" id="roleDraftPanel">
           <span class="badge">身份判定</span>
@@ -210,13 +203,8 @@
       <!-- 中央日志 overlay — 最近 4-6 条 game.log. 绝对定位在 .duel-table 上. -->
       <div class="log-overlay" id="logOverlay" aria-live="polite"></div>
 
-      <section class="opponent-zone" id="enemyBoard">
-        <div class="zone-panel">
-          <div class="zone-title">敌方判定区 <span class="badge">延时锦囊</span></div>
-          <div class="judge-area" id="enemyJudgeArea"><span class="mini-card">空</span></div>
-        </div>
-
-        <article class="hero enemy" id="enemyHero" data-camp="魏">
+            <section class="opponent-zone" id="enemyBoard">
+        <article class="hero enemy seat-card" id="enemyHero" data-camp="魏">
           <div class="hero-aura"></div>
           <span class="lord-badge" id="enemyLordBadge" hidden aria-label="主公">主</span>
           <span class="rebel-badge" id="enemyRebelBadge" hidden aria-label="反贼">反</span>
@@ -237,26 +225,19 @@
             <div class="stat"><small>手牌</small><strong id="enemyHandCount">0</strong></div>
             <div class="stat"><small>状态</small><strong id="enemyState">待机</strong></div>
           </div>
+          <!-- v13 UI修缮6: 装备槽列 (武器/防具/+1马/-1马 定序小方块) 并入角色卡 -->
+          <div class="equipment-area equip-column" id="enemyEquipmentArea"></div>
+          <!-- v13 UI修缮6: 延时锦囊圆标 (名首字, 按放置顺序) 落卡底角 -->
+          <div class="judge-area judge-dots" id="enemyJudgeArea" aria-label="敌方判定区"></div>
+          <span class="hand-corner" id="enemyHandBadge" aria-label="手牌数">0</span>
         </article>
-
-        <div class="zone-panel">
-          <div class="zone-title">敌方装备区 <span class="badge">武器 / 防具 / 坐骑</span></div>
-          <div class="equipment-area" id="enemyEquipmentArea"><span class="mini-card">未装备</span></div>
-          <div class="panel-title" style="margin-top:12px">敌方手牌</div>
-          <div class="small-card-row" id="enemyHandBacks"></div>
-        </div>
       </section>
 
       <!-- v12 H6: 3人身份场第三席 (ally) — 默认 hidden (1v1 零回归), JS 在
            identity3 对局中据 game.ally 存在与否显隐。列模板复用 opponent-zone
            结构 (判定区 | 英雄 | 装备区), 不新造视觉语言。 -->
-      <section class="ally-zone" id="allyZone" hidden>
-        <div class="zone-panel">
-          <div class="zone-title">第三席判定区 <span class="badge">延时锦囊</span></div>
-          <div class="judge-area" id="allyJudgeArea"><span class="mini-card">空</span></div>
-        </div>
-
-        <article class="hero ally" id="allyHero" data-camp="蜀">
+            <section class="ally-zone" id="allyZone" hidden>
+        <article class="hero ally seat-card" id="allyHero" data-camp="蜀">
           <div class="hero-aura"></div>
           <span class="lord-badge" id="allyLordBadge" hidden aria-label="主公">主</span>
           <span class="rebel-badge" id="allyRebelBadge" hidden aria-label="反贼">反</span>
@@ -277,26 +258,19 @@
             <div class="stat"><small>手牌</small><strong id="allyHandCount">0</strong></div>
             <div class="stat"><small>状态</small><strong id="allyState">待机</strong></div>
           </div>
+          <!-- v13 UI修缮6: 装备槽列 (武器/防具/+1马/-1马 定序小方块) 并入角色卡 -->
+          <div class="equipment-area equip-column" id="allyEquipmentArea"></div>
+          <!-- v13 UI修缮6: 延时锦囊圆标 (名首字, 按放置顺序) 落卡底角 -->
+          <div class="judge-area judge-dots" id="allyJudgeArea" aria-label="第三席判定区"></div>
+          <span class="hand-corner" id="allyHandBadge" aria-label="手牌数">0</span>
         </article>
-
-        <div class="zone-panel">
-          <div class="zone-title">第三席装备区 <span class="badge">武器 / 防具 / 坐骑</span></div>
-          <div class="equipment-area" id="allyEquipmentArea"><span class="mini-card">未装备</span></div>
-          <div class="panel-title" style="margin-top:12px">第三席手牌</div>
-          <div class="small-card-row" id="allyHandBacks"></div>
-        </div>
       </section>
 
       <!-- v13 K3: 4/5 人身份场第四/五席 — 预置槽位方案 (与 ally-zone 同构
            复用, 默认 hidden, 1v1/3p 零回归), board-panels 按 game.seats
            存在性逐席显隐。席位文案中性 (第四席/第五席), 身份看徽章。 -->
-      <section class="ally-zone" id="ally2Zone" hidden>
-        <div class="zone-panel">
-          <div class="zone-title">第四席判定区 <span class="badge">延时锦囊</span></div>
-          <div class="judge-area" id="ally2JudgeArea"><span class="mini-card">空</span></div>
-        </div>
-
-        <article class="hero ally" id="ally2Hero" data-camp="群">
+            <section class="ally-zone" id="ally2Zone" hidden>
+        <article class="hero ally seat-card" id="ally2Hero" data-camp="群">
           <div class="hero-aura"></div>
           <span class="lord-badge" id="ally2LordBadge" hidden aria-label="主公">主</span>
           <span class="rebel-badge" id="ally2RebelBadge" hidden aria-label="反贼">反</span>
@@ -317,23 +291,16 @@
             <div class="stat"><small>手牌</small><strong id="ally2HandCount">0</strong></div>
             <div class="stat"><small>状态</small><strong id="ally2State">待机</strong></div>
           </div>
+          <!-- v13 UI修缮6: 装备槽列 (武器/防具/+1马/-1马 定序小方块) 并入角色卡 -->
+          <div class="equipment-area equip-column" id="ally2EquipmentArea"></div>
+          <!-- v13 UI修缮6: 延时锦囊圆标 (名首字, 按放置顺序) 落卡底角 -->
+          <div class="judge-area judge-dots" id="ally2JudgeArea" aria-label="第四席判定区"></div>
+          <span class="hand-corner" id="ally2HandBadge" aria-label="手牌数">0</span>
         </article>
-
-        <div class="zone-panel">
-          <div class="zone-title">第四席装备区 <span class="badge">武器 / 防具 / 坐骑</span></div>
-          <div class="equipment-area" id="ally2EquipmentArea"><span class="mini-card">未装备</span></div>
-          <div class="panel-title" style="margin-top:12px">第四席手牌</div>
-          <div class="small-card-row" id="ally2HandBacks"></div>
-        </div>
       </section>
 
-      <section class="ally-zone" id="ally3Zone" hidden>
-        <div class="zone-panel">
-          <div class="zone-title">第五席判定区 <span class="badge">延时锦囊</span></div>
-          <div class="judge-area" id="ally3JudgeArea"><span class="mini-card">空</span></div>
-        </div>
-
-        <article class="hero ally" id="ally3Hero" data-camp="群">
+            <section class="ally-zone" id="ally3Zone" hidden>
+        <article class="hero ally seat-card" id="ally3Hero" data-camp="群">
           <div class="hero-aura"></div>
           <span class="lord-badge" id="ally3LordBadge" hidden aria-label="主公">主</span>
           <span class="rebel-badge" id="ally3RebelBadge" hidden aria-label="反贼">反</span>
@@ -354,14 +321,12 @@
             <div class="stat"><small>手牌</small><strong id="ally3HandCount">0</strong></div>
             <div class="stat"><small>状态</small><strong id="ally3State">待机</strong></div>
           </div>
+          <!-- v13 UI修缮6: 装备槽列 (武器/防具/+1马/-1马 定序小方块) 并入角色卡 -->
+          <div class="equipment-area equip-column" id="ally3EquipmentArea"></div>
+          <!-- v13 UI修缮6: 延时锦囊圆标 (名首字, 按放置顺序) 落卡底角 -->
+          <div class="judge-area judge-dots" id="ally3JudgeArea" aria-label="第五席判定区"></div>
+          <span class="hand-corner" id="ally3HandBadge" aria-label="手牌数">0</span>
         </article>
-
-        <div class="zone-panel">
-          <div class="zone-title">第五席装备区 <span class="badge">武器 / 防具 / 坐骑</span></div>
-          <div class="equipment-area" id="ally3EquipmentArea"><span class="mini-card">未装备</span></div>
-          <div class="panel-title" style="margin-top:12px">第五席手牌</div>
-          <div class="small-card-row" id="ally3HandBacks"></div>
-        </div>
       </section>
 
       <section class="arena-zone" id="centerArena">
@@ -412,13 +377,6 @@
       </section>
 
       <section class="player-zone" id="playerBoard">
-        <div class="zone-panel">
-          <div class="zone-title">玩家装备区 <span class="badge">武器 / 防具 / 坐骑</span></div>
-          <div class="equipment-area" id="playerEquipmentArea"><span class="mini-card">未装备</span></div>
-          <div class="zone-title" style="margin-top:12px">玩家判定区</div>
-          <div class="judge-area" id="playerJudgeArea"><span class="mini-card">空</span></div>
-        </div>
-
         <section class="panel">
           <div class="panel-title">
             <span>武将技能</span>
@@ -430,7 +388,7 @@
           <div class="skill-bar" id="playerSkillBar"><span class="mini-card">仁德</span></div>
         </section>
 
-        <article class="hero player" id="playerHero" data-camp="蜀">
+        <article class="hero player seat-card" id="playerHero" data-camp="蜀">
           <div class="hero-aura"></div>
           <span class="lord-badge" id="playerLordBadge" hidden aria-label="主公">主</span>
           <span class="rebel-badge" id="playerRebelBadge" hidden aria-label="反贼">反</span>
@@ -450,6 +408,10 @@
             <div class="stat"><small>手牌</small><strong id="playerHandCount">0</strong></div>
             <div class="stat"><small>状态</small><strong id="playerState">行动</strong></div>
           </div>
+          <!-- v13 UI修缮6: 玩家席同款单卡 — 装备槽列 + 延时锦囊圆标 + 手牌数角标 -->
+          <div class="equipment-area equip-column" id="playerEquipmentArea"></div>
+          <div class="judge-area judge-dots" id="playerJudgeArea" aria-label="玩家判定区"></div>
+          <span class="hand-corner" id="playerHandBadge" aria-label="手牌数">0</span>
         </article>
       </section>
 

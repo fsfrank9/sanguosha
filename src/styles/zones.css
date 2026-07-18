@@ -117,3 +117,88 @@
       border-color: rgba(255,224,154,.85);
       font-weight: 900;
     }
+
+/* ───── v13 UI修缮6: 单卡化座席 — 装备槽列 / 判定圆标 / 手牌角标 ─────
+   对照官方截图: 每席一张长方角色卡; 装备按 武器/防具/+1马/-1马 纵列
+   小方块; 延时锦囊为名首字着色圆标 (乐/兵/闪) 落卡底角; 手牌数为
+   右下角小方块数字。 */
+.hero.seat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 26px; /* 底角角标/圆标让位 */
+}
+.equip-column {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 3px;
+  min-height: 0;
+}
+.equip-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  border: 1px solid rgba(255, 214, 138, .32);
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(28, 24, 18, .92), rgba(14, 12, 9, .92));
+  color: #f2e6c9;
+}
+.equip-slot.is-empty {
+  opacity: .28;
+  border-style: dashed;
+}
+.equip-slot__tag {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  color: #d9b36b;
+  border: 1px solid rgba(217, 179, 107, .5);
+  border-radius: 3px;
+  padding: 0 3px;
+  flex: none;
+}
+.judge-dots {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  display: flex;
+  gap: 4px;
+  min-height: 0;
+}
+.judge-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  border: 1px solid rgba(0, 0, 0, .45);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+  background: #6b7280;
+}
+.judge-dot--lebusishu { background: linear-gradient(180deg, #d4a017, #8a6a10); }
+.judge-dot--bingliang { background: linear-gradient(180deg, #8b5a2b, #5c3a1a); }
+.judge-dot--shandian { background: linear-gradient(180deg, #4a90d9, #2b5e96); }
+.hand-corner {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1d1608;
+  background: linear-gradient(180deg, #ffd68a, #caa25a);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, .4);
+}

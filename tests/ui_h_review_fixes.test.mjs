@@ -183,7 +183,10 @@ test('U5: identity3 铁索 → "重铸"附加按钮弃牌摸牌', () => {
   $('playerHand').dispatchClick({ 'data-card-id': 'ts3' });
   $('handConfirmBtn').click();
   assert.equal($('seatTargetExtraBtn').hidden, false, '重铸附加按钮显示');
+  // v13 UI修缮1: 点"重铸"仅暂存, 须按座席面板"确定"执行。
   $('seatTargetExtraBtn').click();
+  assert.ok(game.player.hand.some((card) => card.id === 'ts3'), '点重铸仅暂存, 铁索未弃');
+  $('seatTargetConfirmBtn').click();
   assert.equal(game.player.hand.length, handBefore, '重铸: 弃铁索 + 摸 1 张 (净手牌不变)');
   assert.ok(game.log.some((l) => l.includes('重铸')), '日志记录重铸');
 });

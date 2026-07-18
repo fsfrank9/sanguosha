@@ -81,8 +81,9 @@ test('v9 PR-E4: index.html 两个 hero 元素都有 lord-badge (player + enemy)'
   assert.match(html, /id="playerLordBadge"[^>]*hidden[^>]*>主<\/span>/);
   assert.match(html, /id="enemyLordBadge"[^>]*hidden[^>]*>主<\/span>/);
   // 必须在 .hero 元素内 (player + enemy)
-  assert.match(html, /<article class="hero enemy"[\s\S]{0,300}id="enemyLordBadge"/);
-  assert.match(html, /<article class="hero player"[\s\S]{0,300}id="playerLordBadge"/);
+  // v13 UI修缮6: 座席单卡化 — hero 类名追加 seat-card, 徽章结构不变。
+  assert.match(html, /<article class="hero enemy seat-card"[\s\S]{0,300}id="enemyLordBadge"/);
+  assert.match(html, /<article class="hero player seat-card"[\s\S]{0,300}id="playerLordBadge"/);
 });
 
 test('v9 PR-E4: dom-adapter 缓存 playerLordBadge + enemyLordBadge', () => {
