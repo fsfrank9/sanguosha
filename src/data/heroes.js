@@ -17,7 +17,7 @@
           { id: 'jianxiong', name: '奸雄', desc: '受到伤害后可获得造成伤害的牌。' },
           { id: 'hujia', name: '护驾', desc: '主公技：可令魏势力角色代出【闪】；1v1 中作为身份技展示。', lord: true }
         ] },
-        machao: { id: 'machao', name: '马超', camp: '群', gender: 'male', title: '一骑当千', maxHp: 4, quote: '全军突击！', pack: 'standard', skills: [
+        machao: { id: 'machao', name: '马超', camp: '蜀', gender: 'male', title: '一骑当千', maxHp: 4, quote: '全军突击！', pack: 'standard', skills: [
           { id: 'mashu', name: '马术', desc: '锁定技：你计算与其他角色的距离 -1。' },
           { id: 'tieqi', name: '铁骑', desc: '杀指定目标后判定，红色则目标不能闪。' }
         ] },
@@ -66,62 +66,62 @@
       ]);
 
       addHeroPack('wind', [
-        { id: 'xiahouyuan', name: '夏侯渊', camp: '魏', title: '疾行的猎豹', maxHp: 4, quote: '取汝首级犹探囊取物。', skills: [{ id: 'shensu', name: '神速', desc: '可跳过阶段视为使用杀。' }] },
-        { id: 'caoren', name: '曹仁', camp: '魏', title: '大将军', maxHp: 4, quote: '固若金汤。', skills: [{ id: 'jushou', name: '据守', desc: '结束阶段可摸牌并翻面。' }] },
-        { id: 'huangzhong', name: '黄忠', camp: '蜀', title: '老当益壮', maxHp: 4, quote: '百步穿杨！', skills: [{ id: 'liegong', name: '烈弓', desc: '满足条件时目标不能闪。' }] },
-        { id: 'weiyan', name: '魏延', camp: '蜀', title: '嗜血的独狼', maxHp: 4, quote: '谁敢杀我？', skills: [{ id: 'kuanggu', name: '狂骨', desc: '造成伤害后可回复体力。' }] },
-        { id: 'xiaoqiao', name: '小乔', camp: '吴', title: '矫情之花', maxHp: 3, quote: '接着哦。', skills: [{ id: 'tianxiang', name: '天香', desc: '受到伤害时可弃红桃转移。' }, { id: 'hongyan', name: '红颜', desc: '黑桃牌视为红桃。' }] },
-        { id: 'zhoutai', name: '周泰', camp: '吴', title: '历战之躯', maxHp: 4, quote: '还不够！', skills: [{ id: 'buqu', name: '不屈', desc: '濒死时以不屈牌维持生存。' }] },
-        { id: 'zhangjiao', name: '张角', camp: '群', title: '天公将军', maxHp: 3, quote: '苍天已死，黄天当立！', skills: [{ id: 'leiji', name: '雷击', desc: '使用或打出闪时，可令一名其他角色判定，黑桃则其受2点雷伤。' }, { id: 'guidao', name: '鬼道', desc: '判定牌生效前，可打出黑色手牌替换之。' }, { id: 'huangtian', name: '黄天', desc: '主公技：群势力可给你闪/闪电。', lord: true }] },
-        { id: 'yuji', name: '于吉', camp: '群', title: '太平道人', maxHp: 3, quote: '猜猜看哪。', skills: [{ id: 'guhuo', name: '蛊惑', desc: '可声明任意基本牌/锦囊。' }] }
+        { id: 'xiahouyuan', name: '夏侯渊', camp: '魏', gender: 'male', title: '疾行的猎豹', maxHp: 4, quote: '取汝首级犹探囊取物。', skills: [{ id: 'shensu', name: '神速', desc: '可跳过阶段视为使用杀。' }] },
+        { id: 'caoren', name: '曹仁', camp: '魏', gender: 'male', title: '大将军', maxHp: 4, quote: '固若金汤。', skills: [{ id: 'jushou', name: '据守', desc: '结束阶段可摸牌并翻面。' }] },
+        { id: 'huangzhong', name: '黄忠', camp: '蜀', gender: 'male', title: '老当益壮', maxHp: 4, quote: '百步穿杨！', skills: [{ id: 'liegong', name: '烈弓', desc: '满足条件时目标不能闪。' }] },
+        { id: 'weiyan', name: '魏延', camp: '蜀', gender: 'male', title: '嗜血的独狼', maxHp: 4, quote: '谁敢杀我？', skills: [{ id: 'kuanggu', name: '狂骨', desc: '造成伤害后可回复体力。' }] },
+        { id: 'xiaoqiao', name: '小乔', camp: '吴', gender: 'female', title: '矫情之花', maxHp: 3, quote: '接着哦。', skills: [{ id: 'tianxiang', name: '天香', desc: '受到伤害时可弃红桃转移。' }, { id: 'hongyan', name: '红颜', desc: '黑桃牌视为红桃。' }] },
+        { id: 'zhoutai', name: '周泰', camp: '吴', gender: 'male', title: '历战之躯', maxHp: 4, quote: '还不够！', skills: [{ id: 'buqu', name: '不屈', desc: '濒死时以不屈牌维持生存。' }] },
+        { id: 'zhangjiao', name: '张角', camp: '群', gender: 'male', title: '天公将军', maxHp: 3, quote: '苍天已死，黄天当立！', skills: [{ id: 'leiji', name: '雷击', desc: '使用或打出闪时，可令一名其他角色判定，黑桃则其受2点雷伤。' }, { id: 'guidao', name: '鬼道', desc: '判定牌生效前，可打出黑色手牌替换之。' }, { id: 'huangtian', name: '黄天', desc: '主公技：群势力可给你闪/闪电。', lord: true }] },
+        { id: 'yuji', name: '于吉', camp: '群', gender: 'male', title: '太平道人', maxHp: 3, quote: '猜猜看哪。', skills: [{ id: 'guhuo', name: '蛊惑', desc: '可声明任意基本牌/锦囊。' }] }
       ]);
 
       addHeroPack('forest', [
-        { id: 'xuhuang', name: '徐晃', camp: '魏', title: '周亚夫之风', maxHp: 4, quote: '兵粮寸断，粮草先行。', skills: [{ id: 'duanliang', name: '断粮', desc: '可将黑色基本/装备当兵粮寸断。' }] },
-        { id: 'caopi', name: '曹丕', camp: '魏', title: '霸业的继承者', maxHp: 3, quote: '来，管杀还管埋。', skills: [{ id: 'xingshang', name: '行殇', desc: '角色死亡时可获得其牌。' }, { id: 'fangzhu', name: '放逐', desc: '受伤后可令一名角色翻面摸牌。' }, { id: 'songwei', name: '颂威', desc: '主公技：魏势力黑色判定后你可摸牌。', lord: true }] },
-        { id: 'sunjian', name: '孙坚', camp: '吴', title: '武烈帝', maxHp: 4, quote: '以吾魂魄，保佑吾儿。', skills: [{ id: 'yinghun', name: '英魂', desc: '准备阶段可令一名角色摸弃或弃摸。' }] },
-        { id: 'lusu', name: '鲁肃', camp: '吴', title: '独断的外交家', maxHp: 3, quote: '以和为贵。', skills: [{ id: 'haoshi', name: '好施', desc: '摸牌阶段可多摸并分牌。' }, { id: 'dimeng', name: '缔盟', desc: '可交换两名角色手牌。' }] },
-        { id: 'menghuo', name: '孟获', camp: '蜀', title: '南蛮王', maxHp: 4, quote: '背黑锅我来，送死你去。', skills: [{ id: 'huoshou', name: '祸首', desc: '南蛮入侵视为由你造成。' }, { id: 'zaiqi', name: '再起', desc: '摸牌阶段可弃判定牌回复/摸牌。' }] },
-        { id: 'zhurong', name: '祝融', camp: '蜀', title: '野性的女王', maxHp: 4, quote: '尝尝我飞刀的厉害！', skills: [{ id: 'juxiang', name: '巨象', desc: '南蛮入侵对你无效并可获得。' }, { id: 'lieren', name: '烈刃', desc: '杀造成伤害后可拼点获得牌。' }] },
-        { id: 'jiaxu', name: '贾诩', camp: '群', title: '冷酷的毒士', maxHp: 3, quote: '神仙难救，神仙难救啊。', skills: [{ id: 'wansha', name: '完杀', desc: '你的回合濒死只能由本人用桃。' }, { id: 'luanwu', name: '乱武', desc: '限定技：所有角色依次使用杀或失血。' }, { id: 'weimu', name: '帷幕', desc: '不能成为黑色锦囊目标。' }] },
-        { id: 'dongzhuo', name: '董卓', camp: '群', title: '魔王', maxHp: 8, quote: '酒池肉林，快活快活！', skills: [{ id: 'jiuchi', name: '酒池', desc: '可将黑桃牌当酒。' }, { id: 'roulin', name: '肉林', desc: '与女性角色杀/闪响应加倍。' }, { id: 'benghuai', name: '崩坏', desc: '结束阶段体力不是最少则失去体力或上限。' }, { id: 'baonue', name: '暴虐', desc: '主公技：群势力造成伤害后可令你判定回复。', lord: true }] }
+        { id: 'xuhuang', name: '徐晃', camp: '魏', gender: 'male', title: '周亚夫之风', maxHp: 4, quote: '兵粮寸断，粮草先行。', skills: [{ id: 'duanliang', name: '断粮', desc: '可将黑色基本/装备当兵粮寸断。' }] },
+        { id: 'caopi', name: '曹丕', camp: '魏', gender: 'male', title: '霸业的继承者', maxHp: 3, quote: '来，管杀还管埋。', skills: [{ id: 'xingshang', name: '行殇', desc: '角色死亡时可获得其牌。' }, { id: 'fangzhu', name: '放逐', desc: '受伤后可令一名角色翻面摸牌。' }, { id: 'songwei', name: '颂威', desc: '主公技：魏势力黑色判定后你可摸牌。', lord: true }] },
+        { id: 'sunjian', name: '孙坚', camp: '吴', gender: 'male', title: '武烈帝', maxHp: 4, quote: '以吾魂魄，保佑吾儿。', skills: [{ id: 'yinghun', name: '英魂', desc: '准备阶段可令一名角色摸弃或弃摸。' }] },
+        { id: 'lusu', name: '鲁肃', camp: '吴', gender: 'male', title: '独断的外交家', maxHp: 3, quote: '以和为贵。', skills: [{ id: 'haoshi', name: '好施', desc: '摸牌阶段可多摸并分牌。' }, { id: 'dimeng', name: '缔盟', desc: '可交换两名角色手牌。' }] },
+        { id: 'menghuo', name: '孟获', camp: '蜀', gender: 'male', title: '南蛮王', maxHp: 4, quote: '背黑锅我来，送死你去。', skills: [{ id: 'huoshou', name: '祸首', desc: '南蛮入侵视为由你造成。' }, { id: 'zaiqi', name: '再起', desc: '摸牌阶段可弃判定牌回复/摸牌。' }] },
+        { id: 'zhurong', name: '祝融', camp: '蜀', gender: 'female', title: '野性的女王', maxHp: 4, quote: '尝尝我飞刀的厉害！', skills: [{ id: 'juxiang', name: '巨象', desc: '南蛮入侵对你无效并可获得。' }, { id: 'lieren', name: '烈刃', desc: '杀造成伤害后可拼点获得牌。' }] },
+        { id: 'jiaxu', name: '贾诩', camp: '群', gender: 'male', title: '冷酷的毒士', maxHp: 3, quote: '神仙难救，神仙难救啊。', skills: [{ id: 'wansha', name: '完杀', desc: '你的回合濒死只能由本人用桃。' }, { id: 'luanwu', name: '乱武', desc: '限定技：所有角色依次使用杀或失血。' }, { id: 'weimu', name: '帷幕', desc: '不能成为黑色锦囊目标。' }] },
+        { id: 'dongzhuo', name: '董卓', camp: '群', gender: 'male', title: '魔王', maxHp: 8, quote: '酒池肉林，快活快活！', skills: [{ id: 'jiuchi', name: '酒池', desc: '可将黑桃牌当酒。' }, { id: 'roulin', name: '肉林', desc: '与女性角色杀/闪响应加倍。' }, { id: 'benghuai', name: '崩坏', desc: '结束阶段体力不是最少则失去体力或上限。' }, { id: 'baonue', name: '暴虐', desc: '主公技：群势力造成伤害后可令你判定回复。', lord: true }] }
       ]);
 
       addHeroPack('fire', [
-        { id: 'dianwei', name: '典韦', camp: '魏', title: '古之恶来', maxHp: 4, quote: '吃我一戟！', skills: [{ id: 'qiangxi', name: '强袭', desc: '出牌阶段可失血或弃武器对距离 1 角色造成伤害。' }] },
-        { id: 'xunyu', name: '荀彧', camp: '魏', title: '王佐之才', maxHp: 3, quote: '驱虎吞狼。', skills: [{ id: 'quhu', name: '驱虎', desc: '拼点令强者伤害他人。' }, { id: 'jieming', name: '节命', desc: '受伤后可令一名角色补手牌至体力上限。' }] },
-        { id: 'wolong', name: '卧龙诸葛亮', camp: '蜀', title: '卧龙', maxHp: 3, quote: '此阵可挡精兵十万。', skills: [{ id: 'bazhen', name: '八阵', desc: '无防具时视为装备八卦阵。' }, { id: 'huoji', name: '火计', desc: '可将红色牌当火攻。' }, { id: 'kanpo', name: '看破', desc: '可将黑色牌当无懈可击。' }] },
-        { id: 'pangtong', name: '庞统', camp: '蜀', title: '凤雏', maxHp: 3, quote: '伤一敌可连其百。', skills: [{ id: 'lianhuan', name: '连环', desc: '可将梅花牌当铁索连环重铸/使用。' }, { id: 'niepan', name: '涅槃', desc: '限定技：濒死时复原并摸牌。' }] },
-        { id: 'taishici', name: '太史慈', camp: '吴', title: '笃烈之士', maxHp: 4, quote: '大丈夫生于乱世，当带三尺剑立不世之功！', skills: [{ id: 'tianyi', name: '天义', desc: '拼点成功后杀次数/目标/距离增强。' }] },
-        { id: 'pangde', name: '庞德', camp: '群', title: '抬榇之悟', maxHp: 4, quote: '抬棺而战，不死不休！', skills: [{ id: 'mashu', name: '马术', desc: '锁定技：你计算与其他角色距离 -1。' }, { id: 'mengjin', name: '猛进', desc: '杀被闪抵消后可弃目标一张牌。' }] },
-        { id: 'yanliangwenchou', name: '颜良文丑', camp: '群', title: '虎狼兄弟', maxHp: 4, quote: '快来与我等决一死战！', skills: [{ id: 'shuangxiong', name: '双雄', desc: '摸牌阶段判定后可将异色牌当决斗。' }] },
-        { id: 'yuanshao', name: '袁绍', camp: '群', title: '高贵的名门', maxHp: 4, quote: '弓箭手，准备放箭！', skills: [{ id: 'luanji', name: '乱击', desc: '可将两张同花色手牌当万箭齐发。' }, { id: 'xueyi', name: '血裔', desc: '主公技：手牌上限增加。', lord: true }] }
+        { id: 'dianwei', name: '典韦', camp: '魏', gender: 'male', title: '古之恶来', maxHp: 4, quote: '吃我一戟！', skills: [{ id: 'qiangxi', name: '强袭', desc: '出牌阶段可失血或弃武器对距离 1 角色造成伤害。' }] },
+        { id: 'xunyu', name: '荀彧', camp: '魏', gender: 'male', title: '王佐之才', maxHp: 3, quote: '驱虎吞狼。', skills: [{ id: 'quhu', name: '驱虎', desc: '拼点令强者伤害他人。' }, { id: 'jieming', name: '节命', desc: '受伤后可令一名角色补手牌至体力上限。' }] },
+        { id: 'wolong', name: '卧龙诸葛亮', camp: '蜀', gender: 'male', title: '卧龙', maxHp: 3, quote: '此阵可挡精兵十万。', skills: [{ id: 'bazhen', name: '八阵', desc: '无防具时视为装备八卦阵。' }, { id: 'huoji', name: '火计', desc: '可将红色牌当火攻。' }, { id: 'kanpo', name: '看破', desc: '可将黑色牌当无懈可击。' }] },
+        { id: 'pangtong', name: '庞统', camp: '蜀', gender: 'male', title: '凤雏', maxHp: 3, quote: '伤一敌可连其百。', skills: [{ id: 'lianhuan', name: '连环', desc: '可将梅花牌当铁索连环重铸/使用。' }, { id: 'niepan', name: '涅槃', desc: '限定技：濒死时复原并摸牌。' }] },
+        { id: 'taishici', name: '太史慈', camp: '吴', gender: 'male', title: '笃烈之士', maxHp: 4, quote: '大丈夫生于乱世，当带三尺剑立不世之功！', skills: [{ id: 'tianyi', name: '天义', desc: '拼点成功后杀次数/目标/距离增强。' }] },
+        { id: 'pangde', name: '庞德', camp: '群', gender: 'male', title: '抬榇之悟', maxHp: 4, quote: '抬棺而战，不死不休！', skills: [{ id: 'mashu', name: '马术', desc: '锁定技：你计算与其他角色距离 -1。' }, { id: 'mengjin', name: '猛进', desc: '杀被闪抵消后可弃目标一张牌。' }] },
+        { id: 'yanliangwenchou', name: '颜良文丑', camp: '群', gender: 'male', title: '虎狼兄弟', maxHp: 4, quote: '快来与我等决一死战！', skills: [{ id: 'shuangxiong', name: '双雄', desc: '摸牌阶段判定后可将异色牌当决斗。' }] },
+        { id: 'yuanshao', name: '袁绍', camp: '群', gender: 'male', title: '高贵的名门', maxHp: 4, quote: '弓箭手，准备放箭！', skills: [{ id: 'luanji', name: '乱击', desc: '可将两张同花色手牌当万箭齐发。' }, { id: 'xueyi', name: '血裔', desc: '主公技：手牌上限增加。', lord: true }] }
       ]);
 
       addHeroPack('mountain', [
-        { id: 'zhanghe', name: '张郃', camp: '魏', title: '料敌机先', maxHp: 4, quote: '兵无常势，水无常形。', skills: [{ id: 'qiaobian', name: '巧变', desc: '可弃手牌跳过阶段并移动牌。' }] },
-        { id: 'dengai', name: '邓艾', camp: '魏', title: '矫然的壮士', maxHp: 4, quote: '屯田日久，当建奇功。', skills: [{ id: 'tuntian', name: '屯田', desc: '回合外失牌后判定为田。' }, { id: 'zaoxian', name: '凿险', desc: '觉醒技：田达到条件后获得急袭。' }] },
-        { id: 'liushan', name: '刘禅', camp: '蜀', title: '无为的真命主', maxHp: 3, quote: '享乐太平，有何不可？', skills: [{ id: 'xiangle', name: '享乐', desc: '杀指定你时需弃基本牌。' }, { id: 'fangquan', name: '放权', desc: '可跳过出牌阶段令他人额外回合。' }, { id: 'ruoyu', name: '若愚', desc: '主公觉醒技。', lord: true }] },
-        { id: 'jiangwei', name: '姜维', camp: '蜀', title: '龙的衣钵', maxHp: 4, quote: '丞相遗志，不敢忘却。', skills: [{ id: 'tiaoxin', name: '挑衅', desc: '令目标对你使用杀，否则你弃其牌。' }, { id: 'zhiji', name: '志继', desc: '觉醒技：无手牌时减上限并获得观星。' }] },
-        { id: 'sunce', name: '孙策', camp: '吴', title: '江东的小霸王', maxHp: 4, quote: '吾乃江东小霸王孙伯符！', skills: [{ id: 'jiang', name: '激昂', desc: '红色杀/决斗相关时摸牌。' }, { id: 'hunzi', name: '魂姿', desc: '觉醒技：体力低时减上限得英姿英魂。' }, { id: 'zhiba', name: '制霸', desc: '主公技：吴势力可与你拼点。', lord: true }] },
-        { id: 'erzhang', name: '张昭张纮', camp: '吴', title: '经天纬地', maxHp: 3, quote: '为将军计，当从容图之。', skills: [{ id: 'zhijian', name: '直谏', desc: '可将装备置入他人装备区并摸牌。' }, { id: 'guzheng', name: '固政', desc: '弃牌阶段结束时可归还弃牌并获得其余。' }] },
-        { id: 'caiwenji', name: '蔡文姬', camp: '群', title: '异乡的孤女', maxHp: 3, quote: '胡笳十八拍，拍拍断人肠。', skills: [{ id: 'beige', name: '悲歌', desc: '角色受杀伤害后可弃牌判定辅助。' }, { id: 'duanchang', name: '断肠', desc: '死亡后杀死你的角色失去技能。' }] },
-        { id: 'zuoci', name: '左慈', camp: '群', title: '迷之仙人', maxHp: 3, quote: '幻化之术，存乎一心。', skills: [{ id: 'huashen', name: '化身', desc: '获得化身牌并拥有其技能。' }, { id: 'xinsheng', name: '新生', desc: '受到伤害后获得化身。' }] }
+        { id: 'zhanghe', name: '张郃', camp: '魏', gender: 'male', title: '料敌机先', maxHp: 4, quote: '兵无常势，水无常形。', skills: [{ id: 'qiaobian', name: '巧变', desc: '可弃手牌跳过阶段并移动牌。' }] },
+        { id: 'dengai', name: '邓艾', camp: '魏', gender: 'male', title: '矫然的壮士', maxHp: 4, quote: '屯田日久，当建奇功。', skills: [{ id: 'tuntian', name: '屯田', desc: '回合外失牌后判定为田。' }, { id: 'zaoxian', name: '凿险', desc: '觉醒技：田达到条件后获得急袭。' }] },
+        { id: 'liushan', name: '刘禅', camp: '蜀', gender: 'male', title: '无为的真命主', maxHp: 3, quote: '享乐太平，有何不可？', skills: [{ id: 'xiangle', name: '享乐', desc: '杀指定你时需弃基本牌。' }, { id: 'fangquan', name: '放权', desc: '可跳过出牌阶段令他人额外回合。' }, { id: 'ruoyu', name: '若愚', desc: '主公觉醒技。', lord: true }] },
+        { id: 'jiangwei', name: '姜维', camp: '蜀', gender: 'male', title: '龙的衣钵', maxHp: 4, quote: '丞相遗志，不敢忘却。', skills: [{ id: 'tiaoxin', name: '挑衅', desc: '令目标对你使用杀，否则你弃其牌。' }, { id: 'zhiji', name: '志继', desc: '觉醒技：无手牌时减上限并获得观星。' }] },
+        { id: 'sunce', name: '孙策', camp: '吴', gender: 'male', title: '江东的小霸王', maxHp: 4, quote: '吾乃江东小霸王孙伯符！', skills: [{ id: 'jiang', name: '激昂', desc: '红色杀/决斗相关时摸牌。' }, { id: 'hunzi', name: '魂姿', desc: '觉醒技：体力低时减上限得英姿英魂。' }, { id: 'zhiba', name: '制霸', desc: '主公技：吴势力可与你拼点。', lord: true }] },
+        { id: 'erzhang', name: '张昭张纮', camp: '吴', gender: 'male', title: '经天纬地', maxHp: 3, quote: '为将军计，当从容图之。', skills: [{ id: 'zhijian', name: '直谏', desc: '可将装备置入他人装备区并摸牌。' }, { id: 'guzheng', name: '固政', desc: '弃牌阶段结束时可归还弃牌并获得其余。' }] },
+        { id: 'caiwenji', name: '蔡文姬', camp: '群', gender: 'female', title: '异乡的孤女', maxHp: 3, quote: '胡笳十八拍，拍拍断人肠。', skills: [{ id: 'beige', name: '悲歌', desc: '角色受杀伤害后可弃牌判定辅助。' }, { id: 'duanchang', name: '断肠', desc: '死亡后杀死你的角色失去技能。' }] },
+        { id: 'zuoci', name: '左慈', camp: '群', gender: 'male', title: '迷之仙人', maxHp: 3, quote: '幻化之术，存乎一心。', skills: [{ id: 'huashen', name: '化身', desc: '获得化身牌并拥有其技能。' }, { id: 'xinsheng', name: '新生', desc: '受到伤害后获得化身。' }] }
       ]);
 
       addHeroPack('sp', [
-        { id: 'sp_zhaoyun', name: 'SP 赵云', camp: '群', title: '白马先锋', maxHp: 3, quote: '龙胆在身，进退无惧。', skills: [{ id: 'longdan', name: '龙胆', desc: '杀/闪互转。' }, { id: 'chongzhen', name: '冲阵', desc: '发动龙胆时可获得对方牌。' }] },
-        { id: 'sp_diaochan', name: 'SP 貂蝉', camp: '群', title: '暗黑的傀儡师', maxHp: 3, quote: '这场戏才刚刚开始。', skills: [{ id: 'lihun', name: '离魂', desc: '可获得男性角色手牌后交还。' }, { id: 'biyue', name: '闭月', desc: '结束阶段摸一张。' }] },
-        { id: 'sp_machao', name: 'SP 马超', camp: '群', title: '西凉的猛狮', maxHp: 4, quote: '西凉铁骑，踏破山河！', skills: [{ id: 'zhuiji', name: '追击', desc: '距离相关锁定技。' }, { id: 'shichou', name: '誓仇', desc: '主公技/限定技展示。' }] },
-        { id: 'sp_guanyu', name: 'SP 关羽', camp: '魏', title: '汉寿亭侯', maxHp: 4, quote: '单刀赴会，义薄云天。', skills: [{ id: 'wusheng', name: '武圣', desc: '红牌当杀。' }, { id: 'danji', name: '单骑', desc: '觉醒技：条件达成后获得马术。' }] },
-        { id: 'sp_jiaxu', name: 'SP 贾诩', camp: '魏', title: '算无遗策', maxHp: 3, quote: '一切尽在算计。', skills: [{ id: 'zhenlue', name: '缜略', desc: '锦囊不受距离/无懈影响。' }, { id: 'jianshu', name: '间书', desc: '限定技：交给牌并令二人拼点。' }, { id: 'yongdi', name: '拥嫡', desc: '限定技：令男性角色加上限。' }] },
-        { id: 'sp_caoren', name: 'SP 曹仁', camp: '魏', title: '险不辞难', maxHp: 4, quote: '据守城池，以待援军。', skills: [{ id: 'weikui', name: '伪溃', desc: '可失体力观看并弃牌。' }, { id: 'lizhan', name: '励战', desc: '结束阶段令角色摸牌。' }] },
-        { id: 'sp_ganning', name: 'SP 甘宁', camp: '吴', title: '铃铛游侠', maxHp: 4, quote: '锦帆夜袭，片甲不留。', skills: [{ id: 'yinling', name: '银铃', desc: '可将黑色牌置为锦。' }, { id: 'junwei', name: '军威', desc: '结束阶段可弃锦令目标选择。' }] },
-        { id: 'sp_pangde', name: 'SP 庞德', camp: '魏', title: '决死抬榇', maxHp: 4, quote: '今日不是你死，就是我亡。', skills: [{ id: 'mashu', name: '马术', desc: '距离 -1。' }, { id: 'jianchu', name: '鞬出', desc: '杀指定后可弃目标牌。' }] },
-        { id: 'sp_yuanshu', name: 'SP 袁术', camp: '群', title: '仲家帝', maxHp: 4, quote: '玉玺在手，天下我有。', skills: [{ id: 'yongsi', name: '庸肆', desc: '摸牌/弃牌数与势力数相关。' }, { id: 'weidi', name: '伪帝', desc: '拥有当前主公技。' }] },
-        { id: 'sp_daqiao', name: 'SP 大乔', camp: '吴', title: '韶光易逝', maxHp: 3, quote: '伯符，我去了。', skills: [{ id: 'yanxiao', name: '言笑', desc: '可将方片牌置入判定区抵消判定牌。' }, { id: 'anxian', name: '安娴', desc: '出牌/被杀时摸弃。' }] },
-        { id: 'sp_xiahoudun', name: 'SP 夏侯惇', camp: '魏', title: '啖睛的苍狼', maxHp: 4, quote: '以彼之道，还施彼身。', skills: [{ id: 'fenyong', name: '愤勇', desc: '受到伤害后防止下一次伤害。' }, { id: 'xuehen', name: '雪恨', desc: '准备阶段可弃置来源牌。' }] },
-        { id: 'sp_sunshangxiang', name: 'SP 孙尚香', camp: '蜀', title: '梦醉良缘', maxHp: 3, quote: '夫君，身体要紧。', skills: [{ id: 'liangzhu', name: '良助', desc: '角色回复后可摸牌或令其摸牌。' }, { id: 'fanxiang', name: '返乡', desc: '觉醒技：获得枭姬。' }] }
+        { id: 'sp_zhaoyun', name: 'SP 赵云', camp: '群', gender: 'male', title: '白马先锋', maxHp: 3, quote: '龙胆在身，进退无惧。', skills: [{ id: 'longdan', name: '龙胆', desc: '杀/闪互转。' }, { id: 'chongzhen', name: '冲阵', desc: '发动龙胆时可获得对方牌。' }] },
+        { id: 'sp_diaochan', name: 'SP 貂蝉', camp: '群', gender: 'female', title: '暗黑的傀儡师', maxHp: 3, quote: '这场戏才刚刚开始。', skills: [{ id: 'lihun', name: '离魂', desc: '可获得男性角色手牌后交还。' }, { id: 'biyue', name: '闭月', desc: '结束阶段摸一张。' }] },
+        { id: 'sp_machao', name: 'SP 马超', camp: '群', gender: 'male', title: '西凉的猛狮', maxHp: 4, quote: '西凉铁骑，踏破山河！', skills: [{ id: 'zhuiji', name: '追击', desc: '距离相关锁定技。' }, { id: 'shichou', name: '誓仇', desc: '主公技/限定技展示。' }] },
+        { id: 'sp_guanyu', name: 'SP 关羽', camp: '魏', gender: 'male', title: '汉寿亭侯', maxHp: 4, quote: '单刀赴会，义薄云天。', skills: [{ id: 'wusheng', name: '武圣', desc: '红牌当杀。' }, { id: 'danji', name: '单骑', desc: '觉醒技：条件达成后获得马术。' }] },
+        { id: 'sp_jiaxu', name: 'SP 贾诩', camp: '魏', gender: 'male', title: '算无遗策', maxHp: 3, quote: '一切尽在算计。', skills: [{ id: 'zhenlue', name: '缜略', desc: '锦囊不受距离/无懈影响。' }, { id: 'jianshu', name: '间书', desc: '限定技：交给牌并令二人拼点。' }, { id: 'yongdi', name: '拥嫡', desc: '限定技：令男性角色加上限。' }] },
+        { id: 'sp_caoren', name: 'SP 曹仁', camp: '魏', gender: 'male', title: '险不辞难', maxHp: 4, quote: '据守城池，以待援军。', skills: [{ id: 'weikui', name: '伪溃', desc: '可失体力观看并弃牌。' }, { id: 'lizhan', name: '励战', desc: '结束阶段令角色摸牌。' }] },
+        { id: 'sp_ganning', name: 'SP 甘宁', camp: '吴', gender: 'male', title: '铃铛游侠', maxHp: 4, quote: '锦帆夜袭，片甲不留。', skills: [{ id: 'yinling', name: '银铃', desc: '可将黑色牌置为锦。' }, { id: 'junwei', name: '军威', desc: '结束阶段可弃锦令目标选择。' }] },
+        { id: 'sp_pangde', name: 'SP 庞德', camp: '魏', gender: 'male', title: '决死抬榇', maxHp: 4, quote: '今日不是你死，就是我亡。', skills: [{ id: 'mashu', name: '马术', desc: '距离 -1。' }, { id: 'jianchu', name: '鞬出', desc: '杀指定后可弃目标牌。' }] },
+        { id: 'sp_yuanshu', name: 'SP 袁术', camp: '群', gender: 'male', title: '仲家帝', maxHp: 4, quote: '玉玺在手，天下我有。', skills: [{ id: 'yongsi', name: '庸肆', desc: '摸牌/弃牌数与势力数相关。' }, { id: 'weidi', name: '伪帝', desc: '拥有当前主公技。' }] },
+        { id: 'sp_daqiao', name: 'SP 大乔', camp: '吴', gender: 'female', title: '韶光易逝', maxHp: 3, quote: '伯符，我去了。', skills: [{ id: 'yanxiao', name: '言笑', desc: '可将方片牌置入判定区抵消判定牌。' }, { id: 'anxian', name: '安娴', desc: '出牌/被杀时摸弃。' }] },
+        { id: 'sp_xiahoudun', name: 'SP 夏侯惇', camp: '魏', gender: 'male', title: '啖睛的苍狼', maxHp: 4, quote: '以彼之道，还施彼身。', skills: [{ id: 'fenyong', name: '愤勇', desc: '受到伤害后防止下一次伤害。' }, { id: 'xuehen', name: '雪恨', desc: '准备阶段可弃置来源牌。' }] },
+        { id: 'sp_sunshangxiang', name: 'SP 孙尚香', camp: '蜀', gender: 'female', title: '梦醉良缘', maxHp: 3, quote: '夫君，身体要紧。', skills: [{ id: 'liangzhu', name: '良助', desc: '角色回复后可摸牌或令其摸牌。' }, { id: 'fanxiang', name: '返乡', desc: '觉醒技：获得枭姬。' }] }
       ]);
 
       var HEROES = {

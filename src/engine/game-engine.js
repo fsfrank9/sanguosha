@@ -336,6 +336,8 @@
         continueTurnAfterPreparePhase: function (game, actor) { return continueTurnAfterPreparePhase(game, actor); },
         // v12 H2: AOE 逐座席队列被濒死救援挂起后的续跑 (锦囊域后置装配, 包装注入)
         resumeAOETargets: function (game) { return TricksRuntime.advanceAOETargets(game); },
+        // audit4-L5: 决斗链被插入结算挂起后的续跑 (锦囊域后置装配, 包装注入)
+        resumeDuelChain: function (game) { return TricksRuntime.advanceDuelChain(game); },
         // v12 H 复核修复: 铁索传导环被濒死救援挂起后的续跑 (伤害域后置装配, 包装注入)
         resumeChainTransmit: function (game) { return DamageDyingRuntime.advanceChainTransmit(game); }
       });
@@ -360,15 +362,12 @@
       function discardSourceCardIfPending(game, card) {
         if (!card) return;
         var physical = physicalCardOf(card);
-        if (physical && game.discard.indexOf(physical) !== -1) return;
-        if (physical && (game.seats || []).some(function (seat) {
-          var st = game[seat];
-          if (!st) return false;
-          if ((st.hand || []).indexOf(physical) !== -1) return true;
-          var eq = st.equipment || {};
-          return eq.weapon === physical || eq.armor === physical
-            || eq.horseMinus === physical || eq.horsePlus === physical;
-        })) return;
+        // audit4-H1: "已落地"判定改为全区域定位 (findCardZone: 牌堆/弃牌堆/
+        // 各席手牌/判定区/创区/装备) — 此前漏 牌堆与判定区: AOE 中途击杀
+        // 奖励摸空牌堆触发洗牌, 已弃置的南蛮/万箭被洗回 deck, 旧检查误判
+        // "仍在途"补弃 → 同一张牌 deck+discard 双区并存 (守恒红线,
+        // fuzz seed 50/550)。真在途 (无任何区域) 才补弃。
+        if (physical && findCardZone(game, physical)) return;
         discardCard(game, card);
       }
 
@@ -388,7 +387,11 @@
         taoRecoverBonus: function (g, u, t) { return taoRecoverBonus(g, u, t); },
         isArmorIgnoredBySha: function (g, a, c) { return isArmorIgnoredBySha(g, a, c); },
         // v12 H5: 身份场死亡结算 — 击杀反贼摸三张 (奖惩) 需要摸牌能力
-        drawCards: function (g, a, n) { return drawCards(g, a, n); }
+        drawCards: function (g, a, n) { return drawCards(g, a, n); },
+        // audit4-M9/L2/L4: 装备域后置装配, 包装注入 — 急救红装备/惩罚弃装备
+        // 的失去时机, 濒死黑酒的银月枪触发。
+        triggerEquipmentLoss: function (g, a, c) { return triggerEquipmentLoss(g, a, c); },
+        triggerYinyueQiang: function (g, a) { return triggerYinyueQiang(g, a); }
       });
       var damage = DamageDyingRuntime.damage;
       var enterDying = DamageDyingRuntime.enterDying;
@@ -646,6 +649,8 @@
         // v11 B1 第五步: 锦囊 continuation 所需能力 (函数声明提升, 包装注入
         // 保证前向引用安全)
         setPendingChoice: setPendingChoice,
+        // audit4-M8: 装备域后置装配, 包装注入 (借刀交武器的失去时机)。
+        triggerEquipmentLoss: function (g, a, c) { return triggerEquipmentLoss(g, a, c); },
         damage: function (g, t, a, s, r, c, n, o) { return damage(g, t, a, s, r, c, n, o); },
         discardCard: function (g, c) { return discardCard(g, c); },
         drawCards: function (g, a, n) { return drawCards(g, a, n); },
@@ -762,6 +767,8 @@
         moveCard: moveCard,
         removeCardFromHand: removeCardFromHand,
         removeOwnCardFromAnyZone: removeOwnCardFromAnyZone,
+        // 评审收口: 青龙续杀转化选优复用同一裁决函数
+        selectCardAsConversion: selectCardAsConversion,
         consumeResponse: consumeResponse,
         findResponseCard: findResponseCard,
         requestPlayerResponse: requestPlayerResponse,
@@ -1069,6 +1076,15 @@
         if (!paid) {
           while (chain.aidPaid < chain.aidNeeded && tryLordAidSync(game, lordActor, 'jijiang', chain.reason)) {
             chain.aidPaid += 1;
+            // 评审收口 (对抗验证 F2): 代打座席打出黑牌可挂银月枪询问 —
+            // 双同步窗口共用单槽 pauseState.yinyueResponse 会碰撞丢伤害。
+            // L5 同款守卫: 挂起即停; 已付张数同步进 resumePaid (续跑走
+            // advanceDuelChain 的 auto 分支, 只认 resumePaid — 两个计数
+            // 同为"本轮已向 duelNeeded 支付的总张数")。
+            if (game.pendingChoice) {
+              chain.resumePaid = chain.aidPaid;
+              return success('【决斗】暂停，等待插入结算。');
+            }
           }
         }
         if (chain.aidPaid >= chain.aidNeeded) {
@@ -1370,17 +1386,26 @@
         // 1.弃置目标角色的装备区里的一张牌；2.观看目标角色的手牌并弃置其中一张牌。"
         // 1V1 变体不允许选判定区；若目标只有判定区有牌而无手牌/装备 → 无合法行动，拒绝。
         if (card.type === 'guohe') {
+          // audit4-M2: ∃-目标检查改走合法性矩阵 (identity3 含判定区 —
+          // 界限突破版; 1v1 保持 装备/手牌 二选一变体), 消息按模式给。
           var guoheAnyPickable = otherSeats.some(function (seat) {
-            return (game[seat].hand || []).length > 0 || equipmentList(game[seat]).length > 0;
+            return isLegalCardTarget(game, actor, card, seat);
           });
           if (!guoheAnyPickable) {
-            return fail('1V1【过河拆桥】只能弃对手装备区或手牌；对方两者皆空。');
+            return fail(game.mode === 'identity3'
+              ? '【过河拆桥】需要一名区域里有牌的其他角色。'
+              : '1V1【过河拆桥】只能弃对手装备区或手牌；对方两者皆空。');
           }
         }
         // v12 H3: identity3 顺手牵羊距离 ≤1 — 有牌座席均在距离外时拒绝。
         if (card.type === 'shunshou' && trickDistanceLimited(game)
             && !legalTargetsForCard(game, actor, card).length) {
           return fail('距离不足，无法使用【顺手牵羊】。');
+        }
+        // audit4-M3: 火攻 "一名有手牌的角色" — 无合法目标 (全场空手牌) 时
+        // 拒绝使用, 不再空放白触发集智等 onCardUse。
+        if (card.type === 'huogong' && !legalTargetsForCard(game, actor, card).length) {
+          return fail('没有有手牌的目标，无法使用【火攻】。');
         }
         // v7 PR-6: gltjk flow__condition.md 共同合法性: "判定区里有延时类锦囊
         // 牌的角色不是使用同名延时类锦囊牌的合法目标"。乐 / 兵 → 其他座席；
@@ -1435,6 +1460,13 @@
         return !!(game && game.mode === 'identity3');
       }
 
+      // audit4-M6: 奇才 (黄月英) "使用锦囊牌无距离限制" — flag 在
+      // PASSIVE_EFFECTS 定义已久却无人消费 (v12 H3 恢复官方距离时漏接),
+      // identity3 下顺手/兵粮距离仍拦她。锁定技, 无开关。
+      function ignoresTrickDistance(state) {
+        return SkillRuntime.hasPassiveEffect(state, 'ignoreTrickDistance');
+      }
+
       // v12 H1: 借刀杀人 Bn (受害者) 候选 — 在武器持有者攻击范围内且不被
       // "不能成为目标"类技能保护的其他座席; 1v1 恒为 [使用者本人]。
       function jiedaoVictimCandidates(game, holderSeat) {
@@ -1475,16 +1507,30 @@
         if (card.type === 'shandian') return false; // 闪电只对自己使用
         if (card.type === 'lebusishu' || card.type === 'bingliang') {
           if ((seatState.judgeArea || []).some(function (judge) { return judge && judge.type === card.type; })) return false;
-          if (card.type === 'bingliang' && trickDistanceLimited(game) && distanceBetween(game, actor, seat) > 1) return false;
+          if (card.type === 'bingliang' && trickDistanceLimited(game) && !ignoresTrickDistance(game[actor]) && distanceBetween(game, actor, seat) > 1) return false;
           return !cardTargetProtection(game, actor, seat, card);
         }
         if (card.type === 'guohe') {
-          if (!(seatState.hand || []).length && !equipmentList(seatState).length) return false;
+          // audit4-M2: identity3 走界限突破版语义 "一名区域里有牌的其他角色"
+          // (含判定区 — 可拆乐/兵粮/闪电, 与顺手一致); 仅 1v1 保留官方 1V1
+          // 变体 (装备/手牌二选一, 判定区不可选)。
+          if (game.mode === 'identity3') {
+            if (!hasAnyTargetableCard(seatState)) return false;
+          } else if (!(seatState.hand || []).length && !equipmentList(seatState).length) {
+            return false;
+          }
           return !cardTargetProtection(game, actor, seat, card);
         }
         if (card.type === 'shunshou') {
           if (!hasAnyTargetableCard(seatState)) return false;
-          if (trickDistanceLimited(game) && distanceBetween(game, actor, seat) > 1) return false;
+          if (trickDistanceLimited(game) && !ignoresTrickDistance(game[actor]) && distanceBetween(game, actor, seat) > 1) return false;
+          return !cardTargetProtection(game, actor, seat, card);
+        }
+        // audit4-M3: 火攻目标合法性 "一名有手牌的角色" (card__scroll.md:244) —
+        // 与过河/顺手同型的目标条款, 此前落默认分支可对空手牌角色空放
+        // (还触发集智等 onCardUse 白摸牌)。结算期空手牌兜底保留作防御。
+        if (card.type === 'huogong') {
+          if (!(seatState.hand || []).length) return false;
           return !cardTargetProtection(game, actor, seat, card);
         }
         if (card.type === 'jiedao') {
@@ -1559,6 +1605,11 @@
         if (!playable.ok) return playable;
         // v12 H1: 区域/成本预校验对齐显式目标 (缺省 1v1 对手)。
         if (card && (card.type === 'guohe' || card.type === 'shunshou') && (options.targetZone || options.targetCardId)) {
+          // 评审收口 (对抗验证 F3): 1v1 过河判定区非法请求提前拒绝 —
+          // 此前拖到 resolveGuohe1v1 时牌已入弃牌堆 (裸 API 白损一张)。
+          if (card.type === 'guohe' && options.targetZone === 'judge' && game.mode !== 'identity3') {
+            return fail('1V1【过河拆桥】不能弃置判定区。');
+          }
           var zoneTargetActor = resolveTrickTargetActor(game, actor, card, options) || opponent(actor);
           var requestedZone = options.targetZone || defaultTargetZone(game[zoneTargetActor]);
           var targetChoices = getTargetZoneCards(game, zoneTargetActor, requestedZone);
@@ -1594,7 +1645,15 @@
       }
 
       function playShaCardHandler(game, actor, card, options, self) {
-        return playSha(game, actor, card, options);
+        var result = playSha(game, actor, card, options);
+        // audit4-M1 收口: playCard 已把牌移出手牌, 而 playSha 的拒绝路径
+        // (非法目标/目标保护/距离) 不负责回滚 — 拒绝且牌真在途 (不在任何
+        // 区域) 时退回手牌, 不留守恒泄漏。虚拟杀 (神速/丈八/转化) 的组成
+        // 实体由各转化调用方自理。
+        if (result && !result.ok && card && !card.virtual && !findCardZone(game, card)) {
+          putCard(game, card, { zone: 'hand', actor: actor });
+        }
+        return result;
       }
 
       function playEquipmentCardHandler(game, actor, card, options, self) {
@@ -2406,6 +2465,22 @@
         if (game.turn !== actor) return fail('还没有轮到你行动。');
         if (PLAY_PHASE_ACTIVE_SKILLS[skillId] && game.phase !== 'play') return fail('主动技能只能在出牌阶段发动。');
         self.flags = self.flags || {};
+        // audit4-H2: 显式目标与 playCard 同一存活约束 — 座席名合法但已阵亡
+        // 一律拒绝 (此前反间/结姻可对尸体生效, 重放濒死+死亡结算+奖惩)。
+        // 缺省对手的存活校验由各消费 targetActor 的技能 trigger 把关
+        // (无目标技能 zhiheng/guanxing 等不受 opponent 亡故牵连)。
+        if (options.target) {
+          var requestedSkillTarget = resolveSeatOption(game, options.target);
+          if (!requestedSkillTarget) return fail('未知目标。');
+          if (!game[requestedSkillTarget] || game[requestedSkillTarget].hp <= 0) return fail('目标已阵亡。');
+        }
+        if (Array.isArray(options.targets)) {
+          for (var stIdx = 0; stIdx < options.targets.length; stIdx += 1) {
+            var seatOfTargets = resolveSeatOption(game, options.targets[stIdx]);
+            if (!seatOfTargets) return fail('未知目标。');
+            if (!game[seatOfTargets] || game[seatOfTargets].hp <= 0) return fail('目标已阵亡。');
+          }
+        }
         var activeSkillContext = {
           game: game,
           actor: actor,

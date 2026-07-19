@@ -562,6 +562,15 @@
           var allIds = taoIds.concat(jiuIds).concat(jijiuIds);
           els.dyingRescueChoices.innerHTML = allIds.map(function (cardId) {
             var card = responderState && (responderState.hand || []).find(function (c) { return c.id === cardId; });
+            // audit4-M9: 急救候选可来自装备区红牌 ("红色牌"含装备) — 手牌
+            // 找不到时查装备槽, 加"装备"前缀标注。
+            var fromEquip = false;
+            if (!card && responderState && responderState.equipment) {
+              ['weapon', 'armor', 'horsePlus', 'horseMinus'].forEach(function (slot) {
+                var held = responderState.equipment[slot];
+                if (!card && held && held.id === cardId) { card = held; fromEquip = true; }
+              });
+            }
             if (!card) return '';
             var isJiu = jiuIds.indexOf(cardId) >= 0;
             var isJijiu = jijiuIds.indexOf(cardId) >= 0;
@@ -573,6 +582,7 @@
               dataAttrs: { dyingRescueCardId: cardId },
               title: title,
               extraClass: 'dying-rescue-choice',
+              prefix: fromEquip ? '装备 ' : '',
               suffix: suffix
             });
           }).join('') || '<span class="mini-card">手牌中没有可救援的牌</span>';

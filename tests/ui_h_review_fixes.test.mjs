@@ -130,7 +130,8 @@ test('U3: 借刀 — 持刀者仅一名可达受害者 → 自动完成不报错
 // ───── U4: 黄天玩家按钮 — v13 L1 随可选身份回归 (原"永不出现"守护改正向) ─────
 
 test('U4: 黄天按钮 — 玩家主公时不出现; 玩家忠臣(群) + AI 主公张角时出现 (v13 L1)', () => {
-  const game = start3p('machao', 'caocao', 'zhangjiao'); // ally 张角(持黄天), player 群势力马超
+  // audit4-M7: 马超归蜀 (官方 SHU 006), 群势力玩家改用吕布。
+  const game = start3p('lvbu', 'caocao', 'zhangjiao'); // ally 张角(持黄天), player 群势力吕布
   game.player.hand = [c('shan', { id: 'give-shan' })];
   UI.render();
   assert.equal(game.roles.player, '主公', '缺省预设: 玩家主公');

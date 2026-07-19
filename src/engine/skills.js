@@ -1021,6 +1021,8 @@
         }
         var target = game[targetActor];
         if (!target) return fail('目标无效。');
+        // audit4-H2: 亡者 hp 0 < maxHp 会骗过"已受伤"检查 → 给尸体回血。
+        if (target.hp <= 0) return fail('目标已阵亡。');
         if (target.hp >= target.maxHp) return fail('目标未受伤，不能发动【青囊】。');
         var costCard = removeCardFromHand(self, cardIds[0]);
         if (!costCard) return fail('选择的手牌不存在。');
@@ -1047,6 +1049,8 @@
         var targetActor = context.targetActor || opponent(actor);
         var target = game[targetActor];
         if (!target || target.gender !== 'male') return fail('【结姻】需要一名男性角色为目标。');
+        // audit4-H2: 亡者 hp 0 < maxHp 会骗过"已受伤"检查 → 给尸体回血。
+        if (target.hp <= 0) return fail('目标已阵亡。');
         if (target.hp >= target.maxHp) return fail('目标未受伤，不能发动【结姻】。');
         if (cardIds.length !== 2 || cardIds[0] === cardIds[1]) return fail('请选择两张不同的手牌弃置。');
         var inHand = cardIds.every(function (id) {
@@ -1072,6 +1076,8 @@
         var cardIds = context.cardIds || [];
         var target = game[context.targetActor];
         if (!self || !target || !hasSkill(self, 'rende')) return null;
+        // audit4-H2: 不向亡者交牌 (缺省对手可能已亡)。
+        if (target.hp <= 0) return fail('目标已阵亡。');
         if (!cardIds.length) return fail('请选择要给出的牌。');
         var given = [];
         cardIds.forEach(function (id) {
@@ -1119,6 +1125,9 @@
         var target = game[targetActor];
         var options = context.options || {};
         if (!self || !target || !hasSkill(self, 'fanjian')) return null;
+        // audit4-H2: 缺省对手可能已亡 (身份场对局未终) — 对尸体发动会重放
+        // 濒死/死亡结算与奖惩, 与 playCard 的存活约束对齐。
+        if (target.hp <= 0) return fail('目标已阵亡。');
         if (self.flags.fanjianUsed) return fail('【反间】每回合限一次。');
         if (!cardIds.length) return fail('请选择一张交给对方的牌。');
         var fanjianCard = removeCardFromHand(self, cardIds[0]);
@@ -1535,7 +1544,11 @@
         }
 
         function shensuEquipCandidates(state) {
-          var equipped = equipmentList(state);
+          // audit4-M5: equipmentList 返回 {slot, card} 包装对象 — 直接与手牌
+          // 原始卡 concat 会让装备区候选顶层 id 恒 undefined, 面板渲染全空、
+          // 校验永假 → 神速②最典型用法 (弃已装备的坐骑/防具) 完全不可用。
+          // 统一解包为原始卡; 执行层 removeOwnCardFromAnyZone 本就支持装备区。
+          var equipped = equipmentList(state).map(function (entry) { return entry.card; });
           var handEquips = (state.hand || []).filter(function (c) {
             var info = CARD_INFO[c.type];
             return info && info.family === 'equipment';
@@ -2371,8 +2384,10 @@
           var lijianProtection = cardTargetProtection(game, seatA, seatB,
             { type: 'juedou', name: '决斗', virtual: true }, '决斗');
           if (lijianProtection) return fail(lijianProtection.message);
-          var lijianCost = removeCardFromHand(self, cardIds[0]);
-          if (!lijianCost) return fail('选择的手牌不存在。');
+          // audit4-L3: 官方成本"弃置一张牌" (非"手牌") — 手牌与装备区皆可
+          // 支付 (removeOwnCardFromAnyZone 统一出口, 装备失去时机照常)。
+          var lijianCost = removeOwnCardFromAnyZone(self, cardIds[0], game);
+          if (!lijianCost) return fail('选择的牌不存在。');
           discardCard(game, lijianCost);
           self.flags.lijianUsed = true;
           log(game, actorName(game, actor) + '发动【离间】，弃置【' + lijianCost.name + '】，令'

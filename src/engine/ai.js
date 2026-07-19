@@ -401,9 +401,15 @@
     // 主目标。v12 I3: 多候选按目标评分挑选 (1v1 恒为对手)。
     function aiPrimaryFoe(game, actor) {
       // v13 M2: 感知敌对路由 (明置恒等 hostileSeats)。
+      // audit4 收口: 兜底不再落死板 opponent() 槽位 — 多席下该座席可能已亡,
+      // useSkill/playSha 的存活校验会如实拒绝 (此前靠 H2/M1 漏洞"成功"打在
+      // 尸体上), AI 不递交亡者目标。
       var candidates = StateRuntime.perceivedHostileSeats(game, actor);
-      if (!candidates.length) return opponent(actor);
-      return aiPickHostileTarget(game, actor, candidates) || opponent(actor);
+      var aliveOthers = StateRuntime.aliveSeats(game).filter(function (s) { return s !== actor; });
+      if (!candidates.length) candidates = aliveOthers;
+      var picked = aiPickHostileTarget(game, actor, candidates);
+      if (picked && game[picked] && game[picked].hp > 0) return picked;
+      return aliveOthers.indexOf(opponent(actor)) >= 0 ? opponent(actor) : aliveOthers[0];
     }
 
     // v12 H5: AI 单目标牌的目标座席 — 合法目标矩阵 ∩ 敌对座席 (1v1 恒为
@@ -850,7 +856,14 @@
           var rendeCandidates = self.hand
             .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
             .sort(function (a, b) { return a.score - b.score; });
-          return { skillId: 'rende', cardIds: [rendeCandidates[0].card.id] };
+          // audit4 收口: 显式存活目标 — 缺省 opponent() 槽位多席下可能已亡
+          // (useSkill 存活校验会拒绝)。对手存活保持旧口径, 否则任一存活座席。
+          var rendeTarget = game[opponent(actor)] && game[opponent(actor)].hp > 0
+            ? opponent(actor)
+            : StateRuntime.aliveSeats(game).filter(function (s) { return s !== actor; })[0];
+          if (rendeTarget) {
+            return { skillId: 'rende', cardIds: [rendeCandidates[0].card.id], options: { target: rendeTarget } };
+          }
         }
       }
 
