@@ -679,7 +679,10 @@
         StateRuntime.recordStance(game, { type: 'rescue', source: responder, beneficiary: dyingActor }); // v13 M3 立场遥测 (自救不记)
         // audit4-L2: 使用方法Ⅱ也是一次"回合外使用黑色手牌" — 银月枪时机
         // 与 consumeResponse/consumeWuxie 出口一致 (此前唯此分支遗漏)。
-        if (card.color === 'black' && game.turn !== responder && triggerYinyueQiang) {
+        // 评审收口: 黑色判定走 effectiveCardColor — 红颜持有者的黑桃视为
+        // 红桃, 不触发 (与另两处出口同口径)。
+        if (StateRuntime.effectiveCardColor(responderState, card) === 'black'
+            && game.turn !== responder && triggerYinyueQiang) {
           triggerYinyueQiang(game, responder);
         }
         return { healed: true };

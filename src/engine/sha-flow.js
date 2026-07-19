@@ -31,6 +31,8 @@
     var moveCard = deps.moveCard;
     var removeCardFromHand = deps.removeCardFromHand;
     var removeOwnCardFromAnyZone = deps.removeOwnCardFromAnyZone;
+    // 评审收口: 青龙续杀转化选优与主动/响应路径同一裁决函数。
+    var selectCardAsConversion = deps.selectCardAsConversion;
     var consumeResponse = deps.consumeResponse;
     var findResponseCard = deps.findResponseCard;
     var requestPlayerResponse = deps.requestPlayerResponse;
@@ -444,15 +446,12 @@
               var chaseAsResults = SkillRuntime.runHook(skillRegistry, 'onCardAs', {
                 game: game, actor: actor, state: self, asType: 'sha', mode: 'response'
               });
-              var chaseBest = null;
-              for (var chaseIdx = 0; chaseIdx < chaseAsResults.length; chaseIdx += 1) {
-                var chaseCandidate = chaseAsResults[chaseIdx].result;
-                if (chaseCandidate && chaseCandidate.card
-                    && (!chaseBest || (chaseCandidate.priority || 0) > (chaseBest.priority || 0))) {
-                  chaseBest = chaseCandidate;
-                }
-              }
-              var chasePhysical = chaseBest && removeCardFromHand(self, chaseBest.card.id);
+              // 评审收口: 选优复用 selectCardAsConversion (与主动/响应转化
+              // 同一裁决); 取牌走 removeOwnCardFromAnyZone — 武圣的转化候选
+              // 可来自装备区 (firstMatchingOwnCard), 只扫手牌会静默漏掉,
+              // 装备来源顺带走统一失去时机。
+              var chaseBest = selectCardAsConversion(chaseAsResults);
+              var chasePhysical = chaseBest && removeOwnCardFromAnyZone(self, chaseBest.card.id, game);
               if (chasePhysical) {
                 discardCard(game, chasePhysical);
                 log(game, actorName(game, actor) + '发动【' + (chaseBest.skillName || '转化')

@@ -50,3 +50,23 @@
   决斗链已修的越序属另一类 — 多次独立伤害结算交错)。
 
 复现/验证脚本存 session scratchpad audit4/ (不入库)。
+
+## 评审收口 (sonnet 常规 + opus 对抗验证, 修复批第二提交)
+
+opus 对六类修复面实跑构造 (决斗快照交错/退牌误判/装备急救守恒/判定区
+语义/H1 反向漏洞/AI 目标边界) **全部 SAFE** (含 44 局自对弈守恒零破坏)。
+收口六项:
+- 青龙续杀转化取牌改 removeOwnCardFromAnyZone + selectCardAsConversion
+  复用 — 武圣装备区红牌此前静默漏掉 (sonnet 实证)。
+- 决斗 resolver 侧两处代打循环补 L5 同款挂起守卫 (opus F2 实证: 双银月枪
+  同步窗口共用单槽 pauseState 碰撞丢伤害) + resumePaid/aidPaid 记账统一
+  (opus 脚本复跑抓获首笔代打漏计)。
+- 濒死黑酒银月枪触发改 effectiveCardColor (红颜黑桃视红桃不触发,
+  与另两处出口同口径)。
+- 1v1 显式 targetZone=judge 的过河提前拒绝 (F3: 此前牌已入弃牌堆白损)。
+- 驳回 opus F1 "顺手不应偷判定区": 官方原文 card__scroll.md:27
+  「你获得目标角色的**区域里**的一张牌」— 判定区可偷 (顺走闪电为官方
+  合法玩法), 现行为正确, M2 前提成立。
+- M9 装备回退分支 (rollbackRescueCard) 经双评审目检正确, 公共 API 无法
+  构造合法触发路径, 记录为不可测备案。
+回归 +3 例 (23 例); opus 两套验证脚本复跑 13/13 + 33/33。

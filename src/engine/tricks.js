@@ -1100,9 +1100,17 @@
         log(game, actorName(game, 'player') + '选择不打出【杀】响应' + chain.reason + '。');
         if (tryLordAidSync) {
           var aidNeeded = duelShaRequired(game, 'player', duelFoe);
-          var aidPaid = 0;
+          // 评审收口: 同 advanceDuelChain — 代打打出可挂插入结算 (银月枪),
+          // 已付张数落 resumePaid 快照, 续跑不重复支付 (同槽语义: 本轮
+          // 已向 duelNeeded 支付的总张数)。
+          var aidPaid = chain.resumePaid || 0;
+          chain.resumePaid = 0;
           while (aidPaid < aidNeeded && tryLordAidSync(game, 'player', 'jijiang', chain.reason)) {
             aidPaid += 1;
+            if (game.pendingChoice) {
+              chain.resumePaid = aidPaid;
+              return success('【决斗】暂停，等待插入结算。');
+            }
           }
           if (aidPaid === aidNeeded) {
             chain.shaRemaining = null;

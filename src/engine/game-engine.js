@@ -767,6 +767,8 @@
         moveCard: moveCard,
         removeCardFromHand: removeCardFromHand,
         removeOwnCardFromAnyZone: removeOwnCardFromAnyZone,
+        // 评审收口: 青龙续杀转化选优复用同一裁决函数
+        selectCardAsConversion: selectCardAsConversion,
         consumeResponse: consumeResponse,
         findResponseCard: findResponseCard,
         requestPlayerResponse: requestPlayerResponse,
@@ -1074,6 +1076,15 @@
         if (!paid) {
           while (chain.aidPaid < chain.aidNeeded && tryLordAidSync(game, lordActor, 'jijiang', chain.reason)) {
             chain.aidPaid += 1;
+            // 评审收口 (对抗验证 F2): 代打座席打出黑牌可挂银月枪询问 —
+            // 双同步窗口共用单槽 pauseState.yinyueResponse 会碰撞丢伤害。
+            // L5 同款守卫: 挂起即停; 已付张数同步进 resumePaid (续跑走
+            // advanceDuelChain 的 auto 分支, 只认 resumePaid — 两个计数
+            // 同为"本轮已向 duelNeeded 支付的总张数")。
+            if (game.pendingChoice) {
+              chain.resumePaid = chain.aidPaid;
+              return success('【决斗】暂停，等待插入结算。');
+            }
           }
         }
         if (chain.aidPaid >= chain.aidNeeded) {
@@ -1594,6 +1605,11 @@
         if (!playable.ok) return playable;
         // v12 H1: 区域/成本预校验对齐显式目标 (缺省 1v1 对手)。
         if (card && (card.type === 'guohe' || card.type === 'shunshou') && (options.targetZone || options.targetCardId)) {
+          // 评审收口 (对抗验证 F3): 1v1 过河判定区非法请求提前拒绝 —
+          // 此前拖到 resolveGuohe1v1 时牌已入弃牌堆 (裸 API 白损一张)。
+          if (card.type === 'guohe' && options.targetZone === 'judge' && game.mode !== 'identity3') {
+            return fail('1V1【过河拆桥】不能弃置判定区。');
+          }
           var zoneTargetActor = resolveTrickTargetActor(game, actor, card, options) || opponent(actor);
           var requestedZone = options.targetZone || defaultTargetZone(game[zoneTargetActor]);
           var targetChoices = getTargetZoneCards(game, zoneTargetActor, requestedZone);
