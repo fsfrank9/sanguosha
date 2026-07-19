@@ -83,7 +83,16 @@
         // v12 H1: 显式目标经座席校验 — 无效值返回 null, 由 playSha 优雅拒绝
         // (与旧版 game[garbage] === undefined 的拒绝路径行为一致)。
         var requested = options && (options.target || (options.targets && options.targets[0]));
-        if (requested) return StateRuntime.resolveSeatOption(game, requested);
+        if (requested) {
+          var resolved = StateRuntime.resolveSeatOption(game, requested);
+          // audit4-M1: 显式目标复用合法性矩阵的 自己/亡者 排除 — 此前只校验
+          // 座席名, 公共 API 可对自己/尸体出【杀】(尸体路径会重放死亡结算
+          // 与身份场奖惩)。官方: 杀目标为"攻击范围内的一名角色" (无"包括
+          // 你在内"措辞, 对照桃/酒), 亡者不再参与结算。
+          if (!resolved || resolved === actor) return null;
+          if (!game[resolved] || game[resolved].hp <= 0) return null;
+          return resolved;
+        }
         return defaultHostileTarget(game, actor);
       }
 
@@ -427,13 +436,50 @@
           if (hasEquipmentEffect(self, 'qinglongChase')
               && !(self.skillPreferences && self.skillPreferences.qinglong === 'decline')) {
             var follow = removeFirstCardOfType(self, 'sha');
+            var followPhysicals = null;
+            if (!follow) {
+              // audit4-L1: 无物理杀时经 onCardAs 找可当杀的转化 (龙胆闪/武圣
+              // 红牌…) — 官方"对其使用【杀】"含一切合法视为手段, 与主动出杀/
+              // 响应杀路径一致 (此前只扫物理杀, 赵云龙胆追杀不可达)。
+              var chaseAsResults = SkillRuntime.runHook(skillRegistry, 'onCardAs', {
+                game: game, actor: actor, state: self, asType: 'sha', mode: 'response'
+              });
+              var chaseBest = null;
+              for (var chaseIdx = 0; chaseIdx < chaseAsResults.length; chaseIdx += 1) {
+                var chaseCandidate = chaseAsResults[chaseIdx].result;
+                if (chaseCandidate && chaseCandidate.card
+                    && (!chaseBest || (chaseCandidate.priority || 0) > (chaseBest.priority || 0))) {
+                  chaseBest = chaseCandidate;
+                }
+              }
+              var chasePhysical = chaseBest && removeCardFromHand(self, chaseBest.card.id);
+              if (chasePhysical) {
+                discardCard(game, chasePhysical);
+                log(game, actorName(game, actor) + '发动【' + (chaseBest.skillName || '转化')
+                  + '】，将【' + chasePhysical.name + '】当【杀】用于续杀。');
+                followPhysicals = [chasePhysical];
+                follow = CardRuntime.makeTestCard('sha', {
+                  id: 'qinglong-as-' + chasePhysical.id,
+                  suit: chasePhysical.suit, rank: chasePhysical.rank,
+                  color: chasePhysical.color, name: '杀',
+                  virtual: true, physicalCards: followPhysicals
+                });
+              }
+            }
             if (follow) {
               log(game, actorName(game, actor) + '发动【青龙偃月刀】，继续对' + actorName(game, targetActor) + '使用一张【杀】。');
               discardCard(game, card);
               var chaseResult = playSha(game, actor, follow, { target: targetActor, skipShaCount: true });
               if (chaseResult && chaseResult.ok) return chaseResult;
-              putCard(game, follow, { zone: 'hand', actor: actor });
-              log(game, '【青龙偃月刀】续杀不合法，收回【' + follow.name + '】。');
+              // 回滚: 转化杀退回组成实体 (已入弃牌堆), 物理杀原样退回。
+              if (followPhysicals) {
+                followPhysicals.forEach(function (pc) {
+                  moveCard(game, pc, { zone: 'discard' }, { zone: 'hand', actor: actor });
+                });
+              } else {
+                putCard(game, follow, { zone: 'hand', actor: actor });
+              }
+              log(game, '【青龙偃月刀】续杀不合法，收回所用之牌。');
               return success('目标闪避。');
             }
           }

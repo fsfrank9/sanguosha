@@ -28,6 +28,10 @@
     var isArmorIgnoredBySha = deps.isArmorIgnoredBySha;
     // v11 C1 (批次 25): 救援 — 吴势力对濒死主公用桃回复量 +1 (由引擎注入)
     var taoRecoverBonus = deps.taoRecoverBonus;
+    // audit4-M9/L2/L4: 装备域后置装配 — 急救红装备/惩罚弃装备的失去时机,
+    // 濒死黑酒 (使用方法Ⅱ) 的银月枪触发。
+    var triggerEquipmentLoss = deps.triggerEquipmentLoss;
+    var triggerYinyueQiang = deps.triggerYinyueQiang;
     // v12 H5: 身份场死亡奖惩 (击杀反贼摸三张)
     var drawCards = deps.drawCards;
 
@@ -514,6 +518,10 @@
           var equip = killerState.equipment && killerState.equipment[slot];
           if (equip) {
             discardCard(game, takeCard(game, equip, { zone: 'equipment', actor: killer, slot: slot }));
+            // audit4-L4: 存活击杀者被惩罚弃装备也是"失去装备区牌" — 走统一
+            // 失去时机 (白银狮子②回血/枭姬摸二); 亡者自身 discardAllZones
+            // 的裸弃保持不触发 (死亡结算终态)。
+            if (triggerEquipmentLoss) triggerEquipmentLoss(game, killer, equip);
           }
         });
       }
@@ -571,9 +579,16 @@
       //   救援目标: 任意 (含他人)
       var jijiuCards = [];
       if (hasSkill(responderState, 'jijiu') && game.turn !== responder) {
-        jijiuCards = (responderState.hand || []).filter(function (c) {
+        var jijiuRed = function (c) {
           return c && c.color === 'red' && c.type !== 'tao' && c.type !== 'jiu';
-        });
+        };
+        // audit4-M9: 官方"红色牌"含装备区 (标准缓存: "红色手牌或装备牌") —
+        // 此前只扫手牌, 华佗仅剩红色装备时救不了人。手牌在前保持既有
+        // auto 优先序。
+        var jijiuEquips = ['weapon', 'armor', 'horsePlus', 'horseMinus'].map(function (slot) {
+          return responderState.equipment && responderState.equipment[slot];
+        }).filter(jijiuRed);
+        jijiuCards = (responderState.hand || []).filter(jijiuRed).concat(jijiuEquips);
       }
       if (!taoCards.length && !jiuCards.length && !jijiuCards.length) {
         log(game, actorName(game, responder) + '没有可用的【桃】/【酒】，无法救援。');
@@ -625,8 +640,23 @@
       var dyingState = game[dyingActor];
       if (!responderState || !dyingState) return { skipped: true };
       var idx = responderState.hand.findIndex(function (c) { return c.id === cardId; });
-      if (idx < 0) return { skipped: true };
-      var card = takeCard(game, cardId, { zone: 'hand', actor: responder });
+      // audit4-M9: 急救允许红色装备牌 — 手牌找不到时查装备区 (仅 jijiu;
+      // 桃/酒仍限手牌)。装备来源成功使用后补失去时机, 回退则原槽放回。
+      var jijiuEquipSlot = null;
+      if (idx < 0 && kind === 'jijiu') {
+        ['weapon', 'armor', 'horsePlus', 'horseMinus'].forEach(function (slot) {
+          var held = responderState.equipment && responderState.equipment[slot];
+          if (!jijiuEquipSlot && held && held.id === cardId) jijiuEquipSlot = slot;
+        });
+      }
+      if (idx < 0 && !jijiuEquipSlot) return { skipped: true };
+      var card = jijiuEquipSlot
+        ? takeCard(game, cardId, { zone: 'equipment', actor: responder, slot: jijiuEquipSlot })
+        : takeCard(game, cardId, { zone: 'hand', actor: responder });
+      var rollbackRescueCard = function () {
+        if (jijiuEquipSlot) putCard(game, card, { zone: 'equipment', actor: responder, slot: jijiuEquipSlot });
+        else putCard(game, card, { zone: 'hand', actor: responder, index: idx });
+      };
       if (kind === 'tao') {
         discardCard(game, card);
         // v11 C1 (批次 25): 救援 — 吴势力对濒死主公用桃回复量 +1
@@ -640,13 +670,18 @@
         // 酒 使用方法Ⅱ: 仅 self
         if (responder !== dyingActor) {
           // 不允许救他人时用酒；回退到不消耗
-          putCard(game, card, { zone: 'hand', actor: responder, index: idx });
+          rollbackRescueCard();
           return { skipped: true };
         }
         discardCard(game, card);
         dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + 1);
         log(game, actorName(game, responder) + '濒死时饮下【酒】（使用方法Ⅱ），回复 1 点体力。');
         StateRuntime.recordStance(game, { type: 'rescue', source: responder, beneficiary: dyingActor }); // v13 M3 立场遥测 (自救不记)
+        // audit4-L2: 使用方法Ⅱ也是一次"回合外使用黑色手牌" — 银月枪时机
+        // 与 consumeResponse/consumeWuxie 出口一致 (此前唯此分支遗漏)。
+        if (card.color === 'black' && game.turn !== responder && triggerYinyueQiang) {
+          triggerYinyueQiang(game, responder);
+        }
         return { healed: true };
       }
       // v8 PR-C3: 急救 — 华佗回合外把红色牌当桃 (条件: hasSkill jijiu +
@@ -656,14 +691,16 @@
       if (kind === 'jijiu') {
         if (!hasSkill(responderState, 'jijiu') || game.turn === responder) {
           // 条件不满足时回退
-          putCard(game, card, { zone: 'hand', actor: responder, index: idx });
+          rollbackRescueCard();
           return { skipped: true };
         }
         if (card.color !== 'red' || card.type === 'tao' || card.type === 'jiu') {
-          putCard(game, card, { zone: 'hand', actor: responder, index: idx });
+          rollbackRescueCard();
           return { skipped: true };
         }
         discardCard(game, card);
+        // audit4-M9: 红色装备来源 — 失去装备区牌照常结算失去时机 (枭姬等)。
+        if (jijiuEquipSlot && triggerEquipmentLoss) triggerEquipmentLoss(game, responder, card);
         // v11 C1 (批次 25): 急救视为使用桃, 同样吃【救援】的 +1
         var jijiuHeal = 1 + (taoRecoverBonus ? taoRecoverBonus(game, responder, dyingActor) : 0);
         dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + jijiuHeal);
@@ -672,7 +709,7 @@
         return { healed: true };
       }
       // 未知 kind
-      putCard(game, card, { zone: 'hand', actor: responder, index: idx });
+      rollbackRescueCard();
       return { skipped: true };
     }
 

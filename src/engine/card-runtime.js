@@ -181,6 +181,9 @@
     for (var a = 0; a < seats.length; a += 1) {
       refs.push({ zone: 'hand', actor: seats[a] });
       refs.push({ zone: 'judgeArea', actor: seats[a] });
+      // audit4-H1 支持: "创"区 (不屈) 也是牌可停留的区域 — 落地判定漏扫会
+      // 让 discardSourceCardIfPending 误判在途补弃 (守恒破坏)。
+      refs.push({ zone: 'chuang', actor: seats[a] });
     }
     for (var i = 0; i < refs.length; i += 1) {
       var list = zoneArrayOf(game, refs[i]);

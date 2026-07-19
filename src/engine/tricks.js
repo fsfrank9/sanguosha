@@ -27,6 +27,8 @@
     var removeCardFromHand = deps.removeCardFromHand;
     var removeFirstMatchingCard = deps.removeFirstMatchingCard;
     var removeTargetZoneCard = deps.removeTargetZoneCard;
+    // audit4-M8: 借刀交武器走统一装备失去时机 (枭姬/白银等)。
+    var triggerEquipmentLoss = deps.triggerEquipmentLoss;
     var scoreCardForAI = deps.scoreCardForAI;
     // v11 D1 (批次 33): AI 无懈期望值评估 (ai 域后置装配, 包装注入)
     var aiShouldUseWuxie = deps.aiShouldUseWuxie;
@@ -680,7 +682,8 @@
           return fail('指定牌不存在或已被移除。');
         }
         discardCard(game, info.card);
-        log(game, actorName(game, sourceActor) + '使用【过河拆桥】，弃置了' + actorName(game, targetActor) + (zone === 'equipment' ? '装备区' : '手牌') + '的【' + info.card.name + '】。');
+        var guoheZoneLabel = zone === 'equipment' ? '装备区' : (zone === 'judge' ? '判定区' : '手牌');
+        log(game, actorName(game, sourceActor) + '使用【过河拆桥】，弃置了' + actorName(game, targetActor) + guoheZoneLabel + '的【' + info.card.name + '】。');
         return success('弃置对方一张牌。');
       }
 
@@ -690,6 +693,9 @@
         if (!weapon) return success('【借刀杀人】无效果（目标无武器）。');
         moveCard(game, weapon, { zone: 'equipment', actor: opponentActor, slot: 'weapon' }, { zone: 'hand', actor: sourceActor });
         log(game, actorName(game, sourceActor) + '因【借刀杀人】获得【' + weapon.name + '】，置入手牌。');
+        // audit4-M8: 交出武器是"装备区牌离开" — 走统一失去时机 (枭姬摸二等),
+        // 与 顺手/过河/制衡成本 各路径一致 (此前唯此路径裸 moveCard 漏触发)。
+        if (triggerEquipmentLoss) triggerEquipmentLoss(game, opponentActor, weapon);
         return success('借刀杀人获得武器。');
       }
 
@@ -705,8 +711,14 @@
         var target = game[targetActor];
         if (!target) return fail('未知角色。');
         var requestedZone = options && options.targetZone;
+        // audit4-M2: identity3 走界限突破版 "弃置目标区域里的一张牌" — 判定区
+        // 可拆 (乐/兵粮/闪电), 与顺手牵羊一致; 仅 1v1 保留官方 1V1 变体
+        // (装备/手牌二选一)。
         if (requestedZone === 'judge') {
-          return fail('1V1【过河拆桥】不能弃置判定区。');
+          if (game.mode !== 'identity3') {
+            return fail('1V1【过河拆桥】不能弃置判定区。');
+          }
+          return executeGuohe1v1Pick(game, sourceActor, targetActor, 'judge', options && options.targetCardId);
         }
         if (requestedZone === 'equipment' || requestedZone === 'hand') {
           return executeGuohe1v1Pick(game, sourceActor, targetActor, requestedZone, options && options.targetCardId);
@@ -729,7 +741,13 @@
             }),
             hand: target.hand.map(function (c) {
               return { cardId: c.id, name: c.name, suit: c.suit, color: c.color, rank: c.rank };
-            })
+            }),
+            // audit4-M2: identity3 界限突破版 — 判定区候选一并暴露。
+            judgeArea: game.mode === 'identity3'
+              ? (target.judgeArea || []).map(function (c) {
+                  return { cardId: c.id, name: c.name, suit: c.suit, rank: c.rank };
+                })
+              : []
           });
           return success('【过河拆桥】等待发动者选择…');
         }
@@ -748,6 +766,11 @@
         if (target.hand.length) {
           return executeGuohe1v1Pick(game, sourceActor, targetActor, 'hand', target.hand[0].id);
         }
+        // audit4-M2: identity3 判定区兜底 (界限突破版可拆判定区; 目标可因
+        // 判定区唯一有牌而合法, 不能拆了个寂寞) — 取最后置入的延时锦囊。
+        if (game.mode === 'identity3' && target.judgeArea && target.judgeArea.length) {
+          return executeGuohe1v1Pick(game, sourceActor, targetActor, 'judge', target.judgeArea[target.judgeArea.length - 1].id);
+        }
         return success('过河拆桥无效果（对方两区均空）。');
       }
 
@@ -756,9 +779,12 @@
         var targetActor = pending.target;
         var zone = decision && decision.zone;
         var cardId = decision && decision.cardId;
-        if (zone !== 'equipment' && zone !== 'hand') {
+        // audit4-M2: identity3 界限突破版接受判定区。
+        var guoheZoneOk = zone === 'equipment' || zone === 'hand'
+          || (zone === 'judge' && game.mode === 'identity3');
+        if (!guoheZoneOk) {
           setPendingChoice(game, pending);
-          return fail('请选择 equipment 或 hand。');
+          return fail(game.mode === 'identity3' ? '请选择 equipment / hand / judge。' : '请选择 equipment 或 hand。');
         }
         if (!cardId) {
           setPendingChoice(game, pending);
@@ -944,7 +970,19 @@
           game.pauseState.duelChain = null;
           return success('决斗结算完成。');
         }
+        // audit4-L5: 插入结算挂起 (银月枪/雷击等经 onShanUsed/onCardUse 挂
+        // pendingChoice) 时决斗链停机 — 链保留, 选择排空后由
+        // resumeSuspendedTurnFlowIfReady 的 duelChain 分支续跑 (此前越过挂起
+        // 继续对拼, auto/ask 同局面结果分歧, 对手白掉血)。
+        if (game.pendingChoice) return success('【决斗】暂停，等待插入结算。');
+        // audit4-L5: 插入结算致一方阵亡 → 决斗中止 (官方: 角色死亡其为
+        // 目标的结算终止), 不再对亡者结算伤害。
         var responder = chain.currentResponder;
+        var otherParty = duelOtherParty(chain, responder);
+        if (!game[responder] || game[responder].hp <= 0 || !game[otherParty] || game[otherParty].hp <= 0) {
+          game.pauseState.duelChain = null;
+          return success('【决斗】中止（一方已阵亡）。');
+        }
         var state = game[responder];
         var hasSha = hasShaResponseAvailable(state);
 
@@ -970,9 +1008,15 @@
         // 非玩家 ask 路径: AI / 默认 — 走原 consumeResponse 自动消耗
         // v11 C1: 无双 — 对方为吕布时每轮需依次打出两张【杀】。
         var duelNeeded = duelShaRequired(game, responder, duelOtherParty(chain, responder));
-        var duelPaid = 0;
+        // audit4-L5: 挂起停机时已付张数落快照, 续跑不重复支付。
+        var duelPaid = chain.resumePaid || 0;
+        chain.resumePaid = 0;
         while (duelPaid < duelNeeded && consumeResponse(game, responder, 'sha', chain.reason)) {
           duelPaid += 1;
+          if (game.pendingChoice) {
+            chain.resumePaid = duelPaid;
+            return success('【决斗】暂停，等待插入结算。');
+          }
         }
         if (duelPaid === duelNeeded) {
           chain.currentResponder = duelOtherParty(chain, responder);
@@ -996,6 +1040,11 @@
         }
         while (duelPaid < duelNeeded && tryLordAidSync && tryLordAidSync(game, responder, 'jijiang', chain.reason)) {
           duelPaid += 1;
+          // audit4-L5: 代打座席的打出同样可挂插入结算 (银月枪等)。
+          if (game.pendingChoice) {
+            chain.resumePaid = duelPaid;
+            return success('【决斗】暂停，等待插入结算。');
+          }
         }
         if (duelPaid === duelNeeded) {
           chain.currentResponder = duelOtherParty(chain, responder);

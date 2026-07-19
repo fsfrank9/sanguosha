@@ -77,6 +77,9 @@ function decisionForPendingChoice(pending) {
     case 'guohe-1v1-pick': {
       if (pending.equipment && pending.equipment.length) return { zone: 'equipment', cardId: pending.equipment[0].cardId };
       if (pending.hand && pending.hand.length) return { zone: 'hand', cardId: pending.hand[0].cardId };
+      // audit4-M2: identity3 界限突破版可拆判定区 — 目标可因判定区唯一
+      // 有牌而合法, 无兜底会 fail-重挂死循环。
+      if (pending.judgeArea && pending.judgeArea.length) return { zone: 'judge', cardId: pending.judgeArea[0].cardId };
       return { zone: 'hand' };
     }
     default:

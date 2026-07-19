@@ -15,6 +15,8 @@
     var continueTurnAfterJudgeArea = deps.continueTurnAfterJudgeArea;
     // v12 H2: AOE 逐座席队列续跑 (tricks 域后置装配, 包装注入)
     var resumeAOETargets = deps.resumeAOETargets;
+    // audit4-L5: 决斗链续跑 (tricks 域后置装配, 包装注入)
+    var resumeDuelChain = deps.resumeDuelChain;
     // v12 H 复核修复: 铁索传导环续跑 (damage-dying 域后置装配, 包装注入)
     var resumeChainTransmit = deps.resumeChainTransmit;
 
@@ -101,6 +103,15 @@
         var chainResult = resumeChainTransmit(game);
         // 传导续跑中再次触发濒死暂停 → 保持挂起; 否则继续检查外层 (AOE 等)。
         if (game.pendingChoice) return chainResult || success('回合暂停，等待玩家选择。');
+      }
+      // audit4-L5: 决斗链被插入结算 (银月枪/雷击等) 挂起 → 选择排空后续跑
+      // (须早于 AOE: 离间虚拟决斗可嵌在...出牌阶段独立发生, 决斗为更内层
+      // 的进行中结算; sha-duel-response ask 挂起时 pendingChoice 非空不会
+      // 走到这里, 由各自 resolver 续跑, 无双重推进)。
+      var savedDuel = game.pauseState && game.pauseState.duelChain;
+      if (savedDuel && resumeDuelChain) {
+        var duelResult = resumeDuelChain(game);
+        if (game.pendingChoice) return duelResult || success('回合暂停，等待玩家选择。');
       }
       // v12 H2: AOE (南蛮/万箭) 逐座席结算中某座席濒死暂停 → 救援选择排空后
       // 续跑队列剩余座席 (advanceAOETargets 完成后自清 pauseState.aoe)。
