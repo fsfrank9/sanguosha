@@ -155,7 +155,9 @@
       // 无特殊字符, 替换出的 span 不被二次转义)。
       var LOG_SUIT = { spade: ['♠', 'black'], heart: ['♥', 'red'], club: ['♣', 'black'], diamond: ['♦', 'red'] };
       function colorizeSuits(escapedText) {
-        return escapedText.replace(/spade|heart|club|diamond/g, function (w) {
+        // 评审收口: 加词边界 — 引擎日志只单独插值 card.suit (其余为中文),
+        // \b 防未来牌 type/id 恰含这四个英文子串时被误染 (如 clubhouse)。
+        return escapedText.replace(/\b(spade|heart|club|diamond)\b/g, function (w) {
           var s = LOG_SUIT[w];
           return '<span class="log-suit suit-' + s[1] + '">' + s[0] + '</span>';
         });

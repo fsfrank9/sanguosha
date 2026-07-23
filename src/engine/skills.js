@@ -1905,8 +1905,15 @@
           if (!game || !originalCard || context.replaced) return null;
           // v13 审计三轮: 座次环扫描 (与鬼才共用 findRingSkillHolder) —
           // 此前二元 opponent(), 3p 第三席的鬼道持有者恒不可达。
+          // 评审收口: canPay 与实际可用集对齐 — 黑色装备牌仅 ask 面板 (玩家)
+          // 可用, AI/auto 只用手牌; 故"仅黑装备"的非玩家座席不算可发动, 不占
+          // holder 名额挡住后座真正能自动改判者。张角当前为唯一鬼道持有者,
+          // 此为多持有者场景的前瞻性对齐 (decline 仍由下方统一处理)。
           var holder = findRingSkillHolder(game, judgementActor, 'guidao', function (s) {
-            return guidaoBlackCards(s).length > 0;
+            var entries = guidaoBlackCards(s);
+            // 黑手牌任意座席可用; 仅黑装备只有玩家 (走 ask 面板) 可用。
+            return entries.some(function (e) { return e.zone === 'hand'; })
+              || (s === game.player && entries.length > 0);
           });
           if (!holder) return null;
           var holderState = game[holder];
@@ -1997,7 +2004,7 @@
             // pauseState.judgeArea 挂起快照悬空, 判定永远无法续跑 (回合卡死)。
             if (!chosenEntry) {
               setPendingChoice(game, pending);
-              return fail('找不到这张黑色牌。');
+              return fail('找不到这张牌。');
             }
             var replacement = removeOwnCardFromAnyZone(holderState, decision.cardId, game);
             if (!replacement) {

@@ -23,8 +23,7 @@
 
     /* 张角二修 (#5): 活动信息栏花色以带色形状呈现 (♠♣ 用 .suit-black 浅色,
        ♥♦ 用 .suit-red 红色, 见 cards.css), 加粗更醒目, 取代难辨的英文词。 */
-    .log-suit,
-    .log-overlay__entry .log-suit {
+    .log-suit {
       font-weight: 700;
       padding: 0 1px;
       font-size: 1.05em;
