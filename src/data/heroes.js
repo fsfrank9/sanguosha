@@ -72,7 +72,7 @@
         { id: 'weiyan', name: '魏延', camp: '蜀', gender: 'male', title: '嗜血的独狼', maxHp: 4, quote: '谁敢杀我？', skills: [{ id: 'kuanggu', name: '狂骨', desc: '造成伤害后可回复体力。' }] },
         { id: 'xiaoqiao', name: '小乔', camp: '吴', gender: 'female', title: '矫情之花', maxHp: 3, quote: '接着哦。', skills: [{ id: 'tianxiang', name: '天香', desc: '受到伤害时可弃红桃转移。' }, { id: 'hongyan', name: '红颜', desc: '黑桃牌视为红桃。' }] },
         { id: 'zhoutai', name: '周泰', camp: '吴', gender: 'male', title: '历战之躯', maxHp: 4, quote: '还不够！', skills: [{ id: 'buqu', name: '不屈', desc: '濒死时以不屈牌维持生存。' }] },
-        { id: 'zhangjiao', name: '张角', camp: '群', gender: 'male', title: '天公将军', maxHp: 3, quote: '苍天已死，黄天当立！', skills: [{ id: 'leiji', name: '雷击', desc: '使用或打出闪时，可令一名其他角色判定，黑桃则其受2点雷伤。' }, { id: 'guidao', name: '鬼道', desc: '判定牌生效前，可打出黑色手牌替换之。' }, { id: 'huangtian', name: '黄天', desc: '主公技：群势力可给你闪/闪电。', lord: true }] },
+        { id: 'zhangjiao', name: '张角', camp: '群', gender: 'male', title: '天公将军', maxHp: 3, quote: '苍天已死，黄天当立！', skills: [{ id: 'leiji', name: '雷击', desc: '使用或打出闪时，可令一名其他角色判定，黑桃则其受2点雷伤。' }, { id: 'guidao', name: '鬼道', desc: '一名角色的判定牌生效前，可打出一张黑色牌（手牌或装备牌）替换之。' }, { id: 'huangtian', name: '黄天', desc: '主公技：群势力可给你闪/闪电。', lord: true }] },
         { id: 'yuji', name: '于吉', camp: '群', gender: 'male', title: '太平道人', maxHp: 3, quote: '猜猜看哪。', skills: [{ id: 'guhuo', name: '蛊惑', desc: '可声明任意基本牌/锦囊。' }] }
       ]);
 

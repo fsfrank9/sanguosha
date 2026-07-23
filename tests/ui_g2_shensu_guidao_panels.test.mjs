@@ -107,9 +107,9 @@ test('神速面板: 没有装备可弃 → 选项二/一+二 按钮禁用', () =
   assert.equal(game.pendingChoice, null);
 });
 
-// ───── 鬼道复用鬼才面板 (kind: guidao-replace) ─────────────────────────
+// ───── 鬼道独立面板 (kind: guidao-replace, 张角二修拆出) ────────────────
 
-test('鬼道复用鬼才面板: 张角自己判定乐不思蜀 → guidao-replace 面板 → 选中黑牌确认 → 判定牌被替换', () => {
+test('鬼道独立面板: 张角自己判定乐不思蜀 → guidao 面板 (措辞替换) → 选中黑牌确认 → 判定牌被替换', () => {
   const game = startGameViaUI('zhangjiao', 'liubei');
   game.player.hand = [c('sha', { id: 'ui-gd-black', suit: 'spade', color: 'black', rank: '9' })];
   game.player.judgeArea = [c('lebusishu', { id: 'ui-gd-lebu', suit: 'club', color: 'black' })];
@@ -126,11 +126,13 @@ test('鬼道复用鬼才面板: 张角自己判定乐不思蜀 → guidao-replac
 
   assert.equal(game.pendingChoice && game.pendingChoice.kind, 'guidao-replace', '鬼道挂起');
   assert.equal(game.pendingChoice.judgementActor, 'player', '判定归属为玩家自己');
-  assert.equal($('guicaiPromptPanel').hidden, false, '复用鬼才面板弹出');
-  assert.match($('guicaiPromptHint').textContent, /鬼道/, '提示文案标注鬼道（非鬼才）');
-  assert.match($('guicaiCandidates').innerHTML, /ui-gd-black/, '候选黑牌渲染');
+  assert.equal($('guidaoPromptPanel').hidden, false, '鬼道独立面板弹出');
+  assert.equal($('guicaiPromptPanel').hidden, true, '鬼才面板不弹 (已拆分)');
+  assert.match($('guidaoPromptHint').innerHTML, /鬼道/, '提示文案标注鬼道');
+  assert.match($('guidaoPromptHint').innerHTML, /替换/, '措辞为"替换"而非"代替"');
+  assert.match($('guidaoCandidates').innerHTML, /ui-gd-black/, '候选黑牌渲染');
 
-  $('guicaiCandidates').dispatchClick({ 'data-guicai-card-id': 'ui-gd-black' });
+  $('guidaoCandidates').dispatchClick({ 'data-guidao-card-id': 'ui-gd-black' });
   $('handConfirmBtn').click();
 
   assert.equal(game.pendingChoice, null, '选择已提交');
@@ -140,10 +142,39 @@ test('鬼道复用鬼才面板: 张角自己判定乐不思蜀 → guidao-replac
     game.log.some((line) => line.indexOf('鬼道') >= 0 && line.indexOf('ui-gd-black') >= 0),
     '日志确认正是这张候选黑牌被打出替换判定牌'
   );
-  assert.equal($('guicaiPromptPanel').hidden, true, '面板关闭');
+  assert.equal($('guidaoPromptPanel').hidden, true, '面板关闭');
 });
 
-test('鬼道复用鬼才面板: 点"不发动" → 原判定生效（面板 decline 路径与鬼才共用）', () => {
+test('鬼道独立面板: 装备区黑牌可作候选 (带装备前缀) → 替换生效, 装备离场', () => {
+  const game = startGameViaUI('zhangjiao', 'liubei');
+  game.player.hand = [];
+  game.player.equipment.weapon = c('qinggang', { id: 'ui-gd-equip', suit: 'spade', color: 'black' });
+  game.player.judgeArea = [c('lebusishu', { id: 'ui-gd-lebu3', suit: 'club', color: 'black' })];
+  game.deck = [
+    c('sha', { id: 'gd3-pad-1' }),
+    c('sha', { id: 'gd3-pad-2' }),
+    c('sha', { id: 'gd3-pad-3' }),
+    c('sha', { id: 'gd3-pad-4' }),
+    c('tao', { id: 'ui-gd-orig3', suit: 'diamond', color: 'red', rank: '3' })
+  ];
+
+  Engine.startTurn(game, 'player');
+  UI.render();
+
+  assert.equal(game.pendingChoice && game.pendingChoice.kind, 'guidao-replace', '仅黑装备也挂鬼道 (张角二修根因修复)');
+  assert.match($('guidaoCandidates').innerHTML, /ui-gd-equip/, '装备黑牌渲染为候选');
+  assert.match($('guidaoCandidates').innerHTML, /装备/, '候选带"装备"前缀');
+
+  $('guidaoCandidates').dispatchClick({ 'data-guidao-card-id': 'ui-gd-equip' });
+  $('handConfirmBtn').click();
+
+  assert.equal(game.pendingChoice, null);
+  assert.equal(game.player.equipment.weapon, null, '装备离开装备区');
+  assert.ok(game.discard.some((card) => card.id === 'ui-gd-equip'), '装备黑牌进弃牌堆');
+  assert.ok(game.discard.some((card) => card.id === 'ui-gd-orig3'), '原判定牌进弃牌堆');
+});
+
+test('鬼道独立面板: 点"不发动" → 原判定生效', () => {
   const game = startGameViaUI('zhangjiao', 'liubei');
   game.player.hand = [c('sha', { id: 'ui-gd-black2', suit: 'club', color: 'black' })];
   game.player.judgeArea = [c('lebusishu', { id: 'ui-gd-lebu2', suit: 'club', color: 'black' })];
@@ -157,14 +188,14 @@ test('鬼道复用鬼才面板: 点"不发动" → 原判定生效（面板 decl
 
   Engine.startTurn(game, 'player');
   UI.render();
-  assert.equal($('guicaiPromptPanel').hidden, false);
+  assert.equal($('guidaoPromptPanel').hidden, false);
 
-  $('guicaiDeclineBtn').click();
+  $('guidaoDeclineBtn').click();
 
   assert.equal(game.pendingChoice, null);
   assert.equal(game.player.flags.skipPlay, true, '黑桃原判定生效 → 乐不思蜀跳过出牌阶段');
   assert.ok(game.player.hand.some((card) => card.id === 'ui-gd-black2'), '手牌保留（未打出）');
-  assert.equal($('guicaiPromptPanel').hidden, true, '面板关闭');
+  assert.equal($('guidaoPromptPanel').hidden, true, '面板关闭');
 });
 
 // ───── v13 张角修缮: 雷击询问面板 (kind: leiji-ask) ─────────────────────
@@ -215,7 +246,7 @@ test('雷击面板: 点"不发动" → 不判定, 面板关闭', () => {
   assert.ok(game.log.some((line) => line.indexOf('选择不发动【雷击】') >= 0));
 });
 
-test('雷击→鬼道链: 判定红桃 → 鬼道面板 (复用鬼才面板, 事由【雷击】) → 打出黑桃替换 → 命中', () => {
+test('雷击→鬼道链: 判定红桃 → 鬼道独立面板 (事由【雷击】) → 打出黑桃替换 → 命中', () => {
   const game = startGameViaUI('zhangjiao', 'liubei');
   game.player.hand = [c('sha', { id: 'ui-lj-spade', suit: 'spade', color: 'black', rank: '9' })];
   armLeijiAsk(game, c('sha', { id: 'ui-lj-judge3', suit: 'heart', color: 'red', rank: '4' }));
@@ -225,18 +256,33 @@ test('雷击→鬼道链: 判定红桃 → 鬼道面板 (复用鬼才面板, 事
 
   assert.equal(game.pendingChoice && game.pendingChoice.kind, 'guidao-replace', '判定后挂鬼道改判询问');
   assert.equal(game.pendingChoice.reason, '【雷击】', '事由为雷击');
-  assert.equal($('guicaiPromptPanel').hidden, false, '鬼道复用鬼才面板弹出');
-  assert.match($('guicaiPromptHint').textContent, /鬼道/, '提示标注鬼道');
+  assert.equal($('guidaoPromptPanel').hidden, false, '鬼道独立面板弹出');
+  assert.match($('guidaoPromptHint').innerHTML, /鬼道/, '提示标注鬼道');
 
   const enemyHpBefore = game.enemy.hp;
-  $('guicaiCandidates').dispatchClick({ 'data-guicai-card-id': 'ui-lj-spade' });
+  $('guidaoCandidates').dispatchClick({ 'data-guidao-card-id': 'ui-lj-spade' });
   $('handConfirmBtn').click();
 
   assert.equal(game.pendingChoice, null, '改判已提交');
   assert.equal(game.enemy.hp, enemyHpBefore - 2, '黑桃替换 → 雷击命中 2 点雷伤');
   assert.ok(game.discard.some((card) => card.id === 'ui-lj-judge3'), '原判定牌进弃牌堆');
   assert.ok(game.discard.some((card) => card.id === 'ui-lj-spade'), '替换牌进弃牌堆');
-  assert.equal($('guicaiPromptPanel').hidden, true, '面板关闭');
+  assert.equal($('guidaoPromptPanel').hidden, true, '面板关闭');
+});
+
+// ───── 张角二修 (#5): 活动信息栏花色带色形状 ─────────────────────────
+
+test('活动信息栏: 引擎日志的英文花色词渲染为带色形状 span', () => {
+  const game = startGameViaUI('zhangjiao', 'liubei');
+  game.log = [
+    '张角发动【鬼道】，打出【青釭剑】spade A 替换判定牌。',
+    '刘备进行【乐不思蜀】判定：【桃】heart 3。'
+  ];
+  UI.render();
+  const html = $('battleLog').innerHTML;
+  assert.match(html, /log-suit suit-black[^>]*>♠/, 'spade → 黑色 ♠');
+  assert.match(html, /log-suit suit-red[^>]*>♥/, 'heart → 红色 ♥');
+  assert.doesNotMatch(html.replace(/data-[^=]*="[^"]*"/g, ''), /\b(spade|heart|club|diamond)\b/, '不残留英文花色词');
 });
 
 for (const [name, fn] of tests) {

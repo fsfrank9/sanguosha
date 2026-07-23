@@ -34,7 +34,9 @@
       // v9 PR-E22: 电脑回合节奏 — 用户反馈"自动出牌阶段过得太快, 来不及反应".
       // 拆两档: 出牌阶段的实质动作 (出杀/锦囊等) 用 enemyActionDelay 慢一些
       // 让玩家看清; 准备/判定/摸牌/弃牌/结束 等阶段切换用 enemyPhaseDelay.
-      var enemyActionDelay = 1300;
+      // 张角二修 (#7): AI 出牌动作放慢, 让玩家看清每一步 (配合可回看的活动
+      // 信息栏 #6)。实质动作 1700ms; 阶段切换保持 700ms (非"动作")。
+      var enemyActionDelay = 1700;
       var enemyPhaseDelay = 700;
       var playerRole = '主公';
       var enemyRole = '反贼';
@@ -168,6 +170,8 @@
           'zhihengModePanel',
           'zhihengConfirmBtn', 'zhihengCancelBtn', 'zhihengHint', 'roleDraftPanel',
           'guicaiPromptPanel', 'guicaiPromptHint', 'guicaiOriginalCard', 'guicaiCandidates', 'guicaiDeclineBtn',
+          // 张角二修: 鬼道独立面板 (措辞替换 / 装备黑牌 / 彩色花色)
+          'guidaoPromptPanel', 'guidaoPromptHint', 'guidaoOriginalCard', 'guidaoCandidates', 'guidaoDeclineBtn',
           // v13 张角修缮: 雷击 ask 面板 — 闪结算完后选判定目标
           'leijiAskPanel', 'leijiAskHint', 'leijiAskChoices', 'leijiDeclineBtn',
           'yijiPromptPanel', 'yijiPromptHint', 'yijiCandidates', 'yijiKeepAllBtn', 'yijiConfirmBtn',
@@ -1284,10 +1288,10 @@
         { panelId: 'jiedaoDecisionPanel',   confirmBtnId: 'jiedaoDecisionFireBtn',  cancelBtnId: 'jiedaoDecisionDeclineBtn' },
         { panelId: 'yijiPromptPanel',       confirmBtnId: 'yijiConfirmBtn',         cancelBtnId: 'yijiKeepAllBtn' },
         { panelId: 'qilinPickPanel',        confirmBtnId: null,                     cancelBtnId: 'qilinDeclineBtn' },
-        // v12 G2: guicaiPromptPanel 同时承载 'guicai-replace' 与 'guidao-replace'
-        // 两个 kind (鬼道复用鬼才面板 DOM, 见 prompt-panels.js) — 一条 dispatch
-        // 记录按 panelId 命中, 对两个 kind 同样生效, 无需重复注册。
+        // 鬼才面板只承载 'guicai-replace' (张角二修: 鬼道已拆出独立面板)。
         { panelId: 'guicaiPromptPanel',     confirmBtnId: null,                     cancelBtnId: 'guicaiDeclineBtn' },
+        // 张角二修: 鬼道独立面板 — 点候选 stage 后 hand-confirm 提交, cancel = 不发动。
+        { panelId: 'guidaoPromptPanel',     confirmBtnId: null,                     cancelBtnId: 'guidaoDeclineBtn' },
         // v13 张角修缮: 雷击 ask — 点座席候选 stage 后 hand-confirm 提交,
         // cancel = 不发动。
         { panelId: 'leijiAskPanel',         confirmBtnId: null,                     cancelBtnId: 'leijiDeclineBtn' },

@@ -30,33 +30,38 @@
     var shensuOptionMode = null;
     var shensuEquipCardId = null;
 
+    // 张角二修 (#3/#5): 花色以带色形状呈现 — ♠♣ 黑、♥♦ 红, 决策提示里
+    // 不再用不着色的黑色符号 (♠/♥ 易看错)。
+    function suitHtml(suit) {
+      var sym = suitLabel(suit);
+      if (!sym) return '';
+      var red = (suit === 'heart' || suit === 'diamond');
+      return '<span class="mini-card-suit ' + (red ? 'suit-red' : 'suit-black') + '">' + escapeHtml(sym) + '</span>';
+    }
+    function judgeCardHtml(jc) {
+      return '【' + escapeHtml(jc.name) + '】' + suitHtml(jc.suit)
+        + (jc.rank ? ' ' + escapeHtml(String(jc.rank)) : '');
+    }
+
     function renderPromptPanels(kind, pending) {
       var game = getGame();
     if (els.guicaiPromptPanel) {
-      // v12 G2: 鬼道 (张角) 与 鬼才 (司马懿) 机制同构 (判定牌生效前打出/选
-      // 手牌替换, 差异只在候选是否限黑色 — 候选由引擎侧过滤好), 复用同一
-      // 面板 DOM + 事件绑定, 仅提示文案按 kind 切换技能名与动作措辞。
-      if ((kind === 'guicai-replace' || kind === 'guidao-replace') && pending.actor === 'player') {
+      // 鬼才 (司马懿) — 张角二修: 鬼道已拆出独立面板, 本面板只承载 guicai。
+      if (kind === 'guicai-replace' && pending.actor === 'player') {
         els.guicaiPromptPanel.hidden = false;
-        var isGuidao = kind === 'guidao-replace';
-        var skillLabel = isGuidao ? '鬼道' : '鬼才';
-        var actionLabel = isGuidao ? '打出一张黑色牌替换' : '选择手牌替换';
         if (els.guicaiPromptHint) {
           // v6.1: surface whose judgement is being replaced — when 司马懿
           // replaces opponent's judgement, the holder ≠ judgement actor.
           var whoseJudge = pending.judgementActor && pending.judgementActor !== pending.actor
             ? '对方'
             : '你';
-          els.guicaiPromptHint.textContent =
-            skillLabel + '：' + whoseJudge + '的判定牌【' + pending.judgementCard.name + '】' + suitLabel(pending.judgementCard.suit) +
-            ' ' + (pending.judgementCard.rank || '') +
-            '（' + (pending.reason || '判定') + '）— ' + actionLabel + '，或跳过';
+          els.guicaiPromptHint.innerHTML =
+            '鬼才：' + escapeHtml(whoseJudge) + '的判定牌' + judgeCardHtml(pending.judgementCard) +
+            '（' + escapeHtml(pending.reason || '判定') + '）— 选择手牌代替，或跳过';
         }
         if (els.guicaiOriginalCard) {
           els.guicaiOriginalCard.innerHTML =
-            '<span class="mini-card">原判定：【' + escapeHtml(pending.judgementCard.name) +
-            '】' + escapeHtml(suitLabel(pending.judgementCard.suit)) +
-            ' ' + escapeHtml(String(pending.judgementCard.rank || '')) + '</span>';
+            '<span class="mini-card">原判定：' + judgeCardHtml(pending.judgementCard) + '</span>';
         }
         if (els.guicaiCandidates) {
           // v8 PR-A1: 用 promptCardChoice 统一模板（保留 .guicai-candidate
@@ -71,6 +76,35 @@
         }
       } else {
         els.guicaiPromptPanel.hidden = true;
+      }
+    }
+    // 张角二修: 鬼道独立面板 — 措辞"替换"、候选含装备黑牌 (带"装备"前缀)、
+    // 花色带色形状。
+    if (els.guidaoPromptPanel) {
+      if (kind === 'guidao-replace' && pending.actor === 'player') {
+        els.guidaoPromptPanel.hidden = false;
+        if (els.guidaoPromptHint) {
+          var gdWhose = pending.judgementActor && pending.judgementActor !== pending.actor ? '对方' : '你';
+          els.guidaoPromptHint.innerHTML =
+            '鬼道：' + escapeHtml(gdWhose) + '的判定牌' + judgeCardHtml(pending.judgementCard) +
+            '（' + escapeHtml(pending.reason || '判定') + '）生效前 — 打出一张黑色牌替换之，或跳过';
+        }
+        if (els.guidaoOriginalCard) {
+          els.guidaoOriginalCard.innerHTML =
+            '<span class="mini-card">原判定：' + judgeCardHtml(pending.judgementCard) + '</span>';
+        }
+        if (els.guidaoCandidates) {
+          els.guidaoCandidates.innerHTML = pending.candidates.map(function (card) {
+            return promptCardChoice(card, {
+              dataAttrs: { guidaoCardId: card.id },
+              title: '打出这张黑色牌替换判定牌',
+              extraClass: 'guidao-candidate',
+              prefix: card.zone === 'equipment' ? '装备 ' : ''
+            });
+          }).join('') || '<span class="mini-card">没有黑色牌，必须跳过</span>';
+        }
+      } else {
+        els.guidaoPromptPanel.hidden = true;
       }
     }
     // v13 张角修缮: 雷击 ask — 闪结算完后挂起, 选一名其他角色判定或不发动。
@@ -603,6 +637,18 @@
       stage({ cardId: cardId }, '[data-guicai-card-id="' + cardId + '"]');
     });
     if (els.guicaiDeclineBtn) els.guicaiDeclineBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), { cardId: null });
+      if (!result.ok) renderLog();
+      render();
+    });
+    // 张角二修: 鬼道独立面板 — 点候选 stage, hand-confirm 提交; 不发动直提。
+    if (els.guidaoCandidates) els.guidaoCandidates.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-guidao-card-id]');
+      if (!btn) return;
+      var cardId = btn.getAttribute('data-guidao-card-id');
+      stage({ cardId: cardId }, '[data-guidao-card-id="' + cardId + '"]');
+    });
+    if (els.guidaoDeclineBtn) els.guidaoDeclineBtn.addEventListener('click', function () {
       var result = Engine.resolvePendingChoice(getGame(), { cardId: null });
       if (!result.ok) renderLog();
       render();
