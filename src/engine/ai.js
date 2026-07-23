@@ -285,8 +285,14 @@
       if (!game || !chain) return true;
       var self = game[responder];
       if (!self) return true;
-      if (self.skillPreferences && self.skillPreferences.wuxiePolicy === 'always') return true;
+      // v13 张角三修: 立场过滤须先于 'always' 早退。延时锦囊判定改为"无使用者"
+      // (actor:null) 后, 放置者也进入无懈队列 (不再被 skip=ctx.actor 硬剔除);
+      // 若 'always' 先于立场过滤返回, AI 放置者会无条件取消自己打给敌方的延时
+      // 锦囊 (自耗)。立场不符 (消己方增益 / 放置者消己方延时锦囊) 恒不出, 与任何
+      // wuxiePolicy 无关; 受害者为自身/友方的场景 (如南蛮打到自己) 立场恒成立,
+      // 'always' 回退旧行为不受影响。
       if (!aiWuxieStance(game, responder, chain)) return false; // v12 H5: 立场不符不出
+      if (self.skillPreferences && self.skillPreferences.wuxiePolicy === 'always') return true;
       if (chain.wuxied) return true; // 反无懈: 保卫己方已投入的锦囊
       var opp = game[opponent(responder)];
       var trick = chain.trickName;

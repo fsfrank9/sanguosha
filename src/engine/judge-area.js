@@ -167,10 +167,10 @@
               // 窗口不跳过任何座席, 放置者也应被询问/纳入 (官方: 任何角色可在
               // 判定牌生效前打出无懈)。此前 actor=放置者 令其被"净通过跳过来源"
               // 逻辑排除, 玩家放置的延时锦囊判定前得不到询问 (用户实测)。
-              // AI 放置者仍不会乱耗: aiWuxieStance 按受害者(判定区归属者)立场
-              // 判定, 取消打在敌方的己方延时锦囊不符立场 → 自动保留。
+              // AI 放置者不乱耗由 aiShouldUseWuxie 保证: 立场过滤 (按受害者=判定区
+              // 归属者 ctx.ownerActor) 先于 wuxiePolicy='always' 早退 — 消己方打给
+              // 敌方的延时锦囊不符立场 → 恒保留 (张角三修同批修正 ai.js 过滤顺序)。
               actor: null,
-              placedBy: trick.delayedSource || null,
               ownerActor: actor,
               trickIdx: i,
               trickType: trick.type
