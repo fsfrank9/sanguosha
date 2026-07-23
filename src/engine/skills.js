@@ -1792,7 +1792,10 @@
           var originalCard = saved.currentJudgementCard;
           var resolvedCard = originalCard;
           if (decision.cardId) {
-            var chosen = (holderState.hand || []).find(function (c) { return c.id === decision.cardId; });
+            // 张角二修: 鬼道 (allowEquip) 候选覆盖手牌+装备黑牌; 鬼才仅手牌。
+            var chosen = opts.allowEquip
+              ? (function () { var e = guidaoBlackCards(holderState).find(function (x) { return x.card.id === decision.cardId; }); return e && e.card; })()
+              : (holderState.hand || []).find(function (c) { return c.id === decision.cardId; });
             if (!chosen) {
               setPendingChoice(game, pending);
               return fail('找不到这张牌。');
@@ -1801,7 +1804,10 @@
               setPendingChoice(game, pending);
               return fail('【' + opts.skillLabel + '】只能打出黑色牌。');
             }
-            var replacement = takeCard(game, decision.cardId, { zone: 'hand', actor: holder });
+            // 鬼道装备来源经统一出口走失去时机; 鬼才恒手牌 (同样兼容)。
+            var replacement = opts.allowEquip
+              ? removeOwnCardFromAnyZone(holderState, decision.cardId, game)
+              : takeCard(game, decision.cardId, { zone: 'hand', actor: holder });
             if (!replacement) {
               setPendingChoice(game, pending);
               return fail('找不到这张牌。');
@@ -1873,11 +1879,23 @@
           return success('【雷击】结算完成。');
         }
 
-        // 鬼道 (张角) — gltjk wind spec: "当一名角色的判定牌生效前, 你可以
-        // 打出一张黑色牌替换之"。机制与 鬼才 同构, 候选限黑色手牌; 玩家默认
-        // ask (pausable 判定挂面板), AI auto 取最低分黑牌。
-        function guidaoBlackHand(state) {
-          return (state.hand || []).filter(function (c) { return c.color === 'black'; });
+        // 鬼道 (张角) — gltjk wind spec: "任意角色的判定牌生效前, 可打出一张
+        // 黑色牌替换之" (summary 用"黑色牌"非"黑色手牌")。张角二修: 候选放开
+        // 到黑色手牌 + 黑色装备牌 (removeOwnCardFromAnyZone 统一出口, 装备
+        // 来源顺带走失去时机)。玩家默认 ask (pausable 判定挂面板), AI auto
+        // 取最低分黑牌。zone 标注供面板显示"装备"前缀。
+        function guidaoBlackCards(state) {
+          var out = (state.hand || []).filter(function (c) { return c.color === 'black'; })
+            .map(function (c) { return { card: c, zone: 'hand' }; });
+          var eq = (state && state.equipment) || {};
+          ['weapon', 'armor', 'horsePlus', 'horseMinus'].forEach(function (slot) {
+            if (eq[slot] && eq[slot].color === 'black') out.push({ card: eq[slot], zone: 'equipment' });
+          });
+          return out;
+        }
+        function guidaoCandidateOf(entry) {
+          var c = entry.card;
+          return { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank, zone: entry.zone };
         }
 
         function triggerGuidaoJudgementBeforeResolve(context) {
@@ -1887,8 +1905,15 @@
           if (!game || !originalCard || context.replaced) return null;
           // v13 审计三轮: 座次环扫描 (与鬼才共用 findRingSkillHolder) —
           // 此前二元 opponent(), 3p 第三席的鬼道持有者恒不可达。
+          // 评审收口: canPay 与实际可用集对齐 — 黑色装备牌仅 ask 面板 (玩家)
+          // 可用, AI/auto 只用手牌; 故"仅黑装备"的非玩家座席不算可发动, 不占
+          // holder 名额挡住后座真正能自动改判者。张角当前为唯一鬼道持有者,
+          // 此为多持有者场景的前瞻性对齐 (decline 仍由下方统一处理)。
           var holder = findRingSkillHolder(game, judgementActor, 'guidao', function (s) {
-            return guidaoBlackHand(s).length > 0;
+            var entries = guidaoBlackCards(s);
+            // 黑手牌任意座席可用; 仅黑装备只有玩家 (走 ask 面板) 可用。
+            return entries.some(function (e) { return e.zone === 'hand'; })
+              || (s === game.player && entries.length > 0);
           });
           if (!holder) return null;
           var holderState = game[holder];
@@ -1898,7 +1923,7 @@
             log(game, actorName(game, holder) + '选择不发动【鬼道】。');
             return { declinedGuidao: true };
           }
-          var blackCards = guidaoBlackHand(holderState);
+          var blackEntries = guidaoBlackCards(holderState);
           // v13 张角修缮-3 (评审收口): 同一判定已有改判询问挂起时后到者彻底
           // 退让, 含 auto 路径 (同鬼才 hook — 防 AI 在玩家询问面板背后换牌)。
           var guidaoAlreadyAsking = game.pendingChoice
@@ -1916,9 +1941,7 @@
                 type: originalCard.type, suit: originalCard.suit,
                 rank: originalCard.rank
               },
-              candidates: blackCards.map(function (c) {
-                return { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank };
-              })
+              candidates: blackEntries.map(guidaoCandidateOf)
             });
             return { suspendedForGuidao: true };
           }
@@ -1933,18 +1956,22 @@
           // v13 张角修缮-3: 雷击判定的 AI 鬼道 — 只在能把非黑桃改成黑桃时发动
           // (原判定已黑桃则不动; 目标有红颜则黑桃视为红桃恒不命中, 白弃不发;
           // 此前无脑最低分黑牌替换, AI 张角会亲手换掉自己雷击的黑桃判定)。
+          // 张角二修: auto (AI 缺省 / 显式 guidao='auto') 只用黑色手牌 —
+          // 不自动弃置装备牌 (装备成本重, 是否舍弃交玩家 ask 面板手动决定)。
+          var autoEntries = blackEntries.filter(function (e) { return e.zone === 'hand'; });
+          if (!autoEntries.length) return null;
           if (context.reason === '【雷击】') {
             if (originalCard.suit === 'spade') return null;
             if (hasSkill(game[judgementActor], 'hongyan')) return null;
-            var guidaoSpades = blackCards.filter(function (c) { return c.suit === 'spade'; });
-            if (!guidaoSpades.length) return null;
-            blackCards = guidaoSpades;
+            autoEntries = autoEntries.filter(function (e) { return e.card.suit === 'spade'; });
+            if (!autoEntries.length) return null;
           }
-          var sortedGuidao = blackCards
-            .map(function (card) { return { card: card, score: scoreCardForAI(game, holder, card) }; })
+          var sortedGuidao = autoEntries
+            .map(function (e) { return { card: e.card, score: scoreCardForAI(game, holder, e.card) }; })
             .sort(function (a, b) { return a.score - b.score; });
           var replacement = sortedGuidao[0].card;
-          var paidCard = removeCardFromHand(holderState, replacement.id);
+          // 张角二修: 装备来源经统一出口 (removeOwnCardFromAnyZone) 走失去时机。
+          var paidCard = removeOwnCardFromAnyZone(holderState, replacement.id, game);
           if (!paidCard) return null;
           discardCard(game, originalCard);
           context.card = replacement;
@@ -1961,7 +1988,7 @@
           if (!holderState || !judgementActorState) return fail('未知角色。');
           // v13 张角修缮-3: 雷击内嵌判定的挂起走独立快照 (pauseState.leiji)。
           var leijiResolved = resolveJudgementReplaceForLeiji(game, pending, decision, {
-            requireBlack: true, skillLabel: '鬼道', playVerb: '打出', replaceVerb: '替换'
+            requireBlack: true, allowEquip: true, skillLabel: '鬼道', playVerb: '打出', replaceVerb: '替换'
           });
           if (leijiResolved) return leijiResolved;
           var saved = game.pauseState && game.pauseState.judgeArea;
@@ -1970,18 +1997,16 @@
           var resolvedCard = originalCard;
           var declined = !decision.cardId;
           if (!declined) {
-            var chosen = (holderState.hand || []).find(function (c) { return c.id === decision.cardId; });
+            // 张角二修: 候选覆盖黑色手牌 + 装备牌; 取牌走统一出口 (装备来源
+            // 顺带走失去时机)。
+            var chosenEntry = guidaoBlackCards(holderState).find(function (e) { return e.card.id === decision.cardId; });
             // v12 G2 修复: 未找到牌也必须重挂 — 否则 pendingChoice 被清空而
             // pauseState.judgeArea 挂起快照悬空, 判定永远无法续跑 (回合卡死)。
-            if (!chosen) {
+            if (!chosenEntry) {
               setPendingChoice(game, pending);
               return fail('找不到这张牌。');
             }
-            if (chosen.color !== 'black') {
-              setPendingChoice(game, pending);
-              return fail('【鬼道】只能打出黑色牌。');
-            }
-            var replacement = takeCard(game, decision.cardId, { zone: 'hand', actor: holder });
+            var replacement = removeOwnCardFromAnyZone(holderState, decision.cardId, game);
             if (!replacement) {
               setPendingChoice(game, pending);
               return fail('找不到这张牌。');

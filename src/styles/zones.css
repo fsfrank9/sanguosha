@@ -21,6 +21,14 @@
       font-size: 14px;
     }
 
+    /* 张角二修 (#5): 活动信息栏花色以带色形状呈现 (♠♣ 用 .suit-black 浅色,
+       ♥♦ 用 .suit-red 红色, 见 cards.css), 加粗更醒目, 取代难辨的英文词。 */
+    .log-suit {
+      font-weight: 700;
+      padding: 0 1px;
+      font-size: 1.05em;
+    }
+
     /* v9 PR-E12: 旧版 .side-log-panel 与中央 overlay 双显被隐藏.
        v9 PR-E14: 用户反馈 "为什么把滚动日志删掉了, 参考图都有". 中央
        .log-overlay 已在 PR-E13 彻底 display:none, side-log 恢复显示作为

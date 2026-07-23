@@ -137,23 +137,50 @@
         });
       }
 
+      // 张角二修 (#6): 改同步置底 (原 requestAnimationFrame 延迟触发会在玩家
+      // 于同一帧内上翻后才 fire → 把玩家硬拽回底部)。innerHTML 替换后
+      // scrollHeight 已就绪, 同步赋值即可; 保留 lastElementChild.scrollIntoView
+      // 让末条完整可见 (v29 底部留白), 但只在 renderLog 判定"本就贴底"时调用,
+      // 不覆盖玩家的上翻位置。
       function scrollLogToBottom() {
         if (!els.log) return;
-        var doScroll = function () {
-          els.log.scrollTop = els.log.scrollHeight;
-          if (els.log.lastElementChild) {
-            els.log.lastElementChild.scrollIntoView({ block: 'end', inline: 'nearest' });
-          }
-        };
-        if (window.requestAnimationFrame) window.requestAnimationFrame(doScroll);
-        else doScroll();
+        els.log.scrollTop = els.log.scrollHeight;
+        if (els.log.lastElementChild && els.log.lastElementChild.scrollIntoView) {
+          els.log.lastElementChild.scrollIntoView({ block: 'end', inline: 'nearest' });
+        }
+      }
+
+      // 张角二修 (#5): 引擎日志里的花色为英文词 (card.suit: spade/heart/…),
+      // ♠♣ 黑、♥♦ 红 带色形状呈现, 不再英文难辨。escapeHtml 后再替换 (花色词
+      // 无特殊字符, 替换出的 span 不被二次转义)。
+      var LOG_SUIT = { spade: ['♠', 'black'], heart: ['♥', 'red'], club: ['♣', 'black'], diamond: ['♦', 'red'] };
+      function colorizeSuits(escapedText) {
+        // 评审收口: 加词边界 — 引擎日志只单独插值 card.suit (其余为中文),
+        // \b 防未来牌 type/id 恰含这四个英文子串时被误染 (如 clubhouse)。
+        return escapedText.replace(/\b(spade|heart|club|diamond)\b/g, function (w) {
+          var s = LOG_SUIT[w];
+          return '<span class="log-suit suit-' + s[1] + '">' + s[0] + '</span>';
+        });
+      }
+
+      // 张角二修 (#6): 决策框弹出 / AI 行动刷新会重渲染日志; 若玩家已上翻
+      // 查看历史 (非贴底), 不强制跳到底部 — 保留其滚动位置便于回看。fake-dom
+      // 无真实滚动尺寸 → 视为贴底 (维持旧"总跳底"行为, 守护测试零回归)。
+      function logAtBottom() {
+        if (!els.log) return true;
+        var sh = els.log.scrollHeight, st = els.log.scrollTop, ch = els.log.clientHeight;
+        if (typeof sh !== 'number' || typeof st !== 'number' || typeof ch !== 'number') return true;
+        return sh - st - ch < 40;
       }
 
       function renderLog() {
+        var wasAtBottom = logAtBottom();
+        var prevTop = (els.log && typeof els.log.scrollTop === 'number') ? els.log.scrollTop : 0;
         els.log.innerHTML = view.game.log.slice(-36).map(function (entry) {
-          return '<div class="log-entry">' + escapeHtml(entry) + '</div>';
+          return '<div class="log-entry">' + colorizeSuits(escapeHtml(entry)) + '</div>';
         }).join('');
-        scrollLogToBottom();
+        if (wasAtBottom) scrollLogToBottom();
+        else if (els.log && typeof els.log.scrollTop === 'number') els.log.scrollTop = prevTop;
         renderLogOverlay();
       }
 
@@ -165,7 +192,7 @@
         els.logOverlay.innerHTML = recent.map(function (entry) {
           var isPhase = /阶段|回合开始|回合结束/.test(entry);
           var cls = 'log-overlay__entry' + (isPhase ? ' log-overlay__entry--phase' : '');
-          return '<div class="' + cls + '">' + escapeHtml(entry) + '</div>';
+          return '<div class="' + cls + '">' + colorizeSuits(escapeHtml(entry)) + '</div>';
         }).join('');
       }
 

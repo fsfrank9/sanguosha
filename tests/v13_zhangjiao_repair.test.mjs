@@ -349,6 +349,53 @@ test('R17: 万箭闪化解触发 leiji-ask → AOE 循环挂起不越过, 排空
   assert.ok(!game.pauseState.aoe, 'AOE 队列续跑完自清');
 });
 
+// ───── 张角二修: 鬼道可用黑色手牌 + 装备牌 ────────────────────────────
+
+// 玩家张角判定阶段挂起鬼道 (仅提供指定黑牌来源)。
+function armGuidaoJudgement(game, blackSource) {
+  game.player.judgeArea = [c('lebusishu', { id: 'gd-lebu' })];
+  for (let i = 0; i < 6; i += 1) game.deck.push(c('sha', { id: 'gd-pad-' + i }));
+  game.deck.push(c('tao', { id: 'gd-orig', suit: 'diamond', color: 'red', rank: '3' })); // 红→乐不生效
+  blackSource(game);
+}
+
+test('R18: 玩家张角判定 + 仅黑色装备牌 → 挂 guidao-replace, 候选带 zone=equipment', () => {
+  const game = buildGame();
+  armGuidaoJudgement(game, (g) => { g.player.equipment.weapon = c('qinggang', { id: 'gd-eq', suit: 'spade', color: 'black' }); });
+  Engine.startTurn(game, 'player');
+  assert.equal(game.pendingChoice && game.pendingChoice.kind, 'guidao-replace', '仅黑装备也挂鬼道 (根因修复)');
+  const cand = game.pendingChoice.candidates.find((x) => x.id === 'gd-eq');
+  assert.ok(cand, '装备黑牌进候选');
+  assert.equal(cand.zone, 'equipment', '候选标注装备来源');
+});
+
+test('R19: 玩家张角以黑装备牌替换判定 → 装备离场 + 走失去时机 + 守恒', () => {
+  const game = buildGame();
+  armGuidaoJudgement(game, (g) => { g.player.equipment.weapon = c('qinggang', { id: 'gd-eq2', suit: 'spade', color: 'black' }); });
+  Engine.startTurn(game, 'player');
+  const r = assertCardConservation(game, () => Engine.resolvePendingChoice(game, { cardId: 'gd-eq2' }));
+  assert.equal(r.ok, true, r.message);
+  assert.equal(game.player.equipment.weapon, null, '装备离开装备区');
+  assert.ok(game.discard.some((x) => x.id === 'gd-eq2'), '装备黑牌进弃牌堆');
+  assert.equal(game.player.flags.skipPlay, true, 'spade 替换 → 乐生效跳出牌');
+  assert.ok(game.log.some((l) => l.includes('鬼道') && l.includes('替换')), '措辞为替换');
+});
+
+test('R20: AI 张角 auto 不弃装备保命 — 仅黑装备无黑手牌时鬼道不发动', () => {
+  const game = buildGame({ playerHero: 'liubei', enemyHero: 'zhangjiao' });
+  // enemy 张角 auto: 判定红桃可用黑桃改判命中, 但黑桃仅在装备区 → auto 不弃装备
+  game.enemy.equipment.weapon = c('qinggang', { id: 'ai-eq-spade', suit: 'spade', color: 'black' });
+  game.enemy.hand = [c('shan', { id: 'ai-shan' })];
+  game.player.hand = [c('sha', { id: 'p-sha' })];
+  game.deck.push(c('sha', { id: 'leiji-judge', suit: 'heart', color: 'red', rank: '4' }));
+  const playerHpBefore = game.player.hp;
+  const r = assertCardConservation(game, () => Engine.playCard(game, 'player', 'p-sha'));
+  assert.equal(r.ok, true, r.message);
+  assert.equal(game.player.hp, playerHpBefore, '红桃未中, AI 未弃装备改判 (auto 只用手牌)');
+  assert.ok(game.enemy.equipment.weapon, '装备保留');
+  assert.ok(!game.log.some((l) => l.includes('【鬼道】发动') || (l.includes('鬼道') && l.includes('替换'))), 'AI 鬼道未发动');
+});
+
 for (const [name, fn] of tests) {
   try { fn(); console.log(`✓ ${name}`); }
   catch (error) { console.error(`✗ ${name}`); throw error; }

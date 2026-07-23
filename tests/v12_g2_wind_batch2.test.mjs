@@ -319,6 +319,9 @@ test('C3: 雷击 + 八卦联动 — 八卦判定红视为出闪, 雷击照样触
   game.turn = 'enemy';
   // v13 张角修缮: 雷击玩家侧默认改询问 (leiji-ask) — 本测试钉 auto 保旧直发口径
   game.player.skillPreferences.leiji = 'auto';
+  // 张角二修: 鬼道现可用黑色装备牌 — 黑桃八卦会成为雷击判定的鬼道候选,
+  // 玩家默认 ask 会挂起询问; 本测试只验雷击触发, 钉 guidao=decline 排除干扰。
+  game.player.skillPreferences.guidao = 'decline';
   game.player.equipment.armor = c('bagua', { id: 'bagua1' });
   game.player.hand = []; // 无真闪, 必须靠八卦
   game.enemy.hand = [c('sha', { id: 'atk-sha' })];
