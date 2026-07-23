@@ -1812,11 +1812,12 @@
               setPendingChoice(game, pending);
               return fail('找不到这张牌。');
             }
-            // 同 judge-area 分支: 原判定牌还原红颜视图后弃置, 替换牌补施视图。
-            if (originalCard) discardCard(game, restoreHongyanJudgementView(originalCard));
+            // 张角三修: 鬼道="替换" (glossary: A 入 B 区 + 获得 B) → 原判定牌
+            // 还原红颜视图后进持有者手牌 (获得); 鬼才="代替" → 弃置。
             resolvedCard = replacement;
             applyHongyanJudgementView(game, judgementActor, resolvedCard);
             log(game, actorName(game, holder) + '发动【' + opts.skillLabel + '】，' + opts.playVerb + '【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）' + opts.replaceVerb + actorName(game, judgementActor) + '的判定牌。');
+            settleReplacedOriginal(game, holder, originalCard, opts);
           } else {
             log(game, actorName(game, holder) + '选择不发动【' + opts.skillLabel + '】。');
           }
@@ -1898,6 +1899,20 @@
           return { id: c.id, name: c.name, type: c.type, suit: c.suit, rank: c.rank, zone: entry.zone };
         }
 
+        // 张角三修: 原判定牌落位 — 鬼道 (opts.gainOriginal) "替换" → 持有者获得
+        // (进手牌); 鬼才 "代替" → 弃置。均先还原红颜视图 (物理牌花色不被永久
+        // 改写)。glossary__gamecard: 替换=A 入 B 区同时获得 B; 代替=B 入弃牌堆。
+        function settleReplacedOriginal(game, holder, originalCard, opts) {
+          if (!originalCard) return;
+          var restored = restoreHongyanJudgementView(originalCard);
+          if (opts && opts.gainOriginal) {
+            putCard(game, restored, { zone: 'hand', actor: holder });
+            log(game, actorName(game, holder) + '获得原判定牌【' + restored.name + '】。');
+          } else {
+            discardCard(game, restored);
+          }
+        }
+
         function triggerGuidaoJudgementBeforeResolve(context) {
           var game = context.game;
           var judgementActor = context.actor;
@@ -1973,10 +1988,11 @@
           // 张角二修: 装备来源经统一出口 (removeOwnCardFromAnyZone) 走失去时机。
           var paidCard = removeOwnCardFromAnyZone(holderState, replacement.id, game);
           if (!paidCard) return null;
-          discardCard(game, originalCard);
           context.card = replacement;
           context.replaced = true;
           log(game, actorName(game, holder) + '发动【鬼道】，打出【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）替换' + actorName(game, judgementActor) + '的判定牌。');
+          // 张角三修: 鬼道 "替换" → 持有者获得原判定牌 (AI 同样获得)。
+          settleReplacedOriginal(game, holder, originalCard, { gainOriginal: true });
           return { replacedJudgementCard: true, holder: holder, originalCard: originalCard, replacementCard: replacement };
         }
 
@@ -1988,7 +2004,7 @@
           if (!holderState || !judgementActorState) return fail('未知角色。');
           // v13 张角修缮-3: 雷击内嵌判定的挂起走独立快照 (pauseState.leiji)。
           var leijiResolved = resolveJudgementReplaceForLeiji(game, pending, decision, {
-            requireBlack: true, allowEquip: true, skillLabel: '鬼道', playVerb: '打出', replaceVerb: '替换'
+            requireBlack: true, allowEquip: true, gainOriginal: true, skillLabel: '鬼道', playVerb: '打出', replaceVerb: '替换'
           });
           if (leijiResolved) return leijiResolved;
           var saved = game.pauseState && game.pauseState.judgeArea;
@@ -2011,11 +2027,11 @@
               setPendingChoice(game, pending);
               return fail('找不到这张牌。');
             }
-            // v12 G2 复核修复: 同鬼才 — 原判定牌还原视图后弃置; 替换牌补施视图。
-            if (originalCard) discardCard(game, restoreHongyanJudgementView(originalCard));
+            // 张角三修: 鬼道 "替换" → 持有者获得原判定牌 (进手牌); 替换牌补视图。
             resolvedCard = replacement;
             applyHongyanJudgementView(game, judgementActor, resolvedCard);
             log(game, actorName(game, holder) + '发动【鬼道】，打出【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）替换' + actorName(game, judgementActor) + '的判定牌。');
+            settleReplacedOriginal(game, holder, originalCard, { gainOriginal: true });
           } else {
             log(game, actorName(game, holder) + '选择不发动【鬼道】。');
           }

@@ -146,6 +146,12 @@
     .setup-screen[hidden],
     .pending-prompt-panel[hidden] { display: none !important; }
 
+    /* 张角三修 (#2): 弹出面板为浅色底 (#fef0c8→#f5dca0), 通用 .suit-black
+       (#d8d8d8 浅灰, 为深色棋盘设计) 在此几不可见 → 面板内改深色可读;
+       .suit-red 亦加深便于在浅底辨认。覆盖 cards.css 的默认值 (更高特指度)。 */
+    .pending-prompt-panel .suit-black { color: #1a0f06; }
+    .pending-prompt-panel .suit-red { color: #a11616; }
+
     /* v10 V7: tiesuo / huogong / guanxing / zhiheng 4 panels 升级为
        pending-prompt-panel cream 卷轴风, 与 conversion/target/13 个 pending
        面板视觉统一. 旧 dark fixed 块已删. */

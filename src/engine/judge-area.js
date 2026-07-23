@@ -162,9 +162,15 @@
               awaitingWuxie: true
             };
             checkWuxieAndContinue(game, actor, reason, 'delayed-judge', {
-              // ctx.actor = 放置者 (无懈队列净通过态跳过来源; 直接构造判定区
-              // 的测试布局无此字段 → 不跳过任何座席)
-              actor: trick.delayedSource || null,
+              // 张角三修 (#3): 延时锦囊判定的使用结算"无使用者"
+              // (glossary__gamecard: 置入判定区后"无使用者"的使用结算) → 无懈
+              // 窗口不跳过任何座席, 放置者也应被询问/纳入 (官方: 任何角色可在
+              // 判定牌生效前打出无懈)。此前 actor=放置者 令其被"净通过跳过来源"
+              // 逻辑排除, 玩家放置的延时锦囊判定前得不到询问 (用户实测)。
+              // AI 放置者仍不会乱耗: aiWuxieStance 按受害者(判定区归属者)立场
+              // 判定, 取消打在敌方的己方延时锦囊不符立场 → 自动保留。
+              actor: null,
+              placedBy: trick.delayedSource || null,
               ownerActor: actor,
               trickIdx: i,
               trickType: trick.type
