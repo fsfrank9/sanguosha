@@ -31,6 +31,8 @@
     // v12 H5: 座席级合法目标矩阵 (出杀目标挑选)
     var legalTargetsForCard = deps.legalTargetsForCard;
     var getHuogongChoice = deps.getHuogongChoice;
+    // v14 P2: 方天画戟额外目标前置查询
+    var shaExtraTargetLimit = deps.shaExtraTargetLimit;
     // v11 C5 (批次 29): 锦囊类转化候选枚举 (与 UI 转化面板同源)
     var listCardConversions = deps.listCardConversions;
 
@@ -1028,6 +1030,25 @@
         if (isShaType(card.type)) {
           var aiShaSeat = aiShaTargetSeat(game, actor, card);
           if (aiShaSeat) cardOptions = { target: aiShaSeat };
+          // v14 P2: 方天画戟 — 最后手牌杀可额外指定至多 2 目标。启发:
+          // 主目标之外, 追加感知敌对且可达的座席 (按 aiPickHostileTarget
+          // 同源评分逐个挑, 不祸及同侧; 敌对候选不足则不凑数)。
+          if (aiShaSeat && shaExtraTargetLimit) {
+            var extraLimit = shaExtraTargetLimit(game, actor, card.id);
+            if (extraLimit > 0) {
+              var multiTargets = [aiShaSeat];
+              var extraPool = legalTargetsForCard(game, actor, card).filter(function (seat) {
+                return seat !== aiShaSeat && StateRuntime.perceivedHostile(game, actor, seat);
+              });
+              while (multiTargets.length < 1 + extraLimit && extraPool.length) {
+                var nextPick = aiPickHostileTarget(game, actor, extraPool);
+                if (!nextPick) break;
+                multiTargets.push(nextPick);
+                extraPool = extraPool.filter(function (seat) { return seat !== nextPick; });
+              }
+              if (multiTargets.length > 1) cardOptions = { targets: multiTargets };
+            }
+          }
         }
         if (card.type === 'huogong') {
           // v12 H5 修复: 预览与实际出牌须对同一目标 — 此前预览走

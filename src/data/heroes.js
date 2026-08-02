@@ -51,7 +51,7 @@
         { id: 'sunshangxiang', name: '孙尚香', camp: '吴', gender: 'female', title: '弓腰姬', maxHp: 3, quote: '夫君，身体要紧。', skills: [{ id: 'jieyin', name: '结姻', desc: '出牌阶段限一次，弃两张手牌令一名受伤的男性角色与你各回复 1 点体力。' }, { id: 'xiaoji', name: '枭姬', desc: '失去装备区里的牌后，摸两张牌。' }] },
         { id: 'lvmeng', name: '吕蒙', camp: '吴', gender: 'male', title: '白衣渡江', maxHp: 4, quote: '克己复礼。', skills: [{ id: 'keji', name: '克己', desc: '若未使用/打出杀，可跳过弃牌阶段。' }] },
         { id: 'luxun', name: '陆逊', camp: '吴', gender: 'male', title: '儒生雄才', maxHp: 3, quote: '牌不是万能的，但是没牌是万万不能的。', skills: [{ id: 'qianxun', name: '谦逊', desc: '不能成为顺手牵羊和乐不思蜀目标。' }, { id: 'lianying', name: '连营', desc: '失去最后手牌后可摸一张。' }] },
-        { id: 'daqiao', name: '大乔', camp: '吴', gender: 'female', title: '矜持之花', maxHp: 3, quote: '请休息吧。', skills: [{ id: 'guose', name: '国色', desc: '可将方片牌当【乐不思蜀】使用。' }, { id: 'liuli', name: '流离', desc: '被杀指定时可转移目标。' }] },
+        { id: 'daqiao', name: '大乔', camp: '吴', gender: 'female', title: '矜持之花', maxHp: 3, quote: '请休息吧。', skills: [{ id: 'guose', name: '国色', desc: '可将方片牌当【乐不思蜀】使用。' }, { id: 'liuli', name: '流离', desc: '成为【杀】的目标时，可弃置一张牌，将此【杀】转移给攻击范围内的另一名角色。' }] },
         { id: 'huangyueying', name: '黄月英', camp: '蜀', gender: 'female', title: '归隐的杰女', maxHp: 3, quote: '哼，谁说女子不如男？', skills: [{ id: 'jizhi', name: '集智', desc: '使用锦囊牌时可摸一张。' }, { id: 'qicai', name: '奇才', desc: '锦囊牌距离无限。' }] },
         { id: 'huatuo', name: '华佗', camp: '群', gender: 'male', title: '神医', maxHp: 3, quote: '早睡早起，方能养生。', skills: [{ id: 'jijiu', name: '急救', desc: '回合外可将红色牌当【桃】。' }, { id: 'qingnang', name: '青囊', desc: '出牌阶段可弃一牌令一名角色回复。' }] },
         { id: 'lvbu', name: '吕布', camp: '群', gender: 'male', title: '武的化身', maxHp: 4, quote: '谁能挡我！', skills: [{ id: 'wushuang', name: '无双', desc: '杀/决斗需要目标连续响应两张。' }] },

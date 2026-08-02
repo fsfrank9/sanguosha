@@ -19,6 +19,8 @@
     var resumeDuelChain = deps.resumeDuelChain;
     // v12 H 复核修复: 铁索传导环续跑 (damage-dying 域后置装配, 包装注入)
     var resumeChainTransmit = deps.resumeChainTransmit;
+    // v14 P1: 多目标杀链续跑 (杀链域后置装配, 包装注入)
+    var resumeShaChain = deps.resumeShaChain;
 
     // v10 V3: 玩家响应窗口框架 — 统一暂停/恢复 API.
     //
@@ -112,6 +114,14 @@
       if (savedDuel && resumeDuelChain) {
         var duelResult = resumeDuelChain(game);
         if (game.pendingChoice) return duelResult || success('回合暂停，等待玩家选择。');
+      }
+      // v14 P1: 多目标杀链某席挂起 (闪响应/濒死/天香/雷击/流离…) → 选择
+      // 排空后续跑剩余目标 (advanceShaChain 完成后自清 pauseState.shaChain)。
+      // 位序: 在 chainTransmit/duelChain (更内层的嵌套结算) 之后 — 链内
+      // 伤害触发的传导/嵌套先收敛, 再推进杀链下一目标。
+      var savedShaChain = game.pauseState && game.pauseState.shaChain;
+      if (savedShaChain && resumeShaChain) {
+        return resumeShaChain(game);
       }
       // v12 H2: AOE (南蛮/万箭) 逐座席结算中某座席濒死暂停 → 救援选择排空后
       // 续跑队列剩余座席 (advanceAOETargets 完成后自清 pauseState.aoe)。

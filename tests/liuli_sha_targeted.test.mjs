@@ -38,8 +38,7 @@ test('v8 PR-C2: 引擎注册 liuli onShaTargeted hook + 调用 triggerLiuliOnSha
   assert.match(skillsSrc, /function triggerLiuliOnShaTargeted/);
 });
 
-test('v8 PR-C2: playSha 在 cixiong 后触发 onShaTargeted hook', () => {
-  // 检查 playSha 末尾在 cixiong 后调 SkillRuntime.runHook(... 'onShaTargeted'
+test('v8 PR-C2/v14 P3: playSha 触发 onShaTargeted hook (P3 起时机前移至雌雄前 — 官方 step 4 成为目标时)', () => {
   assert.match(engineSrc, /runHook\(skillRegistry,\s*'onShaTargeted'/);
 });
 

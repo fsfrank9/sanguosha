@@ -21,6 +21,7 @@ import { test, runTests } from './helpers/harness.mjs';
 function decisionForPendingChoice(pending) {
   switch (pending.kind) {
     case 'dying-rescue':
+    case 'liuli-transfer': // v14 P3: 流离转移 — soak 兜底放弃 (AI 席位走技能内 auto 路径)
     case 'guanshi-discard':
     case 'qilin-pick':
     case 'luoshen-continue':

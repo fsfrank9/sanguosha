@@ -163,4 +163,32 @@ test('v8 PR-C4: 回合切换后 qingnangUsed 复位 → 下回合可再用', () 
   assert.equal(r2.ok, true, '下回合可再用');
 });
 
+// v14 P4 连带收口 (守恒 fuzz seed 60536 抓获的预存缺陷): 青囊座席判定
+// 只认 'player'/'enemy' 字面 → ally 席华佗自疗被误路由进 1v1 二元
+// opponent() 回退 (亡席报错/错疗他席)。泛化后显式合法座席直接采用。
+test('v14 P4: ally 席华佗自疗 — 显式 ally 目标不再误路由到 opponent 回退', () => {
+  const game = Engine.newGame({
+    seed: 60536,
+    seats: ['player', 'enemy', 'ally'],
+    roles: { player: '主公', enemy: '反贼', ally: '忠臣' },
+    playerHero: 'sunquan', enemyHero: 'lvmeng', allyHero: 'huatuo'
+  });
+  game.turn = 'ally';
+  game.phase = 'play';
+  game.log = []; game.discard = []; game.deck = [];
+  for (const seat of game.seats) {
+    game[seat].hand = []; game[seat].judgeArea = [];
+    game[seat].equipment = { weapon: null, armor: null, horseMinus: null, horsePlus: null };
+    game[seat].hp = game[seat].maxHp; game[seat].skillPreferences = {}; game[seat].flags = {};
+    game[seat].chuang = [];
+  }
+  game.player.hp = 0; // 亡席 (旧路由的错误落点)
+  game.ally.hp = game.ally.maxHp - 1;
+  game.ally.hand = [c('sha', { id: 'qn-ally-cost' })];
+  const r = Engine.useSkill(game, 'ally', 'qingnang', ['qn-ally-cost'], { target: 'ally' });
+  assert.equal(r.ok, true, r.message);
+  assert.equal(game.ally.hp, game.ally.maxHp, 'ally 席自疗生效');
+  assert.equal(game.player.hp, 0, '亡席未被触碰');
+});
+
 await runTests();

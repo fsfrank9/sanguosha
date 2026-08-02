@@ -307,6 +307,10 @@
           game.pauseState.playSha = null;
           return continueShaAfterCixiong(game, saved.actor, saved.card, saved.amount, saved.targetActor);
         }
+        // v14 P1: 多目标链的雌雄挂起 (锁定阶段, 游标已先行) → 续跑链驱动。
+        if (game.pauseState && game.pauseState.shaChain) {
+          return ShaFlowRuntime.advanceShaChain(game);
+        }
         return success('雌雄双股剑结算完成。');
       }
 
@@ -339,7 +343,9 @@
         // audit4-L5: 决斗链被插入结算挂起后的续跑 (锦囊域后置装配, 包装注入)
         resumeDuelChain: function (game) { return TricksRuntime.advanceDuelChain(game); },
         // v12 H 复核修复: 铁索传导环被濒死救援挂起后的续跑 (伤害域后置装配, 包装注入)
-        resumeChainTransmit: function (game) { return DamageDyingRuntime.advanceChainTransmit(game); }
+        resumeChainTransmit: function (game) { return DamageDyingRuntime.advanceChainTransmit(game); },
+        // v14 P1: 多目标杀链被逐席挂起 (闪响应/濒死/流离等) 后的续跑 (杀链域后置装配, 包装注入)
+        resumeShaChain: function (game) { return ShaFlowRuntime.advanceShaChain(game); }
       });
       var requestPlayerResponse = ResponseRuntime.requestPlayerResponse;
       var RESPONSE_KIND_RESOLVERS = ResponseRuntime.RESPONSE_KIND_RESOLVERS;
@@ -789,7 +795,9 @@
         shanOptionForCard: shanOptionForCard,
         // v12 H7: 主公技·护驾 求助 (杀需闪; 函数声明提升)
         tryLordAidSync: tryLordAidSync,
-        lordAidPlayerCanAid: lordAidPlayerCanAid
+        lordAidPlayerCanAid: lordAidPlayerCanAid,
+        // v14 P1: 多目标链收尾的幂等来源牌弃置
+        discardSourceCardIfPending: discardSourceCardIfPending
       });
       var playSha = ShaFlowRuntime.playSha;
       var continueShaAfterCixiong = ShaFlowRuntime.continueShaAfterCixiong;
@@ -804,6 +812,10 @@
       var applyGuanshiForcedHit = ShaFlowRuntime.applyGuanshiForcedHit;
       var defaultHostileTarget = ShaFlowRuntime.defaultHostileTarget;
       var normalizeSingleTarget = ShaFlowRuntime.normalizeSingleTarget;
+      // v14 P1/P2/P3: 多目标链驱动 + 方天前置查询 + 流离 resolver
+      var advanceShaChain = ShaFlowRuntime.advanceShaChain;
+      var shaExtraTargetLimit = ShaFlowRuntime.shaExtraTargetLimit;
+      var resolveLiuliTransferChoice = ShaFlowRuntime.resolveLiuliTransferChoice;
 
 
       // v11 B1: 银月枪触发与响应已迁往 ./equipment.js (见 EquipmentRuntime 装配)。
@@ -1584,6 +1596,8 @@
       }
 
       registerResponseKind('guanshi-discard', resolveGuanshiDiscardChoice);
+      // v14 P3: 流离转移询问 (sha-flow 域 resolver)
+      registerResponseKind('liuli-transfer', resolveLiuliTransferChoice);
 
       // v10 V3: 注册到 response framework. UI 通过 resolvePendingChoice 或
       // resolveResponseChoice 调过来时, 此 fn 拿 pauseState.shaResponse + decision
@@ -2519,7 +2533,9 @@
         getDiscardCount: getDiscardCount,
         getHuogongChoice: getHuogongChoice,
         // v12 H5: 座席级合法目标矩阵 (AI 出杀目标挑选)
-        legalTargetsForCard: legalTargetsForCard
+        legalTargetsForCard: legalTargetsForCard,
+        // v14 P2: 方天画戟额外目标前置查询 (AI 多目标启发)
+        shaExtraTargetLimit: shaExtraTargetLimit
       });
       var scoreCardForAI = AIRuntime.scoreCardForAI;
       var aiEstimateShaCount = AIRuntime.aiEstimateShaCount;
@@ -2574,6 +2590,9 @@
         nextSeat: nextSeat,
         seatsFrom: seatsFrom,
         legalTargetsForCard: legalTargetsForCard,
+        // v14 P2: 方天画戟额外目标前置查询 (UI 多目标暂存 / AI 目标启发用) —
+        // 手牌中仅剩这张【杀】且装备方天 → 2, 否则 0。
+        shaExtraTargetLimit: shaExtraTargetLimit,
         // v13 J0-4: 座席级合法目标单点查询 (UI 高亮 / 测试断言用)。
         isLegalCardTarget: isLegalCardTarget,
         // v12 H 复核修复: 借刀受害者候选 (持刀者可 杀 到的座席) — UI 两段

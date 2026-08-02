@@ -13,6 +13,7 @@
   var hasEquipmentEffect = StateRuntime.hasEquipmentEffect;
   var canUseUnlimitedSha = StateRuntime.canUseUnlimitedSha;
   var canReachWithSha = StateRuntime.canReachWithSha;
+  var seatsFrom = StateRuntime.seatsFrom;
   var weaponRange = StateRuntime.weaponRange;
   var distanceBetween = StateRuntime.distanceBetween;
   var aliveSeats = StateRuntime.aliveSeats;
@@ -53,6 +54,8 @@
     // v12 H7: 主公技·护驾 求助 (杀需闪)
     var tryLordAidSync = deps.tryLordAidSync;
     var lordAidPlayerCanAid = deps.lordAidPlayerCanAid;
+    // v14 P1: 多目标链收尾的幂等来源牌弃置 (全区域定位, 真在途才补弃)。
+    var discardSourceCardIfPending = deps.discardSourceCardIfPending;
 
       function isArmorIgnoredBySha(game, sourceActor, card) {
         var source = game[sourceActor];
@@ -98,9 +101,93 @@
         return defaultHostileTarget(game, actor);
       }
 
+      // ── v14 P2: 方天画戟 — "若你使用的【杀】是最后的手牌, 你使用此【杀】的
+      // 额外目标数上限 +2" (card__equipment.md)。口径核定 (虚拟杀):
+      //   - 物理杀 / 由手牌转化的虚拟杀 (武圣红牌当杀等): 组成实体全部来自
+      //     手牌 (_handOrigin 指向使用者, card-runtime 统一手牌失去标记) 且
+      //     使用后手牌为空 → 该杀"是最后的手牌", 生效;
+      //   - 装备区来源的转化 (武圣可用装备区红牌) / 无实体的视为使用
+      //     (神速): 所用之牌不是手牌 → 不生效。
+      // playSha 时点牌已移出手牌, 故判 hand.length === 0 + 实体溯源。
+      function fangtianShaEligible(game, actor, card) {
+        var self = game[actor];
+        if (!self || !hasEquipmentEffect(self, 'fangtianLastHandBonus')) return false;
+        if (!card || (self.hand && self.hand.length > 0)) return false;
+        // 实体溯源覆盖三种形态: 普通实体杀 [card] / 转化虚拟杀 physicalCard
+        // (武圣/龙胆/playCardAs) / 组合虚拟杀 physicalCards (丈八/青龙转化)。
+        // 装备区来源的转化实体无 _handOrigin (takeCard 仅对手牌打标) →
+        // 天然不生效; 神速类无实体 → 不生效。
+        var physicals = card.physicalCards
+          || (card.physicalCard ? [card.physicalCard] : [card]);
+        if (!physicals.length) return false;
+        for (var pi = 0; pi < physicals.length; pi += 1) {
+          if (!physicals[pi] || physicals[pi]._handOrigin !== self) return false;
+        }
+        return true;
+      }
+
+      // v14 P2: UI/AI 选目标时点的前置查询 — 牌尚在手牌中: 装备方天 + 该杀
+      // 是仅剩的一张手牌 → 额外目标上限 2, 否则 0。(转化杀的 UI 侧暂不
+      // 走多目标, 引擎侧由 fangtianShaEligible 在使用时点复核。)
+      function shaExtraTargetLimit(game, actor, cardId) {
+        var self = game[actor];
+        if (!self || !hasEquipmentEffect(self, 'fangtianLastHandBonus')) return 0;
+        var hand = self.hand || [];
+        if (hand.length !== 1 || !hand[0] || hand[0].id !== cardId) return 0;
+        return isShaCard(hand[0]) ? 2 : 0;
+      }
+
+      // ── v14 P1: 多目标校验 — 逐席复用单目标合法性矩阵 (座席/自己/亡者/
+      // 目标保护/距离), 全部通过才允许进入结算 (先验后改状态, 与单目标
+      // playSha 的验证序一致); 重复席去重。返回 { targets } 或 { error }。
+      function normalizeMultiTargets(game, actor, options, card) {
+        var requested = options.targets;
+        var seen = {};
+        var targets = [];
+        for (var i = 0; i < requested.length; i += 1) {
+          var resolved = StateRuntime.resolveSeatOption(game, requested[i]);
+          if (!resolved || resolved === actor) return { error: '没有合法的【杀】目标。' };
+          if (!game[resolved] || game[resolved].hp <= 0) return { error: '没有合法的【杀】目标。' };
+          if (seen[resolved]) continue;
+          seen[resolved] = true;
+          targets.push(resolved);
+        }
+        if (!targets.length) return { error: '没有合法的【杀】目标。' };
+        var extraLimit = fangtianShaEligible(game, actor, card) ? 2 : 0;
+        if (targets.length > 1 + extraLimit) {
+          return { error: '【杀】目标数超过上限（额定 1' + (extraLimit ? ' + 方天画戟额外 ' + extraLimit : '') + '）。' };
+        }
+        for (var vi = 0; vi < targets.length; vi += 1) {
+          var protection = cardTargetProtection(game, actor, targets[vi], card, '杀');
+          if (protection) return { error: protection.message };
+          if (!options.ignoreDistance && !canReachWithSha(game, actor, targets[vi])) {
+            return { error: '距离不足，当前武器范围无法对' + actorName(game, targets[vi]) + '使用【杀】。' };
+          }
+        }
+        // 官方 rule__principle.md: 同一张牌对多目标结算"从当前回合角色开始
+        // 按逆时针方向依次" — 指定/锁定/结算三阶段统一按座次环序推进。
+        return { targets: sortTargetsByRing(game, actor, targets) };
+      }
+
+      // v14 P1: 目标按座次环排序 (锚点 = 当前回合角色, 铁索传导同款取锚;
+      // 流离转移可产生重复席位 — 判例 rule__principle.md: 转移给既有目标 B
+      // 则"对 B 连续进行两次结算", 稳定排序保重复席相邻)。
+      function sortTargetsByRing(game, anchorActor, targets) {
+        var anchor = (game.turn && game[game.turn]) ? game.turn : anchorActor;
+        var ring = seatsFrom(game, anchor, true);
+        var order = {};
+        ring.forEach(function (seat, ringIdx) { order[seat] = ringIdx; });
+        return targets.slice().sort(function (a, b) { return (order[a] || 0) - (order[b] || 0); });
+      }
+
       function playSha(game, actor, card, options) {
         options = options || {};
         var self = game[actor];
+        // v14 P1: 显式多目标 (方天画戟额外目标) → 目标队列结算路径; 其余
+        // (含全部既有调用方) 保持单目标原路径 — 行为零漂移红线。
+        if (Array.isArray(options.targets) && options.targets.length > 1) {
+          return playShaMultiTarget(game, actor, card, options);
+        }
         var targetActor = normalizeSingleTarget(game, actor, options);
         // v12 G2 修复: 场上无存活对手时 defaultHostileTarget 返回 undefined —
         // 优雅拒绝而非 game[undefined] 崩溃 (防御深层重入/收官竞态)。
@@ -135,19 +222,32 @@
         }
         log(game, actorName(game, actor) + '对' + actorName(game, targetActor) + '使用【' + card.name + '】。');
 
-        // v7 PR-15: gltjk card__equipment.md 方天画戟 — "若你使用的【杀】是
-        // 最后的手牌，你使用此【杀】的额外目标数上限+2"。1v1 中只有一名对手
-        // (额定 1 + 额外 0)，即便额外目标数上限+2 也无人可选；本 PR 仅做触发
-        // 记录 (log + flags.fangtianBonus) 作为多人模式 / future trick 的占位。
-        // 判定: sha 已从手牌移除，hand.length === 0 即上一刻该 sha 是最后一张。
-        // 每次 playSha 进入时先清旧标记，避免上次结算残留。
-        self.flags = self.flags || {};
-        self.flags.fangtianBonus = false;
-        if (hasEquipmentEffect(self, 'fangtianLastHandBonus') && self.hand.length === 0) {
-          self.flags.fangtianBonus = true;
-          log(game, '【方天画戟】触发：' + actorName(game, actor) + '使用最后一张手牌【杀】，额外目标数上限 +2 (1v1 中无额外可选目标)。');
-        }
+        // (v14 P2: v7 PR-15 的方天占位 flag 路径删除 — 真实现为多目标入口的
+        // 目标数上限 (normalizeMultiTargets/fangtianShaEligible)。单目标使用
+        // 时方天无可观测效果, 与官方一致 — 额外目标是"可以"而非"必须"。)
 
+        // v14 P3: 流离 (大乔) — 官方时机"成为目标时" (flow__use.md step 4)
+        // 先于雌雄"指定目标后" (step 5); 自 v8 起挂在 cixiong 之后的占位
+        // hook 前移至此 (旧位置在 cixiong 挂起路径上还会被整个跳过)。
+        // 转移可连锁 (新目标重新过"成为目标时"); 玩家 ask 挂起走
+        // pauseState.shaLiuli + 'liuli-transfer' resolver。
+        var liuliOutcome = runLiuliStage(game, actor, card, targetActor);
+        if (liuliOutcome.paused) {
+          if (!game.pauseState) game.pauseState = {};
+          game.pauseState.shaLiuli = {
+            mode: 'single', actor: actor, card: card, amount: amount,
+            targetActor: liuliOutcome.pendingTarget
+          };
+          return success('等待【流离】结算…');
+        }
+        targetActor = liuliOutcome.targetActor;
+
+        return designateCixiongAndResolve(game, actor, card, amount, targetActor);
+      }
+
+      // v14 P3: 单目标"指定目标后"(雌雄) + 响应/伤害结算 — 自 playSha 尾部
+      // 拆出, 供 流离 resolver 在转移收束后重入 (语句与拆出前逐行一致)。
+      function designateCixiongAndResolve(game, actor, card, amount, targetActor) {
         // v7 PR-4: 雌雄双股剑 fires at "指定目标后" (gltjk flow__use.md step 5).
         // 在响应窗口之前结算；若需要 source/target 的 pendingChoice，则把
         // sha 的剩余状态保存到 pauseState.playSha，由 resolveCixiong* 完成
@@ -158,56 +258,42 @@
           game.pauseState.playSha = { actor: actor, targetActor: targetActor, card: card, amount: amount };
           return success('【雌雄双股剑】结算中…');
         }
-
-        // v8 PR-C2: 流离 (大乔) — 杀指定目标后 触发 hook (1v1 中目标候选恒空,
-        // 实际为 no-op; 多人模式扩展点)
-        SkillRuntime.runHook(skillRegistry, 'onShaTargeted', {
-          game: game,
-          sourceActor: actor,
-          targetActor: targetActor,
-          target: game[targetActor],
-          card: card
-        });
-
         return continueShaAfterCixiong(game, actor, card, amount, targetActor);
       }
 
-      // v9 PR-E25/E26: 非消耗式探测 — 玩家是否有【闪】可作响应 (真闪 + 转化候选).
-      function hasShanResponseAvailable(state) {
-        if (!state) return false;
-        return listShanResponseOptions(state).length > 0;
+      // ── v14 P3: 流离时机驱动 — 对当前目标跑 onShaTargeted hook; 技能侧
+      // (skills.js) 负责 候选计算/偏好路由/AI 立场决策/玩家 setPendingChoice。
+      // 同步转移 (AI auto) 后新目标重新过时机 (连锁, 每次转移弃一张牌 →
+      // 必然收敛); 玩家 ask → { paused, pendingTarget } 由调用方存快照。
+      // 候选不排除本杀的其他既有目标 — 判例 rule__principle.md: 转移给
+      // 既有目标 B 合法, B 被连续结算两次。
+      function runLiuliStage(game, actor, card, targetActor) {
+        while (true) {
+          var hookContext = {
+            game: game,
+            sourceActor: actor,
+            targetActor: targetActor,
+            target: game[targetActor],
+            card: card
+          };
+          var results = SkillRuntime.runHook(skillRegistry, 'onShaTargeted', hookContext);
+          if (game.pendingChoice) return { paused: true, pendingTarget: targetActor };
+          var transferTo = null;
+          for (var ri = 0; ri < results.length; ri += 1) {
+            if (results[ri].result && results[ri].result.transferTo) {
+              transferTo = results[ri].result.transferTo;
+            }
+          }
+          if (!transferTo || !game[transferTo]) return { targetActor: targetActor };
+          targetActor = transferTo;
+        }
       }
 
-      // v11 C1: 无双 — 锁定技。吕布的【杀】需目标依次两张【闪】; 决斗中
-      // 吕布的对手每轮需依次打出两张【杀】。
-      function shanRequiredAgainstSha(game, sourceActor) {
-        return hasSkill(game[sourceActor], 'wushuang') ? 2 : 1;
-      }
-
-      function continueShaAfterCixiong(game, actor, card, amount, targetActor) {
-        var self = game[actor];
-        targetActor = targetActor || opponent(actor);
-        var target = game[targetActor];
-        var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
-
-        // v12 G2: 红颜 — 攻击者 (小乔) 的黑桃【杀】视为红桃 → 仁王盾不挡。
-        if (!ignoreArmor && StateRuntime.effectiveCardColor(self, card) === 'black' && hasEquipmentEffect(target, 'blockBlackSha')) {
-          log(game, actorName(game, targetActor) + '的【仁王盾】抵消了黑色【杀】。');
-          discardCard(game, card);
-          return success('仁王盾抵消。');
-        }
-
-        // v13 J0-3 (PR #165 缺陷 3): 藤甲 — 锁定技"普通【杀】对你无效"
-        // (gltjk card__equipment.md)。免疫属"对该目标无效", 与仁王盾同层:
-        // 直接短路整个响应询问, 不再先问闪、伤害层事后防止。火/雷【杀】
-        // 不在免疫列 (火焰另有 藤甲② +1, 留在伤害修正层); 朱雀转化已在
-        // playSha 先行, 转化后的火杀照常走响应; 青釭剑无视防具时不短路。
-        if (!ignoreArmor && card.type === 'sha' && hasEquipmentEffect(target, 'tengjiaImmuneNormalShaAOE')) {
-          log(game, actorName(game, targetActor) + '的【藤甲】令普通【杀】无效。');
-          discardCard(game, card);
-          return success('藤甲免疫普通杀。');
-        }
-
+      // v14 P1: step-5 "指定目标后"的响应锁定 (铁骑红判/烈弓距离) — 从
+      // continueShaAfterCixiong 内联 hook 调用抽出, 供多目标链在锁定阶段
+      // 按目标逐一预结算 (官方 rule__principle.md 铁骑判例: 对全部目标
+      // 决定并结算完毕后, 再开始【杀】的使用结算)。
+      function computeShaResponseLock(game, actor, card, targetActor) {
         var responseContext = {
           game: game,
           actor: actor,
@@ -222,6 +308,227 @@
           if (responseResults[responseIndex].result && responseResults[responseIndex].result.responseLocked) {
             responseContext.responseLocked = true;
           }
+        }
+        return responseContext.responseLocked;
+      }
+
+      // ── v14 P1: 多目标杀结算链 (方天画戟) — 参照 advanceTargetQueue 范式:
+      // pauseState.shaChain 快照 + 阶段游标 + "游标先行 + pendingChoice 即
+      // 挂起" (AOE 同款), 恢复经 resumeSuspendedTurnFlowIfReady 的 shaChain
+      // 分支 / resumePlayShaAfterCixiong 的 chain 分支。三阶段按官方
+      // flow__use.md 时机序: liuli (step 4 成为目标时, 逐目标) → cixiong
+      // (step 5 指定目标后, 逐目标) → resolve (逐目标 仁王/藤甲/闪/八卦/
+      // 伤害, 复用单目标 continueShaAfterCixiong 全链)。
+      // 注: 实战中方天占武器槽 → 链内雌雄/贯石/青龙 (皆武器) 不可达,
+      // 但结构保持通用 — 阶段照跑, 逐席结算与单目标全等。
+      function playShaMultiTarget(game, actor, card, options) {
+        var self = game[actor];
+        var normalized = normalizeMultiTargets(game, actor, options, card);
+        if (normalized.error) return fail(normalized.error);
+        var targets = normalized.targets;
+        if (!options.skipShaCount) self.usedSha = true;
+        self.usedOrRespondedSha = true;
+        var amount = 1 + (self.shaBonus || 0);
+        self.shaBonus = 0;
+        // 朱雀转火杀 — 与单目标路径同语义 (见 playSha 内注释; "此杀"整体
+        // 转化, 对全部目标生效)。
+        if (hasEquipmentEffect(self, 'zhuqueShaToFire') && card.type === 'sha'
+            && (!self.skillPreferences || self.skillPreferences.zhuque !== 'decline')) {
+          card.zhuqueOriginalType = card.type;
+          card.zhuqueOriginalName = card.name;
+          card.type = 'fire_sha';
+          card.name = '火杀';
+          log(game, actorName(game, actor) + '发动【朱雀羽扇】，将【杀】转化为【火杀】。');
+        }
+        var targetNames = targets.map(function (seat) { return actorName(game, seat); });
+        log(game, actorName(game, actor) + '对' + targetNames.join('、') + '使用【' + card.name + '】。');
+        log(game, '【方天画戟】生效：最后的手牌【杀】额外目标数上限 +2，共指定 ' + targets.length + ' 个目标。');
+        if (!game.pauseState) game.pauseState = {};
+        game.pauseState.shaChain = {
+          actor: actor,
+          card: card,
+          amount: amount,
+          targets: targets,
+          stage: 'liuli',
+          liuliIdx: 0,
+          lockIdx: 0,
+          locks: [],
+          resolveIdx: 0
+        };
+        return advanceShaChain(game);
+      }
+
+      function advanceShaChain(game) {
+        var chain = game.pauseState && game.pauseState.shaChain;
+        if (!chain) return fail('【杀】多目标结算状态丢失。');
+        // 阶段 1 — step 4 "成为目标时": 逐目标过流离 (可转移/可挂起)。
+        if (chain.stage === 'liuli') {
+          while (chain.liuliIdx < chain.targets.length) {
+            var liuliSeat = chain.targets[chain.liuliIdx];
+            if (!game[liuliSeat] || game[liuliSeat].hp <= 0) { chain.liuliIdx += 1; continue; }
+            var liuliResult = runLiuliStage(game, chain.actor, chain.card, liuliSeat);
+            if (liuliResult.paused) {
+              // 游标停留本席 — resolver 收束后写回最终目标并推进。
+              game.pauseState.shaLiuli = {
+                mode: 'chain', chainIdx: chain.liuliIdx,
+                actor: chain.actor, card: chain.card, amount: chain.amount,
+                targetActor: liuliResult.pendingTarget
+              };
+              return success('等待【流离】结算…');
+            }
+            chain.targets[chain.liuliIdx] = liuliResult.targetActor;
+            chain.liuliIdx += 1;
+          }
+          // 流离可改变目标构成 → 按座次环重排 (判例: 转移给既有目标 B 后
+          // "先对A进行一次结算，再对B连续进行两次结算")。
+          chain.targets = sortTargetsByRing(game, chain.actor, chain.targets);
+          chain.stage = 'locks';
+        }
+        // 阶段 2 — step 5 "指定目标后": 逐目标预结算响应锁定 (铁骑/烈弓,
+        // 官方判例: 对全部目标决定并结算完毕后再开始使用结算) + 雌雄
+        // (实战中方天占武器槽 → 雌雄不可达, 结构保留)。锁定按目标索引存
+        // (流离重复席位各自独立判定)。
+        if (chain.stage === 'locks') {
+          while (chain.lockIdx < chain.targets.length) {
+            var lockSeat = chain.targets[chain.lockIdx];
+            var lockIdxNow = chain.lockIdx;
+            chain.lockIdx += 1; // 游标先行 (雌雄挂起后恢复自下一席)
+            if (!game[lockSeat] || game[lockSeat].hp <= 0) { chain.locks[lockIdxNow] = false; continue; }
+            chain.locks[lockIdxNow] = computeShaResponseLock(game, chain.actor, chain.card, lockSeat);
+            if (game.pendingChoice) return success('等待响应结算…'); // 防御 (铁骑判定链上的改判挂起等)
+            var cxResult = applyCixiongOnDesignate(game, chain.actor, lockSeat);
+            if (cxResult && cxResult.paused) return success('【雌雄双股剑】结算中…');
+            if (game.pendingChoice) return success('等待响应结算…');
+          }
+          chain.stage = 'resolve';
+        }
+        // 阶段 3 — 逐目标使用结算 (座次环序; 复用单目标全链)。
+        while (chain.resolveIdx < chain.targets.length) {
+          if (game.phase === 'gameover') break;
+          var seat = chain.targets[chain.resolveIdx];
+          var resolveIdxNow = chain.resolveIdx;
+          chain.resolveIdx += 1; // 游标先行 — 本席经 resolver 收尾后恢复自下一席
+          if (!game[seat] || game[seat].hp <= 0) continue; // 结算期间倒下的席位不再是目标
+          var seatResult = continueShaAfterCixiong(game, chain.actor, chain.card, chain.amount, seat,
+            { responseLocked: !!chain.locks[resolveIdxNow] });
+          // 本席挂起 (闪响应/护驾/濒死/天香/雷击…) → 保留链, 选择排空后续跑。
+          if (game.pendingChoice) return seatResult || success('等待响应结算…');
+        }
+        return finishShaChain(game);
+      }
+
+      function finishShaChain(game) {
+        var chain = game.pauseState.shaChain;
+        game.pauseState.shaChain = null;
+        // 全目标结算完毕 → 杀入弃牌堆。命中路径可能已由伤害收尾弃置 / 被
+        // 奸雄获得 — 幂等全区域定位, 仅"真在途"补弃 (AOE 收尾同款)。
+        if (chain && chain.card) discardSourceCardIfPending(game, chain.card);
+        return success('【杀】结算完成。');
+      }
+
+      // v14 P1: 逐席结果 (仁王/藤甲/闪避/青龙前置) 的杀弃置 — 单目标路径
+      // 原样立即弃置; 多目标链中该杀仍要对后续目标结算, 逐席不弃, 由
+      // finishShaChain 统一收尾。
+      function settleShaCardAfterOutcome(game, card) {
+        var chain = game.pauseState && game.pauseState.shaChain;
+        if (chain && chain.card === card) return;
+        discardCard(game, card);
+      }
+
+      // v14 P3: 流离 resolver — decision { cardId, target } 弃一张牌 (手牌/
+      // 装备) 转移; { decline } 放弃。非法输入按惯例重挂。转移后新目标重新
+      // 过"成为目标时"时机 (连锁流离), 全部收束后按 mode 回到 单目标雌雄
+      // 阶段 / 多目标链驱动。
+      function resolveLiuliTransferChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.shaLiuli;
+        if (!saved) return fail('找不到【流离】的暂停状态。');
+        var holder = pending.actor;
+        var holderState = game[holder];
+        var d = decision || {};
+        var finalTarget;
+        if (d.decline || (!d.cardId && !d.target)) {
+          log(game, actorName(game, holder) + '选择不发动【流离】。');
+          finalTarget = saved.targetActor;
+        } else {
+          var costOk = holderState && (pending.costIds || []).indexOf(d.cardId) >= 0;
+          var seat = d.target && StateRuntime.resolveSeatOption(game, d.target);
+          var candidateSeats = (pending.candidates || []).map(function (c) { return c.seat; });
+          var targetOk = seat && candidateSeats.indexOf(seat) >= 0 && game[seat] && game[seat].hp > 0;
+          if (!costOk || !targetOk) {
+            setPendingChoice(game, pending);
+            return fail('请选择一张要弃置的牌与转移目标，或 decline 放弃发动【流离】。');
+          }
+          var costCard = removeOwnCardFromAnyZone(holderState, d.cardId, game);
+          if (!costCard) {
+            setPendingChoice(game, pending);
+            return fail('所选弃置牌已不可用，请重新选择。');
+          }
+          discardCard(game, costCard);
+          log(game, actorName(game, holder) + '发动【流离】，弃置【' + costCard.name
+            + '】将【' + saved.card.name + '】转移给' + actorName(game, seat) + '。');
+          // 新目标重新过"成为目标时"时机 (可再流离/再挂起)。
+          var again = runLiuliStage(game, saved.actor, saved.card, seat);
+          if (again.paused) {
+            saved.targetActor = again.pendingTarget;
+            return success('等待【流离】结算…');
+          }
+          finalTarget = again.targetActor;
+        }
+        game.pauseState.shaLiuli = null;
+        if (saved.mode === 'chain') {
+          var chain = game.pauseState.shaChain;
+          if (!chain) return fail('【杀】多目标结算状态丢失。');
+          chain.targets[saved.chainIdx] = finalTarget;
+          chain.liuliIdx = saved.chainIdx + 1;
+          return advanceShaChain(game);
+        }
+        return designateCixiongAndResolve(game, saved.actor, saved.card, saved.amount, finalTarget);
+      }
+
+      // v9 PR-E25/E26: 非消耗式探测 — 玩家是否有【闪】可作响应 (真闪 + 转化候选).
+      function hasShanResponseAvailable(state) {
+        if (!state) return false;
+        return listShanResponseOptions(state).length > 0;
+      }
+
+      // v11 C1: 无双 — 锁定技。吕布的【杀】需目标依次两张【闪】; 决斗中
+      // 吕布的对手每轮需依次打出两张【杀】。
+      function shanRequiredAgainstSha(game, sourceActor) {
+        return hasSkill(game[sourceActor], 'wushuang') ? 2 : 1;
+      }
+
+      // v14 P1: presetLock — 多目标链在锁定阶段已按目标预结算 onNeedResponse
+      // (铁骑/烈弓), 结算阶段经 { responseLocked } 传入, 不再重跑 hook
+      // (避免铁骑二次判定); 单目标路径不传, 行为与拆分前逐行一致。
+      function continueShaAfterCixiong(game, actor, card, amount, targetActor, presetLock) {
+        var self = game[actor];
+        targetActor = targetActor || opponent(actor);
+        var target = game[targetActor];
+        var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
+
+        // v12 G2: 红颜 — 攻击者 (小乔) 的黑桃【杀】视为红桃 → 仁王盾不挡。
+        if (!ignoreArmor && StateRuntime.effectiveCardColor(self, card) === 'black' && hasEquipmentEffect(target, 'blockBlackSha')) {
+          log(game, actorName(game, targetActor) + '的【仁王盾】抵消了黑色【杀】。');
+          settleShaCardAfterOutcome(game, card);
+          return success('仁王盾抵消。');
+        }
+
+        // v13 J0-3 (PR #165 缺陷 3): 藤甲 — 锁定技"普通【杀】对你无效"
+        // (gltjk card__equipment.md)。免疫属"对该目标无效", 与仁王盾同层:
+        // 直接短路整个响应询问, 不再先问闪、伤害层事后防止。火/雷【杀】
+        // 不在免疫列 (火焰另有 藤甲② +1, 留在伤害修正层); 朱雀转化已在
+        // playSha 先行, 转化后的火杀照常走响应; 青釭剑无视防具时不短路。
+        if (!ignoreArmor && card.type === 'sha' && hasEquipmentEffect(target, 'tengjiaImmuneNormalShaAOE')) {
+          log(game, actorName(game, targetActor) + '的【藤甲】令普通【杀】无效。');
+          settleShaCardAfterOutcome(game, card);
+          return success('藤甲免疫普通杀。');
+        }
+
+        var responseContext = { responseLocked: false };
+        if (presetLock) {
+          responseContext.responseLocked = !!presetLock.responseLocked;
+        } else {
+          responseContext.responseLocked = computeShaResponseLock(game, actor, card, targetActor);
         }
 
         // v9 PR-E25: 玩家是【杀】目标 + skillPreferences.shanResponse==='ask' +
@@ -405,7 +712,7 @@
           game.pauseState.guanshi = null;
           log(game, actorName(game, actor) + '选择不发动【贯石斧】。');
           log(game, actorName(game, saved.targetActor) + '闪避成功，没有受到伤害。');
-          discardCard(game, saved.card);
+          settleShaCardAfterOutcome(game, saved.card);
           return success('目标闪避。');
         }
         var ids = (decision && decision.cardIds) || [];
@@ -467,7 +774,7 @@
             }
             if (follow) {
               log(game, actorName(game, actor) + '发动【青龙偃月刀】，继续对' + actorName(game, targetActor) + '使用一张【杀】。');
-              discardCard(game, card);
+              settleShaCardAfterOutcome(game, card);
               var chaseResult = playSha(game, actor, follow, { target: targetActor, skipShaCount: true });
               if (chaseResult && chaseResult.ok) return chaseResult;
               // 回滚: 转化杀退回组成实体 (已入弃牌堆), 物理杀原样退回。
@@ -483,7 +790,7 @@
             }
           }
           log(game, actorName(game, targetActor) + '闪避成功，没有受到伤害。');
-          discardCard(game, card);
+          settleShaCardAfterOutcome(game, card);
           return success('目标闪避。');
         }
 
@@ -569,6 +876,11 @@
       resolveGuanshiDiscardChoice: resolveGuanshiDiscardChoice,
       applyGuanshiForcedHit: applyGuanshiForcedHit,
       defaultHostileTarget: defaultHostileTarget,
-      normalizeSingleTarget: normalizeSingleTarget
+      normalizeSingleTarget: normalizeSingleTarget,
+      // v14 P1/P2/P3: 多目标链驱动 + 方天前置查询 + 流离 resolver
+      advanceShaChain: advanceShaChain,
+      shaExtraTargetLimit: shaExtraTargetLimit,
+      fangtianShaEligible: fangtianShaEligible,
+      resolveLiuliTransferChoice: resolveLiuliTransferChoice
     };
   }
