@@ -148,7 +148,10 @@
           var resolved = StateRuntime.resolveSeatOption(game, requested[i]);
           if (!resolved || resolved === actor) return { error: '没有合法的【杀】目标。' };
           if (!game[resolved] || game[resolved].hp <= 0) return { error: '没有合法的【杀】目标。' };
-          if (seen[resolved]) continue;
+          // 评审收口: 官方"使用牌指定多个目标"不允许重复指定同一角色
+          // (重复席位只能由流离等改目标效果产生) — 拒绝而非静默去重
+          // (去重会让 {targets:[X,X]} 绕过方天资格门混入链语义)。
+          if (seen[resolved]) return { error: '不能重复指定同一名角色为【杀】的目标。' };
           seen[resolved] = true;
           targets.push(resolved);
         }
@@ -277,7 +280,12 @@
             card: card
           };
           var results = SkillRuntime.runHook(skillRegistry, 'onShaTargeted', hookContext);
-          if (game.pendingChoice) return { paused: true, pendingTarget: targetActor };
+          // 评审收口: 挂起检测收窄到本时机自己的询问 kind — 未来其他
+          // onShaTargeted 注册者/弃牌副作用产生异类 pending 时不误吞
+          // 同步 transferTo, 也不写入无人消费的 shaLiuli 快照。
+          if (game.pendingChoice && game.pendingChoice.kind === 'liuli-transfer') {
+            return { paused: true, pendingTarget: targetActor };
+          }
           var transferTo = null;
           for (var ri = 0; ri < results.length; ri += 1) {
             if (results[ri].result && results[ri].result.transferTo) {
@@ -353,6 +361,7 @@
           liuliIdx: 0,
           lockIdx: 0,
           locks: [],
+          cixiongIdx: 0,
           resolveIdx: 0
         };
         return advanceShaChain(game);
@@ -361,6 +370,9 @@
       function advanceShaChain(game) {
         var chain = game.pauseState && game.pauseState.shaChain;
         if (!chain) return fail('【杀】多目标结算状态丢失。');
+        // 评审收口: 终局即收束 — 挂起点结算触发终局时, resume 路径以此
+        // 清链 + 幂等弃置 (AOE 的 wanjian resolver 终局兜底同款)。
+        if (game.phase === 'gameover') return finishShaChain(game);
         // 阶段 1 — step 4 "成为目标时": 逐目标过流离 (可转移/可挂起)。
         if (chain.stage === 'liuli') {
           while (chain.liuliIdx < chain.targets.length) {
@@ -384,19 +396,28 @@
           chain.targets = sortTargetsByRing(game, chain.actor, chain.targets);
           chain.stage = 'locks';
         }
-        // 阶段 2 — step 5 "指定目标后": 逐目标预结算响应锁定 (铁骑/烈弓,
-        // 官方判例: 对全部目标决定并结算完毕后再开始使用结算) + 雌雄
-        // (实战中方天占武器槽 → 雌雄不可达, 结构保留)。锁定按目标索引存
-        // (流离重复席位各自独立判定)。
+        // 阶段 2 — step 5 "指定目标后": 武将技能 (铁骑/烈弓 响应锁定) 对
+        // 全部目标结算完, 再装备技能 (雌雄) 对全部目标 — 两遍分跑, 对齐
+        // 官方判例 (rule__principle 补充: 伏完须先对二人各结算武将技能,
+        // 再各结算装备技能)。锁定按目标索引存 (流离重复席位各自独立判定)。
+        // 实战中方天占武器槽 → 雌雄遍不可达, 结构保真保留。
         if (chain.stage === 'locks') {
           while (chain.lockIdx < chain.targets.length) {
             var lockSeat = chain.targets[chain.lockIdx];
             var lockIdxNow = chain.lockIdx;
-            chain.lockIdx += 1; // 游标先行 (雌雄挂起后恢复自下一席)
+            chain.lockIdx += 1;
             if (!game[lockSeat] || game[lockSeat].hp <= 0) { chain.locks[lockIdxNow] = false; continue; }
             chain.locks[lockIdxNow] = computeShaResponseLock(game, chain.actor, chain.card, lockSeat);
             if (game.pendingChoice) return success('等待响应结算…'); // 防御 (铁骑判定链上的改判挂起等)
-            var cxResult = applyCixiongOnDesignate(game, chain.actor, lockSeat);
+          }
+          chain.stage = 'cixiong';
+        }
+        if (chain.stage === 'cixiong') {
+          while (chain.cixiongIdx < chain.targets.length) {
+            var cxSeat = chain.targets[chain.cixiongIdx];
+            chain.cixiongIdx += 1; // 游标先行 (雌雄挂起后恢复自下一席)
+            if (!game[cxSeat] || game[cxSeat].hp <= 0) continue;
+            var cxResult = applyCixiongOnDesignate(game, chain.actor, cxSeat);
             if (cxResult && cxResult.paused) return success('【雌雄双股剑】结算中…');
             if (game.pendingChoice) return success('等待响应结算…');
           }

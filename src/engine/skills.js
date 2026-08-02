@@ -1,5 +1,6 @@
       import { SkillRuntime } from './skill-runtime.js';
       import { StateRuntime } from './state.js';
+      import { CardRuntime } from './card-runtime.js';
 
       export function installStandardSkillHandlers(skillRegistry, deps) {
         var hasSkill = deps.hasSkill;
@@ -161,6 +162,14 @@
         }
         var physicalSourceCard = physicalCardOf(sourceCard);
         if (!physicalSourceCard) return null;
+        // v14 P 评审收口 (opus 对抗最小复现钉死): 多目标杀链下同一来源牌可
+        // 对同一奸雄座席结算多次 (流离转移给既有目标 → 连续两次伤害) —
+        // 此前 takeCard 返回值被忽略 + 无条件 putCard, 第二次取回把已在
+        // 手牌的同一对象再推一次 → 同一张牌双份 (守恒红线)。归属守卫:
+        // 牌已落在 弃牌堆之外的任何区域 (先前取回入手/入装备等) → 已归属,
+        // 本次不再获得 (虚拟牌分支经 moveCard 返回值天然有同款守卫)。
+        var currentZone = CardRuntime.findCardZone(game, physicalSourceCard);
+        if (currentZone && currentZone.zone !== 'discard') return null;
         // M5: 被朱雀临时转化的【杀】进入奸雄手牌前还原物理身份, 与 discardCard 一致。
         restoreZhuqueIdentity(sourceCard);
         // L2: 决斗/南蛮/万箭/火攻 在使用时已进弃牌堆 — 奸雄获得时从弃牌堆取回,
@@ -1061,7 +1070,10 @@
         // 泛化 — 此前只认 'player'/'enemy' 字面, ally* 座席的显式目标 (含
         // 华佗在第三席自疗) 被误路由进 1v1 二元 opponent() 缺省回退 (亡席
         // 报错 / 错疗他席)。显式合法座席一律直接采用, 缺省回退仅在无显式
-        // 目标时生效 (1v1 行为恒等)。
+        // 目标时生效 (1v1 行为恒等)。评审收口: 座席合法性经 resolveSeatOption
+        // 判定 — options.targetActor 路径绕过 useSkill 入口校验, 裸
+        // `game[key]` 会把 'discard'/'deck' 等对象键误当座席。
+        if (targetActor) targetActor = StateRuntime.resolveSeatOption(game, targetActor);
         if (!targetActor || !game[targetActor]) {
           var opp = game[opponent(actor)];
           if (opp && opp.hp < opp.maxHp) targetActor = opponent(actor);

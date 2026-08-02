@@ -196,4 +196,84 @@ test('P1: 链中途终局 (末位威胁倒下) → 链收束不再结算后续�
   assert.equal(game.pauseState.shaChain, null, '链收束自清');
 });
 
+// ═════ 评审收口回归 (opus 对抗抓获项逐一钉死) ═════════════════════════
+
+test('收口: 流离转移给奸雄席 → 同席双结算奸雄只取回一次, 无牌复制', () => {
+  // opus 最小复现: 华佗(方天)对 [大乔, 曹操] 出杀, 大乔流离转给曹操 →
+  // 曹操连续两次结算 — 修复前第二次奸雄把已在手牌的同一对象再推一次
+  // (同一张牌双份, 守恒红线)。
+  const game = Engine.newGame({
+    seed: 42101,
+    seats: ['player', 'enemy', 'ally', 'ally2'],
+    roles: { player: '主公', enemy: '反贼', ally: '忠臣', ally2: '反贼' },
+    playerHero: 'sunquan', enemyHero: 'caocao', allyHero: 'daqiao', ally2Hero: 'huatuo'
+  });
+  game.log = []; game.discard = []; game.deck = [];
+  for (const seat of game.seats) {
+    game[seat].hand = []; game[seat].judgeArea = [];
+    game[seat].equipment = { weapon: null, armor: null, horseMinus: null, horsePlus: null };
+    game[seat].hp = game[seat].maxHp; game[seat].skillPreferences = {};
+    game[seat].flags = {}; game[seat].chuang = [];
+  }
+  game.turn = 'ally2'; game.phase = 'play';
+  game.ally2.equipment.weapon = fangtianWeapon('ft-jx2');
+  game.ally2.hand = [c('sha', { id: 'MS' })];
+  game.ally.hand = [c('tao', { id: 'dq-jx-cost' })]; // 大乔流离成本
+  assertCardConservation(game, () => {
+    const result = Engine.playCard(game, 'ally2', 'MS', { targets: ['ally', 'enemy'] });
+    assert.equal(result.ok, true, result.message);
+  });
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 2, '曹操被连续两次结算');
+  assert.equal(game.enemy.hand.filter((hc) => hc.id === 'MS').length, 1, '奸雄只获得一份 (归属守卫)');
+  assert.equal(game.discard.filter((dc) => dc.id === 'MS').length, 0, '已归属不补弃');
+  assert.equal(game.pauseState.shaChain, null);
+});
+
+test('收口: playCardAs 多目标转化杀 — 无资格拒绝前置于摘牌, 零副作用', () => {
+  const game = makeTrio({ playerHero: 'guanyu' });
+  // 装备区红牌当杀 + 多目标: 资格要求手牌来源 → 移牌前拒绝, 装备原位
+  game.player.equipment.weapon = fangtianWeapon('ft-as1');
+  game.player.equipment.armor = c('bagua', { id: 'red-armor', suit: 'diamond', color: 'red' });
+  const eqResult = Engine.playCardAs(game, 'player', 'red-armor', 'sha', { targets: ['enemy', 'ally'] });
+  assert.equal(eqResult.ok, false, '装备来源多目标拒绝');
+  assert.ok(game.player.equipment.armor && game.player.equipment.armor.id === 'red-armor', '装备未被摘走 (K5 不变量)');
+  // 手牌来源但无方天: 同样移牌前拒绝
+  game.player.equipment.weapon = null;
+  game.player.hand = [c('tao', { id: 'ws-red', suit: 'heart' })];
+  const handResult = Engine.playCardAs(game, 'player', 'ws-red', 'sha', { targets: ['enemy', 'ally'] });
+  assert.equal(handResult.ok, false, '无方天多目标拒绝');
+  assert.ok(game.player.hand.some((hc) => hc.id === 'ws-red'), '手牌原位');
+});
+
+test('收口: 链未收束前来源杀不入弃牌堆 (在途), 收尾统一弃置恰一次', () => {
+  const game = makeTrio();
+  game.turn = 'enemy';
+  game.enemy.equipment.weapon = fangtianWeapon('ft-late');
+  game.enemy.hand = [c('sha', { id: 'late-sha' })];
+  game.player.hand = [c('shan', { id: 'ld-shan' })];
+  game.player.skillPreferences.shanResponse = 'ask';
+  // 环序 ally 先命中 → 修复前此刻杀已入弃牌堆 (使用结算未结束)
+  Engine.playCard(game, 'enemy', 'late-sha', { targets: ['player', 'ally'] });
+  assert.equal(game.pendingChoice && game.pendingChoice.kind, 'shan-response');
+  assert.equal(game.discard.some((dc) => dc.id === 'late-sha'), false, '挂起时来源杀仍在途 (不早弃)');
+  Engine.resolvePendingChoice(game, { use: true });
+  assert.equal(game.pauseState.shaChain, null);
+  assert.equal(game.discard.filter((dc) => dc.id === 'late-sha').length, 1, '收尾统一弃置恰一次');
+});
+
+test('收口: 挂起点结算触发终局 → resume 清理悬空链 (无泄漏)', () => {
+  const game = makeTrio({ roles: { player: '主公', enemy: '反贼', ally: '忠臣' } });
+  armMultiSha(game, 'go2-sha');
+  game.enemy.hp = 1; // 唯一反贼, 死亡即终局
+  game.ally.hand = [c('tao', { id: 'go2-tao' })];
+  game.ally.skillPreferences.dying = 'ask'; // 救援询问挂起链
+  Engine.playCard(game, 'player', 'go2-sha', { targets: ['enemy', 'ally'] });
+  assert.equal(game.pendingChoice && game.pendingChoice.kind, 'dying-rescue');
+  assert.ok(game.pauseState.shaChain, '链挂起等待');
+  Engine.resolvePendingChoice(game, { decline: true }); // → 终局于 resolver 内
+  assert.equal(game.phase, 'gameover');
+  assert.equal(game.pauseState.shaChain, null, '终局 resume 路径清链 (修复前永久悬空)');
+  assert.equal(game.discard.filter((dc) => dc.id === 'go2-sha').length, 1, '收束幂等弃置');
+});
+
 await runTests();

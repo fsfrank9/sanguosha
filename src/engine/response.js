@@ -89,7 +89,17 @@
     // / yiji-distribute 等各管各的), 统一由 dispatcher 在所有 pendingChoice
     // 排空后调用本函数续跑判定区剩余结算 + 摸牌/出牌阶段。
     function resumeSuspendedTurnFlowIfReady(game) {
-      if (!game || game.pendingChoice || game.phase === 'gameover') return null;
+      if (!game || game.pendingChoice) return null;
+      if (game.phase === 'gameover') {
+        // v14 P 评审收口: 终局时清理悬空的多目标杀链 — advanceShaChain 的
+        // gameover 分支直接 finishShaChain (幂等弃置 + 清态); 否则"链在
+        // 某席挂起 → 该席结算触发终局"会让 pauseState.shaChain 永久悬空
+        // (AOE 在 wanjian resolver 有同款终局兜底, 杀链走此处统一收束)。
+        if (game.pauseState && game.pauseState.shaChain && resumeShaChain) {
+          resumeShaChain(game);
+        }
+        return null;
+      }
       // v12 G2: 神速 — AI 座席在准备阶段发动神速, 虚拟【杀】向玩家开出
       // 闪响应窗口而挂起; 选择排空后从准备阶段末续跑 (判定→摸牌→出牌)。
       var savedPrepare = game.pauseState && game.pauseState.prepareResume;
@@ -118,10 +128,13 @@
       // v14 P1: 多目标杀链某席挂起 (闪响应/濒死/天香/雷击/流离…) → 选择
       // 排空后续跑剩余目标 (advanceShaChain 完成后自清 pauseState.shaChain)。
       // 位序: 在 chainTransmit/duelChain (更内层的嵌套结算) 之后 — 链内
-      // 伤害触发的传导/嵌套先收敛, 再推进杀链下一目标。
+      // 伤害触发的传导/嵌套先收敛, 再推进杀链下一目标。评审收口: 与
+      // chainTransmit/duelChain 同款条件返回 — 链同步收束后继续向外层落
+      // (aoe/judgeArea), 不吞后续续跑分支。
       var savedShaChain = game.pauseState && game.pauseState.shaChain;
       if (savedShaChain && resumeShaChain) {
-        return resumeShaChain(game);
+        var shaChainResult = resumeShaChain(game);
+        if (game.pendingChoice) return shaChainResult || success('回合暂停，等待玩家选择。');
       }
       // v12 H2: AOE (南蛮/万箭) 逐座席结算中某座席濒死暂停 → 救援选择排空后
       // 续跑队列剩余座席 (advanceAOETargets 完成后自清 pauseState.aoe)。

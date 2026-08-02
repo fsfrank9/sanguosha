@@ -368,6 +368,13 @@
       function discardSourceCardIfPending(game, card) {
         if (!card) return;
         var physical = physicalCardOf(card);
+        // v14 P 评审收口: 多目标链的来源杀在全部目标结算完毕前不入弃牌堆
+        // (官方"结算完毕后置入弃牌堆"; 逐席命中若早弃, 后续席位摸牌耗尽
+        // 牌堆时会把仍在结算中的杀洗回并摸走 — opus 对抗实证)。链收尾的
+        // finishShaChain 先清链态再调本函数, 此处放行统一弃置。
+        var activeShaChain = game.pauseState && game.pauseState.shaChain;
+        if (activeShaChain && activeShaChain.card
+            && physicalCardOf(activeShaChain.card) === physical) return;
         // audit4-H1: "已落地"判定改为全区域定位 (findCardZone: 牌堆/弃牌堆/
         // 各席手牌/判定区/创区/装备) — 此前漏 牌堆与判定区: AOE 中途击杀
         // 奖励摸空牌堆触发洗牌, 已弃置的南蛮/万箭被洗回 deck, 旧检查误判
@@ -2369,6 +2376,29 @@
           // defaultHostileTarget 取敌对池首位未必可达 (3p+ 距离差异)。
           // resolveTrickTargetActor 对杀走 isLegalCardTarget (含距离/保护),
           // 显式非法目标与缺省不可达池首位都在移牌前拒绝。
+          // v14 P 评审收口: 多目标转化杀维持 K5 不变量 — 资格/上限/重复席/
+          // 逐席合法性全部在移牌前预判 (opus 实证: 此前 playShaMultiTarget
+          // 移牌后拒绝无回滚, 来源实体凭空消失)。
+          if (Array.isArray(options && options.targets) && options.targets.length > 1) {
+            if (hit.zone !== 'hand' || (self.hand || []).length !== 1
+                || !hasEquipmentEffect(self, 'fangtianLastHandBonus')) {
+              return fail('【杀】目标数超过上限（额定 1）。');
+            }
+            if (options.targets.length > 3) {
+              return fail('【杀】目标数超过上限（额定 1 + 方天画戟额外 2）。');
+            }
+            var preVirtualSha = virtualShaFromCard(original);
+            var preSeen = {};
+            for (var mtIdx = 0; mtIdx < options.targets.length; mtIdx += 1) {
+              var mtSeat = resolveSeatOption(game, options.targets[mtIdx]);
+              if (!mtSeat || mtSeat === actor || !game[mtSeat] || game[mtSeat].hp <= 0
+                  || !isLegalCardTarget(game, actor, preVirtualSha, mtSeat)) {
+                return fail('无效的【杀】目标。');
+              }
+              if (preSeen[mtSeat]) return fail('不能重复指定同一名角色为【杀】的目标。');
+              preSeen[mtSeat] = true;
+            }
+          }
           asTargetActor = resolveTrickTargetActor(game, actor, virtualShaFromCard(original), options);
           if (!asTargetActor) return fail('无效的【杀】目标。');
         }
@@ -2398,8 +2428,17 @@
         // v13 K2/K5: options 透传 + 前置解析出的合法目标显式传入 (缺省与
         // 显式路径均已过 isLegalCardTarget, playSha 内部校验恒通过,
         // 1v1 行为不变)。
-        return playSha(game, actor, virtualShaFromCard(original),
+        var conversionShaResult = playSha(game, actor, virtualShaFromCard(original),
           Object.assign({}, options, { target: asTargetActor }));
+        // v14 P 评审收口兜底: 预检已覆盖全部已知拒绝面; 若未来新增校验令
+        // playSha 在移牌后仍拒绝, 来源实体退回原区域 (在途还原), 不留
+        // 守恒泄漏 (playShaCardHandler 同款)。
+        if (conversionShaResult && !conversionShaResult.ok && !findCardZone(game, original)) {
+          putCard(game, original, hit.zone === 'equipment'
+            ? { zone: 'equipment', actor: actor, slot: hit.slot }
+            : { zone: 'hand', actor: actor });
+        }
+        return conversionShaResult;
       }
 
       // v8 PR-C1: 国色把方片视为乐不思蜀 — 构造虚拟卡 (保留原 suit / rank /

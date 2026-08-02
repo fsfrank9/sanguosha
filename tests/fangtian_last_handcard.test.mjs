@@ -133,24 +133,56 @@ test('P2: 目标数上限 — 非最后手牌多目标拒绝, 牌退回手牌 (�
   assert.equal(game.enemy.hp, game.enemy.maxHp);
 });
 
-test('P2: 无方天时多目标拒绝; 方天下超 1+2 上限拒绝', () => {
+test('P2: 无方天时多目标拒绝; 重复指定同一席拒绝 (评审收口: 不再静默去重)', () => {
   const game = makeTrio();
   game.player.hand = [c('sha', { id: 'nak-sha' })];
   const noWeapon = Engine.playCard(game, 'player', 'nak-sha', { targets: ['enemy', 'ally'] });
   assert.equal(noWeapon.ok, false, '无方天 → 拒绝');
   assert.ok(game.player.hand.some((hc) => hc.id === 'nak-sha'));
-  // 3 席场无法凑 4 目标 (重复席会被去重), 用重复目标验证去重后按 1 目标结算
+  // 评审收口: 官方不允许重复指定同一角色 — {targets:[X,X]} 拒绝而非去重
+  // (旧的静默去重会让普通杀绕过方天资格门混入链语义 + 伪造方天 log)。
   game.player.equipment.weapon = fangtianWeapon('ft8');
   const dup = Engine.playCard(game, 'player', 'nak-sha', { targets: ['enemy', 'enemy'] });
-  assert.equal(dup.ok, true, '重复席去重后为单目标, 合法');
-  assert.equal(game.enemy.hp, game.enemy.maxHp - 1, '仅结算一次');
+  assert.equal(dup.ok, false, '重复席拒绝');
+  assert.ok(game.player.hand.some((hc) => hc.id === 'nak-sha'), '拒绝路径退牌');
+  assert.equal(game.enemy.hp, game.enemy.maxHp, '未结算');
 });
 
-test('P2: 逐席距离校验 — 超出攻击范围的额外目标拒绝', () => {
-  // 5 席环: player 与对面席距离 2, 需武器范围覆盖 — 方天 range 4 恒可达,
-  // 改用"卸下方天"边界: 用 -1 马拉近也无法绕过 normalizeMultiTargets 的
-  // 逐席 canReachWithSha (方天 range 4 在 5 席环恒可达, 该校验面由
-  // 单目标同款矩阵复用保证 — 此处验证被保护席位拒绝路径)。
+function makeFive(opts = {}) {
+  const game = Engine.newGame({
+    seed: opts.seed || 41051,
+    seats: ['player', 'enemy', 'ally', 'ally2', 'ally3'],
+    roles: { player: '主公', enemy: '反贼', ally: '忠臣', ally2: '反贼', ally3: '内奸' },
+    playerHero: 'sunquan', enemyHero: 'lvmeng', allyHero: 'diaochan'
+  });
+  game.log = []; game.discard = []; game.deck = [];
+  for (const seat of game.seats) {
+    game[seat].hand = []; game[seat].judgeArea = [];
+    game[seat].equipment = { weapon: null, armor: null, horseMinus: null, horsePlus: null };
+    game[seat].hp = game[seat].maxHp; game[seat].skillPreferences = {};
+    game[seat].flags = {}; game[seat].chuang = [];
+  }
+  game.turn = 'player'; game.phase = 'play';
+  return game;
+}
+
+test('P2: 方天下 4 个互异目标超 1+2 上限拒绝 (5 席场)', () => {
+  const game = makeFive();
+  game.player.equipment.weapon = fangtianWeapon('ft9a');
+  game.player.hand = [c('sha', { id: 'cap-sha' })];
+  const result = Engine.playCard(game, 'player', 'cap-sha', { targets: ['enemy', 'ally', 'ally2', 'ally3'] });
+  assert.equal(result.ok, false, '4 目标 > 1+2 上限');
+  assert.match(result.message, /目标数超过上限/);
+  assert.ok(game.player.hand.some((hc) => hc.id === 'cap-sha'), '拒绝路径退牌');
+  assert.equal(game.player.usedSha, false, '未消耗出杀次数');
+});
+
+// 注: normalizeMultiTargets 的逐席距离分支 (canReachWithSha) 在 ≤5 席
+// 场不可构造失败面 — 方天资格绑定 range 4 武器, 而 5 席环最远距离
+// 2 (+1 马也仅 3) 恒可达; 该分支与单目标同款矩阵共享实现, 由单目标
+// 距离测试保真 (评审收口: 标题如实化, 不再冒充距离用例)。
+
+test('P2: 目标保护 (空城) 在多目标校验中逐席生效', () => {
   const game = makeTrio({ allyHero: 'zhugeliang' });
   game.player.equipment.weapon = fangtianWeapon('ft9');
   game.player.hand = [c('sha', { id: 'prot-sha' })];
