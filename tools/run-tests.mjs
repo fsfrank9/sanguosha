@@ -45,12 +45,21 @@ if (quick) {
   files = QUICK_TIER.slice();
 } else {
   files = fs.readdirSync(testsDir).filter((f) => f.endsWith('.mjs')).sort();
+  // 评审收口: 空集不得假绿 — 旧 shell 循环在 tests/ 为空时 exit 1,
+  // 分档运行器保持同语义 (目录/后缀被误改时立即暴露)。
+  if (!files.length) {
+    console.error('全档未发现任何 tests/*.mjs — tests 目录或文件后缀异常, 拒绝报绿。');
+    process.exit(1);
+  }
 }
 
 for (const f of files) {
   const rel = path.join('tests', f);
   process.stdout.write(`\n===== ${rel}\n`);
   const r = spawnSync(process.execPath, [rel], { cwd: root, stdio: 'inherit' });
+  // 评审收口: 派生失败/信号致死补诊断输出 (旧 shell 会打印 Killed 等死因)。
+  if (r.error) console.error(String(r.error));
+  if (r.signal) console.error(`子进程被信号终止: ${r.signal} (${rel})`);
   if (r.status !== 0) process.exit(r.status === null ? 1 : r.status);
 }
 console.log(`\n${quick ? '快档' : '全档'} ${files.length} 个测试文件全绿。`);

@@ -23,7 +23,6 @@ export function test(name, fn) {
 
 export async function runTests(opts) {
   const collect = Boolean(opts && opts.collect);
-  const total = queue.length;
   let passed = 0;
   let failures = 0;
   for (const [name, fn] of queue) {
@@ -38,6 +37,9 @@ export async function runTests(opts) {
       console.error(error && error.stack ? error.stack : error);
     }
   }
+  // total 于循环后结算: 用例运行期再注册的用例会被 for...of 继续消费,
+  // 分母语义与旧 runner "打印时读 tests.length" 保持一致 (评审收口)。
+  const total = passed + failures;
   queue.length = 0;
   if (collect && failures > 0) {
     console.error(`\n${failures}/${total} 个测试失败。`);

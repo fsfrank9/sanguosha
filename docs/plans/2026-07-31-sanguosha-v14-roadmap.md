@@ -221,10 +221,21 @@ O 1-2 → P 2-3 → Q 2-3 → R 0-3 (决策门, 可全裁剪)。顺序执行,
   gidPolicy 追加收案记录: **停止逐版滚动重试, 改为"网络环境变更
   (可直连官网) 时触发回填"**; 临时编号 216-223 长期保留, 核对前仍
   不生成 detailUrl 假链。
-- **评审**: 迁移逐文件基线比对之外, 按模型分配规范跑多 agent 评审
-  (haiku 机械核对 176 文件清单项 / sonnet 复核 51 个即跑式文件的
-  延迟执行时序敏感面与 O3 diff / opus 对抗验证 harness·runner·collect
-  语义), 结论与修正见 PR 描述。
+- **评审收口** (haiku×4 机械核对 / sonnet×4 时序与 O3 复核 / opus×2
+  对抗验证, 10 agent 462 项核查): 迁移本体零实质缺陷 — 54 个即跑式
+  文件逐一核实首个 test() 与 runTests() 之间无时序敏感顶层语句;
+  collect/passed 型 13 文件失败路径与 footer 逐项等价; fail-fast/
+  collect 语义实跑确认。对抗探针抓获并同批修正 5 项: ① build:check
+  护栏可被 双引号 import / 缩进 / async / 箭头定义 绕过且误伤注释 →
+  改注释剥离 + 正则匹配 (探针 A-I 全捕获/合规全放行复验); ② 全档
+  空集假绿 (旧 shell 同场景 exit 1) → 空集拒绝报绿; ③ spawnSync
+  信号/派生失败无诊断 → 补死因输出; ④ harness total 改循环后结算
+  (运行期注册用例时分母与旧 runner 打印时读 tests.length 恒等);
+  ⑤ ui_k3_panel_dom 静态 c import 打破该文件"先 fake-dom 后引擎"
+  求值次序意图 → c 并回动态 import。另清 frameShareBtn 残留注释
+  3 处 + dom-adapter-map.md/e15 头注 2 处文档同步。haiku 所报
+  "import 间夹代码"经核实为迁移前既有风格 (ESM import 提升, 行为
+  无关), node:test 5 文件本就不在 harness 收敛范围, 均不动作。
 - **门禁**: `npm run verify` 全绿 (183 文件, 含 200 局基准与 M4 推断
   门禁); `npm run verify:quick` ~2s 全绿; 双红线 (1v1 与 3-5 人身份
   场行为) 零回归 — 既有测试除守护断言随行为更新 (附注释) 外零改动

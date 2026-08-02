@@ -109,7 +109,7 @@
 - **技能多选面板** (zhiheng): line 64
 - **pending 面板** (guicai / yiji / fanjian / fankui / ganglie / qilin / cixiong / jiedao / guohe / wugu / luoshen / shanResponse / dyingRescue): line 66–83
 - **入口屏 (PR-E5/E8/E9/E18/E19)**: lobby + drawer + exit-confirm + heroPick grid + hero pick prompt
-- **角落 widget (PR-E1)**: `frameMenuBtn`, `frameShareBtn`
+- **角落 widget (PR-E1)**: `frameMenuBtn` (`frameShareBtn` 已随 v14 O3 移除)
 - **战报 overlay (PR-E2)**: `logOverlay`, `statusBar*` (**display:none, §8.1**)
 - **手牌底部条 (PR-E16)**: `handConfirmBtn`, `handCancelBtn`, `handDiscardBtn`
 - **technical**: `playerSkillDeckInfo` (PR-E15 牌堆数字位)
@@ -231,7 +231,7 @@
 
 启动 (line 2409) 直入 lobby (PR-E18: splash 已删).
 
-`_toggleCornerButtons(show)` (1806) — `frameMenuBtn` / `frameShareBtn` 仅 game 内可见 (PR-E19).
+`_toggleCornerButtons(show)` (1806) — `frameMenuBtn` 仅 game 内可见 (PR-E19; `frameShareBtn` 已随 v14 O3 移除).
 
 ### 6.2 侧抽屉 + 退出确认 (PR-E5/E19)
 

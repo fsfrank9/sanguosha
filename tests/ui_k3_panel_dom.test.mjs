@@ -13,10 +13,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { installFakeDom } from './helpers/fake-dom.mjs';
 import { test, runTests } from './helpers/harness.mjs';
-import { c } from './helpers/load-engine.mjs';
 
+// 本文件刻意先装 fake-dom 再动态 import 引擎/适配层 (求值次序敏感);
+// c 并入同一动态 import, 不走静态导入 (v14 O 评审收口)。
 const dom = installFakeDom();
-const { Engine } = await import('./helpers/load-engine.mjs');
+const { Engine, c } = await import('./helpers/load-engine.mjs');
 await import('../src/ui/dom-adapter.js');
 
 const UI = globalThis.window.SanguoshaUI;

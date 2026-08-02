@@ -210,8 +210,8 @@
           'wuxieResponsePanel', 'wuxieResponseHint', 'wuxieResponseChoices', 'wuxieResponseDeclineBtn',
           // v10 V6: 决斗 响应面板 — 玩家被发起决斗, 手动选用哪张牌当杀
           'duelResponsePanel', 'duelResponseHint', 'duelResponseChoices', 'duelResponseDeclineBtn',
-          // v9 PR-E1: 装饰外框角落 widgets — 菜单 / 分享. placeholder 行为, 等
-          // PR-E5 接入侧抽屉.
+          // v9 PR-E1: 装饰外框角落 widget — 菜单 (PR-E5 接入侧抽屉;
+          // v14 O3: 分享占位钮已裁决移除).
           'frameMenuBtn',
           // v9 PR-E2: 中央日志 overlay (.duel-table 上, 最近 4-6 条 game.log).
           'logOverlay',
@@ -1148,7 +1148,7 @@
         if (els.lobbyScreen) els.lobbyScreen.hidden = true;
         if (els.setupScreen) els.setupScreen.hidden = false;
         if (els.duelTable) els.duelTable.hidden = true;
-        _toggleCornerButtons(false);   // v9 PR-E19: setup 入口屏不显示菜单/分享
+        _toggleCornerButtons(false);   // v9 PR-E19: setup 入口屏不显示菜单角落钮
         populateHeroSelects();
         // v9 PR-E11: 入 setup 自动随机身份 (assignRandomRoles 内部已重置
         // 选将状态 + renderHeroPickGrid). 用户可点 "随机主公/反贼" 重抽.
@@ -1263,7 +1263,7 @@
         game.player.skillPreferences.tianxiang = 'ask';
         if (els.setupScreen) els.setupScreen.hidden = true;
         if (els.duelTable) els.duelTable.hidden = false;
-        _toggleCornerButtons(true);   // v9 PR-E19: 游戏内才显示菜单/分享角落按钮
+        _toggleCornerButtons(true);   // v9 PR-E19: 游戏内才显示菜单角落按钮
         render();
         maybeStartEnemyTurn();
       }

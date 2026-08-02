@@ -78,15 +78,23 @@ function checkStructure() {
   // v14 O1: 测试样板收敛护栏 — tests/*.mjs 不得再本地定义 test()
   // (统一走 tests/helpers/harness.mjs 的 test/runTests; node:test 导入不受限)。
   // 引入 harness 的文件必须调用 runTests(), 否则队列静默不执行、假绿。
+  // 评审收口加固 (opus 对抗探针 A-I): 先剥注释再按正则匹配 —
+  // ① 定义禁令覆盖 缩进/async/括号前空格/箭头(const test =) 等价写法,
+  //    且不误伤注释中引用旧样板的文字;
+  // ② harness 引用判定兼容单双引号, runTests 调用判定不认注释行
+  //    (堵"双引号 import + 注释里提 runTests"的假绿绕过面)。
+  const stripComments = (s) => s
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^[ \t]*\/\/.*$/gm, '');
   const testsDir = path.join(root, 'tests');
   if (fs.existsSync(testsDir)) {
     for (const name of fs.readdirSync(testsDir)) {
       if (!name.endsWith('.mjs')) continue;
-      const src = read(path.join('tests', name));
-      if (/^function test\(/m.test(src)) {
+      const code = stripComments(read(path.join('tests', name)));
+      if (/^\s*(async\s+)?function\s+test\s*\(/m.test(code) || /^\s*(const|let|var)\s+test\s*=/m.test(code)) {
         errors.push(`tests/${name}: local test() definition is forbidden — import { test, runTests } from './helpers/harness.mjs' (v14 O1)`);
       }
-      if (src.includes("/helpers/harness.mjs'") && !src.includes('runTests(')) {
+      if (/from\s*['"][^'"]*helpers\/harness\.mjs['"]/.test(code) && !/(^|[^.\w])runTests\s*\(/.test(code)) {
         errors.push(`tests/${name}: imports harness but never calls runTests() — queued tests would silently not run (v14 O1)`);
       }
     }

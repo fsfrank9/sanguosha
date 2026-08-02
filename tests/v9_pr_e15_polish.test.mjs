@@ -4,7 +4,8 @@
 //   2. 角色卡内 "手牌"/"状态" stat-grid 文字半截显示, 信息冗余 → 隐藏
 //   3. 底部数字应在武将技能卡最右边往上一点 (deck info)
 //   4. 右下角时间没必要 → 删除
-//   5. 菜单/分享按钮再往外一点
+//   5. 菜单/分享按钮再往外一点 (v14 O3: 分享钮已移除, 对应用例反转为
+//      断言 --share 规则不得残留)
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
