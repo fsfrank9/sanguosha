@@ -7,13 +7,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const css = loadAllStyles();
 const modalsCss = fs.readFileSync(path.join(root, 'src/styles/modals.css'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v9 PR-E27: .pending-prompt-panel::before backdrop pointer-events: none (不再拦截点击)', () => {
   const block = modalsCss.match(/\.pending-prompt-panel::before\s*\{[\s\S]*?\n\s{4}\}/);
@@ -33,7 +31,4 @@ test('v9 PR-E27: loadAllStyles() 拼接含改后的 backdrop 规则', () => {
   assert.match(css, /\.pending-prompt-panel::before\s*\{[\s\S]*?pointer-events:\s*none/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

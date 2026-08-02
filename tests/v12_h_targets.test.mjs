@@ -11,13 +11,9 @@
 // 内部机制见 src/engine/game-engine.js isLegalCardTarget (per-card-type
 // 距离/保护规则) 与 playTiesuoCardHandler (targets.slice(0,2))。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) { return Engine.makeTestCard(type, overrides); }
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts = {}) {
   const game = Engine.newGame({
@@ -244,20 +240,5 @@ test('边界 9: 合法目标矩阵 — 杀/顺手/兵粮受距离限制, 决斗/
   assert.ok(bingliangTargets.indexOf('enemy') >= 0, '兵粮寸断: enemy 距离 1 → 合法');
 });
 
-let failures = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    failures += 1;
-    console.error(`✗ ${name}`);
-    console.error(error && error.stack ? error.stack : error);
-  }
-}
-if (failures > 0) {
-  console.error(`\n${failures}/${tests.length} 个测试失败。`);
-  process.exit(1);
-} else {
-  console.log(`\n全部 ${tests.length} 个测试通过。`);
-}
+const { total } = await runTests({ collect: true });
+console.log(`\n全部 ${total} 个测试通过。`);

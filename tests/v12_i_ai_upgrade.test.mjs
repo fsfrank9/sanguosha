@@ -1,12 +1,9 @@
 // v12 I 阶段行为测试: I1 两步 lookahead / I2 可见信息计数建模 / I3 多人目标
 // 评估 + killPressure 状态机 + discardHold 弃牌保留值 + v11 profile 冻结。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-function c(type, overrides = {}) { return Engine.makeTestCard(type, overrides); }
+import { test, runTests } from './helpers/harness.mjs';
 
 function build1v1(opts = {}) {
   const game = Engine.newGame({
@@ -271,7 +268,4 @@ test('discardHold: 超限弃牌 v12 保闪 (弃 0 分杂牌); v11 先弃闪', ()
   assert.ok(!g2.player.hand.some((x) => x.type === 'shan'), 'v11 旧行为: 闪 0 分先被弃光');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

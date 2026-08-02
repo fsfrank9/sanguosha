@@ -7,15 +7,9 @@
 //       (加压测试实测: 神速向已死对手出杀崩溃 / 兵粮在途牌丢失)。
 //   修复后: 仅当回合不属于该 actor 时才 startTurn, 同回合按阶段续跑。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function prepareCount(game, actor) {
   return (game.turnHistory || []).filter((e) => e.actor === actor && e.phase === 'prepare').length;
@@ -58,7 +52,4 @@ test('runAITurn: 出牌阶段暂停 → resolve → 再调续跑, 不重启且�
   assert.notEqual(game.turn === 'enemy' && game.phase === 'prepare', true, '回合未被重置回准备阶段');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

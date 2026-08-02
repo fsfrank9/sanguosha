@@ -4,15 +4,9 @@
 // 覆盖: 出牌 / 响应 (窄签名 splice 出口) / 装备 / 被拆 / 濒死自救 各类
 // 失去路径 + 在途还原与非最后一张等负例。
 import assert from 'node:assert/strict';
-import { Engine, CardRuntime } from './helpers/load-engine.mjs';
+import { Engine, CardRuntime, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -207,7 +201,4 @@ test('守护: _handOrigin 在途标记不可枚举, JSON 克隆安全', () => {
   assert.equal(taken._handOrigin, undefined, '落位后标记清除');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

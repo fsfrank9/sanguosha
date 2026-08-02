@@ -2,9 +2,7 @@
 // 引擎默认行为零回归 (无 shanResponse='ask' 时自动响应).
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
+import { test, runTests } from './helpers/harness.mjs';
 
 function setupGame(seed) {
   const game = Engine.newGame({ seed: seed || 92001, playerHero: 'liubei', enemyHero: 'caocao' });
@@ -115,7 +113,4 @@ test('v10 V4: 玩家自己用【万箭齐发】打敌方 → 不暂停 (只玩�
   assert.equal(game.enemy.hp, enemyHpBefore, '敌方自动出闪化解');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

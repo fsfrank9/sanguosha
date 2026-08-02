@@ -2,9 +2,7 @@
 // 引擎默认零回归 (无 shaDuelResponse='ask' 时, playDuel 沿用旧 sync 循环).
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
+import { test, runTests } from './helpers/harness.mjs';
 
 function setup(seed) {
   const game = Engine.newGame({ seed: seed || 96001, playerHero: 'liubei', enemyHero: 'caocao' });
@@ -205,7 +203,4 @@ test('v10 V6: 玩家有龙胆 + 闪 → options 含 龙胆转化候选', () => {
   assert.equal(longdan.cardId, 'pshan');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

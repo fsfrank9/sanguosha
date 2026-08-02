@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v11 A2 架构守护: 引擎中"牌离开/进入区域"必须走 CardRuntime 的
 // moveCard/takeCard/putCard 原语。除下方白名单外, game-engine.js 不允许
@@ -45,9 +46,6 @@ const RAW_MUTATION = new RegExp(
   + String.raw`|\.equipment\.(weapon|armor|horseMinus|horsePlus)\s*=[^=]`
 );
 
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
 test('game-engine 不含白名单之外的裸区域操作', () => {
   const offenders = [];
   engineSource.split('\n').forEach((line, i) => {
@@ -83,7 +81,4 @@ test('UI 层不直接操作牌区域', () => {
   assert.doesNotMatch(uiSource, RAW_MUTATION, 'UI 层不应裸操作 hand/deck/discard/judgeArea/equipment');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

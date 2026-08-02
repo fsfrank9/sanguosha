@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
 import { makeStartGameViaUI } from './helpers/ui-game.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 // v11 C7 (批次 31): 耀武 yaowu-reward 面板全链路 — 玩家作为伤害来源,
 // 红杀命中华雄后面板弹出, 二选一按钮直接 resolve (必选, 无 cancel)。
@@ -12,14 +14,7 @@ await import('../src/ui/dom-adapter.js');
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
 
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
-
 const startGameViaUI = makeStartGameViaUI($, UI);
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('耀武面板: 玩家红杀命中华雄 → 弹出 (满血 → 回复钮禁用) → 选摸牌', () => {
   const game = startGameViaUI('lvmeng', 'huaxiong');
@@ -57,7 +52,4 @@ test('耀武面板: 玩家受伤 → 回复钮可用 → 选回复 +1 体力', (
   assert.equal($('yaowuRewardPanel').hidden, true, '面板关闭');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

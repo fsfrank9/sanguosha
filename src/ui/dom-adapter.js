@@ -157,7 +157,7 @@
           'enemyCamp', 'playerCamp', 'enemyQuote', 'playerQuote', 'enemyHp', 'playerHp',
           'enemyHandCount', 'playerHandCount', 'enemyState', 'playerState', 'statusTitle',
           'statusText', 'deckInfo', 'playerHand', 'enemyHandBadge', 'playerHandBadge', 'battleLog', 'handHint',
-          'enemyTurnBadge', 'playerTurnBadge', 'statusBanner', 'playerSkillBar', 'phaseTrack',
+          'enemyTurnBadge', 'playerTurnBadge', 'playerSkillBar', 'phaseTrack',
           'playerHeroSelect', 'enemyHeroSelect', 'playerEquipmentArea', 'enemyEquipmentArea',
           'playerJudgeArea', 'enemyJudgeArea', 'confirmDiscardBtn', 'enemyRibbon', 'playerRibbon',
           'tiesuoModePanel', 'tiesuoRecastBtn', 'tiesuoChainEnemyBtn', 'tiesuoChainSelfBtn',
@@ -212,7 +212,7 @@
           'duelResponsePanel', 'duelResponseHint', 'duelResponseChoices', 'duelResponseDeclineBtn',
           // v9 PR-E1: 装饰外框角落 widgets — 菜单 / 分享. placeholder 行为, 等
           // PR-E5 接入侧抽屉.
-          'frameMenuBtn', 'frameShareBtn',
+          'frameMenuBtn',
           // v9 PR-E2: 中央日志 overlay (.duel-table 上, 最近 4-6 条 game.log).
           'logOverlay',
           // v9 PR-E4: 主公徽章 — 右上角红圆 "主". 由 renderHero 据
@@ -1165,11 +1165,12 @@
         applySetupFamily(matchMode === 'duel' ? 'duel' : 'identity');
       }
 
-      // v9 PR-E19: 角落 widget (菜单 / 分享) 仅游戏内显示 —
+      // v9 PR-E19: 角落 widget (菜单) 仅游戏内显示 —
       // 菜单含退出/重开, 在 lobby/setup 入口屏无意义.
+      // v14 O3: "分享"占位钮裁决移除 (点击无可见效果的死钮不长期停留,
+      // 与 UI 修缮批"未实现功能不上菜单"同口径)。
       function _toggleCornerButtons(show) {
         if (els.frameMenuBtn) els.frameMenuBtn.hidden = !show;
-        if (els.frameShareBtn) els.frameShareBtn.hidden = !show;
       }
       // v13 图鉴续批-2: 筛选 chip 激活态同步。
       function _syncCampFilterChips(container, camp) {
@@ -1608,13 +1609,9 @@
         if (els.lobbyHellBtn) els.lobbyHellBtn.addEventListener('click', function () {
           if (window.alert) window.alert('炼狱 KOF — 待开发 (v10+ 计划)');
         });
-        // v9 PR-E5: 角落"菜单"按钮 — 切换侧抽屉显隐。"分享"仍是 placeholder.
+        // v9 PR-E5: 角落"菜单"按钮 — 切换侧抽屉显隐。
+        // (v14 O3: "分享"占位钮及其 placeholder handler 已裁决移除。)
         if (els.frameMenuBtn) els.frameMenuBtn.addEventListener('click', toggleSideDrawer);
-        if (els.frameShareBtn) els.frameShareBtn.addEventListener('click', function () {
-          if (window.console && window.console.info) {
-            window.console.info('[v9 PR-E1] 分享 click — placeholder');
-          }
-        });
         // v9 PR-E5: 侧抽屉项 click handlers
         if (els.drawerExitBtn) els.drawerExitBtn.addEventListener('click', function () {
           closeSideDrawer();

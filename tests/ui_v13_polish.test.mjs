@@ -10,6 +10,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { installFakeDom } from './helpers/fake-dom.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 const dom = installFakeDom();
 const { Engine } = await import('./helpers/load-engine.mjs');
@@ -18,10 +20,6 @@ await import('../src/ui/dom-adapter.js');
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function ensureHiddenToggle(on) {
   const btn = $('hiddenRolesToggleBtn');
@@ -48,9 +46,6 @@ function drainToPlayerIdle() {
     guard += 1;
   }
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 4: 一级界面分入口 ─────
 
@@ -347,11 +342,7 @@ function finalDrain() {
   while (dom.pendingTimerCount() > 0 && guard < 10) { dom.flushTimers(); guard += 1; }
 }
 
-let passed = 0;
-for (const [name, fn] of tests) {
-  try { fn(); passed += 1; console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+const { passed, total } = await runTests();
 finalDrain();
 assert.equal(dom.pendingTimerCount(), 0, '文末零残留计时器哨兵');
-console.log(`${passed}/${tests.length} 个 v13 UI 修缮用例通过。`);
+console.log(`${passed}/${total} 个 v13 UI 修缮用例通过。`);

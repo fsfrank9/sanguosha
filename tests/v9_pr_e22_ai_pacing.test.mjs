@@ -5,12 +5,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v9 PR-E22: enemyActionDelay 放慢到 >= 1200ms (原 650 太快)', () => {
   const m = adapter.match(/var enemyActionDelay\s*=\s*(\d+)/);
@@ -40,7 +38,4 @@ test('v9 PR-E22: maybeStartEnemyTurn 用 enemyPhaseDelay 起步', () => {
   assert.match(fn[0], /setTimeout\(enemyStep,\s*enemyPhaseDelay\)/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

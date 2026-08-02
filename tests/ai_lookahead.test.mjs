@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(playerHero, enemyHero, seed) {
   const game = Engine.newGame({ seed: seed || 9701, playerHero, enemyHero });
@@ -22,9 +19,6 @@ function buildGame(playerHero, enemyHero, seed) {
   game.phase = 'play';
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── aiCloneGame ───────────────────────────────────────────────────
 
@@ -218,7 +212,4 @@ test('v8 PR-D3: aiChooseCard — 决斗能直接打死对手, 优先决斗', () 
   assert.ok(['kill-jd', 'kill-sha-2'].includes(choice.card.id), '应选 lethal 牌');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

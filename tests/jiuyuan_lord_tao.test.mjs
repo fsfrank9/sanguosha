@@ -3,15 +3,9 @@
 // 覆盖: 出牌阶段对主公用桃 (+1 与 maxHp 封顶) / 濒死救援 桃 与 急救 /
 // 反例 (自用、非吴势力、非主公身份)。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 // player = 孙权 (默认主公), enemy 可换 (吴/非吴)。
 function buildGame(opts) {
@@ -145,7 +139,4 @@ test('救援 濒死 反例: 华佗(群)【急救】救孙权 → 只回复 1', (
   assert.equal(game.player.hp, 1, '群势力 → 无加成');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
 // v11 A1: 引擎变更调用统一接入全局牌守恒断言 (全场唯一牌 ID 集合不变 + 无跨区域重复)。
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -30,9 +31,6 @@ function jiu(id) {
 function sha(id) {
   return { id, type: 'sha', name: '杀', suit: 'spade', color: 'black' };
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-13: 玩家受致命伤但有【桃】+ auto pref → 自救存活', () => {
   const game = buildGame();
@@ -225,7 +223,4 @@ test('C1: 桃数量不足以抵消深度致命伤 → 死亡 (旧 clamp-to-0 下
   assert.ok(game.discard.some((c) => c.id === 'c1d-tao'), '唯一的桃仍被尝试使用');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

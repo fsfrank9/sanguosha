@@ -3,15 +3,9 @@
 // 天香转移过期 (青釭/古锭/寒冰) / 银月枪过八卦 / 雷击-鬼道 3p 座次泛化 /
 // 离间过目标保护 / 不屈入濒死责任链 / 距离剔除亡者 / 酒矩阵自洽。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function build(opts) {
   opts = opts || {};
@@ -324,7 +318,4 @@ test('酒: isLegalCardTarget 自洽 — 自己合法 (未用过), 他人按官�
   assert.equal(Engine.isLegalCardTarget(game, 'player', jiu, 'player'), false, '本回合已用过 (限次挂使用者)');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // v11 B2: 闪/无懈/决斗响应面板已迁往 src/ui/panels/response-panels.js,
@@ -12,9 +13,6 @@ const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8'
 // v12 F5: 杀链/锦囊结算域拆分至 sha-flow.js / tricks.js — 牌结算域源码按域拼接
 const engine = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/engine/sha-flow.js'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v9 PR-E26: 引擎含 shanOptionForCard + listShanResponseOptions', () => {
   assert.match(engine, /function shanOptionForCard\(state, cardId\)/);
@@ -52,7 +50,4 @@ test('v9 PR-E26: shanResponseChoices click → stage (kind:pending, payload.card
   assert.match(win[0], /data-shan-card-id/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

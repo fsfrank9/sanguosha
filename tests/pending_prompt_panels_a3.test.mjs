@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
@@ -8,16 +9,6 @@ const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapterSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 // v11 A3 批次三: cixiong-fire / cixiong-choose 面板的渲染分支与接线正则断言
 // 已由 tests/ui_panels_a3_batch3.test.mjs 的 fake-DOM 全链路行为测试取代。
@@ -57,5 +48,6 @@ test('v8 PR-A3: cixiong-fire 文案提及"异性"和 target 名', () => {
   assert.match(adapterSource, /'雌雄双股剑：对'\s*\+\s*actorDisplayName\(pending\.target\)/);
   assert.match(adapterSource, /异性/);
 });
+await runTests();
 
 console.log('\nPending prompt panels A3 (cixiong-fire + cixiong-choose) tests passed.');

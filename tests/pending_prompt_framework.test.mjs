@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const cssSource = loadAllStyles();
@@ -10,16 +11,6 @@ const adapterSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8');
 const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 test('v8 PR-A1: CSS 含通用 pendingChoice 面板框架四件套', () => {
   assert.match(cssSource, /\.pending-prompt-panel\s*\{/);
@@ -97,5 +88,6 @@ test('v8 hotfix: .pending-prompt-panel[hidden] 必须有 display:none !important
   // 否则所有 pendingChoice 面板会永远可见 (盖住手牌区)
   assert.match(cssSource, /\.pending-prompt-panel\[hidden\][\s\S]{0,200}display:\s*none\s*!important/);
 });
+await runTests();
 
 console.log('\nPending prompt framework (v8 PR-A1) tests passed.');

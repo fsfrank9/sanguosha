@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(playerHero, enemyHero, seed) {
   const game = Engine.newGame({ seed: seed || 9801, playerHero, enemyHero });
@@ -22,9 +19,6 @@ function buildGame(playerHero, enemyHero, seed) {
   game.phase = 'play';
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── aiEvaluateStateWithThreat ─────────────────────────────────────
 
@@ -134,7 +128,4 @@ test('v8 PR-D4: lookahead — 高威胁场景 AI 偏好防御', () => {
   assert.ok(ssScore > nmScore, 'shunshou (拆 sha 降威胁) 应高于 南蛮 (低 heuristic + 对方响应)');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

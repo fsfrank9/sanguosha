@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v5 architecture enforcement. Phase 5C flipped this from default-skip to
 // default-enforced. The GitHub Pages workflow assertion is deferred until
@@ -15,11 +16,6 @@ function read(rel) {
 
 function exists(rel) {
   return fs.existsSync(path.join(root, rel));
-}
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
 }
 
 const SOURCE_MODULES = [
@@ -94,3 +90,4 @@ test('tools/build.mjs validates structure only and does not bundle', () => {
   assert.doesNotMatch(src, /writeFileSync\(.*['"]dist/, 'build.mjs should not write dist artifacts');
   assert.doesNotMatch(src, /buildEngineBundle|buildLegacyBundle|stripModuleSyntax/, 'build.mjs should not concatenate or strip module syntax');
 });
+await runTests();

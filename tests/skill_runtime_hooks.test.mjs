@@ -2,21 +2,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { SkillRuntime } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const skillsSource = fs.readFileSync(path.join(root, 'src/engine/skills.js'), 'utf8');
 // v12 F5: 杀链域拆分 — playSha 链切片改读 sha-flow.js
 const shaFlowSource = fs.readFileSync(path.join(root, 'src/engine/sha-flow.js'), 'utf8');
 assert.ok(SkillRuntime, 'ES module should export SkillRuntime');
-
-function test(name, fn) {
-  try {
-    fn();
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 function normalize(value) {
   return JSON.parse(JSON.stringify(value));
@@ -449,3 +441,4 @@ test('game engine dispatches Guicai through judgement before-resolve hook seam',
   assert.match(judgeSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onJudgementBeforeResolve['"]\s*,\s*judgementContext\s*\)/, 'judge should dispatch before-resolve judgement replacement through SkillRuntime');
   assert.match(judgeSource, /return judgementContext\.card/, 'judge should return the possibly replaced judgement card');
 });
+await runTests();

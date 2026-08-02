@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -15,9 +16,6 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8');
 const setupCss = fs.readFileSync(path.join(stylesDir, 'setup.css'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 顺序选将 state ────────────────────────────────────────────────
 
@@ -161,7 +159,4 @@ test('v9 PR-E11: loadAllStyles() 含新 lock / tab[hidden] / disabled 规则', (
   assert.match(css, /\.hero-pick-tab\[hidden\]/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

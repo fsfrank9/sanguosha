@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
 
@@ -7,6 +7,7 @@ assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module expor
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const html = [
@@ -19,20 +20,6 @@ const html = [
   fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/data/cards.js'), 'utf8'),
 ].join('\n');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function ids(cards) {
   return Array.from(cards).map((card) => card.id);
@@ -76,5 +63,6 @@ test('战报侧栏底部必须预留可见空间，并在布局完成后滚到�
   assert.match(html, /function scrollLogToBottom\(\)/, 'rendering should use a dedicated scrollLogToBottom helper');
   assert.match(html, /lastElementChild\.scrollIntoView\(\{\s*block:\s*'end'/, 'latest log entry should be scrolled fully into view after render');
 });
+await runTests();
 
 console.log('\nv2.9 precise target/log tests passed.');

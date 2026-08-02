@@ -11,12 +11,9 @@
 // 修复: seatOfState 座席归属泛化 (#1/#2); transmitChainDamage 改可挂起队列 +
 // resumeSuspendedTurnFlowIfReady 的 chainTransmit 分支续跑 (#3)。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation, collectCardCensus } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-function c(type, overrides = {}) { return Engine.makeTestCard(type, overrides); }
+import { test, runTests } from './helpers/harness.mjs';
 
 function build3p(opts = {}) {
   const game = Engine.newGame({
@@ -166,7 +163,4 @@ test('缺陷3 对照: 1v1 铁索传导 (单一其他座席) 行为不变', () =>
   assert.equal(game.pauseState.chainTransmit, null, '传导队列已清');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

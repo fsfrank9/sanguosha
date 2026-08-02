@@ -2,15 +2,9 @@
 // AI 大乔/甘宁会评估并使用 国色 (方片→乐不思蜀) / 奇袭 (黑牌→过河拆桥)。
 // 与 UI 转化面板同源 (listCardConversions), 三方 (引擎/UI/AI) 口径一致。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(playerHero, enemyHero) {
   const game = Engine.newGame({ seed: 29001, playerHero, enemyHero });
@@ -139,7 +133,4 @@ test('aiSimulateCardPlay: mode 直接携带 asType → 模拟转化不崩溃且�
   assert.equal(game.player.equipment.weapon.id, 'p-wpn', '原局面不受影响');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

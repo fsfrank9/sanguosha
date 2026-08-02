@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const css = loadAllStyles();
@@ -17,9 +18,6 @@ const css = loadAllStyles();
 const adapter = fs.readFileSync(path.join(root, 'src/ui/panels/board-panels.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 1. modal 误点 bug 修复 ────────────────────────────────────────
 
@@ -89,7 +87,4 @@ test('v9 PR-E23: modals.css 含 .is-staged 金色描边高亮', () => {
   assert.match(css, /\.target-card-choice\.is-staged[\s\S]{0,160}outline:\s*3px\s+solid/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

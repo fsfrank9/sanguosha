@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine, StateRuntime } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 test('state runtime exposes pure actor/state helpers while preserving public engine APIs', () => {
   assert.ok(StateRuntime, 'ES module should export StateRuntime');
@@ -65,5 +61,6 @@ test('state runtime preserves roles, skill lookup, distance, range, limits, and 
   assert.equal(StateRuntime.getActorStatus(game, 'player'), '铁索横置');
   assert.equal(StateRuntime.getActorStatus(game, 'ghost'), '未知');
 });
+await runTests();
 
 console.log('\nState runtime tests passed.');

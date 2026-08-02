@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
 
@@ -7,6 +7,7 @@ assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module expor
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const html = [
@@ -18,20 +19,6 @@ const html = [
   fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/data/cards.js'), 'utf8'),
 ].join('\n');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function skillIds(heroId) {
   return Array.from(Engine.HERO_CATALOG[heroId].skills || []).map((skill) => skill.id);
@@ -167,5 +154,6 @@ test('武将池扩充到标准包、风林火山和 SP 包，并由 UI 动态生
   assert.match(html, /function populateHeroSelects\(\)/, 'UI should populate selects from HERO_CATALOG');
   assert.match(html, /Engine\.HERO_CATALOG/, 'UI setup pool should use the engine catalog, not a small hard-coded list only');
 });
+await runTests();
 
 console.log('\nv3.0 official-flow tests passed.');

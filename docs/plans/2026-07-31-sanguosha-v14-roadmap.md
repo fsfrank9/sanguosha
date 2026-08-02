@@ -177,3 +177,56 @@ O 1-2 → P 2-3 → Q 2-3 → R 0-3 (决策门, 可全裁剪)。顺序执行,
 各一批) 以批次数换确定性。每阶段末盘点批同时是"是否继续下一阶段"的
 决策点; R 阶段三个决策门 (蛊惑版本/KOF 来源/UX 点单) 在 O-Q 期间即可
 并行征询用户, 不阻塞主线。
+
+## O 阶段执行记录 (2026-08-02, 单 PR)
+
+- **O1 测试 harness 统一 — 全量迁移落地**: `tests/helpers/harness.mjs`
+  (test 入队 + runTests 执行; 缺省 fail-fast 与旧即跑式/队列式 runner
+  同语义, `{ collect: true }` 保 soak/benchmark 类 7 文件的续跑收集
+  语义 — 逐失败打印栈、结尾 `N/M 个测试失败。` + exit 1; 返回
+  `{ passed, total }` 供 footer 文案) + `load-engine.mjs` 共享牌工厂
+  c()。迁移脚本化: 基线快照 (183 文件逐一运行记录 exit/stdout/耗时)
+  → 4 种 test() 定义 × 3 种 runner 变体全部严格模式匹配机械改写 →
+  逐文件重跑与基线 stdout 比对, 不合即自动回滚。先 20 文件试点
+  (覆盖全部变体, 全通过) 后全量: **176/176 迁移成功、0 回滚**, 其中
+  172 个 stdout 逐字节一致, 4 个"静默成功"式文件 (skills / ai_flow /
+  skill_runtime_hooks / visual_polish) 按统一语义新增 82 条可见 ✓
+  (用例执行数与源内 test() 调用数逐一核对恒等)。c() 收敛 87→1
+  (advanced_engine 带 makeTestCard 存在性断言的变体有意保留; 3 个
+  node:test 文件手工并入)。护栏入 build:check: tests/*.mjs 禁止本地
+  `function test(` 定义; 引 harness 未调 runTests() (队列静默不执行的
+  假绿面) 同报错。**门禁: 迁移前后用例数恒等 (✓ 1656 = 基线可见
+  1574 + 静默转可见 82), `npm run verify` 全绿**。
+- **O2 慢测试分层落地**: `tools/run-tests.mjs` 分档运行器 — 全档
+  (npm test / verify; 语义与旧 shell for-loop 恒等: tests/*.mjs
+  逐文件、失败即停, CI 两个 workflow 均不变) + 快档 (test:quick /
+  verify:quick; 14 文件 ~2s: 结构/引擎/数据冒烟 + 守恒·裸区域·
+  裸装备·AI 零直读红线 + schema/审计一致性, 清单在运行器内逐文件
+  注明入选理由并做存在性校验)。约定入档: 新增 soak/基准一律入全档。
+  architecture_build 对 package.json test 命令的守护断言随行为更新
+  (附注释, 快档命令一并纳入守护)。
+- **O3 卫生小项一次清**: ① heroes.js 神速/红颜"留待后续批次"过时
+  注释更新 (v12 G2 已实装); ② dom-adapter els 注册表 statusBanner
+  死引用删除 (仅注册从未读写; div 本体承载 statusTitle/statusText/
+  deckInfo 保留不动); ③ frameShareBtn 占位钮裁决**移除** (点击无可见
+  效果, 与 UI 修缮批"未实现功能不上菜单"同口径) — index.html 按钮 +
+  els 缓存 + _toggleCornerButtons + click handler + layout.css --share
+  规则全清, v9 三个守护测试 (e1/e15/e19) 反转为"确认清除"附注释;
+  ④ docs/history.md 补 v13 尾部八批档案 (UI 修缮二/三批、武将图鉴及
+  续批、张角一~三修、audit4), README 对齐 (分档命令、演进表 v14-O
+  行、history 描述、当前推进状态)。
+- **O4 风包 gid 复核收尾 — 收案**: 按预案重试一次官方索引页
+  (www.sanguosha.com) — 仍 CONNECT 403 (与 J4/J 尾批同一网络策略),
+  两个 fixture (official_wind_skills / official_wind_skill_specs) 的
+  gidPolicy 追加收案记录: **停止逐版滚动重试, 改为"网络环境变更
+  (可直连官网) 时触发回填"**; 临时编号 216-223 长期保留, 核对前仍
+  不生成 detailUrl 假链。
+- **评审**: 迁移逐文件基线比对之外, 按模型分配规范跑多 agent 评审
+  (haiku 机械核对 176 文件清单项 / sonnet 复核 51 个即跑式文件的
+  延迟执行时序敏感面与 O3 diff / opus 对抗验证 harness·runner·collect
+  语义), 结论与修正见 PR 描述。
+- **门禁**: `npm run verify` 全绿 (183 文件, 含 200 局基准与 M4 推断
+  门禁); `npm run verify:quick` ~2s 全绿; 双红线 (1v1 与 3-5 人身份
+  场行为) 零回归 — 既有测试除守护断言随行为更新 (附注释) 外零改动
+  通过。方法论三区自查: 本批无新增询问时机与花色面板 (frameShareBtn
+  为移除非新增), 官方术语无涉。

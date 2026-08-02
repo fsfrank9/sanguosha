@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 assert.ok(Engine, 'engine module loaded');
 
@@ -7,15 +8,6 @@ assert.ok(Engine, 'engine module loaded');
 // 审计前这些牌没有无懈窗口, 直接结算。gltjk card__scroll.md: 无懈可击可在
 // 一张锦囊「对一个目标生效前」抵消之。在 1v1 中 南蛮/万箭 只有 1 名目标 (对方),
 // 故单个无懈窗口即与官方一致。
-
-function test(name, fn) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 // 干净的对局: 清空手牌/判定区/装备/牌堆, 双方满血, player 回合 play 阶段。
 function buildGame(opts) {
@@ -188,3 +180,4 @@ test('H1 玩家 ask 路径: 玩家放弃无懈 → 万箭照常结算 (无闪 �
   assert.equal(game.player.hp, hp - 1, '放弃无懈 + 无闪 → 受 1 点伤害');
   assert.ok(game.player.hand.some((card) => card.id === 'p-wuxie2'), '放弃 → 无懈保留');
 });
+await runTests();

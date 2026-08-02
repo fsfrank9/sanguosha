@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(playerHero, enemyHero, seed) {
   const game = Engine.newGame({ seed: seed || 9001, playerHero, enemyHero });
@@ -29,9 +26,6 @@ function buildGame(playerHero, enemyHero, seed) {
   game.aiProfile = 'v11';
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── aiEstimateShaCount ────────────────────────────────────────────
 
@@ -258,7 +252,4 @@ test('v8 PR-D1: aiChooseCard — 对方多闪时 改出 锦囊 而非 杀', () =
   assert.equal(choice.card.id, 'p-nm', '应选 南蛮 (高分)');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

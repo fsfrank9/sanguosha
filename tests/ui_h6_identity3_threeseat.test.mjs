@@ -2,6 +2,8 @@
 // 激将求助面板, 以及 1v1 零回归。fake-DOM 全链路 (真实 lobby 流程开局)。
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 const dom = installFakeDom();
 const { Engine } = await import('./helpers/load-engine.mjs');
@@ -9,10 +11,6 @@ await import('../src/ui/dom-adapter.js');
 
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 // identity3 开局 (真实 lobby → 模式切换 → 选将 → startGame), 然后整形成
 // 确定性局面 (清三席手牌/装备/判定区, 玩家回合出牌阶段)。
@@ -79,9 +77,6 @@ function startDuelViaUI(playerHero = 'liubei', enemyHero = 'caocao') {
   UI.render();
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 模式选择 + 第三席渲染 ─────────────────────────────────────────
 
@@ -276,7 +271,4 @@ test('1v1 零回归: duel 模式下无第三席/无座席点选, 出杀即时结
   assert.equal(game.enemy.hp, enemyHpBefore - 1, '点牌确认即时结算 (旧流程)');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

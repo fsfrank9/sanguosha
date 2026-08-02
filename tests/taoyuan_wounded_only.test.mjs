@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 72, startWithFirstTurn: true });
@@ -15,9 +16,6 @@ function dealTaoyuan(state, id) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-2: 桃园 heals both when both are wounded', () => {
   const game = makeGame();
@@ -83,7 +81,4 @@ test('v7 PR-2: log 顺序为发动者优先（逆时针）', () => {
   }
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

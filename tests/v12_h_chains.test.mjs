@@ -10,13 +10,9 @@
 // src/engine/damage-dying.js (transmitChainDamage), src/engine/judge-area.js
 // (applyJudgeAreaOutcome 的 shandian moveToNext 座次环扫描)。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) { return Engine.makeTestCard(type, overrides); }
+import { test, runTests } from './helpers/harness.mjs';
 
 // 3 座席 identity3 局面: newGame 后清空手牌/判定区/装备/日志/牌堆, 满血,
 // 清技能偏好, turn='player' 之外的场景各测试自行覆盖。默认身份预设
@@ -222,20 +218,5 @@ test('6. AOE 濒死暂停: player 濒死挂起后救回, ally 万箭队列续跑
   assert.equal(game.pauseState.aoe, null, '队列完成自清');
 });
 
-let failures = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    failures += 1;
-    console.error(`✗ ${name}`);
-    console.error(error && error.stack ? error.stack : error);
-  }
-}
-if (failures > 0) {
-  console.error(`\n${failures}/${tests.length} 个测试失败。`);
-  process.exit(1);
-} else {
-  console.log(`\n全部 ${tests.length} 个测试通过。`);
-}
+const { total } = await runTests({ collect: true });
+console.log(`\n全部 ${total} 个测试通过。`);

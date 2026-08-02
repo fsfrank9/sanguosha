@@ -8,12 +8,9 @@
 //   - distanceBetween 剔亡者的 4/5 席有区分度用例 (3 席退化无观测差)
 //   - 闪电座次环多跳 (跨多个已占用判定区)
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-function c(type, overrides = {}) { return Engine.makeTestCard(type, overrides); }
+import { test, runTests } from './helpers/harness.mjs';
 
 const SEATS4 = ['player', 'enemy', 'ally', 'ally2'];
 const SEATS5 = ['player', 'enemy', 'ally', 'ally2', 'ally3'];
@@ -380,8 +377,5 @@ test('K2-12. 铁索缺省目标: 忠臣席直调无显式 targets → 敌对池�
   assert.ok(game.enemy.chained || game.ally2.chained, '敌对池首位 (反贼) 被横置');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
-console.log(`${tests.length} 个 K2 加压用例通过。`);
+const { total } = await runTests();
+console.log(`${total} 个 K2 加压用例通过。`);

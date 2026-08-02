@@ -10,16 +10,12 @@ import {
   IMPLEMENTED_SKILL_IDS,
   ACTIVE_SKILL_IDS,
 } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
-}
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
 }
 
 test('catalog and skill-status data live in dedicated source modules outside the engine', () => {
@@ -77,5 +73,6 @@ test('data module ES exports reach the engine identity-equal', () => {
   assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes('jizhi'), 'implemented skill status should survive ES module import');
   assert.ok(Engine.ACTIVE_SKILL_IDS.includes('guanxing'), 'active skill status should survive ES module import');
 });
+await runTests();
 
 console.log('\nData module architecture tests passed.');

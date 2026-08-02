@@ -1,17 +1,8 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 test('newGame creates player/enemy with hp, hands, deck and player turn', () => {
   const game = Engine.newGame({ seed: 7 });
@@ -90,5 +81,6 @@ test('game over is detected when hp reaches zero', () => {
   assert.equal(game.winner, 'player');
   assert.equal(game.phase, 'gameover');
 });
+await runTests();
 
 console.log('\nAll engine behavior tests passed.');

@@ -3,6 +3,8 @@
 // 横幅修复 / 1v1 与 3p 零回归。fake-DOM 全链路 (真实 lobby 流程开局)。
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 const dom = installFakeDom();
 const { Engine } = await import('./helpers/load-engine.mjs');
@@ -10,10 +12,6 @@ await import('../src/ui/dom-adapter.js');
 
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 // identityN 开局 (真实 lobby → 模式切换 → 选将 → startGame), 然后整形成
 // 确定性局面 (清各席手牌/装备/判定区, 玩家回合出牌阶段)。
@@ -51,9 +49,6 @@ function startIdentityViaUI(modeBtnId, heroBySelect = {}) {
   UI.render();
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 模式选择: 4/5 人档按钮与席位下拉显隐 ─────────────────────────
 
@@ -219,9 +214,5 @@ test('3p 零回归: identity3 开局第四/五席保持隐藏, 布局 class 仍�
   assert.equal($('ally3Zone').hidden, true);
 });
 
-let passed = 0;
-for (const [name, fn] of tests) {
-  try { fn(); passed += 1; console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
-console.log(`${passed}/${tests.length} 个 K3 UI 用例通过。`);
+const { passed, total } = await runTests();
+console.log(`${passed}/${total} 个 K3 UI 用例通过。`);

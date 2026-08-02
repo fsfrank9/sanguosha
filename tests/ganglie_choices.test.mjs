@@ -1,17 +1,9 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v11 A1: 所有推进引擎状态的 Engine.* 调用均原地包上 assertCardConservation (全局牌守恒断言)。
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function buildGame(playerHero, enemyHero, seed) {
   const game = Engine.newGame({ seed: seed || 6104, playerHero, enemyHero });
@@ -235,5 +227,6 @@ test('AI 夏侯惇 auto-fires + AI source auto-discards 2 (no pendingChoice)', (
   assert.equal(game.player.hand.length, 0, 'AI source auto-discarded its remaining 2 cards');
   assert.equal(game.player.hp, game.player.maxHp, 'no damage taken (discard path was taken)');
 });
+await runTests();
 
 console.log('\nGanglie player-choice tests passed.');

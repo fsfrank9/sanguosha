@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // 审计二轮 PR-8: 贯石斧 (guanshi-discard) 与 火攻展示 (huogong-show) 的 UI
 // 面板接线。引擎侧 ask 档在 #120 已落地, 本 PR 补 dom-adapter 面板并在 UI
@@ -13,13 +14,6 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8');
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 面板标记存在 (index.html) ─────────────────────────────────────
 
@@ -117,7 +111,4 @@ test('引擎契约: huogong-show pending 暴露 cardIds, UI 提交 {cardId}', ()
   assert.equal(resolved.ok, true);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -1,17 +1,9 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v11 A1: 所有推进引擎状态的 Engine.* 调用统一包裹 assertCardConservation, 断言全场牌守恒。
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function buildGame(playerHero, enemyHero, seed) {
   const game = Engine.newGame({ seed: seed || 6105, playerHero, enemyHero });
@@ -189,5 +181,6 @@ test('武圣 关羽 juedou response: pulls a red equipment weapon when no red ha
   assert.equal(game.enemy.equipment.weapon, null, 'red equipment was used as 杀 response → consumed');
   assert.equal(game.player.hp, game.player.maxHp - 1, 'caocao took juedou damage');
 });
+await runTests();
 
 console.log('\nWusheng/Zhiheng/Kurou edge tests passed.');

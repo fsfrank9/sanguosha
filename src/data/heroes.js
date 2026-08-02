@@ -196,8 +196,8 @@
         tongji:    { trigger: 'targetValidation',  frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onCardTarget'] },
         // v12 G1 (修复批): 风包首批 3 技能。据守 = 摸三张+翻面 (跳过下回合);
         // 烈弓 = "你可以…" 可选触发 (对齐铁骑惯例); 狂骨 = 锁定技。
-        // 神速/红颜 撤出实现名单: 神速官方为"跳过阶段换杀", 需阶段跳过选择
-        // 框架; 红颜需花色视同层。伪实现按"宁缺毋滥"移除, 留待后续批次。
+        // 神速/红颜曾在本批按"宁缺毋滥"撤出伪实现, 已于 v12 G2 补齐所需
+        // 框架后实装 (见下方 shensu/hongyan 条目; v14 O3 更新此过时注记)。
         jushou:   { trigger: 'turnEnd',           frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'turnOver' },                 hooks: ['onTurnEnd'] },
         liegong:  { trigger: 'cardUse',           frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onNeedResponse'] },
         kuanggu:  { trigger: 'damageAfter',       frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDamageAfter'] },

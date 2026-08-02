@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
 import { countAllCards, assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // H1 (审计二轮): 丈八蛇矛主动使用造出的虚拟【杀】曾被推入弃牌堆, 全场牌数
 // 每用一次 +1, 洗牌后永久污染牌堆; 对手是曹操时【奸雄】还会把这张凭空牌
@@ -17,9 +18,6 @@ function makeGame(playerHero, enemyHero) {
   game.enemy.hand = [];
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('H1: 丈八蛇矛主动使用 → 全场牌数守恒, 虚拟杀不进弃牌堆', () => {
   const game = makeGame('liubei', 'sunquan');
@@ -85,7 +83,4 @@ test('H1 回归: 丈八蛇矛响应路径 (决斗) 牌数守恒不被破坏', ()
   assert.ok(!game.discard.some((c) => String(c.id).startsWith('zhangba-')), '弃牌堆中没有虚拟丈八杀');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

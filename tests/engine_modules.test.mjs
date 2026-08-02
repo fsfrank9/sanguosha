@@ -12,6 +12,7 @@ import {
   PhaseRuntime,
   JudgementRuntime,
 } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -21,11 +22,6 @@ function read(relativePath) {
 
 function exists(relativePath) {
   return fs.existsSync(path.join(root, relativePath));
-}
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
 }
 
 test('engine runtime modules exist as separate ES modules with their own exports', () => {
@@ -126,5 +122,6 @@ test('engine runtime modules import cleanly through ES module loader', () => {
   assert.equal(Object.keys(Engine.HERO_CATALOG).length, 71, 'engine should preserve all local heroes');
   assert.ok(Engine.IMPLEMENTED_SKILL_IDS.includes('jizhi'), 'skill implementation status should survive ES module import');
 });
+await runTests();
 
 console.log('\nEngine module architecture tests passed.');

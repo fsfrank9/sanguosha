@@ -2,9 +2,7 @@
 // 引擎默认零回归 (无 wuxieResponse='ask' 时, 当前 target 有无懈则自动消耗, 锦囊取消).
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
+import { test, runTests } from './helpers/harness.mjs';
 
 function setup(seed) {
   const game = Engine.newGame({ seed: seed || 95001, playerHero: 'liubei', enemyHero: 'caocao' });
@@ -190,7 +188,4 @@ test('v10 V5: 决斗也走 wuxie 链 (trickName="juedou")', () => {
   assert.equal(game.pauseState.wuxieChain.trickName, 'juedou');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

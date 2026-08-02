@@ -3,9 +3,7 @@
 // 引擎默认行为零回归 (无 shanResponse='ask' 时自动响应).
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
+import { test, runTests } from './helpers/harness.mjs';
 
 // 构造: 敌方装银月枪, 敌方在玩家回合内打黑色手牌触发 (回合外).
 // player 是 turn-holder, enemy 是 yinyue 持有者 → 玩家被攻击.
@@ -119,7 +117,4 @@ test('v10 V4: shanResponse=ask 但玩家无闪 → 银月不暂停 (直接受伤
   assert.equal(game.player.hp, hpBefore - 1, '受 1 点银月伤害');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

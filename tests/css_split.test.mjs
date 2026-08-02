@@ -10,12 +10,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles, SPLIT_CSS_FILES } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v9 PR-E0: 分文件都存在 (含 v9 PR-E8 加的 entry.css)', () => {
   const expected = ['tokens.css', 'layout.css', 'hero.css', 'cards.css', 'zones.css', 'modals.css', 'controls.css', 'setup.css', 'entry.css'];
@@ -87,7 +85,4 @@ test('v9 PR-E0: index.html 仍然引用 main.css (不动入口)', () => {
   assert.match(html, /<link\s+rel="stylesheet"\s+href="\.\/src\/styles\/main\.css"/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

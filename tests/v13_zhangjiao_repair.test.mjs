@@ -12,15 +12,9 @@
 //      时替换 (此前无脑最低分黑牌, AI 张角亲手换掉自己的黑桃判定)。
 //   5. 同一判定已有改判询问时后到 hook 退让 (双改判者叠问守卫)。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -444,7 +438,4 @@ test('R23: 对照 — 鬼才 (司马懿) "代替" 仍弃置原判定牌 (不获�
   assert.ok(!game.player.hand.some((x) => x.id === 'r23-orig'), '鬼才不获得原判定牌');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

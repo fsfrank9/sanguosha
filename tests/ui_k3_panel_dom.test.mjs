@@ -12,6 +12,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { installFakeDom } from './helpers/fake-dom.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 const dom = installFakeDom();
 const { Engine } = await import('./helpers/load-engine.mjs');
@@ -20,10 +22,6 @@ await import('../src/ui/dom-adapter.js');
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 // 真实 lobby 流程开局 (dom-adapter 会给玩家席设 tianxiang/huogongCost='ask'
 // 等 UI 偏好), 然后整形成确定性局面。
@@ -102,9 +100,6 @@ function triggerHuogongCost() {
   UI.render();
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 回归哨兵: id 唯一性 (真实浏览器语义) ─────────────────────────
 
@@ -190,9 +185,5 @@ test('火攻重选: 不弃置按钮直提 → 无伤结算 + 两张成本保留'
   assert.ok(game.player.hand.some((x) => x.id === 'c-club'), 'club 保留');
 });
 
-let passed = 0;
-for (const [name, fn] of tests) {
-  try { fn(); passed += 1; console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
-console.log(`${passed}/${tests.length} 个面板 DOM 用例通过。`);
+const { passed, total } = await runTests();
+console.log(`${passed}/${total} 个面板 DOM 用例通过。`);

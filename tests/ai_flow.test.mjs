@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
 
@@ -7,6 +7,7 @@ assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module expor
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const html = [
@@ -14,19 +15,6 @@ const html = [
   loadAllStyles(),
   fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8'),
 ].join('\n');
-
-function test(name, fn) {
-  try {
-    fn();
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function ids(cards) {
   return Array.from(cards).map((card) => card.id);
@@ -150,3 +138,4 @@ test('UI contains skill buttons, discard confirmation controls, and phase active
   assert.match(html, /data-phase="discard"/, 'phase steps should expose data-phase hooks');
   assert.match(html, /discard-selected/, 'selected discard cards should have a visual class');
 });
+await runTests();

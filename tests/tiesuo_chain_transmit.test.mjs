@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v11 A1: 引擎变更调用已接入 assertCardConservation 全局牌守恒断言。
 // H4 (审计二轮): 铁索连环属性伤害传导 — gltjk card__scroll.md。此前 chained
@@ -8,10 +9,6 @@ import { assertCardConservation } from './helpers/card-conservation.mjs';
 //   - 横置角色受到属性 (火/雷) 伤害 → 解除连环状态
 //   - 非传导伤害结算完毕后 → 对其他横置角色造成等量同属性传导伤害
 //   - 传导伤害不再引发新的传导; 普通伤害不解除也不传导
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function makeGame(playerHero = 'liubei', enemyHero = 'sunquan') {
   const game = Engine.newGame({ seed: 97, startWithFirstTurn: true, playerHero, enemyHero });
@@ -21,9 +18,6 @@ function makeGame(playerHero = 'liubei', enemyHero = 'sunquan') {
   game.enemy.hand = [];
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('H4: 双方横置 + 火杀 → 目标受伤解除, 传导等量火伤给另一横置角色并解除', () => {
   const game = makeGame();
@@ -124,7 +118,4 @@ test('H4: 传导伤害致死 → 游戏正常结束', () => {
   assert.equal(game.winner, 'enemy');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

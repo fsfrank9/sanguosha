@@ -5,15 +5,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
 const css = loadAllStyles();
 const modalsCss = fs.readFileSync(path.join(stylesDir, 'modals.css'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── .pending-prompt-panel 升级 ────────────────────────────────────
 
@@ -141,7 +139,4 @@ test('v9 PR-E6: loadAllStyles() 拼接结果含升级后的 pending 规则', () 
   assert.match(css, /\.pending-prompt-panel::before\s*\{/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

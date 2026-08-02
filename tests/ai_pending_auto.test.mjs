@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(playerHero, enemyHero, seed) {
   const game = Engine.newGame({ seed: seed || 9501, playerHero, enemyHero });
@@ -22,9 +19,6 @@ function buildGame(playerHero, enemyHero, seed) {
   game.phase = 'play';
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── cixiong-choose target auto: 挑最不值钱手牌弃置 ────────────────
 
@@ -193,7 +187,4 @@ test('v8 PR-D2: 雌雄 target auto — 受伤时不弃 桃 (因为 桃 高分)',
   assert.ok(game.discard.some((card) => card.id === 'p-sha-lowprio'), '弃了最低分 sha');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

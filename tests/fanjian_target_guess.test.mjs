@@ -1,14 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(playerHero, enemyHero, seed) {
   const game = Engine.newGame({ seed: seed || 6102, playerHero, enemyHero });
@@ -146,5 +138,6 @@ test('Second 反间 in same turn returns "每回合限一次"', () => {
   assert.equal(result.ok, false);
   assert.match(result.message, /每回合限一次/);
 });
+await runTests();
 
 console.log('\nFanjian target-guess tests passed.');

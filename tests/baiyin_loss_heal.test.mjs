@@ -1,15 +1,12 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // M2 (审计二轮): 白银狮子 — "当你失去装备区里的【白银狮子】时, 你回复1点体力"。
 // 此前回血只在 loseEquipment 一条路径生效; 替换防具 / 过河拆桥 / 制衡弃装备 /
 // 反馈拿装备等路径直接清槽位, 全部绕过回血。
 // v11 A1: 所有推进引擎状态的调用均包上 assertCardConservation (全局牌守恒断言)。
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function makeGame(playerHero = 'liubei', enemyHero = 'sunquan') {
   const game = Engine.newGame({ seed: 97, startWithFirstTurn: true, playerHero, enemyHero });
@@ -19,9 +16,6 @@ function makeGame(playerHero = 'liubei', enemyHero = 'sunquan') {
   game.enemy.hand = [];
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('M2: 装新防具替换白银狮子 → 回复 1 点体力', () => {
   const game = makeGame();
@@ -85,7 +79,4 @@ test('M2: 满血时失去白银狮子 → 不回血 (回复体力受上限限制
   assert.equal(game.player.hp, game.player.maxHp, '满血不超回');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

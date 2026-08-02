@@ -2,17 +2,20 @@
 // 验证:
 //   1. tokens.css 含新的 frame design tokens (5 个)
 //   2. layout.css 含 .game-frame 用 background-clip 技巧画条纹边框
-//   3. layout.css 含 .frame-corner-btn + 两个变体 (--menu / --share)
-//   4. index.html 含 frameMenuBtn / frameShareBtn 按钮
+//   3. layout.css 含 .frame-corner-btn + --menu 变体
+//   4. index.html 含 frameMenuBtn 按钮
 //   5. index.html 在 <main class="app"> 内 (在 setup-screen 和 duel-table
 //      之外) 包裹了 .game-frame
-//   6. dom-adapter 缓存 frameMenuBtn / frameShareBtn + 绑定 click handler
+//   6. dom-adapter 缓存 frameMenuBtn + 绑定 click handler
 //   7. .app 改成 position: relative (角落 widgets 绝对定位锚)
+// v14 O3: "分享"占位钮 (frameShareBtn / --share) 裁决移除, 相关守护反转为
+// "确认清除" (原 4/6 两项断言随行为更新)。
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -20,9 +23,6 @@ const stylesDir = path.join(root, 'src', 'styles');
 const css = loadAllStyles();
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v9 PR-E1: tokens.css 含 5 个 frame design tokens', () => {
   const tokens = fs.readFileSync(path.join(stylesDir, 'tokens.css'), 'utf8');
@@ -46,11 +46,12 @@ test('v9 PR-E1: layout.css 含 .game-frame + background-clip 双层条纹技巧'
   assert.match(layout, /border:\s*var\(--frame-stripe-width\)/);
 });
 
-test('v9 PR-E1: layout.css 含 .frame-corner-btn + --menu / --share 变体', () => {
+test('v9 PR-E1: layout.css 含 .frame-corner-btn + --menu 变体 (--share 已清除)', () => {
   const layout = fs.readFileSync(path.join(stylesDir, 'layout.css'), 'utf8');
   assert.match(layout, /\.frame-corner-btn\s*\{/);
   assert.match(layout, /\.frame-corner-btn--menu\s*\{/);
-  assert.match(layout, /\.frame-corner-btn--share\s*\{/);
+  // v14 O3: 分享占位钮移除 → --share 规则不得残留 (孤儿 CSS 守护)
+  assert.doesNotMatch(layout, /\.frame-corner-btn--share\s*\{/);
   // 绝对定位
   assert.match(layout, /\.frame-corner-btn\s*\{[\s\S]{0,400}position:\s*absolute/);
   // hover / focus 样式
@@ -66,11 +67,12 @@ test('v9 PR-E1: layout.css 把 .app 改成 position: relative (角落 widgets �
   assert.match(appBlock[0], /position:\s*relative/);
 });
 
-test('v9 PR-E1: index.html 含 frameMenuBtn + frameShareBtn 按钮', () => {
+test('v9 PR-E1: index.html 含 frameMenuBtn 按钮 (frameShareBtn 已移除)', () => {
   assert.match(html, /id="frameMenuBtn"/);
-  assert.match(html, /id="frameShareBtn"/);
   assert.match(html, /class="frame-corner-btn frame-corner-btn--menu"/);
-  assert.match(html, /class="frame-corner-btn frame-corner-btn--share"/);
+  // v14 O3: 分享占位钮裁决移除 → 不得回潮
+  assert.doesNotMatch(html, /id="frameShareBtn"/);
+  assert.doesNotMatch(html, /frame-corner-btn--share/);
 });
 
 test('v9 PR-E1: index.html 用 .game-frame 包裹各屏 (PR-E20: header 已删)', () => {
@@ -84,18 +86,19 @@ test('v9 PR-E1: index.html 用 .game-frame 包裹各屏 (PR-E20: header 已删)'
 });
 
 test('v9 PR-E1: 角落按钮在 .game-frame 之外 (作为 .app 直接子元素)', () => {
-  // 顺序: <main class="app"> → frameMenuBtn → frameShareBtn → ...(drawer/modal v9 PR-E5)... → <div class="game-frame">
-  assert.match(html, /<main class="app">[\s\S]{0,400}id="frameMenuBtn"[\s\S]{0,400}id="frameShareBtn"[\s\S]{0,4000}<div class="game-frame">/);
+  // 顺序: <main class="app"> → frameMenuBtn → ...(drawer/modal v9 PR-E5)... → <div class="game-frame">
+  // (v14 O3: frameShareBtn 移除, 顺序断言随之收窄)
+  assert.match(html, /<main class="app">[\s\S]{0,400}id="frameMenuBtn"[\s\S]{0,4000}<div class="game-frame">/);
 });
 
-test('v9 PR-E1: dom-adapter 缓存 frameMenuBtn + frameShareBtn', () => {
+test('v9 PR-E1: dom-adapter 缓存 frameMenuBtn (frameShareBtn 已移除)', () => {
   assert.match(adapter, /'frameMenuBtn'/);
-  assert.match(adapter, /'frameShareBtn'/);
+  // v14 O3: 分享占位钮死引用不得回潮
+  assert.doesNotMatch(adapter, /frameShareBtn/);
 });
 
 test('v9 PR-E1: dom-adapter 绑定 click handler 到角落按钮', () => {
   assert.match(adapter, /els\.frameMenuBtn[\s\S]{0,200}addEventListener\(\s*'click'/);
-  assert.match(adapter, /els\.frameShareBtn[\s\S]{0,200}addEventListener\(\s*'click'/);
 });
 
 test('v9 PR-E1: loadAllStyles() 拼接结果含新 frame 规则 (回归)', () => {
@@ -104,7 +107,4 @@ test('v9 PR-E1: loadAllStyles() 拼接结果含新 frame 规则 (回归)', () =>
   assert.match(css, /--frame-stripe-warm:/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
 import { makeStartGameViaUI } from './helpers/ui-game.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 // v11 A3 批次一: 6 个存量面板的全链路行为测试 (弹出 → 点选 → 引擎状态 → 关闭)。
 // 覆盖: 无懈可击响应 / 决斗杀响应 / 鬼才 / 反馈 / 遗计 / 五谷丰登。
@@ -13,14 +15,7 @@ await import('../src/ui/dom-adapter.js');
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
 
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
-
 const startGameViaUI = makeStartGameViaUI($, UI);
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 无懈可击响应面板 (v10 V5, kind: wuxie-response) ─────────────────
 
@@ -264,7 +259,4 @@ test('五谷面板: 玩家使用五谷 → 亮出池弹出 → 选牌提交 → 
   assert.equal($('wuguPickPanel').hidden, true, '面板关闭');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

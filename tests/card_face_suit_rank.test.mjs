@@ -2,22 +2,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const cssSource = loadAllStyles();
 // v12 F6: 战场渲染域迁往 panels/board-panels.js — adapter 源按域拼接
 const adapterSource = fs.readFileSync(path.join(root, 'src/ui/panels/board-panels.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 test('v8 PR-0: dom-adapter 暴露 suitRankBadge / suitColorClass helpers', () => {
   assert.match(adapterSource, /function suitColorClass\(/);
@@ -63,5 +54,6 @@ test('v8 PR-0 (v13 UI修缮6 收窄): 对手手牌隐私 — 仅角标数字, �
   assert.doesNotMatch(adapterSource, /enemyHandBacks/, '牌背行已撤销');
   assert.doesNotMatch(adapterSource, /function miniBacks/, 'miniBacks 已随行撤销');
 });
+await runTests();
 
 console.log('\nCard face suit/rank tests passed.');

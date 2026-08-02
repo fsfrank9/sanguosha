@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
 
@@ -7,6 +7,7 @@ assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module expor
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const html = [
@@ -16,20 +17,6 @@ const html = [
   fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/data/cards.js'), 'utf8'),
 ].join('\n');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function ids(cards) {
   return Array.from(cards).map((card) => card.id);
@@ -113,5 +100,6 @@ test('主游戏界面应按一屏布局约束页面滚动，并提供铁索选�
   assert.match(html, /id="tiesuoChainBothBtn"/, 'Tiesuo chain-both button should exist');
   assert.match(html, /chain-status/, 'UI should include chained status styling');
 });
+await runTests();
 
 console.log('\nv2.7 regression tests passed.');

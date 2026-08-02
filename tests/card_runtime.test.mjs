@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine, CardRuntime } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 test('card runtime exposes pure card helpers while preserving public engine APIs', () => {
   assert.ok(CardRuntime, 'ES module should export CardRuntime');
@@ -43,5 +39,6 @@ test('card runtime preserves card metadata, classification, and physical-card re
   assert.equal(CardRuntime.physicalCardOf(virtual), physical);
   assert.equal(CardRuntime.physicalCardOf(physical), physical);
 });
+await runTests();
 
 console.log('\nCard runtime tests passed.');

@@ -75,6 +75,23 @@ function checkStructure() {
     if (exists(rel)) errors.push(`forbidden v5 artifact still exists: ${rel} (Phase 5C dropped it)`);
   }
 
+  // v14 O1: 测试样板收敛护栏 — tests/*.mjs 不得再本地定义 test()
+  // (统一走 tests/helpers/harness.mjs 的 test/runTests; node:test 导入不受限)。
+  // 引入 harness 的文件必须调用 runTests(), 否则队列静默不执行、假绿。
+  const testsDir = path.join(root, 'tests');
+  if (fs.existsSync(testsDir)) {
+    for (const name of fs.readdirSync(testsDir)) {
+      if (!name.endsWith('.mjs')) continue;
+      const src = read(path.join('tests', name));
+      if (/^function test\(/m.test(src)) {
+        errors.push(`tests/${name}: local test() definition is forbidden — import { test, runTests } from './helpers/harness.mjs' (v14 O1)`);
+      }
+      if (src.includes("/helpers/harness.mjs'") && !src.includes('runTests(')) {
+        errors.push(`tests/${name}: imports harness but never calls runTests() — queued tests would silently not run (v14 O1)`);
+      }
+    }
+  }
+
   return errors;
 }
 

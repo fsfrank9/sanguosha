@@ -1,20 +1,8 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
-
-function test(name, fn) {
-  try {
-    fn();
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function skillGame(playerHero, enemyHero = 'sunquan') {
   const game = Engine.newGame({ seed: 4242, playerHero, enemyHero });
@@ -945,3 +933,4 @@ test('司马懿【鬼才】 does not replace a judgement when Sima Yi has no han
   assert.ok(ids(game.discard).includes('guicai-no-hand-black-judge'), 'unreplaced judgement card should still be finalized');
   assert.equal(game.log.some((entry) => /鬼才/.test(entry)), false, 'Guicai should not log when no replacement is available');
 });
+await runTests();

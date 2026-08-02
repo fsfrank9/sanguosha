@@ -7,15 +7,9 @@
 // spec: 风包 天香 "弃置一张红桃手牌, 将此伤害转移给攻击范围内的一名
 // 其他角色, 然后其摸 X 张牌 (X 为其已损失的体力值)"。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function build1v1(opts) {
   opts = opts || {};
@@ -197,7 +191,4 @@ test('J3 零回归: AI auto 座席 (非 ask) 沿用期望值三态, 不挂起', 
   assert.equal(game2.enemy.hp, game2.enemy.maxHp - 1, '伤害转移到对手');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

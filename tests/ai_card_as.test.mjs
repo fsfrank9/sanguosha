@@ -1,14 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(playerHero, enemyHero) {
   const game = Engine.newGame({ seed: 9999, playerHero, enemyHero });
@@ -130,5 +122,6 @@ test('AI without 武圣/龙胆 keeps normal-mode play even with a red 桃 at ful
   // 桃 at full HP scores -100, no conversion possible → no candidate.
   assert.equal(choice, null, 'no conversion skill → no play option');
 });
+await runTests();
 
 console.log('\nAI card-as conversion tests passed.');

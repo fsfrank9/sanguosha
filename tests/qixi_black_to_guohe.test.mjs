@@ -4,15 +4,9 @@
 // 覆盖: 黑色手牌/装备来源、ask/auto/显式 targetZone 三种结算、无懈抵消、
 // 反例 (红色牌 / 非甘宁 / 对方两区皆空) 与实体牌落弃牌堆守恒。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -159,7 +153,4 @@ test('回归: 甘宁的黑牌不能当乐不思蜀 (国色不外溢)', () => {
   assert.equal(r.ok, false);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

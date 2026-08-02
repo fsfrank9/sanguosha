@@ -15,9 +15,7 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
 import { collectCardCensus } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
+import { test, runTests } from './helpers/harness.mjs';
 
 // pendingChoice 兜底决定表 — 与 v12_h_soak_3p 同源 (kind 覆盖说明见彼处)。
 function decisionForPendingChoice(pending) {
@@ -204,20 +202,5 @@ test('K4 终局可达: 全部固定种子在回合上限内决出胜负', () => 
     `未终局种子: ${undecided.map((o) => o.seed).join(', ')} (更换种子并重跑验证)`);
 });
 
-let failures = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    failures += 1;
-    console.error(`✗ ${name}`);
-    console.error(error && error.stack ? error.stack : error);
-  }
-}
-if (failures > 0) {
-  console.error(`\n${failures}/${tests.length} 个测试失败。`);
-  process.exit(1);
-} else {
-  console.log(`\n全部 ${tests.length} 个测试通过。`);
-}
+const { total } = await runTests({ collect: true });
+console.log(`\n全部 ${total} 个测试通过。`);

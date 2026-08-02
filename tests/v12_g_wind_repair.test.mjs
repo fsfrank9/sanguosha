@@ -26,15 +26,9 @@
 //                   撤出；英雄与技能条目本身保留在 HERO_CATALOG 中 (只是
 //                   技能状态标 todo)，useSkill 主动发动应返回失败。
 import assert from 'node:assert/strict';
-import { Engine, IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS } from './helpers/load-engine.mjs';
+import { Engine, IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 // 2 人局通用构造器: 沿用 yuanshu_wangzun_tongji / yaowu_red_sha_reward 的
 // buildGame 模式 — newGame 之后清空手牌/判定区/装备/日志/牌堆, 满血, 清
@@ -332,7 +326,4 @@ test('HERO_CATALOG: 夏侯渊/小乔仍保留英雄与技能条目 (仅技能未
   assert.ok(Engine.HERO_CATALOG.xiaoqiao.skills.some((s) => s.id === 'hongyan'), '红颜技能条目仍在');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

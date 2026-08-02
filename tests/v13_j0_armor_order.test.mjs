@@ -7,15 +7,9 @@
 //   八卦阵: "每当你需要使用/打出【闪】时，你可以判定，若结果为红色，
 //           你视为使用/打出一张【闪】"
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -224,7 +218,4 @@ test('无双杀 (玩家 ask) + 八卦: 首需求红判定顶掉 → 窗口 shanR
   assert.equal(game.player.hp, game.player.maxHp, '八卦 + 真闪 → 闪避');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

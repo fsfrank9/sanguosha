@@ -4,15 +4,9 @@
 // 2) 贯石斧 EV: AI 来源只在 斩杀压力 (目标血线<=伤害+1) 或 手牌充裕 (>=4)
 //    时才弃两张强制命中; 玩家 auto 座席保持旧行为。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -169,7 +163,4 @@ test('贯石斧 玩家 auto 座席保持旧行为: 无条件发动', () => {
   assert.equal(game.player.hand.length, 0);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

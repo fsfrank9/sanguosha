@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v11 A1: 引擎变更调用已接入 assertCardConservation 全局牌守恒断言。
 
@@ -17,9 +18,6 @@ function makeGuoseGame() {
 function diamondCard(id, type, name) {
   return { id, type: type || 'tao', name: name || '桃', suit: 'diamond', color: 'red', rank: '5' };
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v8 PR-C1: 大乔 + 方片牌 → canPlayCardAs(lebusishu) ok', () => {
   const game = makeGuoseGame();
@@ -114,7 +112,4 @@ test('v8 PR-C1: 国色 触发后, lebusishu 判定流程仍正常 (非红桃 →
   assert.equal(game.enemy.flags && game.enemy.flags.skipPlay, true);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

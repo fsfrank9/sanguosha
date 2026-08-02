@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict';
-import { Engine, CardRuntime } from './helpers/load-engine.mjs';
+import { Engine, CardRuntime, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v11 A2: moveCard 原语行为测试 — 区域定位/移出/放入/移动的单一受控出口。
 
 const { findCardZone, takeCard, putCard, moveCard } = CardRuntime;
-
-function c(type, overrides) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function buildGame() {
   const game = Engine.newGame({ seed: 11, startWithFirstTurn: true, playerHero: 'liubei', enemyHero: 'caocao' });
@@ -22,9 +19,6 @@ function buildGame() {
   game.enemy.judgeArea = [c('lebusishu', { id: 'e-judge-1' })];
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('findCardZone: 定位 deck/discard/hand/equipment/judgeArea, 在途返回 null', () => {
   const game = buildGame();
@@ -103,7 +97,4 @@ test('moveCard: 装备区↔手牌 (借刀夺武器语义) 守恒', () => {
   }, '装备转移');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

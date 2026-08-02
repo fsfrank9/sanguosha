@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 98, startWithFirstTurn: true, playerHero: 'liubei', enemyHero: 'sunquan' });
@@ -15,9 +16,6 @@ function dealSha(state, id, opts) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v8 PR-B4: enemy 装银月 + player 出黑杀 + enemy 用黑闪响应 → 银月触发 → player 受 1 dmg', () => {
   const game = makeGame();
@@ -118,7 +116,4 @@ test('v8 PR-B4: 武圣红牌当闪响应 → response.card.color === red → 不
   assert.equal(game.player.hp, playerHpBefore, '武圣红牌当闪 不触发银月');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

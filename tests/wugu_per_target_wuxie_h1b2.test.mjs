@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 assert.ok(Engine, 'engine module loaded');
 
@@ -8,15 +9,6 @@ assert.ok(Engine, 'engine module loaded');
 // 只抵消「对一个目标」的效果 → 每名 picker 选牌前各自开无懈窗口
 // (responder = opponent(picker))。被无懈则该 picker 不获得, 其余流程不变。
 // v11 A1: 引擎变更调用已接入 assertCardConservation 全局牌守恒断言。
-
-function test(name, fn) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function buildGame(opts) {
   opts = opts || {};
@@ -102,3 +94,4 @@ test('H1b-2 五谷: 选牌暂停仍正常 (无懈窗口先结算, 对方无无�
   assert.equal(game.enemy.hand.length, 1, '对手自取末张');
   assert.ok(!game.pendingChoice, '五谷结算完成');
 });
+await runTests();

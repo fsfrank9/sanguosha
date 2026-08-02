@@ -3,15 +3,9 @@
 // 新交互 kind 'yaowu-reward' (玩家来源 ask 面板二选一; AI/auto 来源
 // 受伤→回血 否则→摸牌)。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -150,7 +144,4 @@ test('耀武 边界: 红杀致濒死 + 自救成功 → 延迟时机照常触发
   assert.ok(game.log.some((l) => l.includes('【耀武】')));
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

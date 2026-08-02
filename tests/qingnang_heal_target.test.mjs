@@ -1,17 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v11 A1: 引擎变更调用已接入全局牌守恒断言 (assertCardConservation)。
 
 const root = path.resolve(import.meta.dirname, '..');
 const heroesSrc = fs.readFileSync(path.join(root, 'src/data/heroes.js'), 'utf8');
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function buildGame(playerHero, enemyHero, seed) {
   const game = Engine.newGame({ seed: seed || 7702, playerHero, enemyHero, startWithFirstTurn: true });
@@ -29,9 +26,6 @@ function buildGame(playerHero, enemyHero, seed) {
   game.phase = 'play';
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v8 PR-C4: SKILL_METADATA 已注册 qingnang (playPhase / oncePerTurn / discardOwn 1)', () => {
   assert.match(heroesSrc, /qingnang:\s*\{[^}]*trigger:\s*'playPhase'/);
@@ -169,7 +163,4 @@ test('v8 PR-C4: 回合切换后 qingnangUsed 复位 → 下回合可再用', () 
   assert.equal(r2.ok, true, '下回合可再用');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

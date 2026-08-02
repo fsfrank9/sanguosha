@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 // 审计二轮 PR-9: dom-adapter 的第一批真实行为测试。此前 2500 行 UI 适配层
 // 只有"源码正则"断言 (grep 自己的源码), 对真实 UI 回归没有检出力。本文件用
@@ -12,10 +14,6 @@ await import('../src/ui/dom-adapter.js');
 
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 // 通过真实 UI 路径开一局, 然后把局面整形成测试需要的状态。
 function startGameViaUI() {
@@ -40,9 +38,6 @@ function startGameViaUI() {
   UI.render();
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('启动: import 即渲染 lobby, 牌桌隐藏', () => {
   assert.equal($('lobbyScreen').hidden, false, 'lobby 可见');
@@ -180,7 +175,4 @@ test('濒死救援面板: 闪电致濒死 → 面板弹出 → 选桃救援 → 
   assert.equal($('dyingRescuePanel').hidden, true, '面板关闭');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

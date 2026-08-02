@@ -2,15 +2,9 @@
 // 确证 16 条 (高2/中9/低5) 逐条钉死。发现编号对应 docs/audit/
 // 2026-07-19-audit4-skills-cards.md。
 import assert from 'node:assert/strict';
-import { Engine, StateRuntime } from './helpers/load-engine.mjs';
+import { Engine, StateRuntime, c } from './helpers/load-engine.mjs';
 import { assertCardConservation, collectCardCensus } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildNp(seats, opts = {}) {
   const game = Engine.newGame({
@@ -390,7 +384,4 @@ test('收口: 1v1 显式 targetZone=judge 的过河提前拒绝, 牌不白损', 
   assert.equal(game.enemy.judgeArea.length, 1);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

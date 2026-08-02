@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
@@ -8,16 +9,6 @@ const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapterSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 test('v8 PR-A5: index.html 含 wuguPickPanel + Hint + Choices', () => {
   assert.match(htmlSource, /id="wuguPickPanel"[^>]*hidden/);
@@ -50,5 +41,6 @@ test('v8 PR-A5: wugu 无 decline 按钮（spec：必须挑一张）', () => {
   // 不应在 index.html 中存在 wuguPickDeclineBtn
   assert.doesNotMatch(htmlSource, /id="wuguPickDeclineBtn"/);
 });
+await runTests();
 
 console.log('\nPending prompt panel A5 (wugu-pick) tests passed.');

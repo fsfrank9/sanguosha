@@ -5,15 +5,9 @@
 // 的功能偏差)。decision.assignments = [{cardId, seat}]; 旧 giveIds 兼容
 // (→ 全部交给 1v1 对手, 行为零回归)。AI auto 路径新增盟友补血线启发。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 // 3 人身份场: player=郭嘉(遗计) 主公, enemy 反贼, ally 忠臣。
 function build3p(opts) {
@@ -176,7 +170,4 @@ test('J1 零回归: 1v1 AI auto — 无盟友, 全部自留', () => {
   assert.equal(game.enemy.hand.length, 0, '敌方未获牌');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

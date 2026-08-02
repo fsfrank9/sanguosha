@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame(opts) {
   const game = Engine.newGame({ seed: 73, startWithFirstTurn: true, ...(opts || {}) });
@@ -17,9 +18,6 @@ function dealSha(state, id) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-3: 麒麟弓 不触发 when target has 0 horses', () => {
   const game = makeGame();
@@ -129,7 +127,4 @@ test('v7 PR-3: AI (enemy) 默认 auto-fire — 不暂停', () => {
   assert.equal(game.pendingChoice, null);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

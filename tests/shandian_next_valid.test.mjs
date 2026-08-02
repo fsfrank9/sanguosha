@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 82, startWithFirstTurn: false });
@@ -12,9 +13,6 @@ function makeGame() {
 function shandian(id, opts) {
   return Object.assign({ id, type: 'shandian', name: '闪电', family: 'delayed', suit: 'spade', color: 'black' }, opts || {});
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-12: 闪电 非命中 → 移至对手判定区 (对手判定区为空)', () => {
   const game = makeGame();
@@ -102,7 +100,4 @@ test('v7 PR-12: 闪电 在 enemy 非命中 + player 判定区已有同名 → �
     'player 已有同名 闪电 → sd-stay-enemy 应回到 enemy');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

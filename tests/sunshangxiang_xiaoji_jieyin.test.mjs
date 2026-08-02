@@ -3,15 +3,9 @@
 // 被顺/主动卸下 全路径生效)。
 // 结姻: 出牌阶段限一次, 弃两张手牌, 与一名已受伤男性角色各回复 1。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -194,7 +188,4 @@ test('AI 结姻: 自身健康 (hp=3) → 不发动 (不给对手白回血)', () 
   assert.ok(!action || action.skillId !== 'jieyin', '健康时不结姻');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

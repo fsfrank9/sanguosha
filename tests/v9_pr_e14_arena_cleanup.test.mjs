@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -25,9 +26,6 @@ const heroCss = fs.readFileSync(path.join(stylesDir, 'hero.css'), 'utf8');
 const layoutCss = fs.readFileSync(path.join(stylesDir, 'layout.css'), 'utf8');
 const controlsCss = fs.readFileSync(path.join(stylesDir, 'controls.css'), 'utf8');
 const zonesCss = fs.readFileSync(path.join(stylesDir, 'zones.css'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 1. 阶段 panel 整个隐藏 ─────────────────────────────────────────
 
@@ -156,7 +154,4 @@ test('v9 PR-E14: loadAllStyles() 拼接含 .rebel-badge + .arena-phase-panel dis
   assert.match(css, /\.arena-phase-panel\s*\{[\s\S]*?display:\s*none/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
 import { makeStartGameViaUI } from './helpers/ui-game.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 // v12 G2: 神速 (shensu-options) + 鬼道 (guidao-replace, 复用鬼才面板 DOM)
 // 面板全链路 — 用 Engine.startTurn 触发真实回合开始 (prepare/judge 阶段),
@@ -14,14 +16,7 @@ await import('../src/ui/dom-adapter.js');
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
 
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
-
 const startGameViaUI = makeStartGameViaUI($, UI);
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 神速面板 (kind: shensu-options) ─────────────────────────────────
 
@@ -289,7 +284,4 @@ test('活动信息栏: 引擎日志的英文花色词渲染为带色形状 span'
   assert.doesNotMatch(html.replace(/data-[^=]*="[^"]*"/g, ''), /\b(spade|heart|club|diamond)\b/, '不残留英文花色词');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();
