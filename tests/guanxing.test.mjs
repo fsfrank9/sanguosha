@@ -1,14 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine, StateRuntime } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, StateRuntime, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(playerHero, enemyHero, opts) {
   opts = opts || {};
@@ -254,5 +246,6 @@ test('Legacy orderIds is treated as topIds (top-first semantic)', () => {
   // deck.slice(-2) = [card-B, card-A] since pop() takes last.
   assert.deepEqual(game.deck.slice(-2).map(c => c.id), ['card-B', 'card-A']);
 });
+await runTests();
 
 console.log('\nGuanxing v6.1 tests passed.');

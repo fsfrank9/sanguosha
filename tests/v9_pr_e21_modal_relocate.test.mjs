@@ -9,15 +9,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
 const css = loadAllStyles();
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const modalsCss = fs.readFileSync(path.join(stylesDir, 'modals.css'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 1. modal 块移出 .hand-dock ────────────────────────────────────
 
@@ -78,7 +76,4 @@ test('v9 PR-E21: loadAllStyles() 仍含 .pending-prompt-panel framework (回归)
   assert.match(css, /\.pending-prompt-panel::before/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

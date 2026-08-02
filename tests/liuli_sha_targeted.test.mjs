@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const heroesSrc = fs.readFileSync(path.join(root, 'src/data/heroes.js'), 'utf8');
@@ -24,9 +25,6 @@ function dealSha(state, id) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v8 PR-C2: SKILL_METADATA 已注册 liuli (trigger=shaTargetedAfter)', () => {
   // 检查 SKILL_METADATA 表中 liuli 条目存在 + 关键字段
@@ -94,7 +92,4 @@ test('v8 PR-C2: docs/data — daqiao 仍带 liuli skill descriptor', () => {
   assert.match(heroesSrc, /daqiao[^}]+skills:\s*\[[^\]]*liuli/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

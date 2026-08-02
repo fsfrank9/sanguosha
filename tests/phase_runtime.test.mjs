@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine, PhaseRuntime } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function normalize(value) {
   return JSON.parse(JSON.stringify(value));
@@ -139,5 +135,6 @@ test('phase runtime resets end-of-turn state without clearing skip phase flags',
   assert.equal(state.flags.biyueTriggered, false);
   assert.equal(state.flags.luoyi, false);
 });
+await runTests();
 
 console.log('\nPhase runtime tests passed.');

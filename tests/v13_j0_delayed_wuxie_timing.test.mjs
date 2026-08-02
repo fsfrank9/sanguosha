@@ -6,15 +6,9 @@
 // 后…置入其下家的判定区")。另: 判定阶段结算顺序为 LIFO ("进行其中最后
 // 置入其判定区里的那张", flow__game.md 判定阶段)。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -172,7 +166,4 @@ test('J0-2c (张角三修): AI 放置者 wuxiePolicy=always — 仍不取消自�
   assert.ok(!game.log.some((l) => l.includes('曹操打出【无懈可击】')), 'AI 未自耗无懈');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

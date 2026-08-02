@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const html = [
@@ -9,15 +10,6 @@ const html = [
   loadAllStyles(),
   fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8'),
 ].join('\n');
-
-function test(name, fn) {
-  try {
-    fn();
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 test('版本标记跟随当前版本 (data-version 与 package.json 主次版本一致)', () => {
   // 审计二轮: index.html 此前停在 data-version="6.1" (实际已 v10), 改为与
@@ -40,3 +32,4 @@ test('final UI keeps responsive and accessible battle feedback hooks', () => {
   assert.match(html, /aria-label="战报"/, 'battle log should have an accessible label');
   assert.match(html, /@media \(max-width: 560px\)/, 'mobile responsive rules should remain present');
 });
+await runTests();

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame(opts) {
   opts = opts || {};
@@ -34,9 +35,6 @@ function dealSha(state, id, opts) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-5: canPlayCard 拒绝 — 目标无武器', () => {
   const game = makeGame();
@@ -182,7 +180,4 @@ test('v7 PR-5: opponent 用黑杀被 source 仁王盾抵消 → sha 已使用 �
   assert.equal(game.enemy.hp, game.enemy.maxHp, '仁王盾抵消，source 未受伤');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -1,21 +1,8 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function ids(cards) {
   return cards.map(card => card.id);
@@ -222,5 +209,6 @@ test('delayed tricks: Shandian starts on self and moves or damages by judgement'
   assert.equal(hit.player.hp, hp - 3);
   assert.equal(hit.player.judgeArea.length, 0);
 });
+await runTests();
 
 console.log('\nCard/equipment tests passed.');

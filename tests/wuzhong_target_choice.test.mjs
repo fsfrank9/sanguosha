@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 93, startWithFirstTurn: true });
@@ -21,9 +22,6 @@ function dealWuzhong(state, id) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-16: 无目标参数 → 默认 actor 摸 2 (旧行为)', () => {
   const game = makeGame();
@@ -68,7 +66,4 @@ test('v7 PR-16: enemy 自己回合也能用 wuzhongTarget 给 player（仅 API �
   assert.equal(game.enemy.hand.length, 0, 'enemy 不摸');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

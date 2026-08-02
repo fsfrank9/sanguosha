@@ -4,12 +4,14 @@
 //   2. 角色卡内 "手牌"/"状态" stat-grid 文字半截显示, 信息冗余 → 隐藏
 //   3. 底部数字应在武将技能卡最右边往上一点 (deck info)
 //   4. 右下角时间没必要 → 删除
-//   5. 菜单/分享按钮再往外一点
+//   5. 菜单/分享按钮再往外一点 (v14 O3: 分享钮已移除, 对应用例反转为
+//      断言 --share 规则不得残留)
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -21,9 +23,6 @@ const adapter = fs.readFileSync(path.join(root, 'src/ui/panels/board-panels.js')
 const heroCss = fs.readFileSync(path.join(stylesDir, 'hero.css'), 'utf8');
 const layoutCss = fs.readFileSync(path.join(stylesDir, 'layout.css'), 'utf8');
 const controlsCss = fs.readFileSync(path.join(stylesDir, 'controls.css'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 1. top-actions 重定位到角色卡上方 ───────────────────────────────
 
@@ -66,14 +65,13 @@ test('v10 V2: layout.css 不再含 .status-bar__time (E15 后已无 JS 用途, V
 
 // ───── 5. frame-corner-btn 再往外 ─────────────────────────────────────
 
-test('v9 PR-E15: .frame-corner-btn--menu / --share 位置 top:-8 + left/right:6 (更靠外)', () => {
+test('v9 PR-E15: .frame-corner-btn--menu 位置 top:-8 + left:6 (更靠外; --share 已随 v14 O3 移除)', () => {
   const menu = layoutCss.match(/\.frame-corner-btn--menu\s*\{[\s\S]*?\n\s{4}\}/);
-  const share = layoutCss.match(/\.frame-corner-btn--share\s*\{[\s\S]*?\n\s{4}\}/);
-  assert.ok(menu && share);
+  assert.ok(menu);
   assert.match(menu[0], /top:\s*-8px/);
   assert.match(menu[0], /left:\s*6px/);
-  assert.match(share[0], /top:\s*-8px/);
-  assert.match(share[0], /right:\s*6px/);
+  // v14 O3: 分享占位钮裁决移除 → --share 定位规则不得残留
+  assert.doesNotMatch(layoutCss, /\.frame-corner-btn--share\s*\{/);
 });
 
 // ───── 回归 ────────────────────────────────────────────────────────────
@@ -82,7 +80,4 @@ test('v9 PR-E15: loadAllStyles() 拼接含 .stat-grid display:none (PR-E16 后 .
   assert.match(css, /\.stat-grid\s*\{[\s\S]*?display:\s*none/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

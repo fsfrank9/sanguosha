@@ -6,12 +6,9 @@
 //     玩家手握第二张真闪却被跳过, 主公无谓掉血。修复: resolveHujiaAidChoice
 //     无双且玩家刚代打一张、仍有闪时再次挂起询问 (与激将侧对称)。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-function c(type, overrides = {}) { return Engine.makeTestCard(type, overrides); }
+import { test, runTests } from './helpers/harness.mjs';
 
 function stockTao(game, n) { for (let i = 0; i < n; i += 1) game.deck.push(c('tao', { id: `t-${i}` })); }
 
@@ -151,7 +148,4 @@ test('缺陷5 对照: 非无双普通杀 → 护驾一张闪即化解 (不多问
   assert.equal(game.player.hand.filter((x) => x.type === 'shan').length, 1, '仅代打一张闪');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

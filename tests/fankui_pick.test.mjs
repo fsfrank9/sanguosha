@@ -1,17 +1,9 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v11 A1: 引擎变更调用统一包上 assertCardConservation, 断言全局牌守恒。
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function buildGame(playerHero, enemyHero, seed) {
   const game = Engine.newGame({ seed: seed || 6103, playerHero, enemyHero });
@@ -162,5 +154,6 @@ test('Invalid zone decision restores pendingChoice', () => {
   assert.equal(result.ok, false);
   assert.ok(Engine.getPendingChoice(game), 'invalid input must not consume the prompt');
 });
+await runTests();
 
 console.log('\nFankui-pick tests passed.');

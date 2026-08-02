@@ -1,12 +1,9 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // 审计二轮批次 6: M4 五谷洗牌 / M7 贯石斧选择权 / L1 火攻展示选择 /
 // L2 奸雄获得锦囊伤害牌 / L3 国色乐走无懈链 / L4 discardExcess 事务化。
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function makeGame(playerHero = 'liubei', enemyHero = 'sunquan') {
   const game = Engine.newGame({ seed: 97, startWithFirstTurn: true, playerHero, enemyHero });
@@ -16,9 +13,6 @@ function makeGame(playerHero = 'liubei', enemyHero = 'sunquan') {
   game.enemy.hand = [];
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('M4: 牌堆仅 1 张但弃牌堆充足 → 五谷洗牌后正常亮出 2 张', () => {
   const game = makeGame();
@@ -189,7 +183,4 @@ test('L4: discardExcess 传重复/无效 cardId → fail 且手牌原封不动',
   assert.equal(game.player.hand.length, 4);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

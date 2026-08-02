@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 assert.ok(Engine, 'engine module loaded');
 
@@ -7,15 +8,6 @@ assert.ok(Engine, 'engine module loaded');
 // 兜底 (八卦逻辑只存在于【杀】响应路径), 导致有八卦无闪的目标必中万箭。
 // gltjk: 八卦阵在「需要使用 / 打出【闪】」时触发, 包括响应【万箭齐发】。
 // 注: 八卦只对需【闪】的场景生效 → 【南蛮入侵】需【杀】, 不触发八卦。
-
-function test(name, fn) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function buildGame(opts) {
   opts = opts || {};
@@ -163,3 +155,4 @@ test('H2 回归: 八卦 vs 杀 红判定仍化解 (重构后行为不变)', () =
   assert.equal(r.ok, true);
   assert.equal(game.enemy.hp, hp, '八卦红判定化解杀 → 不掉血');
 });
+await runTests();

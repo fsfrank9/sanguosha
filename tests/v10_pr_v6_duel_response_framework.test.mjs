@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // v12 F5: 杀链/锦囊结算域拆分至 sha-flow.js / tricks.js — 牌结算域源码按域拼接
@@ -13,9 +14,6 @@ const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 
   + '\n' + fs.readFileSync(path.join(root, 'src/engine/tricks.js'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 引擎: sha-option 枚举 ─────────────────────────────────────────
 
@@ -131,7 +129,4 @@ test('v10 V6 回归: 默认 (无 shaDuelResponse=ask) 决斗仍走旧 sync auto-
   assert.equal(game.player.hand.length, 0, '玩家杀自动消耗');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

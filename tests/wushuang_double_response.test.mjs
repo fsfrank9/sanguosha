@@ -3,15 +3,9 @@
 // 覆盖: 自动路径 (AI/默认同步响应, 含八卦兜底) + 玩家 ask 路径 (第二张
 // 响应窗口 shan-response / sha-duel-response 的再询问与放弃分支)。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -298,7 +292,4 @@ test('无双 决斗 ask: 第二张询问时放弃 → 玩家受伤, 第二张保
   assert.equal(game.player.hand.length, 1, '第二张杀保留');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import { CARD_CATALOG, CARD_RULES } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 const VALID_TIMINGS = new Set([
   'playPhase',
@@ -105,5 +101,6 @@ test('every "responseWindow" entry, where present, uses canonical card type stri
     }
   }
 });
+await runTests();
 
 console.log('\nCard-rule audit tests passed.');

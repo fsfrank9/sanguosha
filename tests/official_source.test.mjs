@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
 
@@ -13,16 +14,6 @@ const windSpecFixturePath = path.join(repoRoot, 'tests/fixtures/official_wind_sk
 const gitignorePath = path.join(repoRoot, '.gitignore');
 
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 function skillNames(hero) {
   return (hero.skills || []).map((skill) => skill.name);
@@ -191,5 +182,6 @@ test('local catalog agrees with official skill names for the current batch', () 
     }
   }
 });
+await runTests();
 
 console.log('\nOfficial source tests passed.');

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v11 A1: 所有推进引擎状态的调用均包上 assertCardConservation 全局牌守恒断言
 // (五谷展示池中的在途牌由 helper 深扫 pendingChoice 计入)。
@@ -23,9 +24,6 @@ function dealWugu(state, id) {
 function deckCard(id, type, name, extra) {
   return Object.assign({ id, type, name, suit: 'heart', color: 'red' }, extra || {});
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-7 / v8 PR-D2: 1v1 X=2 — auto path 按 scoreCard 挑最高分, 不再 deterministic 取顶张', () => {
   const game = makeGame();
@@ -127,7 +125,4 @@ test('v7 PR-7: 全 auto 时剩余牌应被弃 (X=3 假设 但 1v1 X=2 不会有�
   assert.equal(otherDiscarded, 0, '1v1 X=2 双人各取一张，无剩余进弃牌堆');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

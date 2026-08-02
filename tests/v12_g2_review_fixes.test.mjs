@@ -9,15 +9,9 @@
 //   4. 红颜×银月枪: consumeWuxie 姊妹分支漏改 effectiveCardColor →
 //      小乔黑桃无懈仍触发银月枪。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -159,7 +153,4 @@ test('红颜×银月枪: 小乔回合外打出黑桃无懈 → 不触发银月�
   assert.equal(game.enemy.hp, hpBefore, '小乔未因银月枪掉血');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

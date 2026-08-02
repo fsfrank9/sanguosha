@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Engine } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v11 A1: 所有推进引擎状态的 Engine.* 调用均包上 assertCardConservation (全局牌守恒断言)。
 
@@ -28,9 +29,6 @@ function dealSha(state, id) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v8 PR-C3: SKILL_METADATA 已注册 jijiu (cardConvert trigger)', () => {
   assert.match(heroesSrc, /jijiu:\s*\{.*trigger:\s*'cardConvert'/);
@@ -166,7 +164,4 @@ test('v8 PR-C3: 非华佗 + dying + 红色非桃手牌 → 急救不触发, 死'
   assert.equal(g2.phase, 'gameover', '非华佗无急救 → 死');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

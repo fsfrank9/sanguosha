@@ -7,8 +7,10 @@
   "scripts": {
     "build": "node tools/build.mjs",
     "build:check": "node tools/build.mjs --check",
-    "test": "for f in tests/*.mjs; do printf '\\n===== %s\\n' \"$f\"; node \"$f\" || exit 1; done",
-    "verify": "npm run build:check && npm test"
+    "test": "node tools/run-tests.mjs",
+    "test:quick": "node tools/run-tests.mjs --quick",
+    "verify": "npm run build:check && npm test",
+    "verify:quick": "npm run build:check && npm run test:quick"
   },
   "devDependencies": {},
   "engines": {

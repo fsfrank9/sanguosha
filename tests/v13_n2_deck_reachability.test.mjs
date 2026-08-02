@@ -8,12 +8,9 @@
 //       47201/47303 抓获的双区并存)。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Engine, CardRuntime, CARD_CATALOG } from './helpers/load-engine.mjs';
+import { Engine, CardRuntime, CARD_CATALOG, c } from './helpers/load-engine.mjs';
 import { collectCardCensus } from './helpers/card-conservation.mjs';
 
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 test('N2a: CARD_CATALOG 每个牌型都进 buildDeck 配方 (目录⇄牌堆一致)', () => {
   const game = Engine.newGame({ seed: 50001 });

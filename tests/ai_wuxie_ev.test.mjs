@@ -4,15 +4,9 @@
 // 阵容才护; 兵粮 手牌拮据才护; 反无懈与 denial 窗口保持旧行为;
 // skillPreferences.wuxiePolicy='always' 回退。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -232,7 +226,4 @@ test('wuxiePolicy=always 回退: 南蛮满血也照旧无懈', () => {
   assert.ok(game.discard.some((x) => x.id === 'e-wx'), '回退旧行为: 无懈已用');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

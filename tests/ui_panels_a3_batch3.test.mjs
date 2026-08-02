@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
 import { makeStartGameViaUI } from './helpers/ui-game.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 // v11 A3 批次三: 5 个面板的全链路行为测试 (弹出 → 点选 → 引擎状态 → 关闭)。
 // 覆盖: 观星 (三区分配) / 反间 (花色盲猜) / 雌雄发动 / 雌雄应对 / 铁索模式。
@@ -13,14 +15,7 @@ await import('../src/ui/dom-adapter.js');
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
 
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
-
 const startGameViaUI = makeStartGameViaUI($, UI);
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 观星面板 (kind: guanxing-reorder) ──────────────────────────────
 
@@ -246,7 +241,4 @@ test('铁索面板: 选"重铸" → 弃铁索摸 1 张, 双方均未连环', () 
   assert.equal($('tiesuoModePanel').hidden, true, '面板关闭');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

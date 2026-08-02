@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -21,9 +22,6 @@ const adapter = fs.readFileSync(path.join(root, 'src/ui/panels/board-panels.js')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const layoutCss = fs.readFileSync(path.join(stylesDir, 'layout.css'), 'utf8');
 const zonesCss = fs.readFileSync(path.join(stylesDir, 'zones.css'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // PR-E17: .phase-prompt DOM 已删. PR-E20: .title-card + <header> + _toggleHeader
 // 全部删除 (用户反馈"选将界面标题栏删了"). 相关守护已撤.
@@ -75,7 +73,4 @@ test('v9 PR-E13: loadAllStyles() 拼接含 .log-overlay display:none + .status-b
   assert.match(css, /\.status-banner\s*\{[\s\S]*?display:\s*none/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

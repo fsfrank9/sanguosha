@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 92, startWithFirstTurn: true });
@@ -9,9 +10,6 @@ function makeGame() {
   game.enemy.hand = [];
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-15: 装备方天 + 最后一张手牌为 杀 → flags.fangtianBonus=true + log', () => {
   const game = makeGame();
@@ -87,7 +85,4 @@ test('v7 PR-15: 回合结束后 fangtianBonus 复位', () => {
   assert.equal(game.player.flags.fangtianBonus, false, '回合结束复位');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

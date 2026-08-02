@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -16,9 +17,6 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const controlsCss = fs.readFileSync(path.join(stylesDir, 'controls.css'), 'utf8');
 const layoutCss = fs.readFileSync(path.join(stylesDir, 'layout.css'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 1. top-actions 真删 ────────────────────────────────────────────
 
@@ -135,7 +133,4 @@ test('v9 PR-E16: loadAllStyles() 拼接含 .hand-actions + 不含 .pause-banner 
   assert.doesNotMatch(css, /\.pause-banner\s*\{\s*\n\s*position/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 79, startWithFirstTurn: true });
@@ -15,9 +16,6 @@ function dealGuohe(state, id) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-9: canPlayCard 拒绝 — 对手手牌+装备区皆空（仅判定区有牌）', () => {
   const game = makeGame();
@@ -160,7 +158,4 @@ test('v7 PR-9: resolve 错误 zone → fail，pendingChoice 重置', () => {
   assert.ok(game.pendingChoice, '失败后 pendingChoice 应被重置');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

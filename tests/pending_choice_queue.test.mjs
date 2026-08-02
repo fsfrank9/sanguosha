@@ -1,15 +1,12 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // 审计二轮 H2/H3/M6 — pendingChoice 暂停/恢复架构闭环:
 //   H3: pendingChoice 单槽无队列, 杀致濒死 (dying-rescue) 后麒麟弓 (qilin-pick)
 //       直接覆盖 → pauseState.dying 永久泄漏, 游戏软死锁。
 //   H2: 判定阶段【闪电】命中致濒死时回合流程不冻结, 濒死角色照常摸牌行动。
 //   M6: pendingChoice 挂起时可 endTurn / 继续出牌, 甚至跨回合 resolve。
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function makeGame(playerHero = 'liubei', enemyHero = 'sunquan') {
   const game = Engine.newGame({ seed: 97, startWithFirstTurn: true, playerHero, enemyHero });
@@ -19,9 +16,6 @@ function makeGame(playerHero = 'liubei', enemyHero = 'sunquan') {
   game.enemy.hand = [];
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('H3: 杀致濒死 + 麒麟弓双马 → dying-rescue 不被覆盖, qilin-pick 入队依次解决', () => {
   const game = makeGame();
@@ -144,7 +138,4 @@ test('M6: AI 出杀等待玩家闪响应时, aiTakeAction/runAITurn 暂停而非
   assert.equal(game.pendingChoice, null);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

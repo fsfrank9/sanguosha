@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine, JudgementRuntime } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function normalize(value) {
   return JSON.parse(JSON.stringify(value));
@@ -76,5 +72,6 @@ test('judgement runtime evaluates Shandian hit range and move/discard outcome', 
     success: true,
   });
 });
+await runTests();
 
 console.log('\nJudgement runtime tests passed.');

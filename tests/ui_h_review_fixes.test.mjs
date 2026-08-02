@@ -12,6 +12,8 @@
 //      改用泛化座席点选 (1-2 目标 + 重铸)。
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 const dom = installFakeDom();
 const { Engine } = await import('./helpers/load-engine.mjs');
@@ -19,7 +21,6 @@ await import('../src/ui/dom-adapter.js');
 
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
-function c(type, overrides = {}) { return Engine.makeTestCard(type, overrides); }
 
 function shape3p(game) {
   game.turn = 'player';
@@ -47,9 +48,6 @@ function start3p(p = 'diaochan', e = 'caocao', a = 'zhangfei') {
   $('exitConfirmModal').hidden = true;
   return shape3p(UI.getGame());
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── U1: 模式切换不污染 1v1 随机身份 ─────
 
@@ -214,7 +212,4 @@ test('U5 对照: 1v1 铁索仍走旧 tiesuoModePanel (零回归)', () => {
   assert.equal($('seatTargetModePanel').hidden, true, '1v1: 不进座席点选');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -3,14 +3,9 @@
 // 出闪/不出, 引擎自动选第一张; 现改为列出所有候选让玩家选.
 // v11 A1: 引擎变更调用统一接入 assertCardConservation 全局牌守恒断言.
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-function test(name, fn) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
-function c(type, overrides = {}) { return Engine.makeTestCard(type, overrides); }
+import { test, runTests } from './helpers/harness.mjs';
 
 test('v9 PR-E26: shan-response pendingChoice 带 options (真闪枚举)', () => {
   const game = Engine.newGame({ seed: 720, playerHero: 'liubei', enemyHero: 'caocao' });
@@ -88,5 +83,6 @@ test('v9 PR-E26: listShanResponseOptions / shanOptionForCard 已导出且工作'
   assert.ok(pc && pc.kind === 'shan-response', '甄姬有黑牌 → 倾国可响应, 暂停');
   assert.ok(pc.options.some((o) => o.cardId === 'p-blk' && o.via === '倾国'), 'options 含 倾国 转化候选');
 });
+await runTests();
 
 console.log('\nShan-response conversion (PR-E26) tests passed.');

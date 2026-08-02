@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -12,9 +13,6 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 // v12 F6: 战场渲染域迁往 panels/board-panels.js — adapter 源按域拼接
 const adapter = fs.readFileSync(path.join(root, 'src/ui/panels/board-panels.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── HTML 结构 ─────────────────────────────────────────────────────
 
@@ -85,7 +83,4 @@ test('v9 PR-E2: loadAllStyles() 拼接结果含 .log-overlay 规则 (v10 V2: .st
   assert.doesNotMatch(css, /\.status-bar\s*\{/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

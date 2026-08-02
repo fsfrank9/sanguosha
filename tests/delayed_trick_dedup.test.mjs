@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 76, startWithFirstTurn: true });
@@ -21,9 +22,6 @@ function judgeAreaPush(state, type, id, name) {
   state.judgeArea.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-6: 乐不思蜀 — opponent 判定区已有 乐 → canPlayCard 拒绝', () => {
   const game = makeGame();
@@ -101,7 +99,4 @@ test('v7 PR-6: 弃置后判定区清空 → 同名延时锦囊可重新放置', 
   assert.equal(result.ok, true, '判定区清空后可以重新放置');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

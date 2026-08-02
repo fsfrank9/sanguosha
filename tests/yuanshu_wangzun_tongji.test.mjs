@@ -4,15 +4,9 @@
 // 同疾: 锁定技 — 1v1 恒不拦截 (可指定目标只有对手), reserved hook 同流离。
 // 附: 结姻 jieyinUsed 每回合复位的回归 (批次 30 遗漏修复)。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -134,7 +128,4 @@ test('回归 结姻: jieyinUsed 随新回合复位 (每回合限一次, 而非�
   assert.equal(game.player.hp, 2);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

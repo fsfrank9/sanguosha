@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
@@ -12,9 +13,6 @@ const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 
 const tricksSrc = fs.readFileSync(path.join(root, 'src/engine/tricks.js'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 引擎: 链状态机 ────────────────────────────────────────────────
 
@@ -144,7 +142,4 @@ test('v10 V5 回归: 默认 (无 wuxieResponse=ask) 锦囊响应仍走旧 auto-c
   assert.equal(game.player.hand.length, 0, '无懈被自动消耗');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
@@ -8,16 +9,6 @@ const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapterSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 // v11 A3 批次二: jiedao/guohe 面板的渲染分支与接线正则断言已由
 // tests/ui_panels_a3_batch2.test.mjs 的 fake-DOM 全链路行为测试取代。
@@ -61,5 +52,6 @@ test('v8 PR-A4: jiedao-decision 文案展示 source 名 + 手中可用杀数', (
   assert.match(adapterSource, /'fire_sha'/);
   assert.match(adapterSource, /'thunder_sha'/);
 });
+await runTests();
 
 console.log('\nPending prompt panels A4 (jiedao + guohe-1v1) tests passed.');

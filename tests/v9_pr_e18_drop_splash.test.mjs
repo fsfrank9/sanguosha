@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -13,9 +14,6 @@ const css = loadAllStyles();
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const entryCss = fs.readFileSync(path.join(stylesDir, 'entry.css'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── splash HTML 真删 ──────────────────────────────────────────────
 
@@ -84,7 +82,4 @@ test('v9 PR-E18: loadAllStyles() 拼接不含 .splash-screen, 仍含 .lobby-scre
   assert.match(css, /\.lobby-screen\s*\{/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

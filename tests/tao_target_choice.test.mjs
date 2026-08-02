@@ -5,6 +5,7 @@
 // 角色", v13 按玩家实测反馈收口为标准语义, 分歧记录于 docs/audit/ 三轮纪要。
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 71, startWithFirstTurn: true });
@@ -19,11 +20,6 @@ function dealTao(state, id) {
   const card = { id, type: 'tao', name: '桃', suit: 'heart', color: 'red' };
   state.hand.push(card);
   return card;
-}
-
-const tests = [];
-function test(name, fn) {
-  tests.push([name, fn]);
 }
 
 test('J0-4: 自己受伤时可出桃, 目标为自己', () => {
@@ -89,12 +85,4 @@ test('J0-4: 满血时 isLegalCardTarget 对自己也不合法', () => {
   assert.equal(Engine.isLegalCardTarget(game, 'player', tao, 'player'), false);
 });
 
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
+await runTests();

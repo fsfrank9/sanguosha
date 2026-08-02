@@ -1,14 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(playerHero, enemyHero) {
   const game = Engine.newGame({ seed: 4242, playerHero, enemyHero });
@@ -173,5 +165,6 @@ test('AI does not fire any skill when 司马懿 has no actionable active skill',
   const action = Engine.aiChooseSkillAction(game, 'enemy');
   assert.equal(action, null, 'no active skill applies for 司马懿');
 });
+await runTests();
 
 console.log('\nAI skill awareness tests passed.');

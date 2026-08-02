@@ -13,9 +13,7 @@
 import assert from 'node:assert/strict';
 import { Engine, StateRuntime } from './helpers/load-engine.mjs';
 import { collectCardCensus } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
+import { test, runTests } from './helpers/harness.mjs';
 
 // pendingChoice 兜底决定表 — 与 v13_k4_soak45 / v12_h_soak_3p 同源。
 function decisionForPendingChoice(pending) {
@@ -248,20 +246,5 @@ test('M4 推断准确率门禁: 合并准确率显著高于随机基线', () => 
   assert.ok(acc4 >= 0.45, `4p 推断准确率 ${(acc4 * 100).toFixed(1)}% 应 ≥45% (随机基线 33.3%)`);
 });
 
-let failures = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    failures += 1;
-    console.error(`✗ ${name}`);
-    console.error(error && error.stack ? error.stack : error);
-  }
-}
-if (failures > 0) {
-  console.error(`\n${failures}/${tests.length} 个测试失败。`);
-  process.exit(1);
-} else {
-  console.log(`\n全部 ${tests.length} 个测试通过。`);
-}
+const { total } = await runTests({ collect: true });
+console.log(`\n全部 ${total} 个测试通过。`);

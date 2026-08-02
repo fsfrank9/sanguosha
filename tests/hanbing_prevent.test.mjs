@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   // 固定英雄, 避免 default caocao 的 jianxiong 干扰受到伤害时的手牌数量
@@ -16,9 +17,6 @@ function dealSha(state, id) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v8 PR-B1: 寒冰剑 装备 + 杀命中 + 目标手牌 → 防止伤害, 弃 2 手牌', () => {
   const game = makeGame();
@@ -148,7 +146,4 @@ test('v8 PR-B1: 寒冰剑 装备区 catalog 已注册 (data/cards.js)', () => {
   assert.ok(true, '前面 7 条 hanbing 装备实例化 + 触发都成功 → catalog 已可用');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
 import { makeStartGameViaUI } from './helpers/ui-game.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 // v11 C4 (批次 28): 转化面板泛化全链路测试 — 面板按 listCardConversions
 // 动态列按钮: 杀按钮显隐 + 锦囊类转化 (国色 方片→乐 / 奇袭 黑牌→拆) 动态
@@ -13,14 +15,7 @@ await import('../src/ui/dom-adapter.js');
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
 
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
-
 const startGameViaUI = makeStartGameViaUI($, UI);
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 国色: 方片牌 → 乐不思蜀 ──────────────────────────────────────
 
@@ -173,7 +168,4 @@ test('listCardConversions: 按 asType 表枚举, 含 skillName 与 playable', ()
   assert.deepEqual(Engine.listCardConversions(game, 'player', red), [], '红牌无候选');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

@@ -2,22 +2,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const html = [
   fs.readFileSync(path.join(root, 'index.html'), 'utf8'),
   loadAllStyles(),
 ].join('\n');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 test('face-to-face layout has enemy top, center arena, player board, and hand dock in order', () => {
   const enemyIndex = html.indexOf('id="enemyBoard"');
@@ -47,5 +38,6 @@ test('CSS includes battlefield table and bottom hand dock styling hooks', () => 
   assert.ok(/\.opponent-zone/.test(html), 'should include .opponent-zone CSS');
   assert.ok(/\.player-zone/.test(html), 'should include .player-zone CSS');
 });
+await runTests();
 
 console.log('\nUI layout tests passed.');

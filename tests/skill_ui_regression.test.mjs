@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
 
@@ -7,6 +7,7 @@ assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module expor
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const html = [
@@ -22,20 +23,6 @@ const html = [
   fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8'),
   fs.readFileSync(path.join(root, 'src/data/cards.js'), 'utf8'),
 ].join('\n');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function collectSkills() {
   return Object.values(Engine.HERO_CATALOG).flatMap((hero) => (hero.skills || []).map((skill) => ({ hero, skill })));
@@ -172,5 +159,6 @@ test('Guanxing previews min(aliveActorCount, 5, deckSize) cards and reorders via
   assert.match(html, /id="guanxingBottomBtn"/, 'UI should offer a "place on bottom" action (v6.1)');
   assert.match(html, /function confirmGuanxing\(\)/, 'UI should confirm Guanxing after preview/reorder');
 });
+await runTests();
 
 console.log('\nSkill UI regression tests passed.');

@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { installFakeDom } from './helpers/fake-dom.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const dom = installFakeDom();
 const { Engine, HERO_CATALOG, IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS } = await import('./helpers/load-engine.mjs');
@@ -11,9 +12,6 @@ await import('../src/ui/dom-adapter.js');
 
 const $ = dom.$;
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('图鉴: 静态标记 — 武将入口启用 (无 disabled), 图鉴屏骨架齐备', () => {
   assert.match(html, /id="lobbyHeroesBtn"/);
@@ -125,9 +123,5 @@ test('续批-2: 选将阵营筛选 — 点吴只剩吴武将, 选择照常, 重�
   assert.ok(grid.indexOf('hero-pick-card--camp-魏') >= 0, '重进归全部 (魏可见)');
 });
 
-let passed = 0;
-for (const [name, fn] of tests) {
-  try { fn(); passed += 1; console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
-console.log(`${passed}/${tests.length} 个武将图鉴用例通过。`);
+const { passed, total } = await runTests();
+console.log(`${passed}/${total} 个武将图鉴用例通过。`);

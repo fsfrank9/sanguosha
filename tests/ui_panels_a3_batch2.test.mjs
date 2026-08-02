@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
 import { makeStartGameViaUI } from './helpers/ui-game.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 // v11 A3 批次二: 再补 6 个面板的全链路行为测试 (弹出 → 点选 → 引擎状态 → 关闭)。
 // 覆盖: 刚烈发动 / 刚烈来源选择 / 麒麟弓 / 借刀杀人 / 过河拆桥 1V1 / 洛神。
@@ -13,14 +15,7 @@ await import('../src/ui/dom-adapter.js');
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
 
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
-
 const startGameViaUI = makeStartGameViaUI($, UI);
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 刚烈发动面板 (kind: ganglie-fire) ──────────────────────────────
 
@@ -290,7 +285,4 @@ test('洛神面板: 点"见好就收" → 不判定, 直接进入后续阶段', 
   assert.equal($('luoshenPromptPanel').hidden, true, '面板关闭');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

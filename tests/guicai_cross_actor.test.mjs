@@ -1,14 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(playerHero, enemyHero, seed) {
   const game = Engine.newGame({ seed: seed || 6101, playerHero, enemyHero });
@@ -168,5 +160,6 @@ test('player 司马懿 own lebusishu judgement still triggers pendingChoice', ()
   assert.equal(pending.actor, 'player');
   assert.equal(pending.judgementActor, 'player', 'own judgement: holder === judgementActor');
 });
+await runTests();
 
 console.log('\nGuicai cross-actor tests passed.');

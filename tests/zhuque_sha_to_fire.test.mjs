@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 97, startWithFirstTurn: true, playerHero: 'liubei', enemyHero: 'sunquan' });
@@ -15,9 +16,6 @@ function dealSha(state, id, opts) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // M1 (审计): 朱雀转火杀是「本次使用」的视为效果, 弃置后物理牌还原为普通
 // 【杀】。此前 mutate card.type='fire_sha' 永久污染物理牌 (洗回牌堆变永久火杀)。
@@ -144,7 +142,4 @@ test('v8 PR-B3: 朱雀 + 武圣红牌当杀 → card-as 虚拟杀 也被转化�
   assert.equal(game.enemy.hp, enemyHpBefore - 2, '武圣红桃当杀 + 朱雀转火杀 + 藤甲 → 2 dmg');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

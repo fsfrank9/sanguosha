@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // v12 F5: 杀链/锦囊结算域拆分至 sha-flow.js / tricks.js — 牌结算域源码按域拼接
@@ -17,9 +18,6 @@ const equipmentSrc = fs.readFileSync(path.join(root, 'src/engine/equipment.js'),
 // adapter 源为主文件 + 面板模块拼接 (渲染/文案类断言两处皆可命中)。
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 引擎: producer 走 V3 框架 ─────────────────────────────────────
 
@@ -149,7 +147,4 @@ function makeYinyuePending(seed) {
   return game;
 }
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

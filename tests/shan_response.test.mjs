@@ -2,16 +2,8 @@
 // 引擎默认仍自动响应; 仅当 player.skillPreferences.shanResponse === 'ask'
 // 且玩家有【闪】可响应时, 暂停为 pendingChoice 'shan-response'.
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // 敌方回合, 敌方手里一张【杀】打玩家; 玩家手里一张【闪】.
 function setup(prefs) {
@@ -88,5 +80,6 @@ test('v9 PR-E25: 玩家出【杀】打敌方 → 敌方响应自动, 不暂停 (
   assert.equal(r.ok, true);
   assert.equal(Engine.getPendingChoice(game), null, '玩家出杀打敌方 → 敌方响应自动, 不暂停');
 });
+await runTests();
 
 console.log('\nShan-response (player manual 闪 response) tests passed.');

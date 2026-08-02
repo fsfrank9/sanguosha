@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 assert.ok(Engine, 'engine module loaded');
 
@@ -8,15 +9,6 @@ assert.ok(Engine, 'engine module loaded');
 // 「对一个目标」的效果 → 双方都受伤时, 两次回复可被各自独立无懈。
 // 结算顺序从发动者起 = [actor, opponent]; 每名目标 responder = opponent(目标)。
 // v11 A1: 引擎变更调用已接入 assertCardConservation 全局牌守恒断言。
-
-function test(name, fn) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function buildGame(opts) {
   opts = opts || {};
@@ -117,3 +109,4 @@ test('H1b 桃园: 双方满血 → 无目标, 直接结算 (集智仍可触发, 
   assert.equal(game.enemy.hp, e0);
   assert.ok(game.discard.some((card) => card.id === 'ty-full'), '桃园进弃牌堆');
 });
+await runTests();

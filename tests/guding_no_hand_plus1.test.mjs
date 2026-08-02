@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 96, startWithFirstTurn: true, playerHero: 'liubei', enemyHero: 'sunquan' });
@@ -15,9 +16,6 @@ function dealSha(state, id) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v8 PR-B2: 古锭刀 + 目标无手牌 → 杀伤害 +1 (2 dmg)', () => {
   const game = makeGame();
@@ -111,7 +109,4 @@ test('v8 PR-B2: 非古锭刀武器 + 无手牌 → 不触发', () => {
   assert.equal(game.enemy.hp, enemyHpBefore - 1, '非古锭刀 → 不+1');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

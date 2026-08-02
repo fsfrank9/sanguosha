@@ -1,14 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(playerHero, enemyHero) {
   const game = Engine.newGame({ seed: 7777, playerHero, enemyHero });
@@ -363,5 +355,6 @@ test('tieqi "decline" preference skips judgement and lets target 闪 normally', 
     'judgement card untouched',
   );
 });
+await runTests();
 
 console.log('\nPending-choice (guicai / yiji / tieqi) tests passed.');

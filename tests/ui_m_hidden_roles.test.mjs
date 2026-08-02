@@ -6,6 +6,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { installFakeDom } from './helpers/fake-dom.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 const dom = installFakeDom();
 const { Engine } = await import('./helpers/load-engine.mjs');
@@ -13,10 +15,6 @@ await import('../src/ui/dom-adapter.js');
 
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 // 暗身份开关为模块级粘滞状态 (跨局保持) — 每个用例经 ensureHiddenToggle
 // 显式置位, 避免用例间顺序耦合。
@@ -58,9 +56,6 @@ function drainPendingTimers() {
     guard += 1;
   }
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── M1: setup 开关三态同步 ─────
 
@@ -173,11 +168,7 @@ test('零回归: 开关关闭 (缺省) → hiddenRoles=false, 问号全隐, 身�
   }
 });
 
-let passed = 0;
-for (const [name, fn] of tests) {
-  try { fn(); passed += 1; console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+const { passed, total } = await runTests();
 assert.equal(dom.pendingTimerCount(), 0,
   '文末零残留计时器哨兵 — 新用例若引入 AI 先手开局, 须在用例内 drainPendingTimers()');
-console.log(`${passed}/${tests.length} 个 M 阶段 UI 用例通过。`);
+console.log(`${passed}/${total} 个 M 阶段 UI 用例通过。`);

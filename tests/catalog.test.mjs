@@ -1,17 +1,8 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 test('engine exposes advanced CARD_CATALOG with standard and military families', () => {
   assert.ok(Engine.CARD_CATALOG, 'CARD_CATALOG should be exposed');
@@ -64,5 +55,6 @@ test('newGame accepts advanced hero ids while preserving playable start state', 
   assert.equal(game.player.hand.length, 4);
   assert.equal(game.enemy.hand.length, 4);
 });
+await runTests();
 
 console.log('\nCatalog tests passed.');

@@ -7,6 +7,8 @@
 //   零回归: 1v1 roleDraftPanel 随机身份不受影响; 身份场缺省仍主公。
 import assert from 'node:assert/strict';
 import { installFakeDom } from './helpers/fake-dom.mjs';
+import { test, runTests } from './helpers/harness.mjs';
+import { c } from './helpers/load-engine.mjs';
 
 const dom = installFakeDom();
 const { Engine } = await import('./helpers/load-engine.mjs');
@@ -14,10 +16,6 @@ await import('../src/ui/dom-adapter.js');
 
 const UI = globalThis.window.SanguoshaUI;
 const $ = dom.$;
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 // 驱动 enemyStep 定时器链直到轮到玩家/终局/无计时器 (带步数上限)。
 function driveTimers(maxFlushes = 200) {
@@ -54,9 +52,6 @@ function startIdentityWithRole(modeBtnId, roleBtnId) {
   $('exitConfirmModal').hidden = true;
   return UI.getGame();
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── L1: 身份选择面板显隐与状态 ─────
 
@@ -235,9 +230,5 @@ test('零回归: 身份场主公档 (缺省值) → v12 固定预设行为恒等
     ['主公', '反贼', '忠臣', '反贼', '内奸'], '缺省 = 预设原序');
 });
 
-let passed = 0;
-for (const [name, fn] of tests) {
-  try { fn(); passed += 1; console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
-console.log(`${passed}/${tests.length} 个 L 阶段 UI 用例通过。`);
+const { passed, total } = await runTests();
+console.log(`${passed}/${total} 个 L 阶段 UI 用例通过。`);

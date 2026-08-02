@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function newGameWithXuChu() {
   return Engine.newGame({
@@ -67,5 +63,6 @@ test('setSkillPreference rejects unknown actor', () => {
   const r = Engine.setSkillPreference(game, 'bogus', 'luoyi', 'decline');
   assert.equal(r.ok, false);
 });
+await runTests();
 
 console.log('\nSkill preferences tests passed.');

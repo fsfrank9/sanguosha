@@ -24,15 +24,9 @@
 //
 // 文末附"发现的引擎行为问题"清单 (D2 节, 鬼道 pendingChoice 重挂不一致)。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 function buildGame(opts) {
   opts = opts || {};
@@ -596,20 +590,5 @@ test('F3: 红颜 — 小乔出黑桃杀 vs 装仁王盾对手, 不被抵消', ()
 
 // ═══════════════════ 运行 ══════════════════════════════════════════════
 
-let failures = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    failures += 1;
-    console.error(`✗ ${name}`);
-    console.error(error && error.stack ? error.stack : error);
-  }
-}
-if (failures > 0) {
-  console.error(`\n${failures}/${tests.length} 个测试失败。`);
-  process.exit(1);
-} else {
-  console.log(`\n全部 ${tests.length} 个测试通过。`);
-}
+const { total } = await runTests({ collect: true });
+console.log(`\n全部 ${total} 个测试通过。`);

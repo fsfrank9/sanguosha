@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -11,9 +12,6 @@ const css = loadAllStyles();
 const controlsCss = fs.readFileSync(path.join(stylesDir, 'controls.css'), 'utf8');
 const heroCss = fs.readFileSync(path.join(stylesDir, 'hero.css'), 'utf8');
 const cardsCss = fs.readFileSync(path.join(stylesDir, 'cards.css'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── .btn 统一橙金装饰风 ───────────────────────────────────────────
 
@@ -112,7 +110,4 @@ test('v9 PR-E7: loadAllStyles() 拼接结果含新 .btn 规则', () => {
   assert.match(css, /\.btn\s*\{[\s\S]*?#c25a1a/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

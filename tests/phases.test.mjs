@@ -1,21 +1,8 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 test('engine exposes formal phase APIs and phase order', () => {
   assert.deepEqual(Array.from(Engine.PHASES), ['prepare', 'judge', 'draw', 'play', 'discard', 'finish']);
@@ -94,5 +81,6 @@ test('advancePhase goes through finish then starts opponent turn', () => {
   assert.equal(game.turn, 'enemy');
   assert.ok(['play', 'discard'].includes(game.phase));
 });
+await runTests();
 
 console.log('\nPhase tests passed.');

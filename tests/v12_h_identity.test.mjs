@@ -13,13 +13,9 @@
 // determineWinner / completeTurn 的阵亡终止分支) 与 game-engine.js 的
 // 激将/护驾求助框架 (resolveJijiangAidChoice / resolveHujiaAidChoice)。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) { return Engine.makeTestCard(type, overrides); }
+import { test, runTests } from './helpers/harness.mjs';
 
 function resetSeats(game) {
   game.log = [];
@@ -339,20 +335,5 @@ test('8. 1v1 惰性: 主公技/离间在 1v1 中全部 no-op', () => {
   assert.equal(g2.player.hand.length, 1, '失败不消耗成本');
 });
 
-let failures = 0;
-for (const [name, fn] of tests) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    failures += 1;
-    console.error(`✗ ${name}`);
-    console.error(error && error.stack ? error.stack : error);
-  }
-}
-if (failures > 0) {
-  console.error(`\n${failures}/${tests.length} 个测试失败。`);
-  process.exit(1);
-} else {
-  console.log(`\n全部 ${tests.length} 个测试通过。`);
-}
+const { total } = await runTests({ collect: true });
+console.log(`\n全部 ${total} 个测试通过。`);

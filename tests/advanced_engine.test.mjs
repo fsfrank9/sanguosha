@@ -2,20 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 assert.ok(Engine, 'game engine should expose SanguoshaEngine via ES module export');
 
 const html = fs.readFileSync(path.resolve(import.meta.dirname, '../index.html'), 'utf8');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 function c(type, overrides = {}) {
   assert.equal(typeof Engine.makeTestCard, 'function', 'engine should expose makeTestCard for deterministic rules tests');
@@ -164,5 +155,6 @@ test('face-to-face UI places enemy board before arena and player hand dock near 
   assert.ok(playerIndex > arenaIndex, 'player board should be below center arena');
   assert.ok(handDockIndex > playerIndex, 'player hand dock should be at bottom');
 });
+await runTests();
 
 console.log('\nAll advanced engine behavior tests passed.');

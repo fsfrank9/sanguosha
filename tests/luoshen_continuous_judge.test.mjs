@@ -1,17 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const heroesSrc = fs.readFileSync(path.join(root, 'src/data/heroes.js'), 'utf8');
 const htmlSrc = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapterSrc = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const skillStatusSrc = fs.readFileSync(path.join(root, 'src/data/skill-status.js'), 'utf8');
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function buildGame(playerHero, enemyHero, seed) {
   const game = Engine.newGame({ seed: seed || 8801, playerHero, enemyHero });
@@ -28,9 +25,6 @@ function buildGame(playerHero, enemyHero, seed) {
   }
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // v11 A3 批次二: 洛神面板的渲染与接线正则断言已由
 // tests/ui_panels_a3_batch2.test.mjs 的 fake-DOM 全链路行为测试取代。
@@ -238,7 +232,4 @@ test('v8 hotfix-2: qingnang cardSkillConfig 已在 dom-adapter 注册', () => {
   assert.match(adapterSrc, /qingnang:\s*\{[\s\S]{0,500}name:\s*'青囊'/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

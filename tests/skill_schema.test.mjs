@@ -7,16 +7,12 @@ import {
   IMPLEMENTED_SKILL_IDS,
   SKILL_METADATA,
 } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function readJson(rel) {
   return JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8'));
-}
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
 }
 
 // v12 G0 (修复批): 四方一致性审计按 pack 合并加载 — 风包条目从标准包
@@ -180,5 +176,6 @@ test('cache and specs fixtures agree on every shared skill', () => {
     );
   }
 });
+await runTests();
 
 console.log('\nSkill schema and fixture consistency tests passed.');

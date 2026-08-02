@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -11,9 +12,6 @@ const css = loadAllStyles();
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const layoutCss = fs.readFileSync(path.join(stylesDir, 'layout.css'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── 死代码清理 ────────────────────────────────────────────────────
 
@@ -140,7 +138,4 @@ test('v9 PR-E10: loadAllStyles() 仍含核心规则 (回归; PR-E18 splash 已�
   assert.match(css, /\.game-frame\s*\{/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

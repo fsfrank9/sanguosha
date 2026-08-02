@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // v11 A1: 所有推进引擎状态的调用均包上 assertCardConservation (全局牌守恒断言)。
 
@@ -12,9 +13,6 @@ function makeGame() {
   game.enemy.hand = [];
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-14: 丈八蛇矛 使用 path 已实现 (Engine.playZhangbaSha 旧路径不破坏)', () => {
   const game = makeGame();
@@ -127,7 +125,4 @@ test('v7 PR-14: 南蛮入侵响应 — 丈八 同样可用 (需要打出杀响�
   assert.equal(game.enemy.hand.length, 0, '2 张手牌被弃');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

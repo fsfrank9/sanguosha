@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 81, startWithFirstTurn: true });
@@ -15,9 +16,6 @@ function dealBingliang(state, id) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-11: 兵粮 (1V1) 在 distance=2 时仍可用 (+1 马 不再阻挡)', () => {
   const game = makeGame();
@@ -81,7 +79,4 @@ test('v7 PR-11: 兵粮 判定不为梅花 → 跳过摸牌阶段', () => {
     '非 club 判定 → 跳过对手摸牌');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

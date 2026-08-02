@@ -4,15 +4,9 @@
 // pendingChoice 'huogong-cost' 挂起重选三件套: 引擎 resolver + 面板 +
 // 行为测试。AI/auto 座席保持自动改选 (旧行为); 无同花色仍走无伤结算兜底。
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { test, runTests } from './helpers/harness.mjs';
 
 // 布局三重巧合: 玩家出火攻带显式 club 成本; 展示缓存钉在目标的 club 无懈上;
 // 目标 (hp=2, EV 满足) 打出该无懈 (缓存被消耗) → 玩家反无懈 → 结算恢复 →
@@ -119,7 +113,4 @@ test('J2 兜底: 重展示后无同花色 → 无伤结算 (不挂起)', () => {
   assert.ok(game.player.hand.some((x) => x.id === 'c-club'), '失效成本退回手牌');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

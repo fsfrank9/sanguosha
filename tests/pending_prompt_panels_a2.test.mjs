@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
@@ -8,16 +9,6 @@ const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapterSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
   + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8');
-
-function test(name, fn) {
-  try {
-    fn();
-    console.log(`✓ ${name}`);
-  } catch (error) {
-    console.error(`✗ ${name}`);
-    throw error;
-  }
-}
 
 // v11 A3 批次二: qilin 面板的渲染分支与接线正则断言已由
 // tests/ui_panels_a3_batch2.test.mjs 的 fake-DOM 全链路行为测试取代。
@@ -88,5 +79,6 @@ test('v8 PR-A2 / v9 PR-E24: dyingRescueChoices click → stage (kind:pending, pa
 test('v8 PR-A2: 事件绑定 — dyingRescueDeclineBtn click → resolvePendingChoice({decline:true})', () => {
   assert.match(adapterSource, /dyingRescueDeclineBtn\.addEventListener[\s\S]{0,200}resolvePendingChoice\(getGame\(\),\s*\{\s*decline:\s*true\s*\}/);
 });
+await runTests();
 
 console.log('\nPending prompt panels A2 (qilin + dying) tests passed.');

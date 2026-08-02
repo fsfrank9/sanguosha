@@ -8,17 +8,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Engine, CARD_CATALOG } from './helpers/load-engine.mjs';
+import { Engine, CARD_CATALOG, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 // ───── 架构守护 ─────────────────────────────────────────────────────
 
@@ -125,7 +119,4 @@ test('寒冰防止: 经 handler 表仍然生效 (弃两张, 伤害防止)', () =
   assert.equal(game.enemy.hand.length, 0, '弃两张');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

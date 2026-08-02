@@ -1,15 +1,12 @@
 import assert from 'node:assert/strict';
-import { Engine } from './helpers/load-engine.mjs';
+import { Engine, c } from './helpers/load-engine.mjs';
 import { assertCardConservation } from './helpers/card-conservation.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 // M1 (审计二轮): gltjk flow__decreaselife.md / flow__damage.md — "受到伤害后"
 // 时机 (奸雄/反馈/刚烈/遗计) 在扣减体力 (含嵌套濒死结算) 之后, 此前引擎先派发
 // hooks 再进入濒死, 与官方顺序相反。
 // v11 A1: 引擎变更调用统一包 assertCardConservation (全局牌 ID 守恒断言)。
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function makeGame(playerHero, enemyHero) {
   const game = Engine.newGame({ seed: 97, startWithFirstTurn: true, playerHero, enemyHero });
@@ -19,9 +16,6 @@ function makeGame(playerHero, enemyHero) {
   game.enemy.hand = [];
   return game;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('M1: 1 血曹操受杀致濒死 → 先桃自救脱离濒死, 后发动奸雄获得杀', () => {
   const game = makeGame('liubei', 'caocao');
@@ -74,7 +68,4 @@ test('M1: 玩家救援暂停期间 hooks 延迟 — 救活后才派发奸雄', (
   assert.ok(game.enemy.hand.some((card) => card.id === 'pause-sha'), '濒死结束后奸雄获得杀');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

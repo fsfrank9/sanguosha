@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -18,9 +19,6 @@ const css = loadAllStyles();
 const heroCss = fs.readFileSync(path.join(stylesDir, 'hero.css'), 'utf8');
 const setupCss = fs.readFileSync(path.join(stylesDir, 'setup.css'), 'utf8');
 const zonesCss = fs.readFileSync(path.join(stylesDir, 'zones.css'), 'utf8');
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 // ───── hero.css: 三处隐藏 ──────────────────────────────────────────────
 
@@ -75,7 +73,4 @@ test('v9 PR-E12: loadAllStyles() 拼接含 .hero::before content:none (回归; P
   assert.match(css, /\.hero::before\s*\{[\s\S]*?content:\s*none/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

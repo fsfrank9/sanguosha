@@ -12,13 +12,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { SanguoshaEngine as Engine } from '../src/engine/game-engine.js';
 import { StateRuntime } from '../src/engine/state.js';
+import { c } from './helpers/load-engine.mjs';
 
 const SEATS3 = ['player', 'enemy', 'ally'];
 const SEATS5 = ['player', 'enemy', 'ally', 'ally2', 'ally3'];
 
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 // 默认预设 5 席: player=主公 enemy=反贼 ally=忠臣 ally2=反贼 ally3=内奸。
 function newHidden5(seed = 61001, extra = {}) {

@@ -91,12 +91,7 @@
       left: 6px;
     }
 
-    .frame-corner-btn--share {
-      top: -8px;
-      right: 6px;
-      background: var(--frame-corner-gold);
-      color: #221008;
-    }
+    /* v14 O3: .frame-corner-btn--share 规则随分享占位钮移除一并清除. */
 
     /* v9 PR-E5: 侧抽屉菜单 — 左侧滑出, 棕木背景. 由 frameMenuBtn 触发
        显隐. [hidden] 用 transform 滑出, 同时 visibility:hidden 避免点

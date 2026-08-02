@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAllStyles } from './helpers/load-styles.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stylesDir = path.join(root, 'src', 'styles');
@@ -15,14 +16,12 @@ const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
 const layoutCss = fs.readFileSync(path.join(stylesDir, 'layout.css'), 'utf8');
 
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
-
 // ───── 1. 角落按钮默认 hidden (game-only) ─────────────────────────────
 
-test('v9 PR-E19: index.html frameMenuBtn / frameShareBtn 默认 hidden', () => {
+test('v9 PR-E19: index.html frameMenuBtn 默认 hidden (frameShareBtn 已移除)', () => {
   assert.match(html, /<button[^>]*id="frameMenuBtn"[^>]*\shidden[^>]*>/);
-  assert.match(html, /<button[^>]*id="frameShareBtn"[^>]*\shidden[^>]*>/);
+  // v14 O3: 分享占位钮裁决移除
+  assert.doesNotMatch(html, /id="frameShareBtn"/);
 });
 
 test('v9 PR-E19: layout.css .frame-corner-btn[hidden] display:none !important', () => {
@@ -32,11 +31,12 @@ test('v9 PR-E19: layout.css .frame-corner-btn[hidden] display:none !important', 
 
 // ───── 2. _toggleCornerButtons 控制显隐 ───────────────────────────────
 
-test('v9 PR-E19: dom-adapter 含 _toggleCornerButtons 函数 (切 frameMenuBtn/frameShareBtn hidden)', () => {
+test('v9 PR-E19: dom-adapter 含 _toggleCornerButtons 函数 (切 frameMenuBtn hidden)', () => {
   const fn = adapter.match(/function _toggleCornerButtons\(show\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /frameMenuBtn\.hidden\s*=\s*!show/);
-  assert.match(fn[0], /frameShareBtn\.hidden\s*=\s*!show/);
+  // v14 O3: frameShareBtn 移除, 函数只余菜单钮
+  assert.doesNotMatch(fn[0], /frameShareBtn/);
 });
 
 test('v9 PR-E19: showLobby / showSetup 调 _toggleCornerButtons(false), newGame 调 (true)', () => {
@@ -73,7 +73,4 @@ test('v9 PR-E19: loadAllStyles() 拼接含 .frame-corner-btn[hidden] 规则', ()
   assert.match(css, /\.frame-corner-btn\[hidden\]/);
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

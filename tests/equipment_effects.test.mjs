@@ -1,14 +1,6 @@
 import assert from 'node:assert/strict';
-import { Engine, StateRuntime } from './helpers/load-engine.mjs';
-
-function test(name, fn) {
-  fn();
-  console.log(`✓ ${name}`);
-}
-
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
+import { Engine, StateRuntime, c } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function blankState() {
   return {
@@ -121,5 +113,6 @@ test('integration: renwang does NOT block a red Sha', () => {
   assert.equal(game.enemy.hp, game.enemy.maxHp - 1,
     'red Sha is not affected by renwang');
 });
+await runTests();
 
 console.log('\nEquipment passive effects tests passed.');

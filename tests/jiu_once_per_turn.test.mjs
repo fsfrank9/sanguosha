@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { Engine } from './helpers/load-engine.mjs';
+import { test, runTests } from './helpers/harness.mjs';
 
 function makeGame() {
   const game = Engine.newGame({ seed: 78, startWithFirstTurn: true });
@@ -21,9 +22,6 @@ function dealSha(state, id) {
   state.hand.push(card);
   return card;
 }
-
-const tests = [];
-function test(name, fn) { tests.push([name, fn]); }
 
 test('v7 PR-8: 第一次 酒 → ok; 第二次 酒 同回合 → 拒绝', () => {
   const game = makeGame();
@@ -103,7 +101,4 @@ test('v7 PR-8: 酒 不会累加 shaBonus（即使 canPlayCard 被绕过模拟）
   assert.equal(game.player.shaBonus, 1, 'shaBonus 设置为 1，不累加');
 });
 
-for (const [name, fn] of tests) {
-  try { fn(); console.log(`✓ ${name}`); }
-  catch (error) { console.error(`✗ ${name}`); throw error; }
-}
+await runTests();

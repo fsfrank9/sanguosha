@@ -7,14 +7,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SanguoshaEngine as Engine } from '../src/engine/game-engine.js';
+import { c } from './helpers/load-engine.mjs';
 
 const SEATS3 = ['player', 'enemy', 'ally'];
 const SEATS4 = ['player', 'enemy', 'ally', 'ally2'];
 const SEATS5 = ['player', 'enemy', 'ally', 'ally2', 'ally3'];
 
-function c(type, overrides = {}) {
-  return Engine.makeTestCard(type, overrides);
-}
 
 function reset(game, opts = {}) {
   for (const seat of game.seats) {
