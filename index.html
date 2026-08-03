@@ -644,6 +644,15 @@
           <button class="btn small" id="tianxiangConfirmBtn" disabled>转移伤害</button>
           <button class="btn small" id="tianxiangDeclineBtn">不发动</button>
         </div>
+        <!-- v14 P3: 流离 (大乔) — 成为【杀】目标时弃一张牌 (手牌/装备)
+             转移给攻击范围内另一名角色; 成本+目标两段选择, 接线随天香惯例. -->
+        <div class="liuli-ask-panel pending-prompt-panel" id="liuliAskPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="liuliAskHint">流离：弃置一张牌，将【杀】转移给攻击范围内的另一名角色</span>
+          <div class="liuli-cost-choices pending-prompt-panel__choices" id="liuliCostChoices" aria-live="polite"></div>
+          <div class="liuli-target-choices pending-prompt-panel__choices" id="liuliTargetChoices" aria-live="polite"></div>
+          <button class="btn small" id="liuliConfirmBtn" disabled>转移目标</button>
+          <button class="btn small" id="liuliDeclineBtn">不发动</button>
+        </div>
         <div class="dying-rescue-panel pending-prompt-panel" id="dyingRescuePanel" hidden>
           <span class="badge pending-prompt-panel__hint" id="dyingRescueHint">濒死救援：用【桃】或【酒】救援</span>
           <div class="dying-rescue-choices pending-prompt-panel__choices" id="dyingRescueChoices" aria-live="polite"></div>

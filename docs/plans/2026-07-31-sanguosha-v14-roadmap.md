@@ -241,3 +241,115 @@ O 1-2 → P 2-3 → Q 2-3 → R 0-3 (决策门, 可全裁剪)。顺序执行,
   场行为) 零回归 — 既有测试除守护断言随行为更新 (附注释) 外零改动
   通过。方法论三区自查: 本批无新增询问时机与花色面板 (frameShareBtn
   为移除非新增), 官方术语无涉。
+
+## P 阶段执行记录 (2026-08-02, 单 PR)
+
+- **P1 多目标杀结算链**: sha-flow 新增 `playShaMultiTarget` +
+  `pauseState.shaChain` 队列驱动 (`advanceShaChain`), 参照
+  advanceTargetQueue 范式 — 游标先行 + "pendingChoice 即挂起",
+  恢复经 `resumeSuspendedTurnFlowIfReady` 新增 shaChain 分支 (位序在
+  chainTransmit/duelChain 内层收敛之后、AOE 之前) 与
+  resumePlayShaAfterCixiong 的 chain 分支。**双路径设计**: 单目标走
+  既有代码路径零结构改动 (零回归红线的最强保证; 青龙续杀嵌套天然无
+  链态冲突), 多目标 (`options.targets`, 仅方天可达) 走链。三阶段按
+  官方 flow__use.md 时机序:
+  ① liuli (step 4 成为目标时, 逐目标, 可转移/挂起);
+  ② locks (step 5 指定目标后) — **铁骑/烈弓对全部目标预结算**
+  (rule__principle.md 判例: "对三名目标都决定并结算完毕后再开始
+  使用结算", 锁定按目标索引存, `continueShaAfterCixiong` 增可选
+  presetLock 参数, 单目标不传行为不变) + 雌雄 (方天占武器槽实战
+  不可达, 结构保留);
+  ③ resolve — 逐目标复用单目标全链 (仁王/藤甲/闪/八卦/护驾/无双/
+  贯石/伤害), **座次环序** (从当前回合角色起, 判例同款; 流离转移
+  产生的重复席位相邻连续结算)。
+  来源牌收尾: 逐席结果经链感知 `settleShaCardAfterOutcome` 不提前
+  弃置, 链尾 `discardSourceCardIfPending` 幂等补弃 (AOE/N2 同款,
+  奸雄中途取回不双弃 — flow__virtual 判例实测钉死); 挂起期间牌锚在
+  pauseState.shaChain (census 在途可见)。
+- **P2 方天画戟销账**: 占位 flag 路径全删 (sha-flow 触发记录 +
+  phases 两处复位 + cards.js 元数据 + phase_runtime/fangtian 测试
+  随行为反转)。真实现: `fangtianShaEligible` 使用时点核定 — 手牌
+  用尽 + 实体全部溯源自手牌 (`_handOrigin`, 覆盖 普通杀/转化单实体
+  physicalCard/组合 physicalCards 三形态; **虚拟杀口径**: 最后一张
+  手牌经武圣等转化生效, 装备来源/神速无实体不生效);
+  `shaExtraTargetLimit` 前置查询入公开 API (UI/AI 共用)。
+  normalizeMultiTargets 逐席复用单目标合法性矩阵 (保护/距离/亡者/
+  去重) + 上限 1+2 + 座次环排序。UI: 座席点选骨架天然多选 (铁索
+  min/max 先例), 杀入口在方天资格下 max=3 暂存-确认, 多目标经
+  `{ targets }` 结算; 1v1 与非资格局面 UI 零变化。AI: aiTakeAction
+  出杀点在资格下追加感知敌对可达席 (aiPickHostileTarget 同源评分,
+  不祸同侧, 候选不足不凑数)。
+- **P3 流离销账**: v8 reserved hook 转正 — skills.js
+  triggerLiuliOnShaTargeted 真实现: 成本池修正为 手牌+装备 (v8
+  脚手架误含判定区 — 官方"你的牌"不含判定区); 候选=大乔攻击范围内
+  非源非己 + 源合法目标, **不排除既有目标** (判例: 转移给既有目标 B
+  → B 连续两次结算); 玩家 ask 缺省 (kind 'liuli-transfer', 成本+
+  目标两段面板随天香接线惯例, resolver 在 sha-flow, 非法重挂惯例,
+  装备成本走统一失去时机); AI auto 立场启发 (仅感知敌对候选, 优先
+  低血线, 成本取最低分手牌, 无手牌不弃装备 — 鬼道惯例)。**时机
+  修正**: hook 自 v8 起挂在雌雄后 (且雌雄挂起路径整个跳过), 按官方
+  step 4 前移至雌雄前, 转移可连锁 (新目标重过时机, 弃牌成本保证
+  收敛)。1v1 恒 no-op 零回归 (liuli_sha_targeted 钉住)。
+- **P4 交叉回归**: 新增 v14_p_sha_chain 8 例 (奸雄取回×链/仁王逐席/
+  铁骑前置判例/濒死挂起续跑/玩家闪 ask 续跑/流离转移双结算判例/
+  铁索传导×火杀双目标/终局提前收束) + fangtian_last_handcard 重写
+  10 例 + v14_p3_liuli 10 例 + ui_v14_p_multi_liuli 6 例 (fake-DOM
+  全链路: 多目标暂存-确认/单选退化/流离面板两段点选)。守恒 fuzz
+  1200 种子档 (H1 同款 scratch harness, 3/4/5 席轮转 + 大乔高频
+  置入) 三项发现, 逐一基线比对分类:
+  ① **预存**结果形状怪癖 — AI 周瑜反间挂起时 runAITurn 返回
+  {suspendedForFanjian:true} 无 ok 字段 (基线 2c56ed0 同现, k4 soak
+  固定种子未踩到), 记录在案排入滚动候选, 本批不修;
+  ② **预存缺陷连带收口** (seed 60536) — 青囊座席判定只认
+  'player'/'enemy' 字面, ally* 席华佗显式自疗被误路由进 1v1 二元
+  opponent() 回退 (亡席报错/错疗他席; v12 H 起潜伏, k4 阵容无华佗
+  未暴露) → 显式合法座席直接采用, 1v1 行为恒等, 回归用例入
+  qingnang_heal_target;
+  ③ harness 自身 guohe 判定区 zone 名笔误 (基线同败) 校正。
+  修复后全量 1200 种子零失败复跑。三 soak 决策表 +liuli-transfer
+  兜底; 基准复测胜率 63.0% (200 局, 与 P 前恒等), M4 推断门禁保持。
+- **门禁**: `npm run verify` 全绿 (186 文件 ✓1684); verify:quick 全绿;
+  1v1 与 3-5 人身份场双红线零回归 — 既有测试除守护断言随行为更新
+  (e25 签名 +presetLock / phase_runtime flags / fangtian·liuli 占位
+  反转, 均附注释) 外零改动通过。方法论三区自查: ① 流离面板花色经
+  promptCardChoice 带色渲染 (天香同源组件); ② 术语对照官方 —
+  "转移给该角色"/"额外目标数上限+2" 逐字, 流离 desc 补全官方语义;
+  ③ 询问时机 — 流离 ask 固定在 step 4 (响应窗之前), 引擎层保证无
+  auto 抢跑。
+
+### P 阶段评审收口 (2026-08-03, 同 PR 第二提交)
+
+10 agent 两轮评审 (O 同款模型分配; opus×2 状态机对抗/官方判例保真 +
+sonnet×2 diff/测试复核 + haiku 机械清扫, 计 14 条发现) 全部分诊:
+
+- **[高] 奸雄×流离双结算牌复制** (opus 最小复现钉死): 链下同一来源牌
+  可对同一奸雄席结算两次 (流离转移给既有目标), 旧 handler 忽略
+  takeCard 返回值 + 无条件 putCard → 同一对象在手牌双份 (守恒红线)。
+  修复: 归属守卫 — 牌已落在弃牌堆之外任何区域即不再获得 (虚拟牌分支
+  经 moveCard 返回值天然同款)。
+- **[高] playCardAs 多目标转化杀拒绝路径漏牌**: 新多目标分支绕过 v13
+  K5 "移牌前拒绝"不变量, 校验失败时来源实体凭空消失 (基线对照确认为
+  本批引入)。修复: 资格/上限/重复席/逐席合法性全部前置到摘牌之前 +
+  playShaCardHandler 同款回滚兜底。
+- **[中] 重复席入参静默去重**: {targets:[X,X]} 去重后绕过方天资格门,
+  普通杀混入链语义 + 伪造方天 log。修复: 官方口径 — 使用时不允许重复
+  指定同一角色, 直接拒绝 (重复席位只能由流离产生); 测试钉反转。
+- **[中] 链命中路径早弃**: 首席命中即入弃牌堆, 违反官方"结算完毕后
+  置入弃牌堆" (opus 实证: 牌堆耗尽洗牌会把结算中的杀洗回摸走)。
+  修复: discardSourceCardIfPending 链感知放行, 收尾统一弃置。
+- **[中→记录] 单目标路径铁骑×盾牌次序**: 链按官方 step5 全目标预结算
+  锁定 (享乐判例支持), 单目标路径沿 v7 旧序 (仁王/藤甲短路后才跑
+  onNeedResponse) — 预存漏触发面, 非 P 引入。修法牵动全部固定种子
+  基准/soak 轨迹, 按批次纪律**记录在案排入 Q3 复核** (与突袭 ask 同
+  池), 本批不动单目标路径。
+- **[低] 终局悬空链清理** (resume gameover 早退路径) / **[低] resume
+  分支改条件返回** (chainTransmit 同款范式) / **[低] locks 阶段拆
+  武将技/装备技两遍** (伏完判例口径, 实战不可达结构保真) / **[低]
+  青囊 targetActor 路径补 resolveSeatOption 校验** (评审抓获本批
+  连带修引入的旁路) / **[低] runLiuliStage 挂起检测收窄到
+  liuli-transfer kind** (未来注册者防误吞) / **[低] fangtian 测试
+  两处标题如实化 + 补 5 席 4 目标超上限用例** — 全部同批修正。
+- 评审收口回归 4 例入 v14_p_sha_chain (奸雄双结算守卫/playCardAs
+  零副作用拒绝/在途不早弃/终局清链); fangtian 测试重构至 11 例。
+- 门禁复跑: verify 全绿 (186 文件 ✓1690), 基准 63.0% 恒等, fuzz
+  段抽查零失败。

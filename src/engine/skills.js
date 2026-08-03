@@ -1,5 +1,6 @@
       import { SkillRuntime } from './skill-runtime.js';
       import { StateRuntime } from './state.js';
+      import { CardRuntime } from './card-runtime.js';
 
       export function installStandardSkillHandlers(skillRegistry, deps) {
         var hasSkill = deps.hasSkill;
@@ -161,6 +162,14 @@
         }
         var physicalSourceCard = physicalCardOf(sourceCard);
         if (!physicalSourceCard) return null;
+        // v14 P 评审收口 (opus 对抗最小复现钉死): 多目标杀链下同一来源牌可
+        // 对同一奸雄座席结算多次 (流离转移给既有目标 → 连续两次伤害) —
+        // 此前 takeCard 返回值被忽略 + 无条件 putCard, 第二次取回把已在
+        // 手牌的同一对象再推一次 → 同一张牌双份 (守恒红线)。归属守卫:
+        // 牌已落在 弃牌堆之外的任何区域 (先前取回入手/入装备等) → 已归属,
+        // 本次不再获得 (虚拟牌分支经 moveCard 返回值天然有同款守卫)。
+        var currentZone = CardRuntime.findCardZone(game, physicalSourceCard);
+        if (currentZone && currentZone.zone !== 'discard') return null;
         // M5: 被朱雀临时转化的【杀】进入奸雄手牌前还原物理身份, 与 discardCard 一致。
         restoreZhuqueIdentity(sourceCard);
         // L2: 决斗/南蛮/万箭/火攻 在使用时已进弃牌堆 — 奸雄获得时从弃牌堆取回,
@@ -863,35 +872,40 @@
         return blackCard ? { card: blackCard, asName: '闪', skillName: '倾国', priority: 10 } : null;
       }
 
-      // v8 PR-C2: 流离 (大乔) — gltjk card__hero__wu.md：
+      // v8 PR-C2 / v14 P3 真实现: 流离 (大乔) — gltjk card__hero__wu.md：
       //   "每当你成为【杀】的目标时, 你可以弃置一张牌并选择你攻击范围内的一名
       //    角色, 将此【杀】转移给该角色。"
       // ◆ 目标须为源此【杀】的合法目标 (不检测距离)。
+      // ◆ 成本"弃置一张牌" = 手牌或装备区牌 (官方"一名角色的牌"不含判定区 —
+      //   v8 脚手架误把判定区计入可弃池, P3 修正)。
+      // ◆ 候选不排除本杀的其他既有目标 (判例 rule__principle.md: 转移给
+      //   既有目标 B 合法, B 被连续结算两次)。
       // 1v1 注: 攻击范围内除大乔外只剩源, 而源不能用杀指自己 → 候选恒空 →
-      // 函数返回 null, 流离 静默不触发。多人模式下 hook 自动产生候选, 但
-      // 实际 transfer / pendingChoice 暂留未来 PR。
-      // 返回结构 (multi-player 预留):
-      //   { paused: true, candidates: [...] } 若需要 pendingChoice
-      //   { transferred: true, newTarget: 'p3' } 若自动转移
-      //   null  若无可行转移 (1v1 默认)
+      // 返回 null, 流离静默不触发 (行为与 v8 起恒等)。
+      // 返回契约 (sha-flow runLiuliStage 消费):
+      //   { transferTo: seat }  同步转移 (AI/auto, 成本已弃置)
+      //   null + pendingChoice  玩家 ask 挂起 (kind 'liuli-transfer',
+      //                         resolver 在 sha-flow, 快照 pauseState.shaLiuli
+      //                         由 runLiuliStage 调用方写入)
+      //   null                  不触发 / 放弃
       function triggerLiuliOnShaTargeted(context) {
         var target = context.target;
         if (!target || !hasSkill(target, 'liuli')) return null;
-        // 必须有可弃牌 (手牌 / 装备区 / 判定区)
-        var totalCards = (target.hand || []).length
-          + equipmentList(target).length
-          + (target.judgeArea || []).length;
-        if (totalCards === 0) return null;
-        // 候选 = 大乔攻击范围内 & 非自己 & 非源 & 源此杀的合法目标
+        if (target.hp <= 0) return null;
         var game = context.game;
         var targetActor = context.targetActor;
         var sourceActor = context.sourceActor;
+        // 成本池 = 手牌 + 装备区 (判定区牌不是"你的牌")。
+        var costHand = (target.hand || []).slice();
+        var costEquips = equipmentList(target);
+        if (costHand.length + costEquips.length === 0) return null;
+        // 候选 = 大乔攻击范围内 & 非自己 & 非源 & 源此杀的合法目标
         var candidates = [];
         // v12 H 骨架修复: 按 game.seats 座次环遍历 (1v1 恒等旧值)。
         seatList(game).forEach(function (a) {
           if (a === targetActor) return;
           if (a === sourceActor) return;  // spec 限定: 须为源的杀合法目标; 源对自己永远非法
-          if (!game[a]) return;
+          if (!game[a] || game[a].hp <= 0) return;
           // 攻击范围检测: target 的 weaponRange 覆盖 a (距离 ≤ range)
           if (!canReachWithSha(game, targetActor, a)) return;
           // 须为源此杀的合法目标 (sourceCard 的 onCardTarget 检测)
@@ -900,9 +914,48 @@
           candidates.push(a);
         });
         if (candidates.length === 0) return null;
-        // 多人模式扩展点: 此处应 pendingChoice 让大乔挑候选 + 弃牌
-        // 1v1 不会到达这里, 留空逻辑作 reserved scaffolding
-        return null;
+        var pref = (target.skillPreferences && target.skillPreferences.liuli)
+          || (targetActor === 'player' ? 'ask' : 'auto');
+        if (pref === 'decline') return null;
+        if (pref === 'ask') {
+          setPendingChoice(game, {
+            kind: 'liuli-transfer',
+            actor: targetActor,
+            sourceActor: sourceActor,
+            shaName: context.card ? context.card.name : '杀',
+            costIds: costHand.map(function (c) { return c.id; })
+              .concat(costEquips.map(function (e) { return e.card.id; })),
+            cards: costHand.map(function (c) {
+              return { id: c.id, name: c.name, suit: c.suit, rank: c.rank, zone: 'hand' };
+            }).concat(costEquips.map(function (e) {
+              return { id: e.card.id, name: e.card.name, suit: e.card.suit, rank: e.card.rank, zone: 'equipment', slot: e.slot };
+            })),
+            candidates: candidates.map(function (seat) {
+              return { seat: seat, name: game[seat].name };
+            })
+          });
+          log(game, '等待' + actorName(game, targetActor) + '决定是否发动【流离】转移【'
+            + (context.card ? context.card.name : '杀') + '】。');
+          return null; // 挂起信号 = pendingChoice 存在 (runLiuliStage 检测)
+        }
+        // auto (AI): 立场启发 — 仅转移给感知敌对候选 (不祸水同侧); 优先
+        // 血线最低者 (处决压力)。成本只用手牌评分最低的一张, 无手牌不弃
+        // 装备 (装备价值高, 对齐鬼道 AI 不自动弃装备惯例) → 放弃。
+        var hostiles = candidates.filter(function (seat) {
+          return StateRuntime.perceivedHostile(game, targetActor, seat);
+        });
+        if (!hostiles.length || !costHand.length) return null;
+        hostiles.sort(function (a, b) { return game[a].hp - game[b].hp; });
+        var pick = hostiles[0];
+        var scoredCost = costHand
+          .map(function (c) { return { card: c, score: scoreCardForAI(game, targetActor, c) }; })
+          .sort(function (a, b) { return a.score - b.score; });
+        var costCard = removeOwnCardFromAnyZone(target, scoredCost[0].card.id, game);
+        if (!costCard) return null;
+        discardCard(game, costCard);
+        log(game, actorName(game, targetActor) + '发动【流离】，弃置【' + costCard.name
+          + '】将【' + (context.card ? context.card.name : '杀') + '】转移给' + actorName(game, pick) + '。');
+        return { transferTo: pick };
       }
 
       // v8 PR-C1: 国色 (大乔) — gltjk skill cache：
@@ -1013,7 +1066,15 @@
         if (!cardIds.length) return fail('请选择要弃置的一张手牌。');
         var targetActor = options.target || options.targetActor;
         if (targetActor === 'self') targetActor = actor;
-        if (targetActor !== 'player' && targetActor !== 'enemy') {
+        // v14 P4 连带收口 (守恒 fuzz seed 60536 抓获的预存缺陷): 座席判定
+        // 泛化 — 此前只认 'player'/'enemy' 字面, ally* 座席的显式目标 (含
+        // 华佗在第三席自疗) 被误路由进 1v1 二元 opponent() 缺省回退 (亡席
+        // 报错 / 错疗他席)。显式合法座席一律直接采用, 缺省回退仅在无显式
+        // 目标时生效 (1v1 行为恒等)。评审收口: 座席合法性经 resolveSeatOption
+        // 判定 — options.targetActor 路径绕过 useSkill 入口校验, 裸
+        // `game[key]` 会把 'discard'/'deck' 等对象键误当座席。
+        if (targetActor) targetActor = StateRuntime.resolveSeatOption(game, targetActor);
+        if (!targetActor || !game[targetActor]) {
           var opp = game[opponent(actor)];
           if (opp && opp.hp < opp.maxHp) targetActor = opponent(actor);
           else if (self.hp < self.maxHp) targetActor = actor;

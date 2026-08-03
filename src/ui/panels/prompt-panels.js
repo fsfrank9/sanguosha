@@ -22,6 +22,9 @@
     // v13 J3: 天香 ask 面板本地态 — 已选成本牌 / 转移目标。
     var tianxiangCostId = null;
     var tianxiangTargetSeat = null;
+    // v14 P3: 流离 ask 面板本地态 — 已选弃置牌 / 转移目标。
+    var liuliCostId = null;
+    var liuliTargetSeat = null;
     var ganglieSelectedIds = [];
     var guanshiDiscardSelection = [];
     // v12 G2: 神速 面板本地态 — shensuOptionMode 记录用户点了"选项二"还是
@@ -365,6 +368,43 @@
         els.tianxiangAskPanel.hidden = true;
         tianxiangCostId = null;
         tianxiangTargetSeat = null;
+      }
+    }
+    // v14 P3: 流离转移面板 — 成本 (手牌/装备任一) + 转移目标 两段选择,
+    // 结构随天香惯例; 装备成本候选带槽位标注。
+    if (els.liuliAskPanel) {
+      if (kind === 'liuli-transfer' && pending.actor === 'player') {
+        els.liuliAskPanel.hidden = false;
+        if (liuliCostId && (pending.costIds || []).indexOf(liuliCostId) < 0) liuliCostId = null;
+        if (liuliTargetSeat && !(pending.candidates || []).some(function (c) { return c.seat === liuliTargetSeat; })) liuliTargetSeat = null;
+        // 单一转移候选 → 预选。
+        if (!liuliTargetSeat && (pending.candidates || []).length === 1) liuliTargetSeat = pending.candidates[0].seat;
+        if (els.liuliAskHint) {
+          els.liuliAskHint.textContent =
+            '流离：你成为【' + (pending.shaName || '杀') + '】的目标。'
+            + '弃置一张牌（手牌或装备）并选择攻击范围内的转移目标，或不发动。';
+        }
+        if (els.liuliCostChoices) {
+          els.liuliCostChoices.innerHTML = (pending.cards || []).map(function (card) {
+            return promptCardChoice(card, {
+              dataAttrs: { liuliCostId: card.id },
+              title: card.zone === 'equipment' ? '弃置这张装备牌（' + (card.slot || '') + '）' : '弃置这张手牌',
+              extraClass: 'liuli-cost-choice' + (liuliCostId === card.id ? ' selected' : '')
+                + (card.zone === 'equipment' ? ' liuli-cost-equip' : '')
+            });
+          }).join('') || '<span class="mini-card">没有可弃置的牌</span>';
+        }
+        if (els.liuliTargetChoices) {
+          els.liuliTargetChoices.innerHTML = '<span class="badge">转移给</span>' + (pending.candidates || []).map(function (c) {
+            return '<button class="mini-card liuli-target-choice' + (liuliTargetSeat === c.seat ? ' selected' : '') +
+              '" data-liuli-target="' + escapeHtml(c.seat) + '">' + escapeHtml(c.name) + '</button>';
+          }).join('');
+        }
+        if (els.liuliConfirmBtn) els.liuliConfirmBtn.disabled = !(liuliCostId && liuliTargetSeat);
+      } else {
+        els.liuliAskPanel.hidden = true;
+        liuliCostId = null;
+        liuliTargetSeat = null;
       }
     }
     // v13 J2: 火攻成本挂起重选 — 显式成本在结算中途失效 (无懈拉锯 ×
@@ -783,6 +823,34 @@
     if (els.tianxiangDeclineBtn) els.tianxiangDeclineBtn.addEventListener('click', function () {
       tianxiangCostId = null;
       tianxiangTargetSeat = null;
+      var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    // v14 P3: 流离转移面板事件 (成本/目标两段点选 + 确认/不发动, 随天香惯例)。
+    if (els.liuliCostChoices) els.liuliCostChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-liuli-cost-id]');
+      if (!btn) return;
+      liuliCostId = btn.getAttribute('data-liuli-cost-id');
+      render();
+    });
+    if (els.liuliTargetChoices) els.liuliTargetChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-liuli-target]');
+      if (!btn) return;
+      liuliTargetSeat = btn.getAttribute('data-liuli-target');
+      render();
+    });
+    if (els.liuliConfirmBtn) els.liuliConfirmBtn.addEventListener('click', function () {
+      if (!liuliCostId || !liuliTargetSeat) return;
+      var result = Engine.resolvePendingChoice(getGame(), { cardId: liuliCostId, target: liuliTargetSeat });
+      liuliCostId = null;
+      liuliTargetSeat = null;
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.liuliDeclineBtn) els.liuliDeclineBtn.addEventListener('click', function () {
+      liuliCostId = null;
+      liuliTargetSeat = null;
       var result = Engine.resolvePendingChoice(getGame(), { decline: true });
       if (!result.ok) renderLog();
       render();

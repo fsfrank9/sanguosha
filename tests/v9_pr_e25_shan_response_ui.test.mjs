@@ -38,7 +38,9 @@ test('v9 PR-E25: 引擎注册 shan-response kind (v10 V3 后走 RESPONSE_KIND_RE
 
 test('v9 PR-E25: 引擎 continueShaAfterCixiong — 玩家是杀目标 + shanResponse=ask 时暂停 (v10 V3 后走 requestPlayerResponse)', () => {
   // v12 H 骨架: 显式 targetActor 参数 (替代 arguments[n] 偷传)
-  const fn = engine.match(/function continueShaAfterCixiong\(game, actor, card, amount, targetActor\)\s*\{[\s\S]*?\n\s{6}\}/);
+  // v14 P1: 追加可选 presetLock 参数 (多目标链锁定阶段预结算铁骑/烈弓,
+  // 结算阶段传入避免二次判定; 单目标不传行为不变) — 守护随签名更新。
+  const fn = engine.match(/function continueShaAfterCixiong\(game, actor, card, amount, targetActor, presetLock\)\s*\{[\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /targetActor\s*===\s*'player'/);
   assert.match(fn[0], /skillPreferences\.shanResponse\s*===\s*'ask'/);

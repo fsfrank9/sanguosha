@@ -45,8 +45,8 @@
     flags.luoyi = false;
     // v7 PR-8: gltjk card__basic.md 酒 使用方法Ⅰ "出牌阶段。每回合限一次。"
     flags.jiuUsedThisTurn = false;
-    // v7 PR-15: 方天画戟 额外目标 +2 触发标记 (per-sha, 清零是 defensive)
-    flags.fangtianBonus = false;
+    // (v14 P2: v7 PR-15 的 flags.fangtianBonus 占位标记随真实现删除 —
+    // 方天额外目标为使用时点的目标数上限, 无跨回合状态。)
     // v8 PR-C4: 青囊 出牌阶段限一次
     flags.qingnangUsed = false;
     // v11 C8 (批次 32): 结姻 每回合限一次 (批次 30 遗漏复位 — 修复为
@@ -77,8 +77,7 @@
     flags.luoyi = false;
     // v7 PR-8: 酒 使用次数也在回合结束时复位
     flags.jiuUsedThisTurn = false;
-    // v7 PR-15: 方天画戟 标记也在回合结束时复位
-    flags.fangtianBonus = false;
+    // (v14 P2: flags.fangtianBonus 占位标记已随真实现删除。)
     // v8 PR-C4: 青囊 一次性标记复位
     flags.qingnangUsed = false;
     // v11 C8 (批次 32): 结姻 复位 (批次 30 遗漏修复)

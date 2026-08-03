@@ -311,9 +311,9 @@
         fangtian: {
           summary: '若使用的【杀】是最后的手牌，本【杀】额外目标数上限 +2。',
           timing: 'passive',
-          effect: 'v7 PR-15: 已在 playSha 内做触发记录 (log + flags.fangtianBonus)；1v1 中只有 1 名对手 (额定 1 + 额外 0)，+2 上限无人可选，仅为多人/future trick 占位。turn-start/turn-end 复位 flags.fangtianBonus。',
+          effect: 'v14 P2 真实现: 手牌仅剩这张【杀】(含由手牌转化的虚拟杀, _handOrigin 溯源; 装备来源/无实体的视为使用不生效) 时可额外指定至多 2 个目标, 经 playCard options.targets 走多目标结算链 (sha-flow shaChain: 流离→锁定→逐席结算, 按座次环序)。3+ 人身份场有真实候选; 1v1 无额外可选目标。',
           frequency: 'passive',
-          engineHooks: ['playSha:fangtianTrigger', 'flags.fangtianBonus']
+          engineHooks: ['playShaMultiTarget', 'normalizeMultiTargets', 'fangtianShaEligible', 'shaExtraTargetLimit']
         },
         qilin: {
           summary: '【杀】对目标造成伤害时，你可以弃置其装备区里的一张坐骑牌。',

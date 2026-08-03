@@ -513,6 +513,33 @@
       if (!game || game.mode !== 'identity3' || !isSeatTargetCard(card)) return false;
       var legalSeats = Engine.legalTargetsForCard(game, 'player', card);
       if (!legalSeats.length) return false;
+      // v14 P2: 方天画戟 — 手牌仅剩这张【杀】且装备方天 → 可暂存至多
+      // 1+2 个目标 (铁索 min/max 多选先例); 多目标经 { targets } 结算,
+      // 单目标仍走既有 resolveCardSeatTarget 路径。
+      var extraLimit = (Engine.isShaCard(card) && Engine.shaExtraTargetLimit)
+        ? Engine.shaExtraTargetLimit(game, 'player', cardId) : 0;
+      if (extraLimit > 0) {
+        startSeatPicker({
+          legalSeats: legalSeats,
+          min: 1,
+          max: 1 + extraLimit,
+          hintText: '【方天画戟】最后的手牌【杀】：点击场上高亮角色，可指定至多 '
+            + (1 + extraLimit) + ' 个目标',
+          onComplete: function (seats) {
+            if (seats.length > 1) {
+              var hpBefore = {};
+              Engine.seatList(game).forEach(function (s) { hpBefore[s] = game[s].hp; });
+              var result = Engine.playCard(game, 'player', cardId, { targets: seats.slice() });
+              if (!result.ok) game.log.push(result.message);
+              Engine.seatList(game).forEach(function (s) { if (game[s].hp < hpBefore[s]) flashHero(s); });
+              render();
+            } else {
+              resolveCardSeatTarget(cardId, seats[0]);
+            }
+          }
+        });
+        return true;
+      }
       startSeatPicker({
         legalSeats: legalSeats,
         needed: 1,

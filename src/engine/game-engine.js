@@ -307,6 +307,10 @@
           game.pauseState.playSha = null;
           return continueShaAfterCixiong(game, saved.actor, saved.card, saved.amount, saved.targetActor);
         }
+        // v14 P1: 多目标链的雌雄挂起 (锁定阶段, 游标已先行) → 续跑链驱动。
+        if (game.pauseState && game.pauseState.shaChain) {
+          return ShaFlowRuntime.advanceShaChain(game);
+        }
         return success('雌雄双股剑结算完成。');
       }
 
@@ -339,7 +343,9 @@
         // audit4-L5: 决斗链被插入结算挂起后的续跑 (锦囊域后置装配, 包装注入)
         resumeDuelChain: function (game) { return TricksRuntime.advanceDuelChain(game); },
         // v12 H 复核修复: 铁索传导环被濒死救援挂起后的续跑 (伤害域后置装配, 包装注入)
-        resumeChainTransmit: function (game) { return DamageDyingRuntime.advanceChainTransmit(game); }
+        resumeChainTransmit: function (game) { return DamageDyingRuntime.advanceChainTransmit(game); },
+        // v14 P1: 多目标杀链被逐席挂起 (闪响应/濒死/流离等) 后的续跑 (杀链域后置装配, 包装注入)
+        resumeShaChain: function (game) { return ShaFlowRuntime.advanceShaChain(game); }
       });
       var requestPlayerResponse = ResponseRuntime.requestPlayerResponse;
       var RESPONSE_KIND_RESOLVERS = ResponseRuntime.RESPONSE_KIND_RESOLVERS;
@@ -362,6 +368,13 @@
       function discardSourceCardIfPending(game, card) {
         if (!card) return;
         var physical = physicalCardOf(card);
+        // v14 P 评审收口: 多目标链的来源杀在全部目标结算完毕前不入弃牌堆
+        // (官方"结算完毕后置入弃牌堆"; 逐席命中若早弃, 后续席位摸牌耗尽
+        // 牌堆时会把仍在结算中的杀洗回并摸走 — opus 对抗实证)。链收尾的
+        // finishShaChain 先清链态再调本函数, 此处放行统一弃置。
+        var activeShaChain = game.pauseState && game.pauseState.shaChain;
+        if (activeShaChain && activeShaChain.card
+            && physicalCardOf(activeShaChain.card) === physical) return;
         // audit4-H1: "已落地"判定改为全区域定位 (findCardZone: 牌堆/弃牌堆/
         // 各席手牌/判定区/创区/装备) — 此前漏 牌堆与判定区: AOE 中途击杀
         // 奖励摸空牌堆触发洗牌, 已弃置的南蛮/万箭被洗回 deck, 旧检查误判
@@ -789,7 +802,9 @@
         shanOptionForCard: shanOptionForCard,
         // v12 H7: 主公技·护驾 求助 (杀需闪; 函数声明提升)
         tryLordAidSync: tryLordAidSync,
-        lordAidPlayerCanAid: lordAidPlayerCanAid
+        lordAidPlayerCanAid: lordAidPlayerCanAid,
+        // v14 P1: 多目标链收尾的幂等来源牌弃置
+        discardSourceCardIfPending: discardSourceCardIfPending
       });
       var playSha = ShaFlowRuntime.playSha;
       var continueShaAfterCixiong = ShaFlowRuntime.continueShaAfterCixiong;
@@ -804,6 +819,10 @@
       var applyGuanshiForcedHit = ShaFlowRuntime.applyGuanshiForcedHit;
       var defaultHostileTarget = ShaFlowRuntime.defaultHostileTarget;
       var normalizeSingleTarget = ShaFlowRuntime.normalizeSingleTarget;
+      // v14 P1/P2/P3: 多目标链驱动 + 方天前置查询 + 流离 resolver
+      var advanceShaChain = ShaFlowRuntime.advanceShaChain;
+      var shaExtraTargetLimit = ShaFlowRuntime.shaExtraTargetLimit;
+      var resolveLiuliTransferChoice = ShaFlowRuntime.resolveLiuliTransferChoice;
 
 
       // v11 B1: 银月枪触发与响应已迁往 ./equipment.js (见 EquipmentRuntime 装配)。
@@ -1584,6 +1603,8 @@
       }
 
       registerResponseKind('guanshi-discard', resolveGuanshiDiscardChoice);
+      // v14 P3: 流离转移询问 (sha-flow 域 resolver)
+      registerResponseKind('liuli-transfer', resolveLiuliTransferChoice);
 
       // v10 V3: 注册到 response framework. UI 通过 resolvePendingChoice 或
       // resolveResponseChoice 调过来时, 此 fn 拿 pauseState.shaResponse + decision
@@ -2355,6 +2376,29 @@
           // defaultHostileTarget 取敌对池首位未必可达 (3p+ 距离差异)。
           // resolveTrickTargetActor 对杀走 isLegalCardTarget (含距离/保护),
           // 显式非法目标与缺省不可达池首位都在移牌前拒绝。
+          // v14 P 评审收口: 多目标转化杀维持 K5 不变量 — 资格/上限/重复席/
+          // 逐席合法性全部在移牌前预判 (opus 实证: 此前 playShaMultiTarget
+          // 移牌后拒绝无回滚, 来源实体凭空消失)。
+          if (Array.isArray(options && options.targets) && options.targets.length > 1) {
+            if (hit.zone !== 'hand' || (self.hand || []).length !== 1
+                || !hasEquipmentEffect(self, 'fangtianLastHandBonus')) {
+              return fail('【杀】目标数超过上限（额定 1）。');
+            }
+            if (options.targets.length > 3) {
+              return fail('【杀】目标数超过上限（额定 1 + 方天画戟额外 2）。');
+            }
+            var preVirtualSha = virtualShaFromCard(original);
+            var preSeen = {};
+            for (var mtIdx = 0; mtIdx < options.targets.length; mtIdx += 1) {
+              var mtSeat = resolveSeatOption(game, options.targets[mtIdx]);
+              if (!mtSeat || mtSeat === actor || !game[mtSeat] || game[mtSeat].hp <= 0
+                  || !isLegalCardTarget(game, actor, preVirtualSha, mtSeat)) {
+                return fail('无效的【杀】目标。');
+              }
+              if (preSeen[mtSeat]) return fail('不能重复指定同一名角色为【杀】的目标。');
+              preSeen[mtSeat] = true;
+            }
+          }
           asTargetActor = resolveTrickTargetActor(game, actor, virtualShaFromCard(original), options);
           if (!asTargetActor) return fail('无效的【杀】目标。');
         }
@@ -2384,8 +2428,17 @@
         // v13 K2/K5: options 透传 + 前置解析出的合法目标显式传入 (缺省与
         // 显式路径均已过 isLegalCardTarget, playSha 内部校验恒通过,
         // 1v1 行为不变)。
-        return playSha(game, actor, virtualShaFromCard(original),
+        var conversionShaResult = playSha(game, actor, virtualShaFromCard(original),
           Object.assign({}, options, { target: asTargetActor }));
+        // v14 P 评审收口兜底: 预检已覆盖全部已知拒绝面; 若未来新增校验令
+        // playSha 在移牌后仍拒绝, 来源实体退回原区域 (在途还原), 不留
+        // 守恒泄漏 (playShaCardHandler 同款)。
+        if (conversionShaResult && !conversionShaResult.ok && !findCardZone(game, original)) {
+          putCard(game, original, hit.zone === 'equipment'
+            ? { zone: 'equipment', actor: actor, slot: hit.slot }
+            : { zone: 'hand', actor: actor });
+        }
+        return conversionShaResult;
       }
 
       // v8 PR-C1: 国色把方片视为乐不思蜀 — 构造虚拟卡 (保留原 suit / rank /
@@ -2519,7 +2572,9 @@
         getDiscardCount: getDiscardCount,
         getHuogongChoice: getHuogongChoice,
         // v12 H5: 座席级合法目标矩阵 (AI 出杀目标挑选)
-        legalTargetsForCard: legalTargetsForCard
+        legalTargetsForCard: legalTargetsForCard,
+        // v14 P2: 方天画戟额外目标前置查询 (AI 多目标启发)
+        shaExtraTargetLimit: shaExtraTargetLimit
       });
       var scoreCardForAI = AIRuntime.scoreCardForAI;
       var aiEstimateShaCount = AIRuntime.aiEstimateShaCount;
@@ -2574,6 +2629,9 @@
         nextSeat: nextSeat,
         seatsFrom: seatsFrom,
         legalTargetsForCard: legalTargetsForCard,
+        // v14 P2: 方天画戟额外目标前置查询 (UI 多目标暂存 / AI 目标启发用) —
+        // 手牌中仅剩这张【杀】且装备方天 → 2, 否则 0。
+        shaExtraTargetLimit: shaExtraTargetLimit,
         // v13 J0-4: 座席级合法目标单点查询 (UI 高亮 / 测试断言用)。
         isLegalCardTarget: isLegalCardTarget,
         // v12 H 复核修复: 借刀受害者候选 (持刀者可 杀 到的座席) — UI 两段

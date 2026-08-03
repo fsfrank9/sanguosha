@@ -45,11 +45,14 @@ import { test, runTests } from './helpers/harness.mjs';
 // 其余已注册 kind (shan-response / wuxie-response / sha-duel-response /
 // wanjian-response / yinyue-response / jijiang-aid / hujia-aid /
 // jiedao-decision / cixiong-fire / guicai-replace / guidao-replace /
-// shensu-options / guanxing-reorder / yiji-distribute / ganglie-fire) 的
-// resolver 在收到 {} 时都会走"放弃/不发动"分支直接结算, 不会重挂。
+// shensu-options / guanxing-reorder / yiji-distribute / ganglie-fire /
+// liuli-transfer [v14 P3]) 的
+// resolver 在收到 {} 时都会走"放弃/不发动"分支直接结算, 不会重挂
+// (流离兜底仍显式列 decline, 语义自明)。
 function decisionForPendingChoice(pending) {
   switch (pending.kind) {
     case 'dying-rescue':
+    case 'liuli-transfer': // v14 P3: 流离转移 — soak 兜底放弃 (AI 席位走技能内 auto 路径)
     case 'guanshi-discard':
     case 'qilin-pick':
     case 'luoshen-continue':

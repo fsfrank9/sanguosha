@@ -189,6 +189,9 @@
           'huogongCostPanel', 'huogongCostHint', 'huogongCostRepickChoices', 'huogongCostDeclineBtn',
           'tianxiangAskPanel', 'tianxiangAskHint', 'tianxiangCostChoices', 'tianxiangTargetChoices',
           'tianxiangConfirmBtn', 'tianxiangDeclineBtn',
+          // v14 P3: 流离转移面板
+          'liuliAskPanel', 'liuliAskHint', 'liuliCostChoices', 'liuliTargetChoices',
+          'liuliConfirmBtn', 'liuliDeclineBtn',
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
           'cixiongFirePanel', 'cixiongFireHint', 'cixiongFireBtn', 'cixiongFireDeclineBtn',
           'cixiongChoosePanel', 'cixiongChooseHint', 'cixiongChooseChoices', 'cixiongChooseDrawBtn',
@@ -1321,6 +1324,8 @@
         { panelId: 'huogongCostPanel',      confirmBtnId: null,                     cancelBtnId: 'huogongCostDeclineBtn' },
         // v13 J3: 天香 ask — 选成本+目标后确认转移, cancel = 不发动。
         { panelId: 'tianxiangAskPanel',     confirmBtnId: 'tianxiangConfirmBtn',    cancelBtnId: 'tianxiangDeclineBtn' },
+        // v14 P3: 流离转移面板 (专属确认钮型, 随天香惯例)
+        { panelId: 'liuliAskPanel',         confirmBtnId: 'liuliConfirmBtn',        cancelBtnId: 'liuliDeclineBtn' },
         // v12 H6: identity3 单目标牌/主动技 座席点选模式 (无 confirm 语义 —
         // 点合法座席直接生效; 取消按钮退出)。
         // v13 J0-1: 座席点选改"暂存-确认" — hand-confirm 路由到确定按钮
