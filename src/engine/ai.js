@@ -248,7 +248,10 @@
     //   决斗      — 杀数占优且血线安全时应战, 否则无懈
     //   拆/顺     — 有装备要护 或 手牌拮据 (<=2) 时才无懈
     //   乐/兵粮   — 乐: 手牌有阵容才护回合; 兵粮: 手牌拮据才护摸牌
-    //   闪电/无中/借刀/桃园与五谷的 denial 窗口 — 保持旧行为 (恒用)
+    //   闪电      — v14 Q1: 归属者 hp<=3 才消 (1/4 命中 × 3 伤的期望面)
+    //   无中      — v14 Q1: denial 高价值恒消, 仅自身濒危且手牌枯竭保留
+    //   借刀      — v14 Q1: 受害者自己/危急友方必消, 仅持刀友方受累看手牌
+    //   桃园/五谷 — v14 Q1: 受益席血线 <=2 / 奖池有桃或无中才拦截
     // v12 H5: 无懈立场 — 该锦囊当前净状态下"将结算的效果"落在谁身上, 决定
     // responder 是否有动机抵消。受害型锦囊: 结算伤友方 → 想无懈; 受益型
     // (无中/桃园/五谷): 结算利敌方 → 想无懈。wuxied=true 时净状态反转
@@ -269,6 +272,22 @@
       else if (trick === 'aoe-target') victim = ctx.order && ctx.order[ctx.idx];
       // v13 审计三轮: 铁索使用分支逐目标窗口 — 受害者 = 当前目标座席。
       else if (trick === 'tiesuo-target') victim = ctx.targets && ctx.targets[ctx.idx];
+      // v14 Q1: 借刀立场按真实受害面精确建模 (M4 信息性记录裁决落地) —
+      // 持刀者 An (被迫出杀/失武器) 与 受害者 Bn (挨杀) 皆是受害面; 任一为
+      // 自己/友方即有动机抵消 (此前 ctx.targetActor 兜底只近似到持刀者)。
+      // 评审收口: 使用者本人恒支持自己的借刀结算 (1v1 引擎缺省受害者 =
+      // 使用者本人, 自愿承担的受害面不构成抵消动机, 否则使用者会拒绝
+      // 反无懈自己刚打出的借刀); 同理该自担面对第三方立场也不计。
+      else if (trick === 'jiedao') {
+        if (ctx.actor && responder === ctx.actor) return chain.wuxied === true;
+        var jdHolder = ctx.targetActor;
+        var jdVictim = ctx.victimActor === ctx.actor ? null : ctx.victimActor;
+        var jdTouchesFriendly = (jdHolder && (jdHolder === responder
+          || !StateRuntime.perceivedHostile(game, responder, jdHolder)))
+          || (jdVictim && game[jdVictim] && (jdVictim === responder
+          || !StateRuntime.perceivedHostile(game, responder, jdVictim)));
+        return chain.wuxied ? !jdTouchesFriendly : jdTouchesFriendly;
+      }
       else victim = ctx.targetActor || ctx.delayedSide || (ctx.actor ? opponent(ctx.actor) : null);
       var interested;
       // v13 M2: 立场判断走感知路由 (明置恒等直读; 暗置按已翻明/推断)。
@@ -276,8 +295,12 @@
         interested = StateRuntime.perceivedHostile(game, responder, beneficial); // 敌方受益 → 想消
       } else if (victim) {
         interested = victim === responder || !StateRuntime.perceivedHostile(game, responder, victim); // 友方受害 → 想消
+      } else if (ctx.actor && game[ctx.actor]) {
+        // v14 Q1: 未建模兜底改真推导 (此前恒 interested) — 无受害/受益面
+        // 可判时, 按出牌者立场: 敌方使用的锦囊才有抵消动机。
+        interested = StateRuntime.perceivedHostile(game, responder, ctx.actor);
       } else {
-        interested = true; // 未建模 (闪电等) → 保持旧行为
+        interested = true; // 双兜底 (无 actor 信息) → 保守保留旧行为
       }
       // 净抵消态下动机反转: 想消的人已如愿 (不再出), 不想消的人想反无懈。
       return chain.wuxied ? !interested : interested;
@@ -328,13 +351,49 @@
       }
       if (trick === 'delayed-judge') {
         // v13 J0-2: 判定前时点 — 威胁度启发不变 (乐: 手牌有阵容才护回合;
-        // 兵粮: 手牌拮据才护摸牌; 闪电: 高威胁恒取消)。
+        // 兵粮: 手牌拮据才护摸牌)。
         var judgedType = chain.ctx && chain.ctx.trickType;
         if (judgedType === 'lebusishu') return handCount >= 2;
         if (judgedType === 'bingliang') return handCount <= 2;
-        return true; // 闪电等高威胁延时 → 保持取消
+        // v14 Q1: 闪电从恒取消改期望值 — 黑桃 2-9 命中率 1/4 × 3 点雷伤:
+        // 归属者血线脆弱 (hp<=3, 命中即濒死/致死) 才值得消耗无懈; 血厚
+        // 席位保留无懈应对必中型威胁 (决斗/AOE)。
+        var dlOwner = chain.ctx && chain.ctx.ownerActor;
+        var dlOwnerState = dlOwner && game[dlOwner];
+        return !(dlOwnerState && dlOwnerState.hp > 3);
       }
-      return true; // 无中/借刀/桃园与五谷 denial 窗口/未建模锦囊 → 保持旧行为
+      // v14 Q1: 恒用五类改期望值建模 ───────────────────────────────
+      if (trick === 'wuzhong') {
+        // 无中 denial 高价值 (1 无懈换敌 2 摸) — 仅自身濒危且手牌枯竭时
+        // 留无懈应对致命锦囊。
+        return !(self.hp <= 2 && handCount <= 1);
+      }
+      if (trick === 'jiedao') {
+        // 受害者是自己 / 危急友方 → 必消; 仅持刀友方受累 (失武器或被迫
+        // 出杀) → 手头宽裕才消耗。
+        var jdV = chain.ctx && chain.ctx.victimActor;
+        var jdVState = jdV && game[jdV];
+        if (jdV === responder) return true;
+        if (jdVState && jdVState.hp > 0
+            && !StateRuntime.perceivedHostile(game, responder, jdV) && jdVState.hp <= 2) return true;
+        return handCount >= 2;
+      }
+      if (trick === 'taoyuan-target') {
+        // 桃园 denial: 只在敌方受益席回血有实质战果 (血线 <=2, 拦截等效
+        // 濒死救援) 时消耗; 满编敌方回 1 血不值一张无懈。
+        var tyBeneficiary = chain.ctx && chain.ctx.targets && chain.ctx.targets[chain.ctx.idx];
+        var tyState = tyBeneficiary && game[tyBeneficiary];
+        return !!(tyState && tyState.hp <= 2);
+      }
+      if (trick === 'wugu-target') {
+        // 五谷 denial: 1 无懈换敌 1 摸恒亏 — 仅奖池仍有高价值牌 (桃/无中,
+        // 公开信息) 时拦截敌方拿取。
+        var wgPool = chain.ctx && chain.ctx.pool;
+        return !!(wgPool && wgPool.some(function (poolCard) {
+          return poolCard && (poolCard.type === 'tao' || poolCard.type === 'wuzhong');
+        }));
+      }
+      return true; // 其余未建模窗口 → 保守保留旧行为
     }
 
     // ═════ v12 I3: 多人目标评估 — 敌意记账 + 集火/收割/胜负手 ═════
@@ -370,16 +429,26 @@
       // (血线/资源均衡, 接 K4 记录的"全敌对无骑墙"简化)。明置下感知 =
       // 真值, 骑墙在开放身份场同样生效。
       var renegadeLean = null;
+      // v14 Q2: 内奸高阶博弈所需的局面量 (m3 冻结基线只用 renegadeLean)。
+      var renegadeV14 = false;
+      var renegadeLordSeat = null;
+      var renegadeRebelsMaybe = false;
       if (mySide === 'renegade') {
         var lordSum = 0;
         var rebelSum = 0;
         StateRuntime.aliveSeats(g).forEach(function (seat) {
           if (seat === actor) return;
+          if (roles[seat] === '主公') renegadeLordSeat = seat; // 主公身份恒公开
           var perceived = StateRuntime.perceivedSideOf(g, actor, seat);
           if (perceived === 'lordSide') lordSum += aiSeatScore(g, seat);
-          else if (perceived === 'rebelSide') rebelSum += aiSeatScore(g, seat);
+          else if (perceived === 'rebelSide') { rebelSum += aiSeatScore(g, seat); renegadeRebelsMaybe = true; }
+          // 评审收口: 暗置未知席位 (perceived=null) 视作"反贼可能仍在" —
+          // 否则暗身份局开局零证据即误入收割模式 (+40 见人就打)。明置局
+          // 感知恒非 null, 此分支不改变既有行为与 Q2 基准。
+          else if (!perceived && roles[seat] !== '主公') renegadeRebelsMaybe = true;
         });
         if (lordSum !== rebelSum) renegadeLean = lordSum > rebelSum ? 'lordSide' : 'rebelSide';
+        renegadeV14 = !(g[actor] && g[actor].aiRenegadeProfile === 'm3');
       }
       var best = null;
       candidates.forEach(function (seat) {
@@ -394,8 +463,24 @@
         // 但推断为反贼 → 折半 (+4, 信念非事实)。明置恒走直读分支零回归。
         if (StateRuntime.isRoleRevealed(g, seat) && roles[seat] === '反贼') score += 8; // 击杀反贼摸三张
         else if (g.hiddenRoles && StateRuntime.perceivedSideOf(g, actor, seat) === 'rebelSide') score += 4;
-        // v13 M3: 内奸打压强势侧。
+        // v13 M3: 内奸打压强势侧 (v14 Q2 保留为拆家平衡项)。
         if (renegadeLean && StateRuntime.perceivedSideOf(g, actor, seat) === renegadeLean) score += 15;
+        // v14 Q2: 内奸高阶博弈 — 装忠节奏 + 拆家时机 + 终局收割序
+        // (aiRenegadeProfile='m3' 冻结回 M3 单一骑墙, 供基准对照)。
+        // 胜路约束: 主公亡时须仅剩内奸 → 其他人未清场前主公恒不可杀。
+        if (mySide === 'renegade' && renegadeV14) {
+          if (roles[seat] === '主公') {
+            // 终局单挑 (othersAlive===0) 恒单候选, 已在函数头短路弑主 —
+            // 此处只需未清场前的压制 (评审收口: 原 +60 分支不可达, 删除)。
+            score += renegadeRebelsMaybe ? -25 : -40;          // 装忠期回避 / 收割期严防误杀
+          } else if (!renegadeRebelsMaybe) {
+            score += 40;                                       // 反贼确认已清 → 收割忠臣
+          } else if (StateRuntime.perceivedSideOf(g, actor, seat) === 'rebelSide') {
+            score += 10;                                       // 装忠: 打反贼立信 + 击杀奖励
+            if (renegadeLordSeat && g[renegadeLordSeat]
+                && g[renegadeLordSeat].hp <= 2) score += 25;   // 拆家阈值: 主公濒危先保主
+          }
+        }
         score -= aiEstimateShanCountFor(g, actor, seat) * 8;
         score -= aiEstimateTaoCountFor(g, actor, seat) * 6;
         score += Math.min(20, aiHostilityToward(g, actor, seat) * 4);
@@ -699,8 +784,14 @@
       if (seats.length > 2 && aiProfileOf(g, actor) !== 'v11') {
         oppSha = 0;
         // v13 M2: 感知敌对路由 (明置恒等直读)。
+        // v14 Q3: 简化复核落地 — ① 攻击范围外的敌席零威胁 (此前按全场
+        // 敌席杀数直加); ② 非无限杀席位单回合至多倾泻 1 杀 (咆哮/连弩
+        // 才按全部杀数计) — 修正多敌席叠加的系统性高估。1v1 双席分支
+        // 保持原式 (恒相邻 + v11/v12 基准冻结轨迹, 记录为口径差异)。
         StateRuntime.perceivedHostileSeats(g, actor).forEach(function (seat) {
-          oppSha += aiFoeEstimate(g, actor, seat, 'sha');
+          if (!StateRuntime.canReachWithSha(g, seat, actor)) return;
+          var seatSha = aiFoeEstimate(g, actor, seat, 'sha');
+          oppSha += StateRuntime.canUseUnlimitedSha(g[seat]) ? seatSha : Math.min(seatSha, 1);
         });
       } else {
         var oppActor = opponent(actor);

@@ -527,6 +527,21 @@
         var target = game[targetActor];
         var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
 
+        // v14 Q3 (P 评审记录项复核落地): "指定目标后"锁定 (铁骑/烈弓) 前移至
+        // 仁王盾/藤甲有效性检测之前 — 官方 flow__use.md 时机序: step 5 指定
+        // 目标后 早于 使用结算内的有效性检测 (享乐判例); v7 起单目标路径把
+        // onNeedResponse 留在护甲短路之后, 对注定被仁王/藤甲挡下的目标漏跑
+        // 铁骑判定 (P1 链路径已按官方序, 两路自此在护甲时序上对齐)。
+        // 评审收口口径: 铁骑×雌雄的相对序两路仍不同 — 单目标为 雌雄(装备
+        // 技)→铁骑(武将技), 链路径为 locks(武将技)→cixiong(装备技); 后者
+        // 合伏完判例, 但方天占武器槽使链内雌雄实战不可达, 无可观测冲突。
+        var responseContext = { responseLocked: false };
+        if (presetLock) {
+          responseContext.responseLocked = !!presetLock.responseLocked;
+        } else {
+          responseContext.responseLocked = computeShaResponseLock(game, actor, card, targetActor);
+        }
+
         // v12 G2: 红颜 — 攻击者 (小乔) 的黑桃【杀】视为红桃 → 仁王盾不挡。
         if (!ignoreArmor && StateRuntime.effectiveCardColor(self, card) === 'black' && hasEquipmentEffect(target, 'blockBlackSha')) {
           log(game, actorName(game, targetActor) + '的【仁王盾】抵消了黑色【杀】。');
@@ -543,13 +558,6 @@
           log(game, actorName(game, targetActor) + '的【藤甲】令普通【杀】无效。');
           settleShaCardAfterOutcome(game, card);
           return success('藤甲免疫普通杀。');
-        }
-
-        var responseContext = { responseLocked: false };
-        if (presetLock) {
-          responseContext.responseLocked = !!presetLock.responseLocked;
-        } else {
-          responseContext.responseLocked = computeShaResponseLock(game, actor, card, targetActor);
         }
 
         // v9 PR-E25: 玩家是【杀】目标 + skillPreferences.shanResponse==='ask' +

@@ -25,6 +25,8 @@
     // v14 P3: 流离 ask 面板本地态 — 已选弃置牌 / 转移目标。
     var liuliCostId = null;
     var liuliTargetSeat = null;
+    // v14 Q3: 突袭 ask 面板本地态 — 已选目标座席 (至多 2)。
+    var tuxiPickSelection = [];
     var ganglieSelectedIds = [];
     var guanshiDiscardSelection = [];
     // v12 G2: 神速 面板本地态 — shensuOptionMode 记录用户点了"选项二"还是
@@ -368,6 +370,31 @@
         els.tianxiangAskPanel.hidden = true;
         tianxiangCostId = null;
         tianxiangTargetSeat = null;
+      }
+    }
+    // v14 Q3: 突袭摸牌 ask 面板 — 候选座席多选 (至多 2), 确认发动 (放弃
+    // 摸牌) 或不发动照常摸牌。
+    if (els.tuxiPickPanel) {
+      if (kind === 'tuxi-pick' && pending.actor === 'player') {
+        els.tuxiPickPanel.hidden = false;
+        var tuxiLegal = (pending.candidates || []).map(function (cd) { return cd.seat; });
+        tuxiPickSelection = tuxiPickSelection.filter(function (seat) { return tuxiLegal.indexOf(seat) >= 0; });
+        if (els.tuxiPickHint) {
+          els.tuxiPickHint.textContent =
+            '突袭：放弃本回合摸牌，改为获得一至两名角色各一张手牌（已选 '
+            + tuxiPickSelection.length + '/2），或不发动照常摸牌。';
+        }
+        if (els.tuxiPickChoices) {
+          els.tuxiPickChoices.innerHTML = (pending.candidates || []).map(function (cd) {
+            return '<button class="mini-card tuxi-pick-choice' + (tuxiPickSelection.indexOf(cd.seat) >= 0 ? ' selected' : '') +
+              '" data-tuxi-target="' + escapeHtml(cd.seat) + '">' + escapeHtml(cd.name)
+              + '（手牌 ' + cd.handCount + '）</button>';
+          }).join('');
+        }
+        if (els.tuxiConfirmBtn) els.tuxiConfirmBtn.disabled = !(tuxiPickSelection.length >= 1 && tuxiPickSelection.length <= 2);
+      } else {
+        els.tuxiPickPanel.hidden = true;
+        tuxiPickSelection = [];
       }
     }
     // v14 P3: 流离转移面板 — 成本 (手牌/装备任一) + 转移目标 两段选择,
@@ -823,6 +850,29 @@
     if (els.tianxiangDeclineBtn) els.tianxiangDeclineBtn.addEventListener('click', function () {
       tianxiangCostId = null;
       tianxiangTargetSeat = null;
+      var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    // v14 Q3: 突袭面板事件 (座席多选 toggle + 确认/不发动)。
+    if (els.tuxiPickChoices) els.tuxiPickChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-tuxi-target]');
+      if (!btn) return;
+      var seat = btn.getAttribute('data-tuxi-target');
+      var idx = tuxiPickSelection.indexOf(seat);
+      if (idx >= 0) tuxiPickSelection.splice(idx, 1);
+      else if (tuxiPickSelection.length < 2) tuxiPickSelection.push(seat);
+      render();
+    });
+    if (els.tuxiConfirmBtn) els.tuxiConfirmBtn.addEventListener('click', function () {
+      if (!tuxiPickSelection.length || tuxiPickSelection.length > 2) return;
+      var result = Engine.resolvePendingChoice(getGame(), { targets: tuxiPickSelection.slice() });
+      tuxiPickSelection = [];
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.tuxiDeclineBtn) els.tuxiDeclineBtn.addEventListener('click', function () {
+      tuxiPickSelection = [];
       var result = Engine.resolvePendingChoice(getGame(), { decline: true });
       if (!result.ok) renderLog();
       render();

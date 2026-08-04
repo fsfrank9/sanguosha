@@ -214,6 +214,26 @@
       else if (trick === 'delayed-judge') victim = ctx.ownerActor;
       else if (trick === 'aoe-target') victim = ctx.order && ctx.order[ctx.idx];
       else if (trick === 'tiesuo-target') victim = ctx.targets && ctx.targets[ctx.idx];
+      // v14 Q1 评审收口: 借刀受害面 = 持刀者 ∪ 受害者 (与 aiWuxieStance
+      // 同步; 受害者=使用者的自担面不计)。响应者自己就是受害面之一时
+      // 动机 = 显然的自保, 不产生任何阵营信号 (旧兜底把自保记成"保护
+      // 持刀者", 给 inferredLeaning 喂反向证据); 第三方响应则双面各记
+      // 一条 — 未翻明席位无信号, 两面异侧互相抵消 (动机本就双义)。
+      else if (trick === 'jiedao') {
+        if (ctx.targetActor === responder || ctx.victimActor === responder) return;
+        var jdFaces = [];
+        if (ctx.targetActor) jdFaces.push(ctx.targetActor);
+        if (ctx.victimActor && ctx.victimActor !== ctx.actor
+            && ctx.victimActor !== ctx.targetActor && game[ctx.victimActor]) {
+          jdFaces.push(ctx.victimActor);
+        }
+        jdFaces.forEach(function (face) {
+          StateRuntime.recordStance(game, chain.wuxied
+            ? { type: 'wuxie', source: responder, against: face }
+            : { type: 'wuxie', source: responder, beneficiary: face });
+        });
+        return;
+      }
       else victim = ctx.targetActor || ctx.delayedSide || null;
       var entry = null;
       if (victim) {

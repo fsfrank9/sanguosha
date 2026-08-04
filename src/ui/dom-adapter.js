@@ -192,6 +192,9 @@
           // v14 P3: 流离转移面板
           'liuliAskPanel', 'liuliAskHint', 'liuliCostChoices', 'liuliTargetChoices',
           'liuliConfirmBtn', 'liuliDeclineBtn',
+          // v14 Q3: 突袭摸牌 ask 面板
+          'tuxiPickPanel', 'tuxiPickHint', 'tuxiPickChoices',
+          'tuxiConfirmBtn', 'tuxiDeclineBtn',
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
           'cixiongFirePanel', 'cixiongFireHint', 'cixiongFireBtn', 'cixiongFireDeclineBtn',
           'cixiongChoosePanel', 'cixiongChooseHint', 'cixiongChooseChoices', 'cixiongChooseDrawBtn',
@@ -1326,6 +1329,8 @@
         { panelId: 'tianxiangAskPanel',     confirmBtnId: 'tianxiangConfirmBtn',    cancelBtnId: 'tianxiangDeclineBtn' },
         // v14 P3: 流离转移面板 (专属确认钮型, 随天香惯例)
         { panelId: 'liuliAskPanel',         confirmBtnId: 'liuliConfirmBtn',        cancelBtnId: 'liuliDeclineBtn' },
+        // v14 Q3: 突袭摸牌 ask 面板 (多选确认型, 随贯石惯例)
+        { panelId: 'tuxiPickPanel',         confirmBtnId: 'tuxiConfirmBtn',         cancelBtnId: 'tuxiDeclineBtn' },
         // v12 H6: identity3 单目标牌/主动技 座席点选模式 (无 confirm 语义 —
         // 点合法座席直接生效; 取消按钮退出)。
         // v13 J0-1: 座席点选改"暂存-确认" — hand-confirm 路由到确定按钮

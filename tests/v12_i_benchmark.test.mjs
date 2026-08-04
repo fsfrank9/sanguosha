@@ -34,11 +34,17 @@ function autoPrefs(state) {
 }
 
 function playGame(seed, heroP, heroE, profP, profE) {
-  const game = Engine.newGame({ seed, playerHero: heroP, enemyHero: heroE, startWithFirstTurn: true });
+  // v14 Q3: 突袭真 ask 落地后, 首回合须在 profile/偏好布线完成后再开 —
+  // 旧 startWithFirstTurn:true 在 newGame 内先跑首回合 (布线前), 张辽
+  // 首回合缺省 ask 泄漏且首回合实际跑在缺省 profile 上。改显式 startTurn
+  // (game.turn 即建局先手, 发牌序列不变; 首回合自此真正吃到冻结 profile,
+  // 200 局重测 63.0% → 63.5% 重钉)。
+  const game = Engine.newGame({ seed, playerHero: heroP, enemyHero: heroE });
   game.player.aiProfile = profP;
   game.enemy.aiProfile = profE;
   autoPrefs(game.player);
   autoPrefs(game.enemy);
+  Engine.startTurn(game, game.turn);
   let guard = 0;
   let leaks = 0;
   while (game.phase !== 'gameover' && guard < 300) {
