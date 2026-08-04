@@ -397,6 +397,28 @@
         tuxiPickSelection = [];
       }
     }
+    // v14 R1: 蛊惑质疑窗 — AI 于吉背面声明, 玩家决定是否质疑 (质疑真牌
+    // 获「缠怨」, 提示如实告知风险; 只显示声明牌名, 不泄露真牌)。
+    if (els.guhuoChallengePanel) {
+      if (kind === 'guhuo-challenge' && pending.actor === 'player') {
+        els.guhuoChallengePanel.hidden = false;
+        if (els.guhuoChallengeHint) {
+          var ghSourceState = pending.source && game[pending.source];
+          // 评审收口: 目标是质疑前公开信息 (官方时序), 随文案带出。
+          var ghTargets = pending.targetSeats || (pending.targetSeat ? [pending.targetSeat] : []);
+          var ghTargetText = ghTargets.length
+            ? '（目标：' + ghTargets.map(function (seat) {
+              return (game[seat] && game[seat].name) || seat;
+            }).join('、') + '）' : '';
+          els.guhuoChallengeHint.textContent =
+            '蛊惑：' + ((ghSourceState && ghSourceState.name) || '对方')
+            + ' 背面朝上使用【' + (pending.declaredName || '?') + '】' + ghTargetText + '。'
+            + '质疑为假可终止结算；质疑为真则你获得「缠怨」（不能再质疑，体力为1时其余技能无效）。';
+        }
+      } else {
+        els.guhuoChallengePanel.hidden = true;
+      }
+    }
     // v14 P3: 流离转移面板 — 成本 (手牌/装备任一) + 转移目标 两段选择,
     // 结构随天香惯例; 装备成本候选带槽位标注。
     if (els.liuliAskPanel) {
@@ -874,6 +896,17 @@
     if (els.tuxiDeclineBtn) els.tuxiDeclineBtn.addEventListener('click', function () {
       tuxiPickSelection = [];
       var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    // v14 R1: 蛊惑质疑窗事件 (质疑 / 不质疑)。
+    if (els.guhuoChallengeBtn) els.guhuoChallengeBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), { challenge: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.guhuoPassBtn) els.guhuoPassBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), {});
       if (!result.ok) renderLog();
       render();
     });

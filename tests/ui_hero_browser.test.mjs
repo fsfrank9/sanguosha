@@ -52,7 +52,7 @@ test('图鉴: 内容全量 — 每名武将成卡, 汇总计数与数据源一�
   $('heroBrowserBackBtn').click();
 });
 
-test('图鉴: 状态标注 — 奸雄已实现, 蛊惑未实现, 苦肉带主动标', () => {
+test('图鉴: 状态标注 — 奸雄/蛊惑已实现 (v14 R1), 巨象未实现, 苦肉带主动标', () => {
   $('lobbyHeroesBtn').click();
   const grid = String($('heroBrowserGrid').innerHTML);
   const cardOf = (heroId) => {
@@ -61,8 +61,11 @@ test('图鉴: 状态标注 — 奸雄已实现, 蛊惑未实现, 苦肉带主动
     return grid.slice(start, end);
   };
   assert.ok(/奸雄[\s\S]{0,80}is-done/.test(cardOf('caocao')), '曹操奸雄标已实现');
-  assert.ok(/蛊惑[\s\S]{0,80}is-pending/.test(cardOf('yuji')), '于吉蛊惑标未实现');
-  assert.ok(!/蛊惑[\s\S]{0,80}is-done/.test(cardOf('yuji')), '蛊惑不得标已实现');
+  // v14 R1: 蛊惑经用户裁定按风包现行版立项 (todo → implemented, 主动技);
+  // 未实现样本改用祝融巨象 (仍在名单外)。
+  assert.ok(/蛊惑[\s\S]{0,120}is-done/.test(cardOf('yuji')), '于吉蛊惑标已实现 (v14 R1)');
+  assert.ok(/蛊惑[\s\S]{0,120}is-active-skill/.test(cardOf('yuji')), '蛊惑带主动标');
+  assert.ok(/巨象[\s\S]{0,80}is-pending/.test(cardOf('zhurong')), '祝融巨象标未实现 (todo 样本)');
   assert.ok(/苦肉[\s\S]{0,120}is-active-skill/.test(cardOf('huanggai')), '黄盖苦肉带主动标');
   assert.ok(cardOf('yuji').indexOf('可声明任意基本牌/锦囊') >= 0, '技能描述展示');
   $('heroBrowserBackBtn').click();

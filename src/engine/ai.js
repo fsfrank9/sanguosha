@@ -1087,6 +1087,14 @@
         return pausedAction;
       }
 
+      // v14 R1: 蛊惑声明优先于常规技能/出牌 (每回合限一次, 声明后正常
+      // 续跑; 玩家质疑窗挂起时由 runAITurn 的 paused 路径接管)。
+      var guhuoDeclared = aiMaybeDeclareGuhuo(game, actor);
+      if (guhuoDeclared) {
+        guhuoDeclared.action = 'guhuo';
+        return guhuoDeclared;
+      }
+
       var skillAction = aiChooseSkillAction(game, actor);
       if (skillAction) {
         var skillResult = useSkill(game, actor, skillAction.skillId, skillAction.cardIds, skillAction.options);
@@ -1254,6 +1262,65 @@
       return paused;
     }
 
+    // ═════ v14 R1: 蛊惑博弈 (v1 启发) ═════
+
+    // 质疑立场: 缺省不质疑 (质疑真牌吃永久「缠怨」)。三个确定性触发面
+    // (评审收口: 首版仅 保命+无中 两面, 15/16 型血线健康时恒放行, 质疑
+    // 链对人形同虚设 — 扩到全部高价值资源面):
+    // ① 保命赌假 — 声明的打击型落在自己且血线见底 (hp<=1, 若为真即濒死);
+    // ② denial 赌假 — 敌对于吉声明高价值资源 (无中/桃园/五谷: 摸牌/
+    //   群体回血) 且自己血线可承受缠怨久期风险 (hp>=3);
+    // ③ 护财赌假 — 敌对于吉声明 拆/顺 指向自己且自己有牌可失。
+    // 只读公开面: 声明型/目标/自身状态/感知敌对。
+    function aiShouldChallengeGuhuo(game, seat, gh) {
+      var st = game[seat];
+      if (!st || st.chanyuan) return false;
+      var opts = gh.options || {};
+      var targetsMe = opts.target === seat
+        || (Array.isArray(opts.targets) && opts.targets.indexOf(seat) >= 0);
+      var aoeStrike = gh.declareType === 'nanman' || gh.declareType === 'wanjian';
+      var directStrike = gh.declareType === 'sha' || gh.declareType === 'fire_sha'
+        || gh.declareType === 'thunder_sha' || gh.declareType === 'juedou'
+        || gh.declareType === 'huogong';
+      if ((aoeStrike || (directStrike && targetsMe)) && st.hp <= 1) return true;
+      var denialValue = gh.declareType === 'wuzhong' || gh.declareType === 'taoyuan'
+        || gh.declareType === 'wugu';
+      if (denialValue && st.hp >= 3
+          && StateRuntime.perceivedHostile(game, seat, gh.actor)) return true;
+      var stealsMine = (gh.declareType === 'guohe' || gh.declareType === 'shunshou') && targetsMe;
+      if (stealsMine && StateRuntime.perceivedHostile(game, seat, gh.actor)
+          && ((st.hand || []).length > 0 || ['weapon', 'armor', 'horsePlus', 'horseMinus'].some(function (slot) {
+            return st.equipment && st.equipment[slot];
+          }))) return true;
+      return false;
+    }
+
+    // AI 于吉声明 (v1 无中启发): 真无中恒走蛊惑 (无人质疑等价直出, 被质疑
+    // 反赚缠怨); 无真无中时用"死牌" (闪/无懈 — 出牌阶段无主动使用时机)
+    // 诈无中, 且仅在按自身感知模型预判无人会质疑 (无 敌对且hp>=3 且未缠怨
+    // 的存活席) 时才诈 — 与上面质疑启发自洽, AI 生态内诈声明不送牌。
+    function aiMaybeDeclareGuhuo(game, actor) {
+      if (!deps.guhuoAvailable || !deps.guhuoAvailable(game, actor)) return null;
+      var st = game[actor];
+      var hand = st.hand || [];
+      var realWuzhong = hand.find(function (card) { return card.type === 'wuzhong'; });
+      var cover = realWuzhong;
+      if (!cover) {
+        var deadCard = hand.find(function (card) {
+          return card.type === 'shan' || card.type === 'wuxie';
+        });
+        if (!deadCard) return null;
+        var wouldBeChallenged = StateRuntime.aliveSeats(game).some(function (seat) {
+          var other = game[seat];
+          return seat !== actor && other && !other.chanyuan && other.hp >= 3
+            && StateRuntime.perceivedHostile(game, actor, seat);
+        });
+        if (wouldBeChallenged) return null;
+        cover = deadCard;
+      }
+      return deps.playGuhuoDeclare(game, actor, { cardId: cover.id, declareType: 'wuzhong' });
+    }
+
     return {
       scoreCardForAI: scoreCardForAI,
       aiEstimateShaCount: aiEstimateShaCount,
@@ -1281,6 +1348,9 @@
       aiChooseSkillAction: aiChooseSkillAction,
       aiTakeAction: aiTakeAction,
       aiDiscardCandidates: aiDiscardCandidates,
+      // v14 R1: 蛊惑博弈 (质疑立场 + 声明启发)
+      aiShouldChallengeGuhuo: aiShouldChallengeGuhuo,
+      aiMaybeDeclareGuhuo: aiMaybeDeclareGuhuo,
       runAITurn: runAITurn
     };
   }

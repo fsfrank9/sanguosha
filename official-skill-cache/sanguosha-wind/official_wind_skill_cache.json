@@ -281,18 +281,19 @@
         {
           "name": "蛊惑",
           "localSkillId": "guhuo",
-          "implementationStatus": "pending",
+          "implementationStatus": "implemented",
           "sourceTextRef": "c8a0d017a631",
           "sourceTextSha256": "c8a0d017a6318fc1960f1a5b6b4fe66c166401ffe210153ed1e75cdd3b1f0b21",
           "implementationSpec": {
-            "summary": "扣置手牌声明为任意基本牌或非延时锦囊，经质疑流程后按声明结算。",
-            "timing": "需要使用或打出基本牌/非延时锦囊时。",
-            "condition": "有手牌可扣置；质疑机制需要多名角色参与。",
-            "cost": "扣置一张手牌（声明为假且被质疑时弃置）。",
-            "effect": "无人质疑则按声明结算；被质疑则翻开验证，按真伪奖惩。",
-            "frequency": "不限次数。",
+            "summary": "扣置手牌声明为任意基本牌或非延时锦囊，经质疑流程后按声明结算（v14 R1 按风包现行版接入：质疑真牌者获「缠怨」；v1 覆盖出牌阶段使用流程，响应窗口打出流程为已知局限）。",
+            "timing": "需要使用或打出基本牌/非延时锦囊时（v1 已接入：出牌阶段使用）。",
+            "condition": "有手牌可扣置；其他角色（缠怨持有者除外）可质疑，首质疑即止。",
+            "cost": "扣置一张手牌（被质疑且验明为假时置入弃牌堆）。",
+            "effect": "无人质疑按声明结算；质疑验真则质疑者获「缠怨」（不能再质疑蛊惑；体力值为1时其余技能无效）后照常结算；验假终止结算。",
+            "frequency": "每名角色的回合内限一次（gltjk 现行版逐字；旧转写「不限次数」与逐字文本冲突，v14 R1 勘正）。",
             "engineHooks": [
-              "pending.multiplayerChallenge"
+              "playGuhuoDeclare",
+              "guhuo-challenge"
             ]
           }
         }

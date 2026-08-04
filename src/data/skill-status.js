@@ -36,9 +36,12 @@
         'jushou', 'liegong', 'kuanggu',
         // v12 G2 (风包第二批): 神速 (阶段跳过框架) / 红颜 (花色视同层) /
         // 天香 (伤害转移) / 雷击+鬼道 (张角) / 不屈 (周泰, 濒死"创"区)。
-        // 蛊惑 (于吉) 为多人质疑机制, 按"宁缺毋滥"暂不接入 —
-        // spec 已入风包 fixture 如实标注。
         'shensu', 'hongyan', 'tianxiang', 'leiji', 'guidao', 'buqu',
+        // v14 R1 (用户裁定风包现行版立项): 蛊惑 (于吉) — 虚拟声明牌层 +
+        // 质疑链 (guhuo.js 域模块)。v1 接入出牌阶段使用流程 (声明 16 型);
+        // 响应窗口打出流程为已知局限, 见 R1 执行记录。缠怨为获得性技能
+        // (质疑真牌惩罚), 不在 catalog, 运行期入 state.skills。
+        'guhuo',
         // v12 H7 (身份场激活批): 主公技/多人技 —
         //   jijiang   刘备主公技  蜀势力代出【杀】(主动 + 决斗/南蛮响应求助)
         //   hujia     曹操主公技  魏势力代出【闪】(杀/万箭响应求助)
@@ -54,6 +57,7 @@
       // v11 C6: jieyin 为出牌阶段主动技 (占技能按钮, 选 2 张手牌)。
       // v12 H7: jijiang (主公主动求杀) / huangtian (群势力给牌, 全场型) /
       // lijian (弃牌挑决斗) 为出牌阶段主动技; hujia 纯响应型不占按钮。
-      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin', 'jijiang', 'huangtian', 'lijian'];
+      // v14 R1: guhuo 为出牌阶段主动技 (占技能按钮 → UI 声明面板)。
+      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin', 'jijiang', 'huangtian', 'lijian', 'guhuo'];
 
       export { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS };

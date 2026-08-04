@@ -10,6 +10,7 @@
       import { createTricksRuntime } from './tricks.js';
       import { createShaFlowRuntime } from './sha-flow.js';
       import { createEquipmentRuntime } from './equipment.js';
+      import { createGuhuoRuntime } from './guhuo.js';
       import { createJudgeAreaRuntime } from './judge-area.js';
       import { installStandardSkillHandlers, PLAY_PHASE_ACTIVE_SKILLS } from './skills.js';
       import { HERO_CATALOG, HEROES } from '../data/heroes.js';
@@ -2619,10 +2620,42 @@
         var activeSkillResults = SkillRuntime.runHook(skillRegistry, 'onActiveSkill', activeSkillContext);
         var activeSkillResult = selectActiveSkillResult(activeSkillResults, skillId);
         if (activeSkillResult) return activeSkillResult;
+        // v14 R1 评审收口: 蛊惑不走 onActiveSkill (声明需牌型+盖置牌两参,
+        // 面板/AI 直调 playGuhuoDeclare) — useSkill 面如实指路而非误报
+        // "尚未实现"。
+        if (skillId === 'guhuo') {
+          return fail('【蛊惑】经声明面板发动（引擎面: playGuhuoDeclare(game, actor, { cardId, declareType, ... })）。');
+        }
         return fail('这个技能的主动效果尚未实现。');
       }
 
       // v11 B1: AI 域拆分 — 评估/lookahead/runAITurn 整体迁往 ./ai.js,
+      // v14 R1: 蛊惑域 (虚拟声明牌层 + 质疑链)。AI 质疑立场经晚绑定包装
+      // 回环 (AIRuntime 在其后创建, 调用发生在运行期)。
+      var GuhuoRuntime = createGuhuoRuntime({
+        log: log,
+        fail: fail,
+        success: success,
+        actorName: actorName,
+        makeTestCard: makeTestCard,
+        canPlayCard: canPlayCard,
+        legalTargetsForCard: legalTargetsForCard,
+        isLegalCardTarget: isLegalCardTarget,
+        resolveSeatOption: resolveSeatOption,
+        removeCardFromHand: removeCardFromHand,
+        putCard: putCard,
+        discardCard: discardCard,
+        findCardZone: findCardZone,
+        playCardWithRegisteredHandler: playCardWithRegisteredHandler,
+        pendingChoiceGuard: pendingChoiceGuard,
+        setPendingChoice: setPendingChoice,
+        registerResponseKind: registerResponseKind,
+        aiShouldChallengeGuhuo: function (game, seat, gh) {
+          return AIRuntime.aiShouldChallengeGuhuo(game, seat, gh);
+        }
+      });
+      var playGuhuoDeclare = GuhuoRuntime.playGuhuoDeclare;
+
       // 引擎闭包能力经 createAIRuntime 依赖注入; 公开 API 形状不变。
       var AIRuntime = createAIRuntime({
         success: success,
@@ -2645,7 +2678,10 @@
         // v12 H5: 座席级合法目标矩阵 (AI 出杀目标挑选)
         legalTargetsForCard: legalTargetsForCard,
         // v14 P2: 方天画戟额外目标前置查询 (AI 多目标启发)
-        shaExtraTargetLimit: shaExtraTargetLimit
+        shaExtraTargetLimit: shaExtraTargetLimit,
+        // v14 R1: 蛊惑声明 (AI 于吉 v1 无中启发)
+        playGuhuoDeclare: playGuhuoDeclare,
+        guhuoAvailable: GuhuoRuntime.guhuoAvailable
       });
       var scoreCardForAI = AIRuntime.scoreCardForAI;
       var aiEstimateShaCount = AIRuntime.aiEstimateShaCount;
@@ -2704,6 +2740,12 @@
         // 暗置按 aggressionLog/stanceLog 行为推断, 证据不足 null; 恒不读
         // 未翻明 roles)。UI 只应以 viewer='player' 调用。
         perceivedSideOf: StateRuntime.perceivedSideOf,
+        // v14 R1: 蛊惑 (于吉, 风包现行版) — 使用流程声明/可用性/目标枚举
+        // (白名单常量留在 guhuo.js 模块内, 声明合法性经 playGuhuoDeclare
+        // 校验, 不另设公开常量面)。
+        playGuhuoDeclare: playGuhuoDeclare,
+        guhuoAvailable: GuhuoRuntime.guhuoAvailable,
+        guhuoLegalTargets: GuhuoRuntime.guhuoLegalTargets,
         // v14 P2: 方天画戟额外目标前置查询 (UI 多目标暂存 / AI 目标启发用) —
         // 手牌中仅剩这张【杀】且装备方天 → 2, 否则 0。
         shaExtraTargetLimit: shaExtraTargetLimit,

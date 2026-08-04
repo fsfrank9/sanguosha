@@ -52,10 +52,12 @@ test('unimplemented skills are visible but explicitly disabled as todo, not sile
   // 天香/雷击/鬼道/不屈) → 降至 64 (剩余未实现仍多于此).
   assert.ok(todoSkills.length >= 64, 'expanded hero pool should still mark not-yet-implemented skills as todo');
   assert.equal(Engine.HERO_CATALOG.xuchu.skills[0].status, 'implemented');
-  // v12 H7: 激将随身份场激活 (display → implemented); 于吉蛊惑仍是
-  // 诚实的 todo 样本 (多人质疑机制, 宁缺毋滥)。
+  // v12 H7: 激将随身份场激活 (display → implemented)。
+  // v14 R1: 蛊惑经用户裁定按风包现行版立项接入 (todo → implemented,
+  // 主动技); todo 样本改用同为风包待接入的奔袭状态不变量 — 直接断言
+  // 名单外技能仍渲染 todo 样式 (下方 skill-status-todo 断言覆盖)。
   assert.equal(Engine.HERO_CATALOG.liubei.skills.find((skill) => skill.id === 'jijiang').status, 'implemented');
-  assert.equal(Engine.HERO_CATALOG.yuji.skills.find((skill) => skill.id === 'guhuo').status, 'todo');
+  assert.equal(Engine.HERO_CATALOG.yuji.skills.find((skill) => skill.id === 'guhuo').status, 'implemented');
   assert.match(html, /skill-status-todo/, 'UI should render a todo style for unimplemented skills');
   assert.match(html, /未实现/, 'UI should tell the player a skill is not implemented yet');
 });

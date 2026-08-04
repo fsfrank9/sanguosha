@@ -217,6 +217,9 @@
         hujia:    { trigger: 'needResponse',      frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['resolveShaResponse', 'advanceAOETargets'], lord: true },
         huangtian:{ trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'giveHand',   count: 1 },     hooks: ['onActiveSkill'], lord: true },
         lijian:   { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onActiveSkill'] },
+        // v14 R1: 蛊惑 — 出牌阶段扣置手牌声明使用 (风包现行版, 每名角色
+        // 的回合内限一次; cost=playHand: 盖置的手牌按声明结算或验假弃置)。
+        guhuo:    { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['playGuhuoDeclare', 'guhuo-challenge'] },
       };
 
       for (var _heroId in HERO_CATALOG) {

@@ -23,6 +23,7 @@ const REQUIRED_FILES = [
   'src/engine/response.js',
   'src/engine/tricks.js',
   'src/engine/sha-flow.js',
+  'src/engine/guhuo.js',
   'src/engine/skills.js',
   'src/engine/judge-area.js',
   'src/engine/equipment.js',

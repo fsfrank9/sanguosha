@@ -24,7 +24,10 @@
       function renderHero(actor) {
         var state = view.game[actor];
         els[actor + 'Name'].textContent = state.name;
-        els[actor + 'Camp'].textContent = state.camp + ' · ' + state.title;
+        // v14 R1: 缠怨 (蛊惑质疑真牌惩罚) — 公开状态, 势力行附注 (影响
+        // 质疑资格与 hp1 技能压制, 全场可见)。
+        els[actor + 'Camp'].textContent = state.camp + ' · ' + state.title
+          + (state.chanyuan ? ' · 缠怨' : '');
         els[actor + 'Quote'].textContent = state.quote;
         els[actor + 'Hp'].innerHTML = hpMarkup(state);
         els[actor + 'HandCount'].textContent = state.hand.length;

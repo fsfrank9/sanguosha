@@ -663,6 +663,23 @@
           <button class="btn small" id="liuliConfirmBtn" disabled>转移目标</button>
           <button class="btn small" id="liuliDeclineBtn">不发动</button>
         </div>
+        <!-- v14 R1: 蛊惑 (于吉) 质疑窗 — AI 于吉背面声明时玩家决定是否质疑
+             (质疑真牌获「缠怨」)。 -->
+        <div class="guhuo-challenge-panel pending-prompt-panel" id="guhuoChallengePanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="guhuoChallengeHint">蛊惑：对方背面朝上使用了一张牌，是否质疑？</span>
+          <button class="btn small" id="guhuoChallengeBtn">质疑</button>
+          <button class="btn small" id="guhuoPassBtn">不质疑</button>
+        </div>
+        <!-- v14 R1: 蛊惑声明面板 (玩家于吉) — 选声明牌型 + 盖置手牌;
+             需目标的型确认后转座席点选。v1 菜单 11 型 (拆/顺/火攻/借刀/
+             铁索 富交互流留待后续批, 引擎 API 全 16 型 — R1 执行记录)。 -->
+        <div class="guhuo-declare-panel pending-prompt-panel" id="guhuoDeclarePanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="guhuoDeclareHint">蛊惑：选择声明的牌型与要盖置的手牌</span>
+          <div class="guhuo-type-choices pending-prompt-panel__choices" id="guhuoTypeChoices" aria-live="polite"></div>
+          <div class="guhuo-cover-choices pending-prompt-panel__choices" id="guhuoCoverChoices" aria-live="polite"></div>
+          <button class="btn small" id="guhuoConfirmBtn" disabled>声明使用</button>
+          <button class="btn small" id="guhuoCancelBtn">取消</button>
+        </div>
         <div class="dying-rescue-panel pending-prompt-panel" id="dyingRescuePanel" hidden>
           <span class="badge pending-prompt-panel__hint" id="dyingRescueHint">濒死救援：用【桃】或【酒】救援</span>
           <div class="dying-rescue-choices pending-prompt-panel__choices" id="dyingRescueChoices" aria-live="polite"></div>

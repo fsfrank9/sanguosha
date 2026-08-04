@@ -160,6 +160,9 @@
         function skillButtonHtml(skill, state, game, enemyThinking) {
           var isActiveSkill = Engine.ACTIVE_SKILL_IDS.indexOf(skill.id) >= 0;
           var active = game.turn === 'player' && game.phase === 'play' && !enemyThinking && !game.winner && isActiveSkill && skill.status === 'implemented';
+          // v14 R1 缠怨 (评审收口): hp=1 时除缠怨外技能引擎侧无效 — 按钮
+          // 同步禁用, 不承诺引擎不兑现的操作。
+          if (state.chanyuan && state.hp === 1 && skill.id !== 'chanyuan') active = false;
           if (skill.id === 'zhiheng' && state.flags && state.flags.zhihengUsed) active = false;
           if (skill.id === 'fanjian' && state.flags && state.flags.fanjianUsed) active = false;
           if (skill.id === 'guanxing' && state.flags && state.flags.guanxingUsed) active = false;
