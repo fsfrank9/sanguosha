@@ -63,6 +63,22 @@
         if (renegadeBadge) renegadeBadge.hidden = roleHidden || role !== '内奸';
         var secretBadge = els[actor + 'SecretBadge'];
         if (secretBadge) secretBadge.hidden = !roleHidden;
+        // v14 R3: 推断提示徽章 — 暗置未翻明席经玩家视角行为推断路由取
+        // 倾向 (perceivedSideOf 只读公开证据 aggressionLog/stanceLog,
+        // 恒不读未翻明 roles; 红线: 本函数不得旁路直读 role 决定推断显
+        // 示)。null=证据不足恒隐, 与"?"徽章共存不互斥; 明置/已翻明/
+        // 自己席恒隐 (真实身份徽章接管), 明置模式零回归。
+        var suspectBadge = els[actor + 'SuspectBadge'];
+        if (suspectBadge) {
+          var suspectSide = roleHidden
+            ? Engine.perceivedSideOf(view.game, 'player', actor) : null;
+          suspectBadge.hidden = !suspectSide;
+          if (suspectSide) {
+            suspectBadge.textContent = suspectSide === 'rebelSide' ? '疑反' : '疑忠';
+            suspectBadge.className = 'suspect-badge suspect-badge--'
+              + (suspectSide === 'rebelSide' ? 'rebel' : 'lord');
+          }
+        }
         if (els[actor + 'Ribbon']) els[actor + 'Ribbon'].textContent = state.camp;
         if (actor === 'player') {
           lobbyPanels.renderPlayerSkillBar({

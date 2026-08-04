@@ -245,6 +245,45 @@
       display: none !important;
     }
 
+    /* v14 R3: 玩家侧推断提示徽章 — 暗身份未翻明席右上角「疑反/疑忠」
+       弱确定性提示。虚线描边 + 半透明: 与左上角实锤身份徽章明确视觉
+       区分, 防误读为已确认身份。取值只经 Engine.perceivedSideOf
+       (viewer='player') 行为推断路由, 证据不足 (null) 恒隐。独立规则
+       块同上守护测试理由。 */
+    .suspect-badge {
+      position: absolute;
+      z-index: 3;
+      top: 6px;
+      right: 6px;
+      height: 22px;
+      padding: 0 7px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 11px;
+      border: 2px dashed rgba(255, 244, 208, .72);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: .08em;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+      pointer-events: none;
+      user-select: none;
+      opacity: .88;
+    }
+
+    .suspect-badge--rebel {
+      background: rgba(154, 44, 44, .82);
+    }
+
+    .suspect-badge--lord {
+      background: rgba(146, 108, 32, .82);
+    }
+
+    .suspect-badge[hidden] {
+      display: none !important;
+    }
+
     /* v12 H6: identity3 单目标牌/主动技 座席点选模式 — 合法目标座席的英雄卡
        高亮, 沿用 .hero.is-chained 的金色描边惯例 (box-shadow 环, 非新视觉). */
     .hero.is-target-selectable {

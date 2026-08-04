@@ -77,14 +77,16 @@ test('图鉴: 四势力分组标题齐备', () => {
   $('heroBrowserBackBtn').click();
 });
 
-test('续批-1: nav 光标按 disabled 区分 — 基类 pointer, :disabled 才 not-allowed', () => {
+test('续批-1 (v14 R 收窄): nav 基类 pointer 光标, :disabled 变体随死钮清理不复存在', () => {
+  // v14 R 收尾: 四个 disabled 占位钮移除后 nav 无禁用项, :disabled /
+  // :not(:disabled) 变体规则一并清理 — 守护随之收窄为基类语义。
   const css = fs.readFileSync(new URL('../src/styles/entry.css', import.meta.url), 'utf8');
   const base = css.match(/\.lobby-nav-item\s*\{[\s\S]*?\n\s{4}\}/);
   assert.ok(base);
   assert.match(base[0], /cursor:\s*pointer/);
   assert.doesNotMatch(base[0], /not-allowed/);
-  assert.match(css, /\.lobby-nav-item:disabled\s*\{[\s\S]{0,120}not-allowed/);
-  assert.match(css, /\.lobby-nav-item:not\(:disabled\):hover/);
+  assert.doesNotMatch(css, /\.lobby-nav-item:disabled/);
+  assert.match(css, /\.lobby-nav-item:hover/);
 });
 
 test('续批-2: 图鉴阵营筛选 — 点蜀只剩蜀分组, 汇总保持全量, 全部恢复', () => {

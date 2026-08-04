@@ -2700,6 +2700,10 @@
         nextSeat: nextSeat,
         seatsFrom: seatsFrom,
         legalTargetsForCard: legalTargetsForCard,
+        // v14 R3: 玩家侧推断提示 UI 用 — 感知阵营路由 (自己/已翻明真值;
+        // 暗置按 aggressionLog/stanceLog 行为推断, 证据不足 null; 恒不读
+        // 未翻明 roles)。UI 只应以 viewer='player' 调用。
+        perceivedSideOf: StateRuntime.perceivedSideOf,
         // v14 P2: 方天画戟额外目标前置查询 (UI 多目标暂存 / AI 目标启发用) —
         // 手牌中仅剩这张【杀】且装备方天 → 2, 否则 0。
         shaExtraTargetLimit: shaExtraTargetLimit,

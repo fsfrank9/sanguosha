@@ -250,6 +250,7 @@
           // v13 M1: 暗身份 — 开关按钮 + 四 AI 席"?"徽章。
           'hiddenRolesToggleBtn',
           'enemySecretBadge', 'allySecretBadge', 'ally2SecretBadge', 'ally3SecretBadge',
+          'enemySuspectBadge', 'allySuspectBadge', 'ally2SuspectBadge', 'ally3SuspectBadge',
           'allyHeroPickRow', 'allyHeroSelect',
           'ally2HeroPickRow', 'ally2HeroSelect', 'ally3HeroPickRow', 'ally3HeroSelect',
           // v12 H6: identity3 单目标牌/主动技 座席点选模式面板。
