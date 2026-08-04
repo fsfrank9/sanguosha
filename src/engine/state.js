@@ -266,6 +266,11 @@
   }
 
   function hasSkill(state, skillId) {
+    // v14 R1 缠怨 (蛊惑质疑真牌惩罚): 锁定技 — 体力值为 1 时除「缠怨」外
+    // 技能无效。武将技能归属统一经本闸判定, 此处单点压制即全局生效
+    // (装备技走 hasEquipmentEffect, 不在压制面 — 口径见 R1 执行记录;
+    // 被动效果面 skill-runtime.hasPassiveEffect 同步双闸)。
+    if (state && state.chanyuan && state.hp === 1 && skillId !== 'chanyuan') return false;
     return !!(state.skills || []).some(function (skill) { return skill.id === skillId; });
   }
 

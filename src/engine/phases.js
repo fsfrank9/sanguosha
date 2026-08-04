@@ -56,6 +56,9 @@
     // 一次)。与 jieyinUsed 同类, 回合开始/结束两处均复位。
     flags.huangtianUsed = false;
     flags.lijianUsed = false;
+    // v14 R1: 蛊惑 "每名角色的回合内限一次" — v1 仅接入自己回合的使用
+    // 流程, 自回合复位即覆盖 (打出流程接入后需随任意回合切换复位)。
+    flags.guhuoUsedThisTurn = false;
   }
 
   function resetEndOfTurnState(state) {

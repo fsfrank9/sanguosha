@@ -35,6 +35,9 @@
     var guanxingTopIds = [];
     var guanxingBottomIds = [];
     var guanxingSelected = null;
+    // v14 R1: 蛊惑声明面板本地态 (声明牌型 + 盖置手牌)。
+    var guhuoDeclareType = null;
+    var guhuoCoverCardId = null;
 
     function showTiesuoPanel(cardId) {
       var game = getGame();
@@ -705,8 +708,117 @@
       }
     }
 
+    // ───── v14 R1: 蛊惑声明面板 (玩家于吉) ─────
+    // v1 UI 菜单 11 型: 需座席目标的 杀×3/决斗 转座席点选; 无目标型直接
+    // 声明。拆/顺/火攻/借刀/铁索 的富交互流 (区域/成本/双段) 留待后续批
+    // (引擎 API 全 16 型) — R1 执行记录如实标注。
+    var GUHUO_UI_TYPES = [
+      { id: 'sha', label: '杀', seat: true },
+      { id: 'fire_sha', label: '火杀', seat: true },
+      { id: 'thunder_sha', label: '雷杀', seat: true },
+      { id: 'tao', label: '桃', seat: false },
+      { id: 'jiu', label: '酒', seat: false },
+      { id: 'wuzhong', label: '无中生有', seat: false },
+      { id: 'juedou', label: '决斗', seat: true },
+      { id: 'nanman', label: '南蛮入侵', seat: false },
+      { id: 'wanjian', label: '万箭齐发', seat: false },
+      { id: 'taoyuan', label: '桃园结义', seat: false },
+      { id: 'wugu', label: '五谷丰登', seat: false }
+    ];
+
+    function tryEnterGuhuoDeclareMode() {
+      var game = getGame();
+      if (!game || !Engine.guhuoAvailable || !Engine.guhuoAvailable(game, 'player')) return false;
+      guhuoDeclareType = null;
+      guhuoCoverCardId = null;
+      renderGuhuoDeclarePanel();
+      if (els.guhuoDeclarePanel) els.guhuoDeclarePanel.hidden = false;
+      return true;
+    }
+
+    function hideGuhuoDeclarePanel() {
+      guhuoDeclareType = null;
+      guhuoCoverCardId = null;
+      if (els.guhuoDeclarePanel) els.guhuoDeclarePanel.hidden = true;
+    }
+
+    function renderGuhuoDeclarePanel() {
+      var game = getGame();
+      if (!game) return;
+      if (els.guhuoTypeChoices) {
+        els.guhuoTypeChoices.innerHTML = GUHUO_UI_TYPES.map(function (entry) {
+          return '<button class="btn small' + (entry.id === guhuoDeclareType ? ' is-active' : '')
+            + '" data-guhuo-type="' + entry.id + '">' + escapeHtml(entry.label) + '</button>';
+        }).join('');
+      }
+      if (els.guhuoCoverChoices) {
+        els.guhuoCoverChoices.innerHTML = (game.player.hand || []).map(function (card) {
+          return '<button class="mini-card' + (card.id === guhuoCoverCardId ? ' is-active' : '')
+            + '" data-guhuo-cover="' + card.id + '">' + escapeHtml(card.name)
+            + (card.suitLabel ? ' ' + escapeHtml(card.suitLabel + (card.rank || '')) : '') + '</button>';
+        }).join('');
+      }
+      if (els.guhuoConfirmBtn) els.guhuoConfirmBtn.disabled = !(guhuoDeclareType && guhuoCoverCardId);
+    }
+
+    function finishGuhuoDeclare(declareType, coverCardId, targetSeat) {
+      var game = getGame();
+      var opts = { cardId: coverCardId, declareType: declareType };
+      if (targetSeat) opts.target = targetSeat;
+      var result = Engine.playGuhuoDeclare(game, 'player', opts);
+      if (!result.ok) game.log.push(result.message);
+      render();
+    }
+
+    function confirmGuhuoDeclare() {
+      var game = getGame();
+      if (!game || !guhuoDeclareType || !guhuoCoverCardId) return;
+      var entry = null;
+      GUHUO_UI_TYPES.forEach(function (item) { if (item.id === guhuoDeclareType) entry = item; });
+      var declareType = guhuoDeclareType;
+      var coverCardId = guhuoCoverCardId;
+      if (entry && entry.seat) {
+        var legal = (Engine.guhuoLegalTargets(game, 'player', declareType) || [])
+          .filter(function (seat) { return seat !== 'player'; });
+        if (!legal.length) {
+          game.log.push('【' + entry.label + '】当前没有合法目标。');
+          render();
+          return;
+        }
+        hideGuhuoDeclarePanel();
+        startSeatPicker({
+          legalSeats: legal,
+          needed: 1,
+          hintText: '蛊惑【' + entry.label + '】：点击场上高亮角色选择目标',
+          onComplete: function (seats) { finishGuhuoDeclare(declareType, coverCardId, seats[0]); }
+        });
+        render();
+        return;
+      }
+      hideGuhuoDeclarePanel();
+      finishGuhuoDeclare(declareType, coverCardId, null);
+    }
+
     function bindModePanels() {
       var game = getGame();
+      // v14 R1: 蛊惑声明面板事件 (类型/盖置牌点选 + 确认/取消)。
+      if (els.guhuoTypeChoices) els.guhuoTypeChoices.addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-guhuo-type]');
+        if (!btn) return;
+        guhuoDeclareType = btn.getAttribute('data-guhuo-type');
+        renderGuhuoDeclarePanel();
+      });
+      if (els.guhuoCoverChoices) els.guhuoCoverChoices.addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-guhuo-cover]');
+        if (!btn) return;
+        guhuoCoverCardId = btn.getAttribute('data-guhuo-cover');
+        renderGuhuoDeclarePanel();
+      });
+      if (els.guhuoConfirmBtn) els.guhuoConfirmBtn.addEventListener('click', confirmGuhuoDeclare);
+      if (els.guhuoCancelBtn) els.guhuoCancelBtn.addEventListener('click', function () {
+        hideGuhuoDeclarePanel();
+        render();
+      });
       // v13 UI修缮1: 铁索 1v1 面板四选项改 stage-then-confirm — 此前点选项
       // 即打出, 是全 UI 唯一"最终生效不过确定"的出牌路径 (官方每张牌都要
       // 确认)。点选项只暂存 + 高亮, #handConfirmBtn 才 resolveTiesuo。
@@ -804,6 +916,9 @@
     return {
       showTiesuoPanel: showTiesuoPanel,
       hideTiesuoPanel: hideTiesuoPanel,
+      // v14 R1: 蛊惑声明面板
+      tryEnterGuhuoDeclareMode: tryEnterGuhuoDeclareMode,
+      hideGuhuoDeclarePanel: hideGuhuoDeclarePanel,
       showTargetZonePanel: showTargetZonePanel,
       showTargetZonePanelForSeat: showTargetZonePanelForSeat,
       hideTargetZonePanel: hideTargetZonePanel,

@@ -94,6 +94,8 @@
       var hideHuogongPanel = modePanels.hideHuogongPanel;
       var showConversionPanel = modePanels.showConversionPanel;
       var hideConversionPanel = modePanels.hideConversionPanel;
+      // v14 R1: 蛊惑声明面板 (hide 链随 conversion 同步调用)
+      var hideGuhuoDeclarePanel = modePanels.hideGuhuoDeclarePanel;
       var showGuanxingPanelFromPending = modePanels.showGuanxingPanelFromPending;
       var hideGuanxingPanel = modePanels.hideGuanxingPanel;
       var resolveTargetCard = modePanels.resolveTargetCard;
@@ -194,6 +196,9 @@
           'liuliConfirmBtn', 'liuliDeclineBtn',
           // v14 Q3: 突袭摸牌 ask 面板
           'tuxiPickPanel', 'tuxiPickHint', 'tuxiPickChoices',
+          'guhuoChallengePanel', 'guhuoChallengeHint', 'guhuoChallengeBtn', 'guhuoPassBtn',
+          'guhuoDeclarePanel', 'guhuoDeclareHint', 'guhuoTypeChoices', 'guhuoCoverChoices',
+          'guhuoConfirmBtn', 'guhuoCancelBtn',
           'tuxiConfirmBtn', 'tuxiDeclineBtn',
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
           'cixiongFirePanel', 'cixiongFireHint', 'cixiongFireBtn', 'cixiongFireDeclineBtn',
@@ -598,6 +603,7 @@
           hideTargetZonePanel();
           hideHuogongPanel();
           hideConversionPanel();
+          hideGuhuoDeclarePanel();
           hideGuanxingPanel();
           // v12 H 复核修复: identity3 铁索经泛化座席点选 (可选第三席, 1-2 目标
           // + 重铸); 1v1 仍走旧 tiesuoModePanel (enemy/self/both/重铸)。
@@ -612,6 +618,7 @@
           hideTiesuoPanel();
           hideHuogongPanel();
           hideConversionPanel();
+          hideGuhuoDeclarePanel();
           hideGuanxingPanel();
           showTargetZonePanel(cardId);
           return;
@@ -620,6 +627,7 @@
           hideTiesuoPanel();
           hideTargetZonePanel();
           hideConversionPanel();
+          hideGuhuoDeclarePanel();
           hideGuanxingPanel();
           showHuogongPanel(cardId);
           return;
@@ -629,6 +637,7 @@
         hideHuogongPanel();
         hideGuanxingPanel();
         hideConversionPanel();
+        hideGuhuoDeclarePanel();
         var enemyHpBefore = game.enemy.hp;
         var playerHpBefore = game.player.hp;
         var result = Engine.playCard(game, 'player', cardId);
@@ -674,6 +683,7 @@
           hideHuogongPanel();
           hideGuanxingPanel();
           hideConversionPanel();
+          hideGuhuoDeclarePanel();
           var enemyHpBefore = game.enemy.hp;
           var playerHpBefore = game.player.hp;
           var result = action.mode === 'asSha'
@@ -723,6 +733,7 @@
           hideTargetZonePanel();
           hideHuogongPanel();
           hideConversionPanel();
+          hideGuhuoDeclarePanel();
           hideGuanxingPanel();
           enterCardSkillMode(skillId);
           return;
@@ -731,6 +742,7 @@
         hideTargetZonePanel();
         hideHuogongPanel();
         hideConversionPanel();
+        hideGuhuoDeclarePanel();
         // v6.1: 观星 no longer fires on play-phase click — it auto-triggers
         // in the prepare phase via pendingChoice. Clicking the (typically
         // disabled) button now just re-opens an in-progress panel if there
@@ -760,6 +772,13 @@
           return;
         }
         hideGuanxingPanel();
+        // v14 R1: 蛊惑 — 打开声明面板 (选声明牌型 + 盖置手牌; 需目标的
+        // 型确认后转座席点选, 由 mode-panels 承载)。
+        if (skillId === 'guhuo') {
+          if (modePanels.tryEnterGuhuoDeclareMode) modePanels.tryEnterGuhuoDeclareMode();
+          render();
+          return;
+        }
         // v13 UI修缮1: 直发型主动技 (苦肉自伤) 改 stage-then-confirm — 此前
         // 点技能按钮即掉血, 是唯一零确认的主动结算入口。再点同技能取消暂存。
         if (skillId === 'kurou') {
@@ -1149,6 +1168,7 @@
         hideTargetZonePanel();
         hideHuogongPanel();
         hideConversionPanel();
+        hideGuhuoDeclarePanel();
         hideGuanxingPanel();
         modePanels.cancelSeatPicker();
         exitSkillSelectMode();
@@ -1204,6 +1224,7 @@
         hideTargetZonePanel();
         hideHuogongPanel();
         hideConversionPanel();
+        hideGuhuoDeclarePanel();
         hideGuanxingPanel();
         modePanels.cancelSeatPicker();
         exitSkillSelectMode();
@@ -1332,6 +1353,9 @@
         { panelId: 'liuliAskPanel',         confirmBtnId: 'liuliConfirmBtn',        cancelBtnId: 'liuliDeclineBtn' },
         // v14 Q3: 突袭摸牌 ask 面板 (多选确认型, 随贯石惯例)
         { panelId: 'tuxiPickPanel',         confirmBtnId: 'tuxiConfirmBtn',         cancelBtnId: 'tuxiDeclineBtn' },
+        // v14 R1: 蛊惑质疑窗 (确认=质疑 / 取消=不质疑) 与声明面板。
+        { panelId: 'guhuoChallengePanel',   confirmBtnId: 'guhuoChallengeBtn',      cancelBtnId: 'guhuoPassBtn' },
+        { panelId: 'guhuoDeclarePanel',     confirmBtnId: 'guhuoConfirmBtn',        cancelBtnId: 'guhuoCancelBtn' },
         // v12 H6: identity3 单目标牌/主动技 座席点选模式 (无 confirm 语义 —
         // 点合法座席直接生效; 取消按钮退出)。
         // v13 J0-1: 座席点选改"暂存-确认" — hand-confirm 路由到确定按钮
@@ -1474,6 +1498,7 @@
           hideTargetZonePanel();
           hideHuogongPanel();
           hideConversionPanel();
+          hideGuhuoDeclarePanel();
           hideGuanxingPanel();
           exitSkillSelectMode();
           if (game.phase === 'play') Engine.finishPlayPhase(game);

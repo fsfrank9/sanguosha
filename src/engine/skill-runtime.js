@@ -33,13 +33,21 @@
     return effects[effectName];
   }
 
+  // v14 R1 缠怨压制闸 (与 state.js hasSkill 同步双闸): 体力值为 1 时
+  // 除「缠怨」外技能无效 — 被动效果 (咆哮/藤甲类武将被动) 同样失效。
+  function chanyuanSuppressed(state) {
+    return !!(state && state.chanyuan && state.hp === 1);
+  }
+
   function hasPassiveEffect(state, effectName) {
+    if (chanyuanSuppressed(state)) return false;
     return !!(state && state.skills || []).some(function (skill) {
       return !!skillEffectValue(skill.id, effectName);
     });
   }
 
   function sumPassiveEffect(state, effectName) {
+    if (chanyuanSuppressed(state)) return 0;
     return (state && state.skills || []).reduce(function (total, skill) {
       var value = skillEffectValue(skill.id, effectName);
       return total + (typeof value === 'number' ? value : 0);
