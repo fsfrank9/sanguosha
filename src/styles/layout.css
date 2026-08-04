@@ -358,6 +358,29 @@
     .duel-table.is-identity4 #playerHandDock,
     .duel-table.is-identity5 #playerHandDock { grid-area: dock; }
 
+    /* v14 R3 (K3 遗留销账): 座席环横排压缩 — 窄视口下首行席位列允许
+       收缩 (minmax(0,1fr) 解除 min-content 撑底; 覆写块后置, 上方
+       grid-template-areas 原块保持原文供守护锚定), 列宽不足 236px 时
+       各席卡同倍率收窄 (官方"同一规格"口径保持: 全部非玩家席同栅格
+       同规则, 收缩恒等宽), 地板 172px 防卡内元素折叠, 首行不再溢出
+       裁切。1v1/3p 布局零改动。 */
+    .duel-table.is-identity4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .duel-table.is-identity5 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .duel-table.is-identity4 .opponent-zone,
+    .duel-table.is-identity4 .ally-zone,
+    .duel-table.is-identity5 .opponent-zone,
+    .duel-table.is-identity5 .ally-zone {
+      min-width: 0;
+    }
+
+    .duel-table.is-identity4 .opponent-zone .hero.seat-card,
+    .duel-table.is-identity4 .ally-zone .hero.seat-card,
+    .duel-table.is-identity5 .opponent-zone .hero.seat-card,
+    .duel-table.is-identity5 .ally-zone .hero.seat-card {
+      width: clamp(172px, 100%, 236px);
+    }
+
     .arena-zone {
       display: grid;
       grid-template-columns: minmax(260px, .92fr) minmax(300px, 1.08fr);

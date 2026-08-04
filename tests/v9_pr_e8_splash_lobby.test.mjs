@@ -30,15 +30,19 @@ test('v9 PR-E8: setup-screen 默认 hidden (新流程 lobby → setup)', () => {
   assert.match(html, /<section class="setup-screen" id="setupScreen" hidden>/);
 });
 
-test('v9 PR-E8: lobby 含 topbar (avatar + name + currency) + 3 模式卡 + 5 nav', () => {
+test('v9 PR-E8: lobby 含 topbar (avatar + name + currency) + 3 模式卡 + nav', () => {
   assert.match(html, /class="lobby-screen__topbar"/);
   assert.match(html, /class="lobby-screen__avatar"/);
   assert.match(html, /class="lobby-screen__currency"/);
   assert.match(html, /id="lobbyKofBtn"/);
   assert.match(html, /id="lobby1v1Btn"/);
   assert.match(html, /id="lobbyHellBtn"/);
+  // v14 R 收尾: 排行榜/设置/素材/福利 四死钮移除 (用户裁定), nav 仅存
+  // 可用的「武将」入口 — 零死钮验收: nav 内不允许 disabled 项。
   const navCount = (html.match(/class="lobby-nav-item"/g) || []).length;
-  assert.equal(navCount, 5, 'lobby 底部 nav 应有 5 项');
+  assert.equal(navCount, 1, 'lobby 底部 nav 仅存「武将」1 项');
+  const navBlock = html.match(/<nav class="lobby-screen__nav"[\s\S]*?<\/nav>/);
+  assert.ok(navBlock && !/disabled/.test(navBlock[0]), 'nav 内零 disabled 死钮');
 });
 
 test('v9 PR-E8: lobby 模式卡 — KOF/炼狱 用 --placeholder + disabled, 1V1 用 --active', () => {

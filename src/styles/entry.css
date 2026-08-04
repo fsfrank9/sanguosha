@@ -150,14 +150,15 @@
       letter-spacing: .06em;
     }
 
+    /* v14 R 收尾: 四个 disabled 占位钮移除后 nav 仅存「武将」— 网格收
+       为单列内容宽居中, :disabled 变体规则随死钮一并清理。 */
     .lobby-screen__nav {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: minmax(120px, 220px);
+      justify-content: center;
       gap: 10px;
     }
 
-    /* v13 图鉴续批-1: 光标/不透明度按 :disabled 区分 — 「武将」已启用,
-       不能再顶着禁止光标 (旧规则把 not-allowed 写在基类上)。 */
     .lobby-nav-item {
       display: flex;
       flex-direction: column;
@@ -174,12 +175,7 @@
       letter-spacing: .12em;
     }
 
-    .lobby-nav-item:disabled {
-      cursor: not-allowed;
-      opacity: .7;
-    }
-
-    .lobby-nav-item:not(:disabled):hover {
+    .lobby-nav-item:hover {
       border-color: rgba(255, 214, 138, .55);
       color: #ffd68a;
       background: rgba(0, 0, 0, .5);
