@@ -619,7 +619,19 @@
         // (公开) 或推断为同侧者; 明置恒等直读。
         var sameSide = StateRuntime.sideOf(game, responder) !== null
           && !StateRuntime.perceivedHostile(game, responder, dyingActor);
-        if (sameSide && taoCards.length) {
+        // v14 Q2: 内奸装忠 — 除内奸与主公外仍有任何座席存活时主公濒死
+        // 必救 (determineWinner: 主公亡时存活者非仅内奸即反贼胜 → 内奸
+        // 败; 胜路要求主公活到终局单挑, 与打人层 renegadeOthersAlive===0
+        // 同口径 — 评审收口: 原按感知阵营过滤在"反贼全灭仅剩忠臣"时漏救
+        // 致内奸当场判负)。身份直读面: 自己的身份 + 主公公开身份, 合规。
+        // m3 冻结基线保持不救。
+        var renegadeSaveLord = (game.roles || {})[responder] === '内奸'
+          && (game.roles || {})[dyingActor] === '主公'
+          && responderState.aiRenegadeProfile !== 'm3'
+          && aliveSeats(game).some(function (seat) {
+            return seat !== responder && seat !== dyingActor;
+          });
+        if ((sameSide || renegadeSaveLord) && taoCards.length) {
           return executeDyingRescue(game, responder, dyingActor, 'tao', taoCards[0].id);
         }
         log(game, actorName(game, responder) + '选择不救援。');

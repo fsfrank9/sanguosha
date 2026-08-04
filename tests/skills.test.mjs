@@ -486,11 +486,14 @@ test('马超【铁骑】 red judgment suppresses Bagua automatic Shan', () => {
   assert.ok(!game.log.some((entry) => /八卦阵/.test(entry)), 'Bagua should not trigger after red Tieqi locks response');
 });
 
-test('张辽【突袭】 v13 审计三轮: 1v1 单候选缺省不发动 (偷1弃2摸恒亏), 照常摸牌', () => {
+test('张辽【突袭】 v13 审计三轮: 1v1 单候选 auto 档不发动 (偷1弃2摸恒亏), 照常摸牌', () => {
   // spec (card__hero__wei.md): "放弃摸牌, 改为获得一至两名角色的各一张手牌"
   // — 发动即放弃全部摸牌; 旧实现"偷1+摸1"系语义误读。AI 期望值门: 可偷满
-  // 2 张 (≥2 名有牌座席) 才发动; 1v1 单候选缺省不发动。
+  // 2 张 (≥2 名有牌座席) 才发动; 1v1 单候选不发动。
+  // v14 Q3: 玩家缺省改真 ask (tuxi-pick, 见 v14_q_ai_depth) — 本用例钉的
+  // EV 门语义随 pref='auto' 档保留 (守护随缺省更新)。
   const game = skillGame('zhangliao', 'sunquan');
+  game.player.skillPreferences = { tuxi: 'auto' };
   game.enemy.hand = [c('shan', { id: 'not-stolen' })];
   game.deck = [c('tao', { id: 'draw-2' }), c('sha', { id: 'draw-1' })];
 

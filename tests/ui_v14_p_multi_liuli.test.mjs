@@ -155,4 +155,43 @@ test('P3 UI: 不发动按钮 → 自己照常结算', () => {
   assert.equal($('liuliAskPanel').hidden, true);
 });
 
+// ───── v14 Q3: 突袭摸牌 ask 面板 ──────────────────────────────────────
+
+function triggerTuxiAsk() {
+  const game = startIdentity3ViaUI('zhangliao', 'lvmeng', 'diaochan');
+  game.enemy.hand = [c('shan', { id: 'ui-tx-e' })];
+  game.ally.hand = [c('tao', { id: 'ui-tx-a' })];
+  game.player.hand = [];
+  game.deck = [c('sha', { id: 'ui-tx-d1' }), c('sha', { id: 'ui-tx-d2' })];
+  Engine.startTurn(game, 'player');
+  assert.equal(game.pendingChoice && game.pendingChoice.kind, 'tuxi-pick', '突袭挂起');
+  UI.render();
+  return game;
+}
+
+test('Q3 UI: 突袭面板渲染 — 候选多选 toggle + 确认门禁 (1-2 席)', () => {
+  const game = triggerTuxiAsk();
+  assert.equal($('tuxiPickPanel').hidden, false, '面板出现');
+  assert.match($('tuxiPickChoices').innerHTML, /data-tuxi-target="enemy"/);
+  assert.match($('tuxiPickChoices').innerHTML, /data-tuxi-target="ally"/);
+  assert.equal($('tuxiConfirmBtn').disabled, true, '未选前禁用');
+  $('tuxiPickChoices').dispatchClick({ 'data-tuxi-target': 'enemy' });
+  assert.equal($('tuxiConfirmBtn').disabled, false, '选 1 席可发动');
+  $('tuxiPickChoices').dispatchClick({ 'data-tuxi-target': 'ally' });
+  $('tuxiConfirmBtn').click();
+  assert.equal(game.player.hand.length, 2, '双席各获得一张');
+  assert.equal(game.deck.length, 2, '放弃摸牌');
+  assert.equal(game.phase, 'play');
+  assert.equal($('tuxiPickPanel').hidden, true, '面板关闭');
+});
+
+test('Q3 UI: 不发动按钮 → 照常摸牌进入出牌阶段', () => {
+  const game = triggerTuxiAsk();
+  $('tuxiDeclineBtn').click();
+  assert.equal(game.player.hand.length, 2, '照常摸 2');
+  assert.equal(game.enemy.hand.length, 1, '未偷牌');
+  assert.equal(game.phase, 'play');
+  assert.equal($('tuxiPickPanel').hidden, true);
+});
+
 await runTests();

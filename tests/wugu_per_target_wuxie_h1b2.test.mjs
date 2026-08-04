@@ -48,7 +48,9 @@ test('H1b-2 五谷: 对方持无懈(auto) → 抵消发动者的获得, 对方�
   game.player.skillPreferences.wugu = 'auto';
   game.player.hand = [c('wugu', { id: 'wg1' })];
   game.enemy.hand = [c('wuxie', { id: 'e-wx' })];
-  game.deck = [c('sha', { id: 'd1' }), c('sha', { id: 'd2' })];
+  // v14 Q1: 五谷 denial 改期望值 (奖池含 桃/无中 才拦截) — 奖池置入
+  // 桃保住本用例的 denial 流程覆盖面。
+  game.deck = [c('tao', { id: 'd1' }), c('sha', { id: 'd2' })];
   const r = assertCardConservation(game, () => Engine.playCard(game, 'player', 'wg1'));
   assert.equal(r.ok, true);
   assert.equal(game.player.hand.length, 0, '发动者获得被无懈抵消 → 不摸');

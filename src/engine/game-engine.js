@@ -93,6 +93,12 @@
           drawCount: 2
         };
         SkillRuntime.runHook(skillRegistry, 'onDrawPhase', drawContext);
+        // v14 Q3: 突袭玩家 ask — 摸牌决策挂起 (发动=放弃摸牌, 摸与否由
+        // resolver 收尾), 快照补记 hook 后的最终 drawCount。
+        if (game.pauseState && game.pauseState.tuxiAsk && game.pendingChoice) {
+          game.pauseState.tuxiAsk.drawCount = drawContext.drawCount;
+          return { suspended: true };
+        }
         return drawCards(game, actor, drawContext.drawCount);
       }
 
@@ -983,6 +989,8 @@
       registerResponseKind('qilin-pick', resolveQilinPickChoice);
       registerResponseKind('cixiong-fire', resolveCixiongFireChoice);
       registerResponseKind('cixiong-choose', resolveCixiongChoose);
+      // v14 Q3: 突袭摸牌阶段真 ask
+      registerResponseKind('tuxi-pick', resolveTuxiPickChoice);
       registerResponseKind('jiedao-decision', resolveJiedaoDecisionChoice);
       registerResponseKind('wugu-pick', resolveWuguPickChoice);
       registerResponseKind('guohe-1v1-pick', resolveGuohe1v1PickChoice);
@@ -2091,13 +2099,71 @@
         setPhase(game, actor, 'draw');
         log(game, actorName(game, actor) + '的摸牌阶段。');
         if (!state.flags.skipDraw) {
-          performDrawPhase(game, actor);
+          var drawOutcome = performDrawPhase(game, actor);
+          // v14 Q3: 突袭 ask 挂起 — 停在摸牌阶段, 出牌推进由 tuxi-pick
+          // resolver 经 finishDrawPhaseAndAdvance 收尾。
+          if (drawOutcome && drawOutcome.suspended) {
+            return success('等待' + actorName(game, actor) + '决定【突袭】。');
+          }
         } else {
           log(game, actorName(game, actor) + '跳过摸牌阶段。');
         }
+        return finishDrawPhaseAndAdvance(game, actor);
+      }
+
+      // v14 Q3: 摸牌阶段收尾 + 推进出牌/弃牌 — 自 continueTurnAfterJudgeArea
+      // 尾部拆出, 供 突袭 ask resolver 重入 (语句与拆出前逐行一致)。
+      function finishDrawPhaseAndAdvance(game, actor) {
+        var state = game[actor];
         setPhase(game, actor, nextPlayablePhase(state));
         log(game, actorName(game, actor) + '进入' + (game.phase === 'play' ? '出牌' : '弃牌') + '阶段。');
         return success('回合开始。');
+      }
+
+      // v14 Q3: 突袭 ask resolver — decision { targets: [seat, seat?] } 发动
+      // (放弃摸牌, 获得每席一张手牌); { decline } 或空决策 = 放弃发动照常
+      // 摸牌 (soak 决策表 {} 兜底安全)。非法目标按惯例重挂。
+      function resolveTuxiPickChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.tuxiAsk;
+        if (!saved) return fail('找不到【突袭】询问的暂停状态。');
+        var actor = pending.actor;
+        var d = decision || {};
+        // 评审收口: 显式传了 targets 但不是数组 (如单个座席字符串) → 按
+        // 惯例重挂报错, 不静默落入放弃分支。
+        if (d.targets != null && !Array.isArray(d.targets)) {
+          setPendingChoice(game, pending);
+          return fail('【突袭】的 targets 须为座席数组（一至两名）。');
+        }
+        var requested = Array.isArray(d.targets) ? d.targets : [];
+        if (!d.decline && requested.length) {
+          var legalSeats = (pending.candidates || []).map(function (cd) { return cd.seat; });
+          var picks = [];
+          for (var i = 0; i < requested.length; i += 1) {
+            var seat = resolveSeatOption(game, requested[i]);
+            if (!seat || legalSeats.indexOf(seat) < 0 || picks.indexOf(seat) >= 0
+                || !game[seat] || game[seat].hp <= 0 || !(game[seat].hand || []).length) {
+              setPendingChoice(game, pending);
+              return fail('请选择一至两名有手牌的其他角色，或 decline 放弃发动【突袭】。');
+            }
+            picks.push(seat);
+          }
+          if (picks.length > 2) {
+            setPendingChoice(game, pending);
+            return fail('【突袭】至多指定两名角色。');
+          }
+          game.pauseState.tuxiAsk = null;
+          picks.forEach(function (seat) {
+            takeHandCard(game, seat, actor, '发动【突袭】，获得');
+          });
+          log(game, actorName(game, actor) + '发动【突袭】，放弃摸牌。');
+          return finishDrawPhaseAndAdvance(game, actor);
+        }
+        game.pauseState.tuxiAsk = null;
+        log(game, actorName(game, actor) + '选择不发动【突袭】。');
+        // 评审收口: == null 判缺省而非 falsy 兜底 — 快照 drawCount=0 (未来
+        // 某技能压零) 时放弃发动应摸 0 张, 不得被 || 吞成 2。
+        drawCards(game, actor, saved.drawCount == null ? 2 : saved.drawCount);
+        return finishDrawPhaseAndAdvance(game, actor);
       }
 
       function finishPlayPhase(game) {
@@ -2198,7 +2264,12 @@
         if (game.phase === 'judge') {
           setPhase(game, actor, 'draw');
           log(game, actorName(game, actor) + '的摸牌阶段。');
-          if (!game[actor].flags.skipDraw) performDrawPhase(game, actor);
+          if (!game[actor].flags.skipDraw) {
+            var drawStep = performDrawPhase(game, actor);
+            // 评审收口: 突袭 ask 挂起时如实回报 (resolver 收尾时直接推进
+            // 到出牌/弃牌阶段, 手动分步 API 无需再补 draw→play 一步)。
+            if (drawStep && drawStep.suspended) return success('等待【突袭】决定。');
+          }
           return success('进入摸牌阶段。');
         }
         if (game.phase === 'draw') {

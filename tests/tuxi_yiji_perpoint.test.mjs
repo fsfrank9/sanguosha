@@ -24,8 +24,10 @@ function buildGame(playerHero, enemyHero, seed) {
 
 // ─── 突袭: v13 审计三轮 — "放弃摸牌, 改为获得一至两名角色的各一张手牌" ───
 
-test('突袭 v13: 1v1 单候选缺省不发动 (期望值门), 照常摸两张', () => {
+test('突袭 v13: 1v1 单候选 auto 档不发动 (期望值门), 照常摸两张', () => {
+  // v14 Q3: 玩家缺省改真 ask — EV 门语义随 pref='auto' 档保留 (守护随缺省更新)。
   const game = buildGame('zhangliao', 'caocao');
+  game.player.skillPreferences = Object.assign({}, game.player.skillPreferences, { tuxi: 'auto' });
   game.enemy.hand = [c('sha', { id: 'opp-card' })];
   game.deck = [c('shan', { id: 'draw-A' }), c('shan', { id: 'draw-B' })];
 

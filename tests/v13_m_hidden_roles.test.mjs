@@ -350,7 +350,7 @@ test('M3 遥测: 玩家护驾代闪 (杀响应分支) → stanceLog 记 aid 证�
 
 // ───── M3: 内奸骑墙 (打压感知强势侧 +15) ────────────────────────────
 
-test('M3: 内奸骑墙 — 主忠侧强势 → 打忠臣; 反贼侧强势 → 打反贼', () => {
+test('M3: 内奸骑墙 (m3 冻结档打压强势侧) × v14 装忠叠加 — 双档并钉', () => {
   // 明置 5 席 (感知=真值, 骑墙在开放身份场同样生效)。内奸=ally3。
   // 候选 ally(忠臣) vs ally2(反贼) 血线/手牌全同 — 反贼有 +8 击杀奖励
   // 基线, 骑墙 +15 应能翻转。
@@ -361,8 +361,15 @@ test('M3: 内奸骑墙 — 主忠侧强势 → 打忠臣; 反贼侧强势 → �
   game.player.hand = [c('shan'), c('shan'), c('shan'), c('shan')];
   game.enemy.hp = 1;
   game.enemy.hand = [];
+  // v14 Q2: 缺省档在骑墙 (+15) 之上叠 装忠 (+10 打反贼) — 主忠强势时
+  // 反贼 8+10=18 反超忠臣 15, 内奸转为打反贼立信 (守护随行为更新);
+  // M3 旧口径经 aiRenegadeProfile='m3' 冻结档保留可测。
   const pickLordStrong = Engine.aiPickHostileTarget(game, 'ally3', ['ally', 'ally2']);
-  assert.equal(pickLordStrong, 'ally', '主忠强势 → 骑墙打压忠臣 (+15 胜过反贼 +8)');
+  assert.equal(pickLordStrong, 'ally2', 'v14 装忠: 主忠强势仍打反贼 (8+10 > 15)');
+  game.ally3.aiRenegadeProfile = 'm3';
+  const pickLordStrongM3 = Engine.aiPickHostileTarget(game, 'ally3', ['ally', 'ally2']);
+  assert.equal(pickLordStrongM3, 'ally', 'm3 冻结: 主忠强势 → 骑墙打压忠臣 (+15 胜过反贼 +8)');
+  delete game.ally3.aiRenegadeProfile;
   // 反贼侧强势: 反转资源
   game.player.hp = 1;
   game.player.hand = [];
@@ -370,7 +377,7 @@ test('M3: 内奸骑墙 — 主忠侧强势 → 打忠臣; 反贼侧强势 → �
   game.enemy.hand = [c('shan'), c('shan'), c('shan'), c('shan')];
   game.ally2.hp = 4;
   const pickRebelStrong = Engine.aiPickHostileTarget(game, 'ally3', ['ally', 'ally2']);
-  assert.equal(pickRebelStrong, 'ally2', '反贼强势 → 骑墙打压反贼 (15+8)');
+  assert.equal(pickRebelStrong, 'ally2', '反贼强势 → 骑墙+装忠同向打反贼 (15+8+10)');
 });
 
 test('M3: 非内奸不骑墙 — 反贼多候选仍按旧口径评分 (集火低血线)', () => {

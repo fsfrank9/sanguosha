@@ -2196,6 +2196,27 @@
             return game[seat] && game[seat].hp > 0 && (game[seat].hand || []).length > 0;
           });
           if (!candidates.length) return;
+          // v14 Q3 (三轮审计降级项销账): 玩家张辽摸牌阶段真 ask — 缺省挂
+          // tuxi-pick (候选/放弃自选), 摸牌在 resolver 收尾 (performDrawPhase
+          // 检 pauseState.tuxiAsk 挂起, 出牌阶段推进由 resolver 补齐)。
+          // 显式 'auto'/'always' 保留旧直发路径 (soak/基准逐键 auto 不受扰)。
+          if (context.actor === 'player' && pref !== 'auto' && pref !== 'always') {
+            if (!game.pauseState) game.pauseState = {};
+            game.pauseState.tuxiAsk = { actor: actor, drawCount: context.drawCount };
+            setPendingChoice(game, {
+              kind: 'tuxi-pick',
+              actor: actor,
+              candidates: candidates.map(function (seat) {
+                return { seat: seat, name: game[seat].name, handCount: (game[seat].hand || []).length };
+              })
+            });
+            log(game, '等待' + actorName(game, actor) + '决定是否发动【突袭】。');
+            // 已知局限 (评审收口记录): runHook 无早退, 注册在 tuxi 之后的
+            // onDrawPhase hook (如裸衣) 在挂起期间照跑, 不受"发动后
+            // drawCount 归零"抑制 — 现役武将无 tuxi+裸衣 组合, 若未来
+            // 出现需给 runHook 增加挂起短路。
+            return;
+          }
           var pool = StateRuntime.perceivedHostileFirstPool(game, actor, candidates);
           var picks = pool.slice(0, 2);
           if (picks.length < 2 && pref !== 'always') return;
