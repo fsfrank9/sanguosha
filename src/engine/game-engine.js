@@ -54,6 +54,8 @@
       var setPhase = PhaseRuntime.setPhase;
       var nextPlayablePhase = PhaseRuntime.nextPlayablePhase;
       var resetActorTurnState = PhaseRuntime.resetActorTurnState;
+      // v15 S1: 蛊惑限次全场按回合复位 (响应窗口声明发生在他人回合内)
+      var resetGuhuoTurnLimit = PhaseRuntime.resetGuhuoTurnLimit;
       var resetEndOfTurnState = PhaseRuntime.resetEndOfTurnState;
       var evaluateDelayedTrick = JudgementRuntime.evaluateDelayedTrick;
 
@@ -352,7 +354,9 @@
         // v12 H 复核修复: 铁索传导环被濒死救援挂起后的续跑 (伤害域后置装配, 包装注入)
         resumeChainTransmit: function (game) { return DamageDyingRuntime.advanceChainTransmit(game); },
         // v14 P1: 多目标杀链被逐席挂起 (闪响应/濒死/流离等) 后的续跑 (杀链域后置装配, 包装注入)
-        resumeShaChain: function (game) { return ShaFlowRuntime.advanceShaChain(game); }
+        resumeShaChain: function (game) { return ShaFlowRuntime.advanceShaChain(game); },
+        // v15 S1: 响应窗口蛊惑声明拦截 (函数声明提升, 蛊惑域后置装配)
+        guhuoResponseIntercept: guhuoResponseIntercept
       });
       var requestPlayerResponse = ResponseRuntime.requestPlayerResponse;
       var RESPONSE_KIND_RESOLVERS = ResponseRuntime.RESPONSE_KIND_RESOLVERS;
@@ -394,6 +398,10 @@
       // v11 B1: 伤害/濒死域拆分 — damage/enterDying/濒死救援/铁索传导 迁往
       // ./damage-dying.js, 引擎闭包能力经 createDamageDyingRuntime 依赖注入。
       var DamageDyingRuntime = createDamageDyingRuntime({
+        // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
+        guhuoResponsePossible: guhuoResponsePossible,
+        // v15 S1: 蛊惑声明救援牌的注入取用口 (濒死不走 consumeResponse)
+        takeGuhuoResponseCard: takeGuhuoResponseCard,
         skillRegistry: skillRegistry,
         log: log,
         success: success,
@@ -576,8 +584,26 @@
         return card ? { card: card, asName: card.name, skillName: null } : null;
       }
 
+      // v15 S1: 蛊惑打出流程注入口 — 声明已亮出 (无人质疑/验真), 实体牌
+      // 在处理区待用, 牌面除牌名外全部确定。各响应消费出口先来这里取牌,
+      // 取到即以"声明牌名 + 实体牌面"顶替常规响应扫描 (实体牌已在声明期
+      // 离手, 不再从任何区域摘牌)。一次性消费, 取走即清。
+      var GUHUO_SHA_DECLARES = ['sha', 'fire_sha', 'thunder_sha'];
+
+      function takeGuhuoResponseCard(game, actor, types) {
+        var pending = game && game.pauseState && game.pauseState.guhuoResponse;
+        if (!pending || pending.actor !== actor) return null;
+        if (types && types.indexOf(pending.declareType) < 0) return null;
+        game.pauseState.guhuoResponse = null;
+        return pending;
+      }
+
       function consumeResponse(game, actor, type, reason, preferredCardId) {
-        var response = findResponseCard(game[actor], type, preferredCardId, game);
+        var guhuoResolved = takeGuhuoResponseCard(game, actor,
+          type === 'sha' ? GUHUO_SHA_DECLARES : [type]);
+        var response = guhuoResolved
+          ? { card: guhuoResolved.physical, asName: guhuoResolved.declaredName, skillName: '蛊惑' }
+          : findResponseCard(game[actor], type, preferredCardId, game);
         if (!response) {
           // v12 I2: 响应空窗记账 (纯遥测) — 自动响应含全部转化路径, 拿不出
           // 即公开证明该座席当下凑不出此牌型; AI 估计在其下个回合开始 (摸牌,
@@ -624,7 +650,12 @@
 
       function consumeWuxie(game, actor, reason, preferredCardId) {
         var card;
-        if (preferredCardId) {
+        // v15 S1: 蛊惑声明的【无懈可击】(响应中的使用流程) — 牌面已亮出,
+        // 实体牌在处理区, 直接顶替手牌扫描。
+        var guhuoWuxie = takeGuhuoResponseCard(game, actor, ['wuxie']);
+        if (guhuoWuxie) {
+          card = guhuoWuxie.physical;
+        } else if (preferredCardId) {
           // v10 V5: 玩家指定用哪张无懈 (面板候选选定)
           var state = game[actor];
           var idx = state.hand.findIndex(function (c) {
@@ -637,7 +668,8 @@
         }
         if (!card) return false;
         discardCard(game, card);
-        log(game, actorName(game, actor) + '打出【无懈可击】抵消' + reason + '。');
+        log(game, actorName(game, actor) + (guhuoWuxie ? '发动【蛊惑】，将【' + card.name + '】当' : '打出')
+          + '【无懈可击】抵消' + reason + '。');
         SkillRuntime.runHook(skillRegistry, 'onCardUse', {
           game: game,
           actor: actor,
@@ -658,6 +690,10 @@
       // consumeWuxie/requestPlayerResponse 为函数声明/已装配别名, 提升与
       // 装配顺序保证前向引用安全。
       var TricksRuntime = createTricksRuntime({
+        // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
+        guhuoResponsePossible: guhuoResponsePossible,
+        // v15 S 收口: 借刀持刀者使用杀 — 声明牌注入取用口 (不走 consumeResponse)
+        takeGuhuoResponseCard: takeGuhuoResponseCard,
         log: log,
         success: success,
         fail: fail,
@@ -739,6 +775,8 @@
       // v11 B1: 装备域装配 — 依赖注入引擎闭包能力 (函数声明经包装注入,
       // 提升保证前向引用); yinyue-response 在工厂内自注册。
       var EquipmentRuntime = createEquipmentRuntime({
+        // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
+        guhuoResponsePossible: guhuoResponsePossible,
         log: log,
         success: success,
         fail: fail,
@@ -778,6 +816,8 @@
       // (AIRuntime 后置), 其余 deps 此时均已就绪。直调面回绑同名 var,
       // registerResponseKind 注册行与 PLAY_HANDLERS/导出表零文本改动。
       var ShaFlowRuntime = createShaFlowRuntime({
+        // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
+        guhuoResponsePossible: guhuoResponsePossible,
         log: log,
         fail: fail,
         success: success,
@@ -883,6 +923,13 @@
       function resolvePendingChoice(game, decision) {
         var pending = game && game.pendingChoice;
         if (!pending) return fail('没有待处理的选择。');
+        // v15 S1: 响应窗口蛊惑声明 — 先于 kind resolver 拦截 (声明是"如何
+        // 进行响应"的另一条分支, 不是该 kind 的一个决策值)。校验失败时
+        // pendingChoice 原样留在槽内, 窗口不丢。
+        if (decision && decision.guhuo) {
+          return finishPendingChoiceResolution(game,
+            guhuoResponseIntercept(game, pending, decision.guhuo));
+        }
         // 注册表迁移收官: 所有 pendingChoice / response kind 统一经
         // RESPONSE_KIND_RESOLVERS 分发 (此前仅 V3-V6 的 shan/wuxie/sha-duel/
         // wanjian/yinyue 走注册表, 其余 15 个 kind 是手写 if 链)。
@@ -890,6 +937,13 @@
         if (!resolver) return fail('未知的选择类型：' + pending.kind);
         game.pendingChoice = null;
         return finishPendingChoiceResolution(game, resolver(game, pending, decision || {}));
+      }
+
+      // v15 S1: 响应窗口蛊惑声明拦截 (两个 dispatcher 共用)。函数声明提升,
+      // GuhuoRuntime 在文件末装配、调用发生在运行期 — 与既有晚绑定包装
+      // (aiShouldChallengeGuhuo 等) 同款。
+      function guhuoResponseIntercept(game, pending, guhuoOpts) {
+        return GuhuoRuntime.declareGuhuoResponse(game, pending, guhuoOpts || {});
       }
 
       // v12 F1: 技能域函数群 (trigger/resolver/辅助 共 53 个) 已整体迁往
@@ -1996,6 +2050,9 @@
         game.turn = actor;
         var state = game[actor];
         resetActorTurnState(state);
+        // v15 S1: 蛊惑"每名角色的回合内限一次"是全场按回合刷新的额度
+        // (响应窗口声明发生在他人回合内) → 每席随回合切换复位。
+        resetGuhuoTurnLimit(game);
 
         setPhase(game, actor, 'prepare');
         log(game, actorName(game, actor) + '的准备阶段。');
@@ -2652,9 +2709,17 @@
         registerResponseKind: registerResponseKind,
         aiShouldChallengeGuhuo: function (game, seat, gh) {
           return AIRuntime.aiShouldChallengeGuhuo(game, seat, gh);
-        }
+        },
+        // v15 S1: 亮出为真后把窗口交还原 kind resolver 走正常打出/使用流程。
+        responseResolverFor: function (kind) { return RESPONSE_KIND_RESOLVERS[kind]; }
       });
       var playGuhuoDeclare = GuhuoRuntime.playGuhuoDeclare;
+      // v15 S1: 各响应窗口 gate 的开窗谓词 (于吉可背面朝上打出任意手牌 →
+      // 手上没有所需牌型也要开窗)。晚绑定包装: 调用点在 sha-flow/tricks/
+      // damage-dying 域, 装配早于本处。
+      function guhuoResponsePossible(game, actor) {
+        return GuhuoRuntime.guhuoResponsePossible(game, actor);
+      }
 
       // 引擎闭包能力经 createAIRuntime 依赖注入; 公开 API 形状不变。
       var AIRuntime = createAIRuntime({
@@ -2680,8 +2745,11 @@
         // v14 P2: 方天画戟额外目标前置查询 (AI 多目标启发)
         shaExtraTargetLimit: shaExtraTargetLimit,
         // v14 R1: 蛊惑声明 (AI 于吉 v1 无中启发)
+        // v15 S2: 全型声明启发 — 目标枚举与借刀受害者候选同步注入
         playGuhuoDeclare: playGuhuoDeclare,
-        guhuoAvailable: GuhuoRuntime.guhuoAvailable
+        guhuoAvailable: GuhuoRuntime.guhuoAvailable,
+        guhuoLegalTargets: GuhuoRuntime.guhuoLegalTargets,
+        jiedaoVictimCandidates: jiedaoVictimCandidates
       });
       var scoreCardForAI = AIRuntime.scoreCardForAI;
       var aiEstimateShaCount = AIRuntime.aiEstimateShaCount;
@@ -2746,6 +2814,12 @@
         playGuhuoDeclare: playGuhuoDeclare,
         guhuoAvailable: GuhuoRuntime.guhuoAvailable,
         guhuoLegalTargets: GuhuoRuntime.guhuoLegalTargets,
+        // v15 S1: 响应窗口面 — 当前挂起窗口是否可声明 (UI 入口门禁) 与
+        // 该窗口的可声明牌名 (声明入口经 resolvePendingChoice({guhuo:…}))。
+        guhuoResponseAvailable: GuhuoRuntime.guhuoResponseAvailable,
+        guhuoResponseTypes: function (game) {
+          return GuhuoRuntime.guhuoResponseMenu(game);
+        },
         // v14 P2: 方天画戟额外目标前置查询 (UI 多目标暂存 / AI 目标启发用) —
         // 手牌中仅剩这张【杀】且装备方天 → 2, 否则 0。
         shaExtraTargetLimit: shaExtraTargetLimit,

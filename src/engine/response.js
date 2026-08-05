@@ -180,6 +180,12 @@
     function resolveResponseChoice(game, decision) {
       var pending = game && game.pendingChoice;
       if (!pending) return fail('没有待处理的响应。');
+      // v15 S1: 响应窗口蛊惑声明 — 与 resolvePendingChoice 同款前置拦截
+      // (两个 dispatcher 都是公开入口, 口径必须一致)。
+      if (decision && decision.guhuo && deps.guhuoResponseIntercept) {
+        return finishPendingChoiceResolution(game,
+          deps.guhuoResponseIntercept(game, pending, decision.guhuo));
+      }
       var resolver = RESPONSE_KIND_RESOLVERS[pending.kind];
       if (!resolver) return fail('未注册的响应类型：' + pending.kind);
       game.pendingChoice = null;

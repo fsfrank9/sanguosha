@@ -770,6 +770,18 @@
             <button class="btn small" id="duelResponseDeclineBtn">不出【杀】</button>
           </div>
         </div>
+        <!-- v15 S1: 蛊惑响应声明面板 — 玩家为于吉且响应窗口 (闪/杀/桃·酒/
+             无懈) 挂起时与该窗口并列显示: 选声明牌名 + 盖置手牌, 确认后走
+             打出流程/响应中的使用流程 (质疑链复用)。窗口所需牌名由引擎
+             guhuoResponseTypes 给出, UI 不自行推断。 -->
+        <div class="guhuo-response-panel pending-prompt-panel" id="guhuoResponsePanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="guhuoResponseHint">蛊惑：可将一张手牌背面朝上当所需的牌打出</span>
+          <div class="guhuo-response-types pending-prompt-panel__choices" id="guhuoResponseTypes" aria-live="polite"></div>
+          <div class="guhuo-response-covers pending-prompt-panel__choices" id="guhuoResponseCovers" aria-live="polite"></div>
+          <div class="guhuo-response-actions pending-prompt-panel__actions">
+            <button class="btn small" id="guhuoResponseConfirmBtn" disabled>发动【蛊惑】</button>
+          </div>
+        </div>
         <!-- v12 H6/H7: 激将 (jijiang-aid, 代打【杀】) / 护驾 (hujia-aid, 代打
              【闪】) 求助响应面板 — AI 主公打不出所需牌时向玩家 (同势力座席)
              求助。两个 kind 复用同一 DOM (与鬼道复用鬼才面板同例)，文案按

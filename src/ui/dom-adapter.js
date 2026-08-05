@@ -199,6 +199,9 @@
           'guhuoChallengePanel', 'guhuoChallengeHint', 'guhuoChallengeBtn', 'guhuoPassBtn',
           'guhuoDeclarePanel', 'guhuoDeclareHint', 'guhuoTypeChoices', 'guhuoCoverChoices',
           'guhuoConfirmBtn', 'guhuoCancelBtn',
+          // v15 S1: 蛊惑响应声明面板 (响应窗口内的打出/使用流程入口)
+          'guhuoResponsePanel', 'guhuoResponseHint', 'guhuoResponseTypes',
+          'guhuoResponseCovers', 'guhuoResponseConfirmBtn',
           'tuxiConfirmBtn', 'tuxiDeclineBtn',
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
           'cixiongFirePanel', 'cixiongFireHint', 'cixiongFireBtn', 'cixiongFireDeclineBtn',

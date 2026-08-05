@@ -430,8 +430,10 @@
       // v10 V4: 银月枪 触发 + 玩家为目标 + shanResponse=ask + 有闪 → 暂停.
       if (targetActor === 'player') {
         var yinyueTarget = game.player;
+        // v15 S1: 蛊惑可背面朝上打出任意手牌当【闪】 → 无闪也要开窗。
         if (yinyueTarget.skillPreferences && yinyueTarget.skillPreferences.shanResponse === 'ask'
-            && hasShanResponseAvailable(yinyueTarget)) {
+            && (hasShanResponseAvailable(yinyueTarget)
+              || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, 'player')))) {
           requestPlayerResponse(game, {
             kind: 'yinyue-response',
             actor: 'player',

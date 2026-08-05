@@ -1272,9 +1272,57 @@
     //   群体回血) 且自己血线可承受缠怨久期风险 (hp>=3);
     // ③ 护财赌假 — 敌对于吉声明 拆/顺 指向自己且自己有牌可失。
     // 只读公开面: 声明型/目标/自身状态/感知敌对。
+    // v15 S2 增补两面 (响应窗口接入后):
+    // ④ 响应赌假 — 声明是对"我推进中的事件"的响应 (闪应我的杀/万箭/银月,
+    //   杀应我发起的决斗, 桃救我正打死的人); 真牌打出我照样落空, 赌假的
+    //   代价上限是缠怨久期, 故血线可承受 (hp>=2) 即开。
+    // ⑤ 被抓包记忆 — 该声明者此前被质破的次数多于被验真的次数 (亮出是
+    //   全场公开信息, 不读暗牌不读身份), 敌对且 hp>=2 时提高质疑意愿。
+    function guhuoResponseBlocksMe(game, seat, gh) {
+      if (gh.mode !== 'response') return false;
+      var pending = gh.responsePending || {};
+      if (pending.kind === 'dying-rescue') {
+        // 桃/酒救援: 被救者与我敌对 → 这张响应是在拆我的战果。
+        return !!pending.dyingActor
+          && StateRuntime.perceivedHostile(game, seat, pending.dyingActor);
+      }
+      if (pending.kind === 'wuxie-response') {
+        // 无懈抵消的是场上正在结算的锦囊 — 只在敌对时按 denial 面处理。
+        return StateRuntime.perceivedHostile(game, seat, gh.actor);
+      }
+      return pending.sourceActor === seat || pending.starterActor === seat;
+    }
+
+    // 评审收口: "被我的事件挡住"只是必要条件, 不是充分条件 — 首版无条件
+    // 恒质疑, 于吉用**真牌**声明即可稳定钓走缠怨 (零成本), 此后质疑队列
+    // 恒空、全 16 型可无风险诈。补三条各自独立的赌假理由 (全部公开信息):
+    //   ① 有前科 — 该声明者被质破次数多于被验真次数;
+    //   ② 响应空窗记账 — 该席此前公开证明凑不出这一牌型 (consumeResponse
+    //      的 aiRevealed 遥测, 真实对局中同为公开信息);
+    //   ③ 高赌注 — 赌中即当场终结 (濒死救援) 或对手血线已见底 (打出成功
+    //      他就活下来), 值得用缠怨久期换。
+    function guhuoResponseWorthChallenging(game, seat, gh) {
+      var st = game[seat];
+      if (!st || st.hp < 2) return false; // 缠怨久期风险不可承受
+      if (!guhuoResponseBlocksMe(game, seat, gh)) return false;
+      var declarer = game[gh.actor] || {};
+      if ((declarer.guhuoBusted || 0) > (declarer.guhuoProven || 0)) return true;
+      var revealed = declarer.aiRevealed || {};
+      var needed = (gh.declareType === 'fire_sha' || gh.declareType === 'thunder_sha')
+        ? 'sha' : gh.declareType;
+      if (revealed[needed]) return true;
+      var pending = gh.responsePending || {};
+      if (pending.kind === 'dying-rescue') return true;
+      return declarer.hp <= 1;
+    }
+
     function aiShouldChallengeGuhuo(game, seat, gh) {
       var st = game[seat];
       if (!st || st.chanyuan) return false;
+      if (guhuoResponseWorthChallenging(game, seat, gh)) return true;
+      var declarer = game[gh.actor] || {};
+      if ((declarer.guhuoBusted || 0) > (declarer.guhuoProven || 0) && st.hp >= 2
+          && StateRuntime.perceivedHostile(game, seat, gh.actor)) return true;
       var opts = gh.options || {};
       var targetsMe = opts.target === seat
         || (Array.isArray(opts.targets) && opts.targets.indexOf(seat) >= 0);
@@ -1295,30 +1343,101 @@
       return false;
     }
 
-    // AI 于吉声明 (v1 无中启发): 真无中恒走蛊惑 (无人质疑等价直出, 被质疑
-    // 反赚缠怨); 无真无中时用"死牌" (闪/无懈 — 出牌阶段无主动使用时机)
-    // 诈无中, 且仅在按自身感知模型预判无人会质疑 (无 敌对且hp>=3 且未缠怨
-    // 的存活席) 时才诈 — 与上面质疑启发自洽, AI 生态内诈声明不送牌。
+    // v15 S2: AI 于吉声明启发 (全型) —
+    // ① 真牌恒蛊惑: 手上有可直接使用的声明型真牌时走蛊惑而非直出 (无人
+    //    质疑等价直出, 被质疑反赚缠怨, 严格不劣);
+    // ② 诈声明: 无可用真牌时用"死牌" (闪/无懈 — 出牌阶段无主动使用时机)
+    //    按型 EV 降序试, 且仅在按自身感知模型预判无人会质疑时才诈 (与
+    //    质疑启发自洽, AI 生态内诈声明不送牌)。
+    // 合法性/目标合法性一律交给 playGuhuoDeclare 判 (声明失败零副作用),
+    // AI 侧只负责排序与目标挑选 — 单一真相源, 不复制规则。
+    var GUHUO_DECLARE_PRIORITY = [
+      'wuzhong', 'tao', 'shunshou', 'guohe', 'sha', 'fire_sha', 'thunder_sha',
+      'juedou', 'huogong', 'nanman', 'wanjian', 'jiu', 'jiedao', 'wugu', 'taoyuan', 'tiesuo'
+    ];
+    var GUHUO_SEAT_TYPES = ['sha', 'fire_sha', 'thunder_sha', 'juedou', 'guohe',
+      'shunshou', 'huogong', 'jiedao'];
+
+    // 声明型 → 结算选项 (目标/受害者/横置座席)。取不到目标即返回 null,
+    // 由调用方跳过该型。
+    function aiGuhuoDeclareOptions(game, actor, type) {
+      var opts = {};
+      if (GUHUO_SEAT_TYPES.indexOf(type) >= 0) {
+        var legal = (deps.guhuoLegalTargets ? deps.guhuoLegalTargets(game, actor, type) : [])
+          .filter(function (seat) { return seat !== actor; });
+        if (!legal.length) return null;
+        var picked = aiPickHostileTarget(game, actor, legal) || legal[0];
+        opts.target = picked;
+        if (type === 'jiedao') {
+          // 借刀: 持刀者攻击的受害者取"持刀者可及且与我敌对"的一席。
+          var victims = deps.jiedaoVictimCandidates
+            ? deps.jiedaoVictimCandidates(game, picked) : [];
+          var victim = victims.filter(function (seat) {
+            return seat !== actor && StateRuntime.perceivedHostile(game, actor, seat);
+          })[0] || victims.filter(function (seat) { return seat !== actor; })[0];
+          if (!victim) return null;
+          opts.jiedaoVictim = victim;
+        }
+        return opts;
+      }
+      if (type === 'tiesuo') {
+        var chainable = StateRuntime.aliveSeats(game).filter(function (seat) {
+          return seat !== actor && StateRuntime.perceivedHostile(game, actor, seat);
+        });
+        if (chainable.length < 2) return null; // 只横置一名敌人收益近乎为零
+        opts.targets = chainable.slice(0, 2);
+      }
+      return opts;
+    }
+
+    function firstHandCardOfType(hand, type) {
+      for (var i = 0; i < hand.length; i += 1) {
+        if (hand[i] && hand[i].type === type) return hand[i];
+      }
+      return null;
+    }
+
+    function aiGuhuoWouldBeChallenged(game, actor) {
+      return StateRuntime.aliveSeats(game).some(function (seat) {
+        var other = game[seat];
+        return seat !== actor && other && !other.chanyuan && other.hp >= 3
+          && StateRuntime.perceivedHostile(game, actor, seat);
+      });
+    }
+
     function aiMaybeDeclareGuhuo(game, actor) {
       if (!deps.guhuoAvailable || !deps.guhuoAvailable(game, actor)) return null;
       var st = game[actor];
       var hand = st.hand || [];
-      var realWuzhong = hand.find(function (card) { return card.type === 'wuzhong'; });
-      var cover = realWuzhong;
-      if (!cover) {
-        var deadCard = hand.find(function (card) {
-          return card.type === 'shan' || card.type === 'wuxie';
-        });
-        if (!deadCard) return null;
-        var wouldBeChallenged = StateRuntime.aliveSeats(game).some(function (seat) {
-          var other = game[seat];
-          return seat !== actor && other && !other.chanyuan && other.hp >= 3
-            && StateRuntime.perceivedHostile(game, actor, seat);
-        });
-        if (wouldBeChallenged) return null;
-        cover = deadCard;
+      // ① 真牌恒蛊惑 — 按 EV 序取第一张能声明其本名的真牌。
+      for (var i = 0; i < GUHUO_DECLARE_PRIORITY.length; i += 1) {
+        var type = GUHUO_DECLARE_PRIORITY[i];
+        var real = firstHandCardOfType(hand, type);
+        if (!real) continue;
+        var trueOpts = aiGuhuoDeclareOptions(game, actor, type);
+        if (!trueOpts) continue;
+        trueOpts.cardId = real.id;
+        trueOpts.declareType = type;
+        var trueResult = deps.playGuhuoDeclare(game, actor, trueOpts);
+        if (trueResult && trueResult.ok) return trueResult;
       }
-      return deps.playGuhuoDeclare(game, actor, { cardId: cover.id, declareType: 'wuzhong' });
+      // ② 诈声明 — 死牌盖置, 预判有质疑者即不诈。
+      var deadCard = hand.find(function (card) {
+        return card.type === 'shan' || card.type === 'wuxie';
+      });
+      if (!deadCard) return null;
+      if (aiGuhuoWouldBeChallenged(game, actor)) return null;
+      for (var j = 0; j < GUHUO_DECLARE_PRIORITY.length; j += 1) {
+        var fakeType = GUHUO_DECLARE_PRIORITY[j];
+        if (fakeType === deadCard.type) continue; // 同名即真牌, 已在 ① 试过
+        var fakeOpts = aiGuhuoDeclareOptions(game, actor, fakeType);
+        if (!fakeOpts) continue;
+        fakeOpts.cardId = deadCard.id;
+        fakeOpts.declareType = fakeType;
+        var fakeResult = deps.playGuhuoDeclare(game, actor, fakeOpts);
+        if (fakeResult && fakeResult.ok) return fakeResult;
+      }
+      return null;
     }
 
     return {

@@ -590,7 +590,11 @@
         }).filter(jijiuRed);
         jijiuCards = (responderState.hand || []).filter(jijiuRed).concat(jijiuEquips);
       }
-      if (!taoCards.length && !jiuCards.length && !jijiuCards.length) {
+      // v15 S1: 于吉可背面朝上使用任意手牌当【桃】(自己濒死时亦可当【酒】)
+      // → 手上没有桃/酒也要开窗 (仅玩家席 ask 路径)。
+      var guhuoRescue = pref === 'ask' && deps.guhuoResponsePossible
+        && deps.guhuoResponsePossible(game, responder);
+      if (!taoCards.length && !jiuCards.length && !jijiuCards.length && !guhuoRescue) {
         log(game, actorName(game, responder) + '没有可用的【桃】/【酒】，无法救援。');
         return { skipped: true };
       }
@@ -647,10 +651,18 @@
       return executeDyingRescue(game, responder, dyingActor, 'jijiu', jijiuCards[0].id);
     }
 
-    function executeDyingRescue(game, responder, dyingActor, kind, cardId) {
+    // v15 S1: guhuoCard — 蛊惑声明并亮出的实体牌 (声明期已离手, 锚在处理
+    // 区)。给出时跳过区域摘牌, 直接按声明的 kind 结算; 牌面除牌名外已
+    // 确定 (银月枪/回复量等一律按实体牌面与常规路径同款判定)。
+    function executeDyingRescue(game, responder, dyingActor, kind, cardId, guhuoCard) {
       var responderState = game[responder];
       var dyingState = game[dyingActor];
       if (!responderState || !dyingState) return { skipped: true };
+      if (guhuoCard) {
+        return finishDyingRescueWithCard(game, responder, dyingActor, kind, guhuoCard, function () {
+          putCard(game, guhuoCard, { zone: 'hand', actor: responder });
+        });
+      }
       var idx = responderState.hand.findIndex(function (c) { return c.id === cardId; });
       // audit4-M9: 急救允许红色装备牌 — 手牌找不到时查装备区 (仅 jijiu;
       // 桃/酒仍限手牌)。装备来源成功使用后补失去时机, 回退则原槽放回。
@@ -669,6 +681,16 @@
         if (jijiuEquipSlot) putCard(game, card, { zone: 'equipment', actor: responder, slot: jijiuEquipSlot });
         else putCard(game, card, { zone: 'hand', actor: responder, index: idx });
       };
+      return finishDyingRescueWithCard(game, responder, dyingActor, kind, card,
+        rollbackRescueCard, jijiuEquipSlot);
+    }
+
+    // v15 S1: 救援牌到手后的结算主体 (常规摘牌路径与蛊惑处理区路径共用)。
+    // jijiuEquipSlot 仅常规路径给出 (装备来源急救的失去时机)。
+    function finishDyingRescueWithCard(game, responder, dyingActor, kind, card,
+      rollbackRescueCard, jijiuEquipSlot) {
+      var responderState = game[responder];
+      var dyingState = game[dyingActor];
       if (kind === 'tao') {
         discardCard(game, card);
         // v11 C1 (批次 25): 救援 — 吴势力对濒死主公用桃回复量 +1
@@ -733,6 +755,20 @@
       if (!saved) return fail('找不到濒死结算的暂停状态。');
       var responder = pending.actor;
       var dyingActor = pending.dyingActor;
+      // v15 S1: 蛊惑声明的救援 (响应中的使用流程) — 牌已亮出并锚在处理区,
+      // 牌名由声明确定, 不过手牌候选清单。
+      var guhuoRescueCard = decision && decision.guhuoResolved && deps.takeGuhuoResponseCard
+        ? deps.takeGuhuoResponseCard(game, responder, ['tao', 'jiu'])
+        : null;
+      if (guhuoRescueCard) {
+        var ghKind = guhuoRescueCard.declareType === 'jiu' ? 'jiu' : 'tao';
+        var ghOutcome = executeDyingRescue(game, responder, dyingActor, ghKind, null,
+          guhuoRescueCard.physical);
+        if (!ghOutcome.healed) saved.idx += 1;
+        var ghNext = processDyingNext(game);
+        if (ghNext && ghNext.paused) return success('继续等待救援。');
+        return success('濒死结算完成。');
+      }
       if (decision && (decision.decline || decision.skip)) {
         log(game, actorName(game, responder) + '选择不救援。');
         saved.idx += 1; // C2: 放弃 → 进入下一名响应者

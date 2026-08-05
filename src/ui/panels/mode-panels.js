@@ -708,10 +708,14 @@
       }
     }
 
-    // ───── v14 R1: 蛊惑声明面板 (玩家于吉) ─────
-    // v1 UI 菜单 11 型: 需座席目标的 杀×3/决斗 转座席点选; 无目标型直接
-    // 声明。拆/顺/火攻/借刀/铁索 的富交互流 (区域/成本/双段) 留待后续批
-    // (引擎 API 全 16 型) — R1 执行记录如实标注。
+    // ───── v14 R1 / v15 S2: 蛊惑声明面板 (玩家于吉) ─────
+    // v15 S2 菜单补齐 16/16 型 (引擎 API 自 R1 起即全 16 型可用):
+    //   seat   — 需一名座席目标 (杀×3/决斗/拆/顺/火攻), 确认后转座席点选;
+    //            拆/顺的区域与具体牌、火攻的成本与展示牌均在结算期由既有
+    //            pendingChoice 自选, 不进声明面 (官方: 声明期只定牌名+目标);
+    //   victim — 借刀杀人: 两段点选 (先持刀者, 再其攻击的受害者);
+    //   multi  — 铁索连环: 1-2 名座席 (重铸不是"使用/打出", 不在技能文本内);
+    //   无标记 — 无目标型直接声明。
     var GUHUO_UI_TYPES = [
       { id: 'sha', label: '杀', seat: true },
       { id: 'fire_sha', label: '火杀', seat: true },
@@ -723,7 +727,12 @@
       { id: 'nanman', label: '南蛮入侵', seat: false },
       { id: 'wanjian', label: '万箭齐发', seat: false },
       { id: 'taoyuan', label: '桃园结义', seat: false },
-      { id: 'wugu', label: '五谷丰登', seat: false }
+      { id: 'wugu', label: '五谷丰登', seat: false },
+      { id: 'guohe', label: '过河拆桥', seat: true },
+      { id: 'shunshou', label: '顺手牵羊', seat: true },
+      { id: 'huogong', label: '火攻', seat: true },
+      { id: 'jiedao', label: '借刀杀人', seat: true, victim: true },
+      { id: 'tiesuo', label: '铁索连环', multi: true }
     ];
 
     function tryEnterGuhuoDeclareMode() {
@@ -761,10 +770,10 @@
       if (els.guhuoConfirmBtn) els.guhuoConfirmBtn.disabled = !(guhuoDeclareType && guhuoCoverCardId);
     }
 
-    function finishGuhuoDeclare(declareType, coverCardId, targetSeat) {
+    function finishGuhuoDeclare(declareType, coverCardId, extraOpts) {
       var game = getGame();
       var opts = { cardId: coverCardId, declareType: declareType };
-      if (targetSeat) opts.target = targetSeat;
+      Object.keys(extraOpts || {}).forEach(function (key) { opts[key] = extraOpts[key]; });
       var result = Engine.playGuhuoDeclare(game, 'player', opts);
       if (!result.ok) game.log.push(result.message);
       render();
@@ -777,6 +786,27 @@
       GUHUO_UI_TYPES.forEach(function (item) { if (item.id === guhuoDeclareType) entry = item; });
       var declareType = guhuoDeclareType;
       var coverCardId = guhuoCoverCardId;
+      // v15 S2: 铁索连环 — 1-2 名座席 (使用分支; 重铸不在技能文本内)。
+      if (entry && entry.multi) {
+        var chainSeats = (Engine.guhuoLegalTargets(game, 'player', declareType) || []);
+        if (!chainSeats.length) {
+          game.log.push('【' + entry.label + '】当前没有合法目标。');
+          render();
+          return;
+        }
+        hideGuhuoDeclarePanel();
+        startSeatPicker({
+          legalSeats: chainSeats,
+          min: 1,
+          max: 2,
+          hintText: '蛊惑【' + entry.label + '】：点击场上高亮角色（1-2 名）',
+          onComplete: function (seats) {
+            finishGuhuoDeclare(declareType, coverCardId, { targets: seats });
+          }
+        });
+        render();
+        return;
+      }
       if (entry && entry.seat) {
         var legal = (Engine.guhuoLegalTargets(game, 'player', declareType) || [])
           .filter(function (seat) { return seat !== 'player'; });
@@ -790,7 +820,38 @@
           legalSeats: legal,
           needed: 1,
           hintText: '蛊惑【' + entry.label + '】：点击场上高亮角色选择目标',
-          onComplete: function (seats) { finishGuhuoDeclare(declareType, coverCardId, seats[0]); }
+          onComplete: function (seats) {
+            // v15 S2: 借刀杀人 — 第二段点选持刀者攻击的受害者 (官方: 声明期
+            // 一并确定; 引擎侧 playGuhuoDeclare 复检座席合法性)。
+            if (entry.victim) {
+              // 与既有【借刀杀人】出牌流同款 (resolveSeatPick): 候选唯一
+              // 时直接成局, 多候选才开第二段点选。
+              var victims = Engine.jiedaoVictimCandidates
+                ? Engine.jiedaoVictimCandidates(game, seats[0]) : [];
+              if (!victims.length) {
+                game.log.push('【借刀杀人】：该持刀者没有可攻击的目标。');
+                render();
+                return;
+              }
+              if (victims.length === 1) {
+                finishGuhuoDeclare(declareType, coverCardId,
+                  { target: seats[0], jiedaoVictim: victims[0] });
+                return;
+              }
+              startSeatPicker({
+                legalSeats: victims,
+                needed: 1,
+                hintText: '蛊惑【借刀杀人】：点击持刀者要攻击的角色',
+                onComplete: function (victimSeats) {
+                  finishGuhuoDeclare(declareType, coverCardId,
+                    { target: seats[0], jiedaoVictim: victimSeats[0] });
+                }
+              });
+              render();
+              return;
+            }
+            finishGuhuoDeclare(declareType, coverCardId, { target: seats[0] });
+          }
         });
         render();
         return;
