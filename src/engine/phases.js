@@ -56,9 +56,22 @@
     // 一次)。与 jieyinUsed 同类, 回合开始/结束两处均复位。
     flags.huangtianUsed = false;
     flags.lijianUsed = false;
-    // v14 R1: 蛊惑 "每名角色的回合内限一次" — v1 仅接入自己回合的使用
-    // 流程, 自回合复位即覆盖 (打出流程接入后需随任意回合切换复位)。
+    // v14 R1: 蛊惑 "每名角色的回合内限一次" — 回合主的复位在此;
+    // v15 S1: 打出流程接入后蛊惑可在任何角色的回合内发动 (响应窗口),
+    // 故全场每席都随回合切换复位 → resetGuhuoTurnLimit (startTurn 调用)。
     flags.guhuoUsedThisTurn = false;
+  }
+
+  // v15 S1: "每名角色的回合内限一次" — 限次是按回合刷新的全场额度, 不是
+  // 回合主专属。每个回合开始时清空所有座席的蛊惑发动记号 (响应窗口声明
+  // 发生在他人回合内, 只复位回合主会让额度永久卡死)。
+  function resetGuhuoTurnLimit(game) {
+    if (!game) return;
+    var seats = Array.isArray(game.seats) && game.seats.length ? game.seats : ['player', 'enemy'];
+    seats.forEach(function (seat) {
+      var state = game[seat];
+      if (state) ensureFlags(state).guhuoUsedThisTurn = false;
+    });
   }
 
   function resetEndOfTurnState(state) {
@@ -96,5 +109,6 @@
     setPhase: setPhase,
     nextPlayablePhase: nextPlayablePhase,
     resetActorTurnState: resetActorTurnState,
-    resetEndOfTurnState: resetEndOfTurnState
+    resetEndOfTurnState: resetEndOfTurnState,
+    resetGuhuoTurnLimit: resetGuhuoTurnLimit
   };

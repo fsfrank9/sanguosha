@@ -2,6 +2,12 @@
   // 无懈/决斗响应面板的渲染 + 事件绑定, 从 dom-adapter.js 整体迁出,
   // 渲染函数体逐行一致; 点候选 stage 改经注入的 stage() 助手 (语义同
   // 原 stagedModalChoice 赋值 + render), 不出/不使用按钮直接 resolve。
+  // v15 S1: 响应窗口可声明牌名的中文标签 (引擎给 type, UI 只负责显示)。
+  var GUHUO_RESPONSE_LABELS = {
+    shan: '闪', sha: '杀', fire_sha: '火杀', thunder_sha: '雷杀',
+    tao: '桃', jiu: '酒', wuxie: '无懈可击'
+  };
+
   export function createResponsePanels(ctx) {
     var els = ctx.els;
     var Engine = ctx.Engine;
@@ -12,7 +18,59 @@
     var suitLabel = ctx.suitLabel;
     var stage = ctx.stage;
 
+    // v15 S1: 蛊惑响应声明本地态 (声明牌名 + 盖置手牌)。窗口切换即清空。
+    var guhuoRespType = null;
+    var guhuoRespCover = null;
+    var guhuoRespWindow = null;
+
+    // v15 S1: 蛊惑响应声明面板 — 与所在响应窗口并列显示 (不占用原窗口的
+    // 候选区)。可声明牌名由引擎按窗口给出 (guhuoResponseTypes), UI 不自行
+    // 推断; 盖置牌为任意手牌 (背面朝上, 牌名与真伪由质疑链裁决)。
+    function renderGuhuoResponsePanel(kind, pending) {
+      if (!els.guhuoResponsePanel) return;
+      var game = getGame();
+      var open = !!game && !!pending && pending.actor === 'player'
+        && !!Engine.guhuoResponseAvailable && Engine.guhuoResponseAvailable(game);
+      if (!open) {
+        guhuoRespType = null;
+        guhuoRespCover = null;
+        guhuoRespWindow = null;
+        els.guhuoResponsePanel.hidden = true;
+        return;
+      }
+      if (guhuoRespWindow !== kind) {
+        guhuoRespWindow = kind;
+        guhuoRespType = null;
+        guhuoRespCover = null;
+      }
+      els.guhuoResponsePanel.hidden = false;
+      var types = (Engine.guhuoResponseTypes && Engine.guhuoResponseTypes(game)) || [];
+      if (els.guhuoResponseHint) {
+        els.guhuoResponseHint.textContent =
+          '【蛊惑】：可将一张手牌背面朝上当所需的牌打出/使用（其他角色可质疑；验假则视为没有决定如何响应）。';
+      }
+      if (els.guhuoResponseTypes) {
+        els.guhuoResponseTypes.innerHTML = types.map(function (type) {
+          return '<button class="btn small' + (type === guhuoRespType ? ' is-active' : '')
+            + '" data-guhuo-resp-type="' + escapeHtml(type) + '">'
+            + escapeHtml(GUHUO_RESPONSE_LABELS[type] || type) + '</button>';
+        }).join('');
+      }
+      if (els.guhuoResponseCovers) {
+        els.guhuoResponseCovers.innerHTML = ((game.player && game.player.hand) || []).map(function (card) {
+          return '<button class="mini-card' + (card.id === guhuoRespCover ? ' is-active' : '')
+            + '" data-guhuo-resp-cover="' + escapeHtml(card.id) + '" title="盖置此牌（背面朝上）">'
+            + escapeHtml(card.name) + ' ' + suitLabel(card.suit)
+            + (card.rank ? String(card.rank).toUpperCase() : '') + '</button>';
+        }).join('');
+      }
+      if (els.guhuoResponseConfirmBtn) {
+        els.guhuoResponseConfirmBtn.disabled = !(guhuoRespType && guhuoRespCover);
+      }
+    }
+
     function renderResponsePanels(kind, pending) {
+      renderGuhuoResponsePanel(kind, pending);
       // v10 V5: 无懈可击 响应 — 锦囊 targeting 玩家时弹. 文案据 chainWuxied 区分:
       //   false="对方使用【X】，是否打出【无懈】？"
       //   true="对方对【X】打出【无懈】，是否再【无懈】？"
@@ -106,6 +164,30 @@
     }
 
     function bindResponsePanels() {
+      // v15 S1: 蛊惑响应声明 — 牌名/盖置牌点选只暂存 (与全 UI"最终生效必过
+      // 确认"一致), 确认才走 resolvePendingChoice({guhuo:…})。
+      if (els.guhuoResponseTypes) els.guhuoResponseTypes.addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-guhuo-resp-type]');
+        if (!btn) return;
+        guhuoRespType = btn.getAttribute('data-guhuo-resp-type');
+        render();
+      });
+      if (els.guhuoResponseCovers) els.guhuoResponseCovers.addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-guhuo-resp-cover]');
+        if (!btn) return;
+        guhuoRespCover = btn.getAttribute('data-guhuo-resp-cover');
+        render();
+      });
+      if (els.guhuoResponseConfirmBtn) els.guhuoResponseConfirmBtn.addEventListener('click', function () {
+        if (!guhuoRespType || !guhuoRespCover) return;
+        var result = Engine.resolvePendingChoice(getGame(), {
+          guhuo: { cardId: guhuoRespCover, declareType: guhuoRespType }
+        });
+        guhuoRespType = null;
+        guhuoRespCover = null;
+        if (!result.ok) renderLog();
+        render();
+      });
       // v9 PR-E26: 闪响应 — 候选两步化. 点候选 (真闪/转化牌) 只 stage 高亮,
       // #handConfirmBtn 才 resolvePendingChoice({cardId}); 不出 → {use:false}.
       // resolvePendingChoice 后引擎完成【杀】结算, enemyStep 轮询自动续上.

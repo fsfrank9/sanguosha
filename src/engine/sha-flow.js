@@ -565,9 +565,11 @@
         //   pref) 仍走自动响应, 保证旧测试同步行为不变.
         // v10 V3: 走 requestPlayerResponse 框架 — pauseState.shaResponse + pendingChoice
         // 的设置统一. resolve 在 RESPONSE_KIND_RESOLVERS['shan-response'] 注册.
+        // v15 S1: 于吉可背面朝上打出任意手牌当【闪】 → 手上没有闪也要开窗。
         if (targetActor === 'player' && !responseContext.responseLocked
             && target.skillPreferences && target.skillPreferences.shanResponse === 'ask'
-            && hasShanResponseAvailable(target)) {
+            && (hasShanResponseAvailable(target)
+              || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, targetActor)))) {
           // v13 J0-3 (PR #165 缺陷 3): 八卦阵先行 — "需要使用/打出【闪】时"
           // 先给判定机会 (红=视为打出闪, 免出手牌; 可用 skillPreferences.bagua
           // ='decline' 关闭), 判定失败/无八卦才回到手牌响应窗口; 窗口内放弃
@@ -870,7 +872,8 @@
           }
         }
         if (dodged && shanRemaining > 1) {
-          if (hasShanResponseAvailable(game.player)) {
+          if (hasShanResponseAvailable(game.player)
+              || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, 'player'))) {
             return requestPlayerResponse(game, {
               kind: 'shan-response',
               actor: 'player',

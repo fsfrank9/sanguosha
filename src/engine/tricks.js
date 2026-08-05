@@ -144,7 +144,13 @@
         var responder = chain.queue[chain.idx];
         chain.currentResponder = responder;
         var state = game[responder];
-        var hasWuxie = state && state.hp > 0 && hasWuxieResponseAvailable(state);
+        // v15 S1: 玩家席于吉可背面朝上使用任意手牌当【无懈可击】 → 手上
+        // 没有无懈也要开窗 (AI 席维持原门禁 — 响应中声明为已知局限)。
+        var hasWuxie = state && state.hp > 0
+          && (hasWuxieResponseAvailable(state)
+            || (responder === 'player' && state.skillPreferences
+              && state.skillPreferences.wuxieResponse === 'ask'
+              && deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, responder)));
         if (!hasWuxie) {
           chain.idx += 1;
           continue;
@@ -1004,7 +1010,10 @@
           return success('【决斗】中止（一方已阵亡）。');
         }
         var state = game[responder];
-        var hasSha = hasShaResponseAvailable(state);
+        // v15 S1: 于吉可背面朝上打出任意手牌当【杀】 → 手上没有杀也要开窗。
+        var hasSha = hasShaResponseAvailable(state)
+          || (responder === 'player' && deps.guhuoResponsePossible
+            && deps.guhuoResponsePossible(game, responder));
 
         // 玩家 ask + 有杀响应 → 暂停
         if (responder === 'player'
@@ -1192,8 +1201,10 @@
         // 有闪可响应 → 暂停, 让玩家自选闪 / 不出. 引擎默认仍走自动响应.
         if (responseType === 'shan' && targetActor === 'player') {
           var aoeTarget = game.player;
+          // v15 S1: 蛊惑可背面朝上打出任意手牌当【闪】 → 无闪也要开窗。
           if (aoeTarget.skillPreferences && aoeTarget.skillPreferences.shanResponse === 'ask'
-              && hasShanResponseAvailable(aoeTarget)) {
+              && (hasShanResponseAvailable(aoeTarget)
+                || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, 'player')))) {
             aoe.idx += 1;  // 玩家座席结果由 resolver 收尾, 游标先行越过
             return requestPlayerResponse(game, {
               kind: 'wanjian-response',

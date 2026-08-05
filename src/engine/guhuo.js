@@ -15,11 +15,12 @@
 // 的牌名的牌" (声明牌限次不消耗 — 本实现中 usedSha 等在结算期才落账,
 // 天然满足)。
 //
-// v1 接入口径 (R1 执行记录): 出牌阶段【使用流程】全量 (声明白名单 = 引擎
-// 全部可主动使用的基本牌/非延时锦囊 16 型); 响应窗口【打出流程】(乱武/
-// 濒死蛊惑桃等判例面) 未接入, 如实记录为已知局限留待后续批。现行版正文
-// 无质疑资格体力限制 (对照经典版 "体力值大于0" — spec 缺口已在调研简报
-// 标注), 按正文全体其他存活角色可质疑, 缠怨持有者锁定除外。
+// v15 S1 接入口径: 出牌阶段【使用流程】全量 (声明白名单 = 引擎全部可主动
+// 使用的基本牌/非延时锦囊 16 型) + 响应窗口【打出流程/响应中的使用流程】
+// (闪/杀/桃·酒/无懈 六个窗口, 玩家席)。现行版正文无质疑资格体力限制
+// (对照经典版 "体力值大于0" — spec 缺口逐条裁定见
+// docs/audit/2026-08-05-guhuo-spec-gaps.md), 按正文全体其他存活角色可
+// 质疑, 缠怨持有者锁定除外。
 import { StateRuntime } from './state.js';
 
 export function createGuhuoRuntime(deps) {
@@ -59,6 +60,166 @@ export function createGuhuoRuntime(deps) {
     jiedao: { required: ['target'], allowed: ['target'] },
     tiesuo: { required: [], allowed: [] }
   };
+
+  // ═════ v15 S1: 响应窗口【打出流程】/【响应中的使用流程】 ═════
+  //
+  // 官方 ◆ (card__hero__neutral.md:336) 打出流程与使用流程分列, 逐字:
+  // "你发动【蛊惑】声明打出的牌的牌名对某事件进行响应即你开始一个特殊的
+  // 打出流程: 首先你在声明打出的牌的同时将一张手牌扣置入处理区, 然后其他
+  // 角色依次决定是否质疑。若没有角色质疑, 你亮出之, 确定除牌名外的所有
+  // 牌面信息, 然后进入'打出牌时', 之后此特殊的打出流程开始按照正常的打出
+  // 流程进行。… 若验明为假, 终止此特殊的打出流程, 你将之置入弃牌堆, 视为
+  // 你没有决定如何进行响应, 你可以打出为你声明的牌名的牌进行响应。"
+  //
+  // 与使用流程的三点差异 (spec 裁定见 docs/audit/2026-08-05-guhuo-spec-gaps.md):
+  // ① 无"选择目标时"步骤、无"取消不合法的目标" — 打出没有目标面;
+  // ② 目标由窗口自身确定 (濒死角色 / 被响应的锦囊), 声明期不另选;
+  // ③ 验假 → "视为没有决定如何进行响应" = 响应窗口原样重开 (本回合限次
+  //    已消耗 → 重开窗内不能再蛊惑, 只能打出真牌或放弃)。
+  //
+  // 濒死【桃】/【酒】与【无懈可击】走的是"响应中的使用流程" (使用流程 ◆
+  // 末句同款: "若你是对某事件进行响应需要使用牌, 则视为你没有决定如何
+  // 进行响应"), 验假后果与打出流程一致, 故同表驱动。
+  var GUHUO_RESPONSE_WINDOWS = {
+    'shan-response': { types: ['shan'], flow: 'playout' },
+    'wanjian-response': { types: ['shan'], flow: 'playout' },
+    'yinyue-response': { types: ['shan'], flow: 'playout' },
+    'sha-duel-response': { types: ['sha', 'fire_sha', 'thunder_sha'], flow: 'playout' },
+    'wuxie-response': { types: ['wuxie'], flow: 'use' },
+    // 酒 使用方法Ⅱ 仅自救 (executeDyingRescue 同款口径) → 自己濒死才入列。
+    'dying-rescue': { types: ['tao'], selfTypes: ['jiu'], flow: 'use' }
+  };
+
+  // 该响应窗口可声明的牌名 (窗口所需牌型即声明面; 声明【杀】须同时声明
+  // 属性 → 三型分列, 官方 ◆ "普通【杀】, 火【杀】和雷【杀】")。
+  function guhuoResponseTypes(game, pending) {
+    var spec = pending && GUHUO_RESPONSE_WINDOWS[pending.kind];
+    if (!spec) return [];
+    var types = spec.types.slice();
+    if (spec.selfTypes && pending.actor === pending.dyingActor) {
+      types = types.concat(spec.selfTypes);
+    }
+    return types;
+  }
+
+  // 响应窗口开窗门槛 (各窗口 gate 调用): 于吉 + 本回合次数未用 + 有手牌
+  // → 即便手上没有窗口所需牌型也必须开窗 (蛊惑可背面朝上打出任意手牌;
+  // 此前"无闪不开窗"会把蛊惑的响应面直接锁死)。
+  // v1 口径: 仅玩家席 — AI 席在响应中声明会把玩家质疑窗挂进 consumeResponse
+  // 的同步调用栈 (需要全响应链改造), 记录为已知局限。
+  function guhuoResponsePossible(game, actor) {
+    if (actor !== 'player') return false;
+    var state = game && game[actor];
+    if (!state || !StateRuntime.hasSkill(state, 'guhuo')) return false;
+    if (state.flags && state.flags.guhuoUsedThisTurn) return false;
+    return (state.hand || []).length > 0;
+  }
+
+  // 当前挂起的响应窗口是否可发动蛊惑 (UI 面板入口门禁)。
+  function guhuoResponseAvailable(game) {
+    var pending = game && game.pendingChoice;
+    if (!pending || !GUHUO_RESPONSE_WINDOWS[pending.kind]) return false;
+    if (!guhuoResponsePossible(game, pending.actor)) return false;
+    return guhuoResponseTypes(game, pending).length > 0;
+  }
+
+  // 响应窗口声明入口 — 由 resolvePendingChoice / resolveResponseChoice 在
+  // decision.guhuo 存在时先于 kind resolver 拦截 (pendingChoice 仍在槽内,
+  // 校验失败即原样退回, 窗口不丢)。
+  function declareGuhuoResponse(game, pending, opts) {
+    opts = opts || {};
+    var spec = pending && GUHUO_RESPONSE_WINDOWS[pending.kind];
+    if (!spec) return fail('当前响应窗口不能发动【蛊惑】。');
+    var actor = pending.actor;
+    var state = game[actor];
+    if (!state) return fail('未知角色。');
+    if (!StateRuntime.hasSkill(state, 'guhuo')) return fail('该角色没有【蛊惑】。');
+    if (state.flags && state.flags.guhuoUsedThisTurn) return fail('【蛊惑】每名角色的回合内限一次。');
+    var allowed = guhuoResponseTypes(game, pending);
+    if (allowed.indexOf(opts.declareType) < 0) return fail('此响应窗口不能声明该牌名。');
+    var physical = (state.hand || []).find(function (item) { return item.id === opts.cardId; });
+    if (!physical) return fail('找不到要盖置的手牌。');
+
+    var declaredName = colorlessDeclaredCard(opts.declareType).name;
+    // 盖置入处理区 (守恒在途面同使用流程), 发动即计次 (验假不返还)。
+    deps.removeCardFromHand(state, physical.id);
+    if (!state.flags) state.flags = {};
+    state.flags.guhuoUsedThisTurn = true;
+    game.pendingChoice = null; // 质疑期窗口暂离槽位 (响应决定尚未作出)
+    if (!game.pauseState) game.pauseState = {};
+    game.pauseState.guhuo = {
+      actor: actor,
+      declareType: opts.declareType,
+      declaredName: declaredName,
+      physical: physical,
+      options: {},
+      mode: 'response',
+      flow: spec.flow,
+      responsePending: pending,
+      queue: buildChallengeQueue(game, actor),
+      idx: 0
+    };
+    log(game, actorName(game, actor) + '发动【蛊惑】，背面朝上'
+      + (spec.flow === 'use' ? '使用' : '打出') + '【' + declaredName + '】进行响应。');
+    return advanceGuhuoChallenge(game);
+  }
+
+  // 亮出结算 (响应模式): 打出流程无目标合法性步骤, 验真/无质疑 → 把
+  // "声明牌名 + 实体牌面" 注入 pauseState.guhuoResponse, 交回原窗口的
+  // resolver 走正常打出/使用流程; 验假 → 弃置 + 窗口原样重开。
+  function revealGuhuoResponse(game, challenger, gh) {
+    game.pauseState.guhuo = null;
+    var physical = gh.physical;
+    var isTrue = physical.type === gh.declareType;
+    var verb = gh.flow === 'use' ? '使用' : '打出';
+    log(game, actorName(game, gh.actor) + '亮出盖置的牌：【' + physical.name + '】'
+      + (physical.suitLabel || physical.suit || '') + (physical.rank || '') + '。');
+    noteGuhuoReveal(game, gh.actor, isTrue, !!challenger);
+
+    if (challenger && !isTrue) {
+      deps.discardCard(game, physical);
+      log(game, '验明为假 —【' + gh.declaredName + '】的' + verb
+        + '流程终止，视为' + actorName(game, gh.actor) + '没有决定如何进行响应。');
+      // "你可以打出为你声明的牌名的牌进行响应" — 窗口原样重开 (本回合
+      // 蛊惑次数已消耗, 重开窗内只能打出真牌或放弃)。
+      deps.setPendingChoice(game, gh.responsePending);
+      var reopened = success('【蛊惑】被质破，请重新决定如何响应。');
+      reopened.paused = true;
+      return reopened;
+    }
+    if (challenger && isTrue) grantChanyuan(game, challenger);
+
+    game.pauseState.guhuoResponse = {
+      actor: gh.actor,
+      declareType: gh.declareType,
+      declaredName: gh.declaredName,
+      physical: physical
+    };
+    var resolver = deps.responseResolverFor(gh.responsePending.kind);
+    var result = resolver
+      ? resolver(game, gh.responsePending, { use: true, guhuoResolved: true })
+      : fail('未注册的响应类型：' + gh.responsePending.kind);
+    // 兜底: 注入未被消费 (理论上不出现 — 各窗口消费出口已全覆盖) → 收回
+    // 实体牌防漏牌 (守恒红线)。
+    var leftover = game.pauseState && game.pauseState.guhuoResponse;
+    if (leftover && leftover.physical === physical) {
+      game.pauseState.guhuoResponse = null;
+      if (!deps.findCardZone(game, physical)) {
+        deps.putCard(game, physical, { zone: 'hand', actor: gh.actor });
+      }
+    }
+    return result;
+  }
+
+  // v15 S2: 被抓包记忆 — 亮出是全场公开信息, 按声明者记公开账 (诈声明被
+  // 抓 / 真牌被质疑各计一笔), 供 AI 质疑启发读取。不读暗牌、不读身份。
+  function noteGuhuoReveal(game, actor, isTrue, challenged) {
+    var st = game[actor];
+    if (!st) return;
+    if (!challenged) return; // 未被质疑 → 牌面虽亮出但无"诚信"证据落账
+    if (isTrue) st.guhuoProven = (st.guhuoProven || 0) + 1;
+    else st.guhuoBusted = (st.guhuoBusted || 0) + 1;
+  }
 
   function guhuoAvailable(game, actor) {
     var state = game && game[actor];
@@ -208,12 +369,15 @@ export function createGuhuoRuntime(deps) {
   function revealAndSettleGuhuo(game, challenger) {
     var gh = game.pauseState && game.pauseState.guhuo;
     if (!gh) return fail('蛊惑状态丢失。');
+    // v15 S1: 响应窗口 (打出流程/响应中的使用流程) 走独立结算路径。
+    if (gh.mode === 'response') return revealGuhuoResponse(game, challenger, gh);
     game.pauseState.guhuo = null;
     var physical = gh.physical;
     var actor = gh.actor;
     var isTrue = physical.type === gh.declareType;
     log(game, actorName(game, actor) + '亮出盖置的牌：【' + physical.name + '】'
       + (physical.suitLabel || physical.suit || '') + (physical.rank || '') + '。');
+    noteGuhuoReveal(game, actor, isTrue, !!challenger);
 
     if (challenger && !isTrue) {
       // 验假: 终止结算, 置入弃牌堆; "视为没有使用过声明牌名的牌" —
@@ -298,6 +462,11 @@ export function createGuhuoRuntime(deps) {
     GUHUO_DECLARABLE: GUHUO_DECLARABLE,
     guhuoAvailable: guhuoAvailable,
     guhuoLegalTargets: guhuoLegalTargets,
-    playGuhuoDeclare: playGuhuoDeclare
+    playGuhuoDeclare: playGuhuoDeclare,
+    // v15 S1: 响应窗口面 (声明入口 / UI 门禁 / 各窗口 gate 谓词)
+    guhuoResponseAvailable: guhuoResponseAvailable,
+    guhuoResponseTypes: guhuoResponseTypes,
+    guhuoResponsePossible: guhuoResponsePossible,
+    declareGuhuoResponse: declareGuhuoResponse
   };
 }
