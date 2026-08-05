@@ -994,6 +994,11 @@
         randomSuit: randomSuit,
         removeOwnCardFromAnyZone: removeOwnCardFromAnyZone,
         removeTargetZoneCard: removeTargetZoneCard,
+        // v15 T: 猛进 ask 挂起后续跑闪避分支剩余流程 (杀链域后置装配,
+        // 包装注入 — 与 resumeAOETargets 等既有晚绑定同款)。
+        continueShaDodgeAfterSkills: function (game, actor, card, amount, targetActor) {
+          return ShaFlowRuntime.continueShaDodgeAfterSkills(game, actor, card, amount, targetActor);
+        },
         restoreZhuqueIdentity: restoreZhuqueIdentity,
         selectActiveSkillResult: selectActiveSkillResult,
         setPhase: setPhase,
@@ -1016,6 +1021,7 @@
       var triggerLuoshenPrepare = SkillDomain.triggerLuoshenPrepare;
       var getGuanxingPreview = SkillDomain.getGuanxingPreview;
       var resolveFankuiPickChoice = SkillDomain.resolveFankuiPickChoice;
+      var resolveMengjinPickChoice = SkillDomain.resolveMengjinPickChoice;
       var resolveYaowuRewardChoice = SkillDomain.resolveYaowuRewardChoice;
       var resolveGanglieFireChoice = SkillDomain.resolveGanglieFireChoice;
       var resolveGanglieSourceChoice = SkillDomain.resolveGanglieSourceChoice;
@@ -1039,6 +1045,8 @@
       registerResponseKind('guanxing-reorder', resolveGuanxingChoice);
       registerResponseKind('fanjian-guess', resolveFanjianGuessChoice);
       registerResponseKind('fankui-pick', resolveFankuiPickChoice);
+      // v15 T: 猛进 (庞德) 选牌窗 — resolver 收尾后续跑闪避分支剩余流程。
+      registerResponseKind('mengjin-pick', resolveMengjinPickChoice);
       registerResponseKind('ganglie-fire', resolveGanglieFireChoice);
       registerResponseKind('ganglie-source-choice', resolveGanglieSourceChoice);
       registerResponseKind('qilin-pick', resolveQilinPickChoice);
@@ -1678,6 +1686,32 @@
 
       registerResponseKind('wanjian-response', resolveWanjianResponseChoice);
 
+      // v15 T: 重铸 — 官方把"重铸"列为独立于使用/打出的操作 (出牌阶段
+      // 弃置该牌并摸一张)。既有面只有【铁索连环】自带重铸; 连环 (庞统)
+      // 令"梅花手牌"也能重铸 (card__hero__shu.md:322 逐字)。判定统一走
+      // 本谓词 + onCanRecast hook, 技能侧只声明"哪些牌可重铸"。
+      function canRecastCard(game, actor, card) {
+        if (!card) return false;
+        if (card.type === 'tiesuo') return true;
+        return SkillRuntime.runHook(skillRegistry, 'onCanRecast', {
+          game: game, actor: actor, state: game[actor], card: card
+        }).some(function (entry) { return entry.result === true; });
+      }
+
+      function recastHandCard(game, actor, cardId) {
+        var self = game[actor];
+        if (!self) return fail('未知角色。');
+        if (game.turn !== actor || game.phase !== 'play') return fail('只能在自己的出牌阶段重铸。');
+        var card = (self.hand || []).find(function (item) { return item.id === cardId; });
+        if (!card) return fail('找不到这张手牌。');
+        if (!canRecastCard(game, actor, card)) return fail('这张牌不能重铸。');
+        removeCardFromHand(self, cardId);
+        discardCard(game, card);
+        log(game, actorName(game, actor) + '重铸【' + card.name + '】，摸一张牌。');
+        drawCards(game, actor, 1);
+        return success('重铸完成。');
+      }
+
       function playCard(game, actor, cardId, options) {
         var pendingGuard = pendingChoiceGuard(game);
         if (pendingGuard) return pendingGuard;
@@ -1685,6 +1719,11 @@
         options = options || {};
         if (!self) return fail('未知角色。');
         var card = self.hand.find(function (item) { return item.id === cardId; });
+        // v15 T: 非铁索牌的重铸请求经统一入口 (连环的梅花重铸面) —
+        // 铁索自身的重铸仍走既有 handler 分支, 行为逐字不变。
+        if (options.mode === 'recast' && card && card.type !== 'tiesuo') {
+          return recastHandCard(game, actor, cardId);
+        }
         var playable = canPlayCard(game, actor, card);
         if (!playable.ok) return playable;
         // v12 H1: 区域/成本预校验对齐显式目标 (缺省 1v1 对手)。
@@ -2443,9 +2482,11 @@
           original = cardOrId;
         }
         if (!original) return fail('找不到这张牌。');
-        // v8 PR-C1: 国色把方片当乐; v11 C3: 奇袭把黑牌当拆 — asType 白名单
-        if (asType !== 'sha' && asType !== 'lebusishu' && asType !== 'guohe') {
-          return fail('当前只支持转化为【杀】、【乐不思蜀】或【过河拆桥】。');
+        // v8 PR-C1: 国色把方片当乐; v11 C3: 奇袭把黑牌当拆;
+        // v15 T: 火计→火攻 / 连环→铁索连环 / 双雄→决斗 — 白名单改由
+        // 转化牌工厂表驱动 (新增牌名只改一处)。
+        if (asType !== 'sha' && !CARD_AS_TRICK_SPECS[asType]) {
+          return fail('不支持转化为该牌名。');
         }
         var cardAsContext = { mode: 'proactive', game: game, actor: actor, state: self, card: original, asType: asType };
         var conversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', cardAsContext));
@@ -2459,21 +2500,15 @@
           playableSha.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【杀】使用。';
           return playableSha;
         }
-        if (asType === 'guohe') {
-          // v11 C3: 奇袭 — 复用普通过河拆桥的 canPlayCard 检查
-          // (对方两区皆空 / 回合与阶段限制在那里统一把关)。
-          var playableGuohe = canPlayCard(game, actor, virtualGuoheFromCard(original));
-          if (!playableGuohe.ok) return playableGuohe;
-          playableGuohe.skillName = conversion.skillName;
-          playableGuohe.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【过河拆桥】使用。';
-          return playableGuohe;
-        }
-        // lebusishu
-        var playableLebu = canPlayCard(game, actor, virtualLebusishuFromCard(original));
-        if (!playableLebu.ok) return playableLebu;
-        playableLebu.skillName = conversion.skillName;
-        playableLebu.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【乐不思蜀】使用。';
-        return playableLebu;
+        // v15 T: 锦囊/延时类一律走同一条 — 虚拟牌交给普通 canPlayCard
+        // 把关 (目标存在性/阶段/距离/∃合法目标 等在那里统一判定)。
+        var virtualTrick = virtualTrickFromCard(asType, original);
+        var playableTrick = canPlayCard(game, actor, virtualTrick);
+        if (!playableTrick.ok) return playableTrick;
+        playableTrick.skillName = conversion.skillName;
+        playableTrick.message = '发动【' + conversion.skillName + '】，将【' + original.name
+          + '】当【' + virtualTrick.name + '】使用。';
+        return playableTrick;
       }
 
       function playCardAs(game, actor, cardId, asType, options) {
@@ -2492,12 +2527,12 @@
         // resolveTrickTargetActor (显式 options.target 优先, 缺省敌对座席池,
         // 1v1 恒对手零回归); 目标解析前置于牌移出区域之前, 失败零副作用。
         var asTargetActor = null;
-        if (asType === 'lebusishu') {
-          asTargetActor = resolveTrickTargetActor(game, actor, virtualLebusishuFromCard(original), options);
-          if (!asTargetActor) return fail('无效的【乐不思蜀】目标。');
-        } else if (asType === 'guohe') {
-          asTargetActor = resolveTrickTargetActor(game, actor, virtualGuoheFromCard(original), options);
-          if (!asTargetActor) return fail('无效的【过河拆桥】目标。');
+        // v15 T: 指向型锦囊 (乐/拆/火攻/决斗) 统一前置解析; 铁索连环无
+        // 单目标面 (1-2 名或重铸), 目标在结算期由 handler 处理。
+        if (asType !== 'sha' && asType !== 'tiesuo' && CARD_AS_TRICK_SPECS[asType]) {
+          var asVirtual = virtualTrickFromCard(asType, original);
+          asTargetActor = resolveTrickTargetActor(game, actor, asVirtual, options);
+          if (!asTargetActor) return fail('无效的【' + asVirtual.name + '】目标。');
         } else if (asType === 'sha') {
           // v13 K5 (review 修复): 杀转化同样前置解析 — playSha 的距离/保护
           // 校验失败时不退牌, 而此处来源牌已 removeOwnCardFromAnyZone 移出
@@ -2535,24 +2570,22 @@
         // cleared if it came from equipment (relevant for 关羽 卸下武器当杀).
         removeOwnCardFromAnyZone(self, cardId, game);
         log(game, actorName(game, actor) + playable.message);
-        if (asType === 'lebusishu') {
-          // v8 PR-C1: 国色 把方片当乐。v13 J0-2: 与普通乐不思蜀一致 — 放置
-          // 时直接置入判定区, 无懈窗口移至判定阶段生效前 (delayed-judge)。
-          var virtualLebu = virtualLebusishuFromCard(original);
-          virtualLebu.delayedSource = actor;
-          putCard(game, virtualLebu, { zone: 'judgeArea', actor: asTargetActor });
-          log(game, actorName(game, actor) + '将【乐不思蜀】置入' + actorName(game, asTargetActor) + '的判定区。');
-          return success('延时锦囊已放置。');
-        }
-        if (asType === 'guohe') {
-          // v11 C3 (批次 27): 奇袭 黑牌当拆 — 与普通过河拆桥一致: 先弃置来源
-          // 实体牌 (discardCard 经 physicalCardOf 落原牌), 再走无懈链 →
-          // guohe continuation (1v1 两选项 pick / options.targetZone 照常)。
-          var virtualGuoheCard = virtualGuoheFromCard(original);
-          discardCard(game, virtualGuoheCard);
-          return checkWuxieAndContinue(game, asTargetActor, '【过河拆桥】', 'guohe', {
-            actor: actor, card: virtualGuoheCard, options: options || {}, targetActor: asTargetActor
-          });
+        // v15 T: 其余锦囊转化统一交给已注册的结算 handler — 与普通出牌
+        // 完全同路 (无懈链/逐目标/成本询问一律复用), 不再逐型手写。
+        // (奇袭黑牌当拆的 v11 C3 路径即此条的特例, 行为逐字一致。)
+        if (CARD_AS_TRICK_SPECS[asType]) {
+          var virtualTrickCard = virtualTrickFromCard(asType, original);
+          var trickOptions = Object.assign({}, options || {});
+          if (asTargetActor) trickOptions.target = asTargetActor;
+          var trickResult = playCardWithRegisteredHandler(game, actor, virtualTrickCard, trickOptions, self);
+          // 守恒兜底: handler 拒绝且实体不在任何区域 → 退回原区域
+          // (playCardAs 的杀分支同款不变量)。
+          if (trickResult && !trickResult.ok && !findCardZone(game, original)) {
+            putCard(game, original, hit.zone === 'equipment'
+              ? { zone: 'equipment', actor: actor, slot: hit.slot }
+              : { zone: 'hand', actor: actor });
+          }
+          return trickResult;
         }
         // v13 K2/K5: options 透传 + 前置解析出的合法目标显式传入 (缺省与
         // 显式路径均已过 isLegalCardTarget, playSha 内部校验恒通过,
@@ -2572,6 +2605,38 @@
 
       // v8 PR-C1: 国色把方片视为乐不思蜀 — 构造虚拟卡 (保留原 suit / rank /
       // physical card 以便弃牌正确; type/name/family 改为 lebusishu)
+      // ═════ v15 T: 转化牌工厂表 ═════
+      // 新增可转化牌名只需在此加一行 (火计→火攻 / 连环→铁索连环 /
+      // 双雄→决斗)。既有三型 (杀/乐/拆) 的构造字段逐字保持不变 —
+      // 杀走 makeTestCard 且名字带"（当杀）", 锦囊走字面对象。
+      var CARD_AS_TRICK_SPECS = {
+        lebusishu: { name: '乐不思蜀', family: 'delayed' },
+        guohe: { name: '过河拆桥', family: 'trick' },
+        huogong: { name: '火攻', family: 'trick' },
+        tiesuo: { name: '铁索连环', family: 'trick' },
+        juedou: { name: '决斗', family: 'trick' }
+      };
+
+      function virtualTrickFromCard(asType, original) {
+        var spec = CARD_AS_TRICK_SPECS[asType];
+        if (!spec) return null;
+        return {
+          id: original.id,
+          type: asType,
+          name: spec.name,
+          family: spec.family,
+          suit: original.suit,
+          color: original.color,
+          rank: original.rank,
+          physicalCard: original
+        };
+      }
+
+      function virtualCardAs(asType, original) {
+        if (asType === 'sha') return virtualShaFromCard(original);
+        return virtualTrickFromCard(asType, original);
+      }
+
       function virtualLebusishuFromCard(original) {
         return {
           id: original.id,
@@ -2606,7 +2671,11 @@
       var PROACTIVE_CARD_AS_TYPES = [
         { asType: 'sha', asName: '杀' },
         { asType: 'lebusishu', asName: '乐不思蜀' },
-        { asType: 'guohe', asName: '过河拆桥' }
+        { asType: 'guohe', asName: '过河拆桥' },
+        // v15 T (火包): 火计 → 火攻 / 连环 → 铁索连环 / 双雄 → 决斗
+        { asType: 'huogong', asName: '火攻' },
+        { asType: 'tiesuo', asName: '铁索连环' },
+        { asType: 'juedou', asName: '决斗' }
       ];
 
       function listCardConversions(game, actor, cardOrId) {
@@ -2787,6 +2856,15 @@
         canPlayCard: canPlayCard,
         canPlayCardAs: canPlayCardAs,
         listCardConversions: listCardConversions,
+        // v15 T: 重铸入口与可重铸谓词 (UI 手牌菜单 / AI 决策用)
+        recastHandCard: recastHandCard,
+        canRecastCard: function (game, actor, cardOrId) {
+          var state = game && game[actor];
+          var card = typeof cardOrId === 'string'
+            ? (state && (state.hand || []).find(function (item) { return item.id === cardOrId; }))
+            : cardOrId;
+          return canRecastCard(game, actor, card);
+        },
         playCard: playCard,
         playCardAs: playCardAs,
         useSkill: useSkill,

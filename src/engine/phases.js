@@ -56,6 +56,12 @@
     // 一次)。与 jieyinUsed 同类, 回合开始/结束两处均复位。
     flags.huangtianUsed = false;
     flags.lijianUsed = false;
+    // v15 T (火包): 强袭 出牌阶段限一次 / 天义 出牌阶段限一次 +
+    // 天义拼点结果的回合级增益 (赢: 杀次数/距离/目标上限; 没赢: 不能使用杀)
+    flags.qiangxiUsed = false;
+    flags.tianyiUsed = false;
+    flags.tianyiWon = false;
+    flags.tianyiLost = false;
     // v14 R1: 蛊惑 "每名角色的回合内限一次" — 回合主的复位在此;
     // v15 S1: 打出流程接入后蛊惑可在任何角色的回合内发动 (响应窗口),
     // 故全场每席都随回合切换复位 → resetGuhuoTurnLimit (startTurn 调用)。
@@ -101,6 +107,12 @@
     // v12 H 复核修复: 黄天/离间 每回合限一次复位 (回合结束侧)。
     flags.huangtianUsed = false;
     flags.lijianUsed = false;
+    // v15 T (火包): 强袭/天义 每回合限一次 (回合结束侧同步复位);
+    // 天义的回合级增益 (次数/距离/目标上限, 或"不能使用杀") 一并清除。
+    flags.qiangxiUsed = false;
+    flags.tianyiUsed = false;
+    flags.tianyiWon = false;
+    flags.tianyiLost = false;
   }
 
   export const PhaseRuntime = {

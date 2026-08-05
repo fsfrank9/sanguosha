@@ -245,7 +245,7 @@
         var gained = removeTargetZoneCard(game, sourceActor, autoZone);
         if (!gained || !gained.card) return null;
         putCard(game, gained.card, { zone: 'hand', actor: targetActor });
-        log(game, actorName(game, targetActor) + '发动【反馈】，获得' + actorName(game, sourceActor) + '的一张' + gained.zone + '牌。');
+        log(game, actorName(game, targetActor) + '发动【反馈】，获得' + actorName(game, sourceActor) + '的一张' + zoneLabel(gained.zone) + '。');
         return { gainedSourceCard: true };
       }
 
@@ -270,8 +270,105 @@
           return fail('找不到目标牌，请重新选择。');
         }
         putCard(game, gained.card, { zone: 'hand', actor: holder });
-        log(game, actorName(game, holder) + '发动【反馈】，获得' + actorName(game, sourceActor) + '的一张' + gained.zone + '牌。');
+        log(game, actorName(game, holder) + '发动【反馈】，获得' + actorName(game, sourceActor) + '的一张' + zoneLabel(gained.zone) + '。');
         return success('反馈完成。');
+      }
+
+      // v15 T: 区域名 → 日志措辞 ('手牌' 已含"牌"字, 装备区/判定区需补)。
+      // 顺带勘正反馈的同款叠字 ("一张手牌牌")。
+      function zoneLabel(zone) {
+        return zone === '手牌' ? '手牌' : zone + '牌';
+      }
+
+      // ═════ v15 T (火包): 猛进 (庞德) ═════
+      // 官方逐字 (card__hero__neutral.md:225): "每当你使用的【杀】被目标
+      // 角色使用的【闪】抵消时，你可以弃置其一张牌。"
+      // (:231 的 1V1 变体把"目标角色"写成"对手" — 本仓同时支持 1v1 与
+      //  3/4/5 人身份场, 取通用版, 目标即该【杀】的目标座席。)
+      // 可弃面 = 目标的手牌与装备区 (判定区的牌不为任何角色所拥有,
+      // glossary__zone.md — 与反馈同口径); 手牌为暗牌 → 随机取一张
+      // (removeTargetZoneCard 的既有语义), 装备区可指定具体牌。
+      function triggerMengjinShaDodged(context) {
+        var game = context.game;
+        var actor = context.actor;
+        var targetActor = context.targetActor;
+        var self = game[actor];
+        var target = game[targetActor];
+        if (!self || !target || actor === targetActor) return null;
+        if (!hasSkill(self, 'mengjin') || game.phase === 'gameover') return null;
+        if (target.hp <= 0) return null;
+        var pref = (self.skillPreferences && self.skillPreferences.mengjin)
+          || (actor === 'player' ? 'ask' : 'auto');
+        if (pref === 'decline') {
+          log(game, actorName(game, actor) + '选择不发动【猛进】。');
+          return null;
+        }
+        var zones = [];
+        if (target.hand && target.hand.length > 0) {
+          zones.push({ zone: 'hand', count: target.hand.length });
+        }
+        ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
+          var card = target.equipment && target.equipment[slot];
+          if (card) zones.push({
+            zone: 'equipment', slot: slot, cardId: card.id,
+            name: card.name, suit: card.suit, rank: card.rank
+          });
+        });
+        if (!zones.length) return null; // 目标无牌可弃 → 静默不触发
+        if (pref === 'ask') {
+          setPendingChoice(game, {
+            kind: 'mengjin-pick',
+            actor: actor,
+            targetActor: targetActor,
+            zones: zones
+          });
+          log(game, '等待' + actorName(game, actor) + '决定是否发动【猛进】。');
+          return { suspendedForMengjin: true };
+        }
+        // auto: 装备区优先 (公开信息, 确定性收益 > 随机手牌)
+        var equipEntry = zones.find(function (entry) { return entry.zone === 'equipment'; });
+        return applyMengjinDiscard(game, actor, targetActor,
+          equipEntry ? 'equipment' : 'hand', equipEntry ? equipEntry.cardId : null);
+      }
+
+      function applyMengjinDiscard(game, actor, targetActor, zone, cardId) {
+        var removed = removeTargetZoneCard(game, targetActor, zone, cardId);
+        if (!removed || !removed.card) return null;
+        discardCard(game, removed.card);
+        log(game, actorName(game, actor) + '发动【猛进】，弃置'
+          + actorName(game, targetActor) + '的一张' + zoneLabel(removed.zone) + '。');
+        return { mengjinDiscarded: true };
+      }
+
+      // 玩家席猛进选牌 resolver — decision: { zone: 'hand'|'equipment',
+      // cardId? } / { decline: true }。收尾后由引擎续跑闪避分支剩余流程。
+      function resolveMengjinPickChoice(game, pending, decision) {
+        var actor = pending.actor;
+        var targetActor = pending.targetActor;
+        var d = decision || {};
+        if (d.decline || d.skip) {
+          log(game, actorName(game, actor) + '选择不发动【猛进】。');
+        } else {
+          var zone = d.zone;
+          if (['hand', 'equipment'].indexOf(zone) < 0) {
+            setPendingChoice(game, pending);
+            return fail('请选择有效的区域（hand / equipment）。');
+          }
+          var applied = applyMengjinDiscard(game, actor, targetActor, zone,
+            zone === 'hand' ? null : d.cardId);
+          if (!applied) {
+            setPendingChoice(game, pending);
+            return fail('找不到目标牌，请重新选择。');
+          }
+        }
+        // 续跑闪避分支剩余流程 (青龙续杀 + 结算收尾)。
+        var resume = game.pauseState && game.pauseState.shaDodgeResume;
+        if (resume && deps.continueShaDodgeAfterSkills) {
+          game.pauseState.shaDodgeResume = null;
+          return deps.continueShaDodgeAfterSkills(game, resume.actor, resume.card,
+            resume.amount, resume.targetActor);
+        }
+        return success('猛进结算完成。');
       }
 
       // 遗计 — spec: "**按伤害点数逐点处理**；每点伤害对应摸两张牌，然后
@@ -973,6 +1070,49 @@
       //   "出牌阶段，你可以将一张黑色牌当【过河拆桥】使用。"
       // 仅 proactive (出牌阶段主动转化); 黑色手牌或装备牌皆可作来源
       // (spec condition: "发动者有黑色手牌或装备牌", 与武圣同口径)。
+      // ═════ v15 T (火包): 转化类技能 ═════
+      // 火计 (卧龙诸葛亮, card__hero__shu.md:338): "你可以将一张红色手牌当
+      // 【火攻】使用。" — 限手牌 (对照武圣的"红色牌"含装备区)。
+      function triggerHuojiCardAs(context) {
+        var state = context.state;
+        if (!state || !hasSkill(state, 'huoji')) return null;
+        if (context.mode !== 'proactive' || context.asType !== 'huogong') return null;
+        if (!context.card || !isHandCardOf(state, context.card)) return null;
+        if (StateRuntime.effectiveCardColor(state, context.card) !== 'red') return null;
+        return { card: context.card, asName: '火攻', skillName: '火计', priority: 10 };
+      }
+
+      // 连环 (庞统, card__hero__shu.md:322): "你可以将一张梅花手牌当【铁索
+      // 连环】使用；你能重铸梅花手牌。" — 转化面走 onCardAs; 重铸面见
+      // lianhuanCanRecast (引擎重铸入口查此谓词)。
+      function triggerLianhuanCardAs(context) {
+        var state = context.state;
+        if (!state || !hasSkill(state, 'lianhuan')) return null;
+        if (context.mode !== 'proactive' || context.asType !== 'tiesuo') return null;
+        if (!context.card || !isHandCardOf(state, context.card)) return null;
+        if (context.card.suit !== 'club') return null;
+        return { card: context.card, asName: '铁索连环', skillName: '连环', priority: 10 };
+      }
+
+      // 双雄 (颜良文丑, card__hero__neutral.md:161): 摸牌阶段放弃摸牌改判定
+      // 并获得判定牌后, "你于此回合内可以将与之颜色不同的一张手牌当
+      // 【决斗】使用" — 回合级授权, 颜色由 flags.shuangxiongColor 记录。
+      function triggerShuangxiongCardAs(context) {
+        var state = context.state;
+        if (!state || !hasSkill(state, 'shuangxiong')) return null;
+        if (context.mode !== 'proactive' || context.asType !== 'juedou') return null;
+        var judgedColor = state.flags && state.flags.shuangxiongColor;
+        if (!judgedColor) return null;
+        if (!context.card || !isHandCardOf(state, context.card)) return null;
+        if (StateRuntime.effectiveCardColor(state, context.card) === judgedColor) return null;
+        return { card: context.card, asName: '决斗', skillName: '双雄', priority: 10 };
+      }
+
+      // 转化面统一的"限手牌"谓词 (武圣/龙胆等含装备区的转化不用此闸)。
+      function isHandCardOf(state, card) {
+        return (state.hand || []).some(function (item) { return item && item.id === card.id; });
+      }
+
       function triggerQixiCardAs(context) {
         var state = context.state;
         if (!state || !hasSkill(state, 'qixi')) return null;
@@ -1092,6 +1232,110 @@
         target.hp = Math.min(target.maxHp, target.hp + 1);
         log(game, actorName(game, actor) + '发动【青囊】，弃置【' + costCard.name + '】，令' + actorName(game, targetActor) + '回复 1 点体力。');
         return success('青囊完成。');
+      }
+
+      // ═════ v15 T (火包): 强袭 (典韦) ═════
+      // 官方逐字 (card__hero__wei.md:319): "出牌阶段限一次，你可以失去1点
+      // 体力或弃置一张武器牌，并选择你攻击范围内的一名角色，对其造成1点
+      // 伤害。" (:323 的 1V1 变体把目标写死为"对手" — 取通用版, 目标经
+      // 攻击范围矩阵解析, 1v1 中候选恒为对手, 行为等价。)
+      // 成本二选一: cardIds 给出武器牌 id → 弃武器; 不给 → 失去 1 点体力。
+      // 顺序: 官方"失去体力或弃武器"在"选择目标"之前 → 先付成本再造成
+      // 伤害 (典韦成本致自己濒死时伤害仍结算, 与官方一致)。
+      function triggerQiangxiActiveSkill(context) {
+        if (context.skillId !== 'qiangxi') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        var cardIds = context.cardIds || [];
+        if (!self || !hasSkill(self, 'qiangxi')) return null;
+        if (self.flags.qiangxiUsed) return fail('【强袭】每回合限一次。');
+        var targetActor = context.targetActor
+          || StateRuntime.perceivedHostileSeats(game, actor).filter(function (seat) {
+            return StateRuntime.canReachWithSha(game, actor, seat);
+          })[0];
+        if (!targetActor || !game[targetActor]) return fail('请选择攻击范围内的一名角色。');
+        if (targetActor === actor) return fail('【强袭】不能选择自己。');
+        if (game[targetActor].hp <= 0) return fail('目标已阵亡。');
+        // "你攻击范围内的一名角色" — 攻击范围 = 距离 <= 武器射程。
+        if (!StateRuntime.canReachWithSha(game, actor, targetActor)) {
+          return fail('目标不在你的攻击范围内。');
+        }
+        // 成本: 指定了武器牌 → 弃武器; 否则失去 1 点体力。
+        var weapon = self.equipment && self.equipment.weapon;
+        var wantsWeaponCost = cardIds.length > 0;
+        if (wantsWeaponCost) {
+          if (!weapon || cardIds[0] !== weapon.id) return fail('【强袭】的成本只能是你装备区里的武器牌。');
+          takeCard(game, weapon, { zone: 'equipment', actor: actor, slot: 'weapon' });
+          discardCard(game, weapon);
+          // 失去装备区的牌 → 照常结算失去时机 (枭姬等)。
+          if (triggerEquipmentLoss) triggerEquipmentLoss(game, actor, weapon);
+          log(game, actorName(game, actor) + '发动【强袭】，弃置武器【' + weapon.name + '】。');
+        } else {
+          self.hp -= 1;
+          log(game, actorName(game, actor) + '发动【强袭】，失去 1 点体力。');
+        }
+        self.flags.qiangxiUsed = true;
+        // 失去体力可能致自身濒死 → 濒死结算先跑 (loseHp 语义); 伤害在其后。
+        if (!wantsWeaponCost && self.hp <= 0) enterDying(game, actor);
+        if (game.phase === 'gameover') return success('强袭结算完成。');
+        if (!game[targetActor] || game[targetActor].hp <= 0) return success('强袭目标已不在场。');
+        damage(game, targetActor, 1, actor, '【强袭】');
+        return success('强袭完成。');
+      }
+
+      // ═════ v15 T (火包): 节命 (荀彧) ═════
+      // 官方逐字 (card__hero__wei.md:335): "每当你受到1点伤害后，你可以令
+      // 一名角色将手牌补至X张（X为其体力上限且至多为5）。"
+      // 逐点处理 (与遗计同款"每受到1点伤害"口径): amount 点伤害触发 amount 次。
+      // "补至" = 只摸不弃 — 手牌已达/超过 X 时不摸。
+      function triggerJiemingDamageAfter(context) {
+        var game = context.game;
+        var targetActor = context.targetActor;
+        var self = game[targetActor];
+        if (!self || !hasSkill(self, 'jieming') || game.phase === 'gameover') return null;
+        if (context.amount <= 0) return null;
+        var pref = (self.skillPreferences && self.skillPreferences.jieming) || 'auto';
+        if (pref === 'decline') {
+          log(game, actorName(game, targetActor) + '选择不发动【节命】。');
+          return null;
+        }
+        for (var point = 0; point < context.amount; point += 1) {
+          if (self.hp <= 0 && game.phase !== 'gameover') {
+            // 濒死中仍可发动 (官方无限制), 但阵亡后不再触发。
+            if (!game[targetActor]) break;
+          }
+          var beneficiary = jiemingPickBeneficiary(game, targetActor);
+          if (!beneficiary) break;
+          var beneficiaryState = game[beneficiary];
+          var limit = Math.min(beneficiaryState.maxHp, 5);
+          var need = limit - (beneficiaryState.hand || []).length;
+          if (need <= 0) continue;
+          drawCards(game, beneficiary, need);
+          log(game, actorName(game, targetActor) + '发动【节命】，令' + actorName(game, beneficiary)
+            + '将手牌补至 ' + limit + ' 张。');
+        }
+        return { jiemingApplied: true };
+      }
+
+      // 受益者挑选: 显式偏好座席优先 (skillPreferences.jiemingTarget), 否则
+      // 取"补牌收益最大且非敌对"的座席 — 只读公开信息 (手牌数是公开的,
+      // 体力上限是公开的), 不读暗牌不读暗置身份。
+      function jiemingPickBeneficiary(game, actor) {
+        var explicit = game[actor].skillPreferences && game[actor].skillPreferences.jiemingTarget;
+        if (explicit) {
+          var resolved = StateRuntime.resolveSeatOption(game, explicit);
+          if (resolved && game[resolved] && game[resolved].hp > 0) return resolved;
+        }
+        var best = null;
+        var bestGain = 0;
+        StateRuntime.aliveSeats(game).forEach(function (seat) {
+          if (seat !== actor && StateRuntime.perceivedHostile(game, actor, seat)) return;
+          var st = game[seat];
+          var gain = Math.min(st.maxHp, 5) - (st.hand || []).length;
+          if (gain > bestGain) { bestGain = gain; best = seat; }
+        });
+        return best;
       }
 
       // v11 C6 (批次 30): 结姻 (孙尚香) — gltjk skill cache:
@@ -2276,6 +2520,47 @@
           return triggerJianxiongDamageAfter(context.game, context.targetActor, context.sourceCard);
         }
       });
+        // v15 T: 火计 (卧龙诸葛亮) — 红色手牌当火攻
+        SkillRuntime.registerSkill(skillRegistry, 'huoji', {
+        onCardAs: function (context) {
+          return triggerHuojiCardAs(context);
+        }
+      });
+        // v15 T: 连环 (庞统) — 梅花手牌当铁索连环 + 梅花手牌可重铸
+        SkillRuntime.registerSkill(skillRegistry, 'lianhuan', {
+        onCardAs: function (context) {
+          return triggerLianhuanCardAs(context);
+        },
+        onCanRecast: function (context) {
+          var state = context.state;
+          if (!state || !hasSkill(state, 'lianhuan')) return null;
+          return !!(context.card && context.card.suit === 'club');
+        }
+      });
+        // v15 T: 双雄 (颜良文丑) — 回合级授权的异色手牌当决斗
+        SkillRuntime.registerSkill(skillRegistry, 'shuangxiong', {
+        onCardAs: function (context) {
+          return triggerShuangxiongCardAs(context);
+        }
+      });
+        // v15 T: 强袭 (典韦) — 出牌阶段限一次, 失体力/弃武器换 1 点伤害
+        SkillRuntime.registerSkill(skillRegistry, 'qiangxi', {
+        onActiveSkill: function (context) {
+          return triggerQiangxiActiveSkill(context);
+        }
+      });
+        // v15 T: 节命 (荀彧) — 每受到 1 点伤害后令一名角色补手牌至 X
+        SkillRuntime.registerSkill(skillRegistry, 'jieming', {
+        onDamageAfter: function (context) {
+          return triggerJiemingDamageAfter(context);
+        }
+      });
+        // v15 T: 猛进 (庞德) — 杀被闪抵消时弃目标一张牌
+        SkillRuntime.registerSkill(skillRegistry, 'mengjin', {
+        onShaDodged: function (context) {
+          return triggerMengjinShaDodged(context);
+        }
+      });
         SkillRuntime.registerSkill(skillRegistry, 'fankui', {
         onDamageAfter: function (context) {
           return triggerFankuiDamageAfter(context);
@@ -2557,6 +2842,7 @@
           triggerLuoshenPrepare: triggerLuoshenPrepare,
           getGuanxingPreview: getGuanxingPreview,
           resolveFankuiPickChoice: resolveFankuiPickChoice,
+          resolveMengjinPickChoice: resolveMengjinPickChoice,
           resolveYaowuRewardChoice: resolveYaowuRewardChoice,
           resolveGanglieFireChoice: resolveGanglieFireChoice,
           resolveGanglieSourceChoice: resolveGanglieSourceChoice,
@@ -2569,6 +2855,8 @@
       }
 
       export const PLAY_PHASE_ACTIVE_SKILLS = {
+        // v15 T (火包): 强袭 (出牌阶段限一次)
+        qiangxi: true,
         zhiheng: true,
         kurou: true,
         rende: true,

@@ -768,6 +768,35 @@
             var guanshiResult = applyGuanshiForcedHit(game, actor, targetActor, card, amount);
             if (guanshiResult) return guanshiResult;
           }
+          // v15 T: 猛进 (庞德) — "每当你使用的【杀】被目标角色使用的【闪】
+          // 抵消时, 你可以弃置其一张牌" (card__hero__neutral.md:225)。
+          // 位序: 贯石斧之后 (贯石强制命中 → 杀未被抵消, 猛进不触发),
+          // 青龙续杀之前 (抵消的瞬间先于"继续使用一张杀")。
+          // 到此处的 dodged 恒为"闪抵消" — 仁王盾/藤甲免疫在开窗前已短路
+          // 返回; 八卦"视为使用的闪"与护驾代打"视为你使用"均计 (官方
+          // card__equipment.md:123 / card__hero__wei.md:13 逐字)。
+          SkillRuntime.runHook(skillRegistry, 'onShaDodged', {
+            game: game, actor: actor, targetActor: targetActor, card: card, amount: amount
+          });
+          // 玩家席猛进经 pendingChoice 选牌 → 挂起, 由 resolver 续跑本段
+          // 剩余流程 (青龙续杀 + 结算收尾)。
+          if (game.pendingChoice) {
+            if (!game.pauseState) game.pauseState = {};
+            game.pauseState.shaDodgeResume = {
+              actor: actor, targetActor: targetActor, card: card, amount: amount
+            };
+            return success('等待【猛进】决定。');
+          }
+          return continueShaDodgeAfterSkills(game, actor, card, amount, targetActor);
+        }
+        return settleShaHit(game, actor, card, amount, targetActor);
+      }
+
+      // v15 T: 闪避分支的剩余流程 (青龙续杀 + 收尾) — 猛进 ask 挂起后由
+      // resolver 重入本函数, 时序与同步路径一致。
+      function continueShaDodgeAfterSkills(game, actor, card, amount, targetActor) {
+        var self = game[actor];
+        {
           // v13 审计三轮: 青龙偃月刀 — (a) "你可以"可选效果, 补 decline 偏好
           // (缺省 auto 发动, 沿用朱雀/银月惯例); (b) 续杀锁定为"相同的目标"
           // (官方 card__equipment.md — 此前无显式目标, 多席下 defaultHostileTarget
@@ -824,7 +853,12 @@
           settleShaCardAfterOutcome(game, card);
           return success('目标闪避。');
         }
+      }
 
+      // v15 T: 命中分支 (原 resolveShaAfterResponse 的落点段, 函数体逐行
+      // 不变 — 仅为闪避分支抽出续跑入口而拆分)。
+      function settleShaHit(game, actor, card, amount, targetActor) {
+        var target = game[targetActor];
         // v13 J3: 伤害落点回调 — 被天香转移/被防止时目标未受伤害, 麒麟等
         // "对目标角色造成伤害时"的武器命中特效不触发 (修复 v12 已知偏差);
         // 天香 ask 挂起时回调随重入结算延迟触发, 时序与决策一致。
@@ -905,6 +939,8 @@
       shanRequiredAgainstSha: shanRequiredAgainstSha,
       isArmorIgnoredBySha: isArmorIgnoredBySha,
       resolveShanResponseChoice: resolveShanResponseChoice,
+      // v15 T: 猛进 ask 挂起后的闪避分支续跑入口 (skills 域经包装回调)
+      continueShaDodgeAfterSkills: continueShaDodgeAfterSkills,
       resolveGuanshiDiscardChoice: resolveGuanshiDiscardChoice,
       applyGuanshiForcedHit: applyGuanshiForcedHit,
       defaultHostileTarget: defaultHostileTarget,

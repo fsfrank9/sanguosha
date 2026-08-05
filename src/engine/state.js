@@ -49,9 +49,33 @@
     return effects[effectName];
   }
 
+  // v15 T: 虚拟装备层 — "视为装备着某装备牌"的锁定技。挂在
+  // hasEquipmentEffect 这个单点上 (装备判断零容忍红线要求所有装备效果
+  // 查询都过此出口), 因此这类技能对既有装备面 (八卦判定/青釭无视防具/
+  // 乐不思蜀等) 自动一致, 无需逐处补判。
+  //   bazhen 八阵 (卧龙诸葛亮): 锁定技, 装备区里没有防具牌时视为装备
+  //   着【八卦阵】(card__hero__shu.md:336 逐字)。
+  var VIRTUAL_EQUIPMENT_SKILLS = [
+    { skill: 'bazhen', as: 'bagua', slot: 'armor' }
+  ];
+
+  function virtualEquipmentTypes(state) {
+    if (!state) return [];
+    return VIRTUAL_EQUIPMENT_SKILLS.filter(function (entry) {
+      // "装备区里没有防具牌" — 真实防具在位时虚拟层让位 (官方口径);
+      // hasSkill 走统一出口 → 缠怨 hp1 压制等对锁定技照常生效。
+      if (!hasSkill(state, entry.skill)) return false;
+      return !(state.equipment && state.equipment[entry.slot]);
+    }).map(function (entry) { return entry.as; });
+  }
+
   function hasEquipmentEffect(state, effectName) {
-    return equipmentSlots(state).some(function (card) {
+    var equipped = equipmentSlots(state).some(function (card) {
       return !!equipmentEffectValue(card.type, effectName);
+    });
+    if (equipped) return true;
+    return virtualEquipmentTypes(state).some(function (type) {
+      return !!equipmentEffectValue(type, effectName);
     });
   }
 
@@ -329,7 +353,23 @@
     }
     // v11 C8 (批次 32): handLimitDelta — 回合级手牌上限修正 (妄尊 -1 等),
     // 由 resetActorTurnState / resetEndOfTurnState 复位。
-    return Math.max(0, (state.hp || 0) + (state.handLimitDelta || 0));
+    // v15 T: 血裔 (袁绍) — 主公技锁定技, 手牌上限 +2X。
+    return Math.max(0, (state.hp || 0) + (state.handLimitDelta || 0) + xueyiHandLimitBonus(game, actor));
+  }
+
+  // v15 T: 血裔 — "主公技，锁定技，你的手牌上限+2X（X为其他群势力角色数）"
+  // (card__hero__neutral.md:151 逐字)。主公技随身份场激活 (1v1 无身份 →
+  // 恒 0, 与激将/护驾/妄尊同惯例); X 按**存活**的其他群势力角色计
+  // (阵亡角色不再是场上角色)。锁定技 → 无开关, 但走 hasSkill 统一出口
+  // (缠怨 hp1 压制照常)。
+  function xueyiHandLimitBonus(game, actor) {
+    var state = game && game[actor];
+    if (!state || !hasSkill(state, 'xueyi')) return 0;
+    if (!game.roles || game.roles[actor] !== '主公') return 0;
+    var others = aliveSeats(game).filter(function (seat) {
+      return seat !== actor && game[seat] && game[seat].camp === '群';
+    });
+    return 2 * others.length;
   }
 
   // v12 G2: 红颜 (小乔) — 锁定技"你的黑桃牌视为红桃牌"的花色视同层。

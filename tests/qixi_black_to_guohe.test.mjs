@@ -143,7 +143,9 @@ test('回归: 未注册的 asType 仍被白名单拒绝', () => {
   game.player.hand = [c('sha', { id: 'black-sha', suit: 'spade', color: 'black' })];
   const r = Engine.playCardAs(game, 'player', 'black-sha', 'shunshou');
   assert.equal(r.ok, false);
-  assert.match(r.message, /只支持/);
+  // v15 T: 白名单改由转化牌工厂表驱动, 拒绝文案随之统一 (行为不变 —
+  // 顺手牵羊仍不是任何已注册技能的转化目标)。
+  assert.match(r.message, /不支持转化/);
 });
 
 test('回归: 甘宁的黑牌不能当乐不思蜀 (国色不外溢)', () => {
