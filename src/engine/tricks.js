@@ -892,9 +892,12 @@
         if (!opponentState || !opponentState.equipment.weapon) {
           return success('【借刀杀人】无效果（目标无武器）。');
         }
+        // v15 S 评审收口: 于吉可背面朝上使用任意手牌当【杀】 → 手上没有
+        // 杀也要走"决定"分支 (路线图 S1 明文含"借刀应杀"); 非蛊惑局面
+        // 维持既有"无杀即交武器"。
         var hasSha = opponentState.hand.some(function (c) {
           return c && (c.type === 'sha' || c.type === 'fire_sha' || c.type === 'thunder_sha');
-        });
+        }) || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, opponentActor));
         var canHit = game[jdVictim] && game[jdVictim].hp > 0
           && canReachWithSha(game, opponentActor, jdVictim)
           && !cardTargetProtection(game, opponentActor, jdVictim, { type: 'sha', color: 'black', name: '杀' }, '杀');
@@ -924,9 +927,15 @@
 
       function jiedaoFireOpponentSha(game, sourceActor, opponentActor, victimActor) {
         var opponentState = game[opponentActor];
-        var borrowedSha = removeFirstCardOfType(opponentState, 'sha')
+        // v15 S: 蛊惑声明的【杀】(响应中的使用流程) — 牌已亮出并锚在处理
+        // 区, 直接顶替手牌摘取 (受害目标由借刀本身确定, 声明期不另选)。
+        var guhuoSha = deps.takeGuhuoResponseCard
+          ? deps.takeGuhuoResponseCard(game, opponentActor, ['sha', 'fire_sha', 'thunder_sha'])
+          : null;
+        var borrowedSha = guhuoSha ? guhuoSha.physical
+          : (removeFirstCardOfType(opponentState, 'sha')
           || removeFirstCardOfType(opponentState, 'fire_sha')
-          || removeFirstCardOfType(opponentState, 'thunder_sha');
+          || removeFirstCardOfType(opponentState, 'thunder_sha'));
         if (!borrowedSha) {
           return transferWeaponJiedao(game, sourceActor, opponentActor);
         }
@@ -1111,7 +1120,11 @@
           }
           chain.shaRemaining -= 1;
           if (chain.shaRemaining > 0) {
-            if (hasShaResponseAvailable(game.player)) {
+            // 评审收口: 与 sha-flow 的无双第二张【闪】窗口对称 — 蛊惑可当
+            // 【杀】打出, 手上没有杀也要开第二个窗口 (此前直接判"无法打出
+            // 第二张", 蛊惑额度未消耗却被跳过)。
+            if (hasShaResponseAvailable(game.player)
+                || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, 'player'))) {
               log(game, '【无双】：' + actorName(game, 'player') + '需再打出一张【杀】。');
               return advanceDuelChain(game);
             }
@@ -1217,6 +1230,24 @@
               statusMessage: '等待玩家响应【' + title + '】。'
             });
           }
+        }
+        // v15 S 评审收口: 需【打出杀】的 AOE (南蛮入侵) 此前对玩家席也走
+        // 自动响应, 没有任何窗口 → 蛊惑的打出流程在此点不可达 (路线图 S1
+        // 明文含"南蛮应杀")。仅在玩家确实可发动蛊惑时开窗, 否则维持既有
+        // 自动响应 (零行为变更); 窗口内放弃/打真杀走同一 resolver。
+        if (responseType === 'sha' && targetActor === 'player'
+            && deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, 'player')) {
+          aoe.idx += 1;
+          return requestPlayerResponse(game, {
+            kind: 'aoe-sha-response',
+            actor: 'player',
+            pauseKey: 'aoeShaResponse',
+            source: { sourceActor: aoe.sourceActor, title: title, card: aoe.card },
+            options: listShaResponseOptions(game.player),
+            meta: { sourceActor: aoe.sourceActor, sourceName: title },
+            logMessage: '等待' + actorName(game, 'player') + '决定是否打出【杀】响应【' + title + '】。',
+            statusMessage: '等待玩家响应【' + title + '】。'
+          });
         }
         aoe.idx += 1;
         if (consumeResponse(game, targetActor, responseType, '【' + title + '】')) {
@@ -1342,6 +1373,44 @@
         }
         return success(title + '响应完成。');
       }
+
+      // v15 S 评审收口: 南蛮入侵 (需打出【杀】) 的玩家响应窗口 resolver —
+      // 与万箭闪响应同构 (放弃/指定牌/蛊惑注入三入口 → 化解或受 1 伤 →
+      // 续跑 AOE 队列)。仅在玩家可发动蛊惑时开窗, 其余局面走不到这里。
+      function resolveAOEShaResponseChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.aoeShaResponse;
+        if (!saved) return fail('找不到【南蛮入侵】响应的暂停状态。');
+        game.pauseState.aoeShaResponse = null;
+        var sourceActor = saved.sourceActor;
+        var title = saved.title || '南蛮入侵';
+        var responded = false;
+        if (decision.cardId) {
+          responded = consumeResponse(game, 'player', 'sha', '【' + title + '】', decision.cardId);
+          if (!responded) log(game, actorName(game, 'player') + '指定的牌无法当【杀】。');
+        } else if (decision.use) {
+          // 蛊惑注入亦走这条 (consumeResponse 先取处理区的声明牌)。
+          responded = consumeResponse(game, 'player', 'sha', '【' + title + '】');
+          if (!responded) log(game, actorName(game, 'player') + '没有可打出的【杀】。');
+        } else {
+          log(game, actorName(game, 'player') + '选择不打出【杀】响应【' + title + '】。');
+        }
+        if (!responded && tryLordAidSync && tryLordAidSync(game, 'player', 'jijiang', '【' + title + '】')) {
+          responded = true;
+        }
+        if (responded) {
+          log(game, actorName(game, 'player') + '成功化解【' + title + '】。');
+        } else {
+          damage(game, 'player', 1, sourceActor, '【' + title + '】', saved.card);
+        }
+        if (game.pauseState.aoe && !game.pendingChoice && game.phase !== 'gameover') {
+          return advanceAOETargets(game);
+        }
+        if (game.pauseState.aoe && game.phase === 'gameover') {
+          game.pauseState.aoe = null;
+        }
+        return success(title + '响应完成。');
+      }
+      registerResponseKind('aoe-sha-response', resolveAOEShaResponseChoice);
 
       // L1 (审计二轮): 火攻 "目标展示一张手牌" 是目标的选择, 此前恒取
       // hand[0] (确定性泄露 + 目标无选择权)。现在: AI / 'auto' (默认) 目标用

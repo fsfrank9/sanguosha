@@ -692,6 +692,8 @@
       var TricksRuntime = createTricksRuntime({
         // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
         guhuoResponsePossible: guhuoResponsePossible,
+        // v15 S 收口: 借刀持刀者使用杀 — 声明牌注入取用口 (不走 consumeResponse)
+        takeGuhuoResponseCard: takeGuhuoResponseCard,
         log: log,
         success: success,
         fail: fail,
@@ -2816,7 +2818,7 @@
         // 该窗口的可声明牌名 (声明入口经 resolvePendingChoice({guhuo:…}))。
         guhuoResponseAvailable: GuhuoRuntime.guhuoResponseAvailable,
         guhuoResponseTypes: function (game) {
-          return GuhuoRuntime.guhuoResponseTypes(game, game && game.pendingChoice);
+          return GuhuoRuntime.guhuoResponseMenu(game);
         },
         // v14 P2: 方天画戟额外目标前置查询 (UI 多目标暂存 / AI 目标启发用) —
         // 手牌中仅剩这张【杀】且装备方天 → 2, 否则 0。

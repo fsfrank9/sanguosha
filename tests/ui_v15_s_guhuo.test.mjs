@@ -82,6 +82,7 @@ test('S1 UI 闪响应窗: 无闪也弹蛊惑面板 → 选牌名+盖置牌确认
 test('S1 UI 验假重开: 面板随窗口重开但蛊惑入口按限次收起', () => {
   const game = startDuel('yuji', 'caocao');
   game.turn = 'enemy';
+  game.player.guhuoBusted = 1; // 有前科 → AI 走响应赌假面质疑
   game.player.hand = [c('sha', { id: 'ui-fake-cover' }), c('shan', { id: 'ui-backup-shan' })];
   game.enemy.hand = [c('sha', { id: 'ui-e-sha2' })];
   Engine.playCard(game, 'enemy', 'ui-e-sha2', { target: 'player' });
@@ -124,6 +125,33 @@ test('S1 UI: 非于吉席位的响应窗口不出现蛊惑面板', () => {
   UI.render();
   assert.equal($('shanResponsePanel').hidden, false);
   assert.equal($('guhuoResponsePanel').hidden, true, '无蛊惑技能 → 无声明面板');
+});
+
+test('S1 UI 收口: 同 kind 连开的两个窗口之间不残留暂存 (无双第二张闪)', () => {
+  // 评审收口回归钉: 本地态按 kind 字符串比会把窗口 1 的暂存原样带进窗口 2
+  // 且确认钮已启用 → 单击即零确认发动蛊惑并丢一张牌。
+  const game = startDuel('yuji', 'lvbu');
+  game.turn = 'enemy';
+  game.player.hand = [c('shan', { id: 'ws-shan-a' }), c('shan', { id: 'ws-shan-b' }),
+    c('wuzhong', { id: 'ws-junk' })];
+  game.enemy.hand = [c('sha', { id: 'ws-e-sha' })];
+  Engine.playCard(game, 'enemy', 'ws-e-sha', { target: 'player' });
+  UI.render();
+  // 窗口 1: 先在蛊惑面板暂存 (只暂存, 不确认), 再改主意走主面板打真闪
+  $('guhuoResponseTypes').dispatchClick({ 'data-guhuo-resp-type': 'shan' });
+  $('guhuoResponseCovers').dispatchClick({ 'data-guhuo-resp-cover': 'ws-junk' });
+  assert.equal($('guhuoResponseConfirmBtn').disabled, false, '窗口 1 内已选齐');
+  $('shanResponseChoices').dispatchClick({ 'data-shan-card-id': 'ws-shan-a' });
+  $('handConfirmBtn').click();
+  UI.render();
+  // 窗口 2 (无双第二张闪, 同为 shan-response)
+  const second = Engine.getPendingChoice(game);
+  assert.ok(second && second.kind === 'shan-response', '无双第二张窗口');
+  assert.equal($('guhuoResponsePanel').hidden, false, '蛊惑面板随新窗口出现');
+  assert.equal($('guhuoResponseConfirmBtn').disabled, true, '暂存已清 → 确认钮禁用');
+  assert.ok(!/is-active/.test($('guhuoResponseCovers').innerHTML), '盖置牌高亮不残留');
+  assert.ok(!/is-active/.test($('guhuoResponseTypes').innerHTML), '牌名高亮不残留');
+  assert.ok(!game.player.flags.guhuoUsedThisTurn, '未误发动');
 });
 
 // ───── S2: 声明菜单 16/16 ─────

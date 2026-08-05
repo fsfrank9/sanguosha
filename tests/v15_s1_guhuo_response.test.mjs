@@ -85,7 +85,9 @@ test('S1 打出流程 (闪): 无人质疑 → 亮出后按正常打出流程闪�
 
 test('S1 打出流程 (闪): 验假 → 终止 + 视为没有决定如何进行响应 → 窗口原样重开', () => {
   const game = buildDuel();
-  // 声明闪盖置真【杀】; 曹操是这张【杀】的使用者 → 响应赌假面触发质疑。
+  // 声明闪盖置真【杀】; 曹操是这张【杀】的使用者且于吉有前科 (公开的
+  // 被质破记录) → 响应赌假面触发质疑。
+  game.player.guhuoBusted = 1;
   game.player.hand = [c('sha', { id: 'p-fake' }), c('shan', { id: 'p-real-shan' })];
   game.enemy.hand = [c('sha', { id: 'e-sha' })];
   Engine.playCard(game, 'enemy', 'e-sha', { target: 'player' });
@@ -110,6 +112,7 @@ test('S1 打出流程 (闪): 验假 → 终止 + 视为没有决定如何进行�
 
 test('S1 打出流程 (闪): 验真 → 质疑者获缠怨 (打出◆未复述缠怨条款, 按技能正文授予)', () => {
   const game = buildDuel();
+  game.player.guhuoBusted = 1; // 有前科 → 曹操按响应赌假面质疑 (结果为真)
   game.player.hand = [c('shan', { id: 'p-true-shan' })];
   game.enemy.hand = [c('sha', { id: 'e-sha' })];
   Engine.playCard(game, 'enemy', 'e-sha', { target: 'player' });
@@ -330,6 +333,86 @@ test('S1 已知局限钉: AI 席在响应窗口不声明蛊惑 (仅玩家席接�
   assert.equal(Engine.getPendingChoice(game), null, 'AI 席不开响应窗口');
   assert.equal(game.enemy.hp, before - 1, 'AI 于吉照常受伤 (不声明蛊惑)');
   assert.ok(game.enemy.hand.some((card) => card.id === 'ai-nonshan'), '手牌未被当闪打出');
+});
+
+// ───── 评审收口回归钉 (opus 对抗端到端复现) ─────
+
+test('S1 收口: 南蛮入侵 (需打出杀) 也开窗 — 此前玩家席走自动响应, 打出流程不可达', () => {
+  const game = buildDuel();
+  game.player.hand = [c('sha', { id: 'nm-true-sha' })];
+  game.enemy.hand = [c('nanman', { id: 'e-nanman' })];
+  Engine.playCard(game, 'enemy', 'e-nanman', {});
+  assert.equal(Engine.getPendingChoice(game).kind, 'wuxie-response');
+  Engine.resolvePendingChoice(game, { use: false });
+  const window = Engine.getPendingChoice(game);
+  assert.ok(window && window.kind === 'aoe-sha-response', '南蛮玩家窗口开启');
+  assert.deepEqual(Engine.guhuoResponseTypes(game), ['sha', 'fire_sha', 'thunder_sha']);
+  assertCardConservation(game, () => {
+    Engine.resolvePendingChoice(game, { guhuo: { cardId: 'nm-true-sha', declareType: 'sha' } });
+  });
+  assert.equal(game.player.hp, game.player.maxHp, '打出【杀】化解南蛮');
+});
+
+test('S1 收口: 南蛮窗口零行为变更面 — 非蛊惑局面仍走自动响应 (不开窗)', () => {
+  const game = buildDuel('caocao', 'liubei');
+  game.player.hand = [c('sha', { id: 'auto-sha' })];
+  game.enemy.hand = [c('nanman', { id: 'e-nanman-2' })];
+  Engine.playCard(game, 'enemy', 'e-nanman-2', {});
+  Engine.resolvePendingChoice(game, { use: false }); // 无懈窗
+  assert.equal(Engine.getPendingChoice(game), null, '非于吉席不开南蛮窗口');
+  assert.ok(game.discard.some((card) => card.id === 'auto-sha'), '自动打出真杀化解');
+});
+
+test('S1 收口: 借刀杀人 (持刀者使用杀) 也开决定窗 — 无杀也能声明', () => {
+  const game = buildDuel();
+  game.player.equipment.weapon = c('qinggang', { id: 'p-weapon' });
+  game.player.hand = [c('shan', { id: 'jd-cover-shan' })]; // 手上无杀
+  game.enemy.hand = [c('jiedao', { id: 'e-jiedao' })];
+  Engine.playCard(game, 'enemy', 'e-jiedao', { target: 'player', jiedaoVictim: 'enemy' });
+  Engine.resolvePendingChoice(game, { use: false }); // 无懈窗
+  const window = Engine.getPendingChoice(game);
+  assert.ok(window && window.kind === 'jiedao-decision', '无杀也进决定窗 (蛊惑可当杀使用)');
+  assertCardConservation(game, () => {
+    Engine.resolvePendingChoice(game, { guhuo: { cardId: 'jd-cover-shan', declareType: 'sha' } });
+  });
+  assert.ok(game.player.equipment.weapon, '声明成功 → 武器未被交出');
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1, '持刀者的杀落在借刀指定的受害者');
+});
+
+test('S1 收口: 无双第二张【杀】的窗口同样提供蛊惑 (与闪路径对称)', () => {
+  const game = buildDuel('yuji', 'lvbu');
+  game.player.hand = [c('sha', { id: 'ws-sha' }), c('wuzhong', { id: 'ws-cover' })];
+  game.enemy.hand = [c('juedou', { id: 'e-duel-ws' })];
+  Engine.playCard(game, 'enemy', 'e-duel-ws', { target: 'player' });
+  Engine.resolvePendingChoice(game, { use: false }); // 无懈窗
+  assert.equal(Engine.getPendingChoice(game).kind, 'sha-duel-response');
+  Engine.resolvePendingChoice(game, { cardId: 'ws-sha' }); // 第一张真杀
+  const second = Engine.getPendingChoice(game);
+  assert.ok(second && second.kind === 'sha-duel-response', '无双第二张窗口开启 (此前直接判负)');
+  assert.equal(Engine.guhuoResponseAvailable(game), true, '第二张窗口可发动蛊惑');
+});
+
+test('S1 收口: AI 席不得经公开 dispatcher 越界发动响应蛊惑 (声明入口复用同一谓词)', () => {
+  const game = buildDuel('caocao', 'yuji');
+  game.enemy.skillPreferences.dying = 'ask'; // 引擎支持的旋钮 → AI 席也能拿到窗口
+  game.enemy.hp = 1;
+  // 有【桃】→ AI 席也能拿到 ask 救援窗 (评审复现的入口); 另备一张非桃牌
+  // 作为越界声明的盖置牌。
+  game.enemy.hand = [c('tao', { id: 'ai-tao', suit: 'heart', color: 'red' }),
+    c('wuzhong', { id: 'ai-cover' })];
+  game.turn = 'player';
+  game.player.hand = [c('sha', { id: 'p-kill-ai' })];
+  Engine.playCard(game, 'player', 'p-kill-ai', { target: 'enemy' });
+  const dying = Engine.getPendingChoice(game);
+  assert.ok(dying && dying.kind === 'dying-rescue' && dying.actor === 'enemy');
+  assert.equal(Engine.guhuoResponseAvailable(game), false, 'UI 门禁: AI 席无声明面');
+  assert.deepEqual(Engine.guhuoResponseTypes(game), [], '菜单谓词与门禁同口径');
+  const rejected = Engine.resolvePendingChoice(game, {
+    guhuo: { cardId: 'ai-cover', declareType: 'tao' }
+  });
+  assert.equal(rejected.ok, false, '直调 dispatcher 同样被拒');
+  assert.ok(!game.enemy.flags.guhuoUsedThisTurn, '额度未消耗');
+  assert.ok(game.enemy.hand.some((card) => card.id === 'ai-cover'), '手牌零副作用');
 });
 
 await runTests();

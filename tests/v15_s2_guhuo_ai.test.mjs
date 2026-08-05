@@ -109,40 +109,78 @@ test('S2 诈声明: 无死牌 (手牌全是能用的真牌) 时不硬诈', () =>
 
 // ───── 质疑面: 响应赌假 ─────
 
-test('S2 质疑面 响应赌假: 玩家用蛊惑响应我推进的事件 → 血线可承受即质疑', () => {
-  const game = Engine.newGame({ seed: 75211, playerHero: 'yuji', enemyHero: 'caocao' });
+function buildResponseCase(seed, tweak) {
+  const game = Engine.newGame({ seed, playerHero: 'yuji', enemyHero: 'caocao' });
   game.log = []; game.discard = []; game.deck = [];
   for (const actor of ['player', 'enemy']) {
     game[actor].hand = []; game[actor].judgeArea = []; game[actor].flags = {};
     game[actor].equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
     game[actor].hp = game[actor].maxHp;
-    game[actor].skillPreferences = { shanResponse: 'ask' };
+    game[actor].skillPreferences = { shanResponse: 'ask', dying: 'ask' };
   }
   game.turn = 'enemy';
   game.phase = 'play';
-  game.player.hand = [c('sha', { id: 'p-bluff-cover' })];
-  game.enemy.hand = [c('sha', { id: 'e-sha' })];
-  Engine.playCard(game, 'enemy', 'e-sha', { target: 'player' });
-  Engine.resolvePendingChoice(game, { guhuo: { cardId: 'p-bluff-cover', declareType: 'shan' } });
-  assert.ok(game.log.some((line) => /质疑【蛊惑】！/.test(line)), '杀的使用者质疑了这次响应');
+  if (tweak) tweak(game);
+  game.player.hand = game.player.hand.length ? game.player.hand : [c('sha', { id: 'resp-cover' })];
+  game.enemy.hand = [c('sha', { id: 'resp-e-sha' })];
+  Engine.playCard(game, 'enemy', 'resp-e-sha', { target: 'player' });
+  Engine.resolvePendingChoice(game, {
+    guhuo: { cardId: game.player.hand.length ? 'resp-cover' : 'resp-cover', declareType: 'shan' }
+  });
+  return game;
+}
 
-  // 血线见底 (hp<=1) 时不赌 — 缠怨久期风险不可承受
-  const frail = Engine.newGame({ seed: 75212, playerHero: 'yuji', enemyHero: 'caocao' });
-  frail.log = []; frail.discard = []; frail.deck = [];
+function challenged(game) {
+  return game.log.some((line) => /质疑【蛊惑】！/.test(line));
+}
+
+test('S2 质疑面 响应赌假: "挡住我"只是必要条件 — 无赌假理由时不质疑 (真牌钓缠怨面已堵)', () => {
+  // 评审收口回归钉: 首版无条件恒质疑 → 于吉用真牌声明即可稳定钓走缠怨,
+  // 此后 1v1 质疑队列恒空、全型可无风险诈。
+  const clean = buildResponseCase(75221);
+  assert.equal(challenged(clean), false, '无前科/无空窗记账/血线健康 → 不赌');
+  assert.equal(clean.enemy.chanyuan, undefined, '不送缠怨');
+});
+
+test('S2 质疑面 响应赌假 ①有前科: 被质破多于被验真 → 质疑', () => {
+  const game = buildResponseCase(75222, (g) => { g.player.guhuoBusted = 1; });
+  assert.equal(challenged(game), true);
+});
+
+test('S2 质疑面 响应赌假 ②响应空窗记账: 该席此前公开证明凑不出闪 → 质疑', () => {
+  const game = buildResponseCase(75223, (g) => { g.player.aiRevealed = { shan: true }; });
+  assert.equal(challenged(game), true);
+});
+
+test('S2 质疑面 响应赌假 ③高赌注: 声明者血线见底 (打出成功他就活了) → 质疑', () => {
+  const game = buildResponseCase(75224, (g) => { g.player.hp = 1; });
+  assert.equal(challenged(game), true);
+});
+
+test('S2 质疑面 响应赌假: 质疑者自己血线见底 (hp<=1) → 恒不赌 (缠怨久期不可承受)', () => {
+  const game = buildResponseCase(75225, (g) => { g.enemy.hp = 1; g.player.guhuoBusted = 3; });
+  assert.equal(challenged(game), false);
+});
+
+test('S2 质疑面 响应赌假 ③高赌注: 濒死救援恒质疑 (赌中即当场终结)', () => {
+  const game = Engine.newGame({ seed: 75226, playerHero: 'yuji', enemyHero: 'caocao' });
+  game.log = []; game.discard = []; game.deck = [];
   for (const actor of ['player', 'enemy']) {
-    frail[actor].hand = []; frail[actor].judgeArea = []; frail[actor].flags = {};
-    frail[actor].equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
-    frail[actor].hp = frail[actor].maxHp;
-    frail[actor].skillPreferences = { shanResponse: 'ask' };
+    game[actor].hand = []; game[actor].judgeArea = []; game[actor].flags = {};
+    game[actor].equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
+    game[actor].hp = game[actor].maxHp;
+    game[actor].skillPreferences = { shanResponse: 'ask', dying: 'ask' };
   }
-  frail.turn = 'enemy';
-  frail.phase = 'play';
-  frail.enemy.hp = 1;
-  frail.player.hand = [c('sha', { id: 'p-bluff-2' })];
-  frail.enemy.hand = [c('sha', { id: 'e-sha-2' })];
-  Engine.playCard(frail, 'enemy', 'e-sha-2', { target: 'player' });
-  Engine.resolvePendingChoice(frail, { guhuo: { cardId: 'p-bluff-2', declareType: 'shan' } });
-  assert.ok(!frail.log.some((line) => /质疑【蛊惑】！/.test(line)), 'hp<=1 不赌假');
+  game.turn = 'enemy';
+  game.phase = 'play';
+  game.player.hp = 1;
+  game.player.hand = [c('tao', { id: 'dy-tao', suit: 'heart', color: 'red' })];
+  game.enemy.hand = [c('sha', { id: 'dy-sha' })];
+  Engine.playCard(game, 'enemy', 'dy-sha', { target: 'player' });
+  Engine.resolvePendingChoice(game, { use: false }); // 不出闪 → 濒死
+  Engine.resolvePendingChoice(game, { guhuo: { cardId: 'dy-tao', declareType: 'tao' } });
+  assert.equal(challenged(game), true, '救援声明恒质疑');
+  assert.equal(game.enemy.chanyuan, true, '这次是真桃 → 质疑者吃缠怨');
 });
 
 // ───── 质疑面: 被抓包记忆 ─────

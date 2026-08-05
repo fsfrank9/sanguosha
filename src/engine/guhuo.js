@@ -85,6 +85,11 @@ export function createGuhuoRuntime(deps) {
     'wanjian-response': { types: ['shan'], flow: 'playout' },
     'yinyue-response': { types: ['shan'], flow: 'playout' },
     'sha-duel-response': { types: ['sha', 'fire_sha', 'thunder_sha'], flow: 'playout' },
+    // v15 S 评审收口: 南蛮入侵 (打出杀) 与 借刀杀人 (持刀者使用杀) —
+    // 路线图 S1 明文含"南蛮/借刀应杀"; 借刀的受害目标由借刀本身确定,
+    // 声明期不另选目标, 故与其他窗口同构。
+    'aoe-sha-response': { types: ['sha', 'fire_sha', 'thunder_sha'], flow: 'playout' },
+    'jiedao-decision': { types: ['sha', 'fire_sha', 'thunder_sha'], flow: 'use' },
     'wuxie-response': { types: ['wuxie'], flow: 'use' },
     // 酒 使用方法Ⅱ 仅自救 (executeDyingRescue 同款口径) → 自己濒死才入列。
     'dying-rescue': { types: ['tao'], selfTypes: ['jiu'], flow: 'use' }
@@ -123,6 +128,13 @@ export function createGuhuoRuntime(deps) {
     return guhuoResponseTypes(game, pending).length > 0;
   }
 
+  // 当前窗口可声明的牌名 (UI 用) — 不可发动时恒空, 与
+  // guhuoResponseAvailable 同口径 (评审收口: 两个导出谓词不得互相矛盾)。
+  function guhuoResponseMenu(game) {
+    if (!guhuoResponseAvailable(game)) return [];
+    return guhuoResponseTypes(game, game.pendingChoice);
+  }
+
   // 响应窗口声明入口 — 由 resolvePendingChoice / resolveResponseChoice 在
   // decision.guhuo 存在时先于 kind resolver 拦截 (pendingChoice 仍在槽内,
   // 校验失败即原样退回, 窗口不丢)。
@@ -135,6 +147,10 @@ export function createGuhuoRuntime(deps) {
     if (!state) return fail('未知角色。');
     if (!StateRuntime.hasSkill(state, 'guhuo')) return fail('该角色没有【蛊惑】。');
     if (state.flags && state.flags.guhuoUsedThisTurn) return fail('【蛊惑】每名角色的回合内限一次。');
+    // 评审收口: 与各窗口 gate / UI 门禁复用同一谓词 — 此前公开 dispatcher
+    // 可绕过"仅玩家席"边界 (AI 席经 skillPreferences.dying='ask' 拿到窗口
+    // 后直调即可发动), 落进本批明文声明不支持的区域。
+    if (!guhuoResponsePossible(game, actor)) return fail('该角色当前不能在响应中发动【蛊惑】。');
     var allowed = guhuoResponseTypes(game, pending);
     if (allowed.indexOf(opts.declareType) < 0) return fail('此响应窗口不能声明该牌名。');
     var physical = (state.hand || []).find(function (item) { return item.id === opts.cardId; });
@@ -466,6 +482,7 @@ export function createGuhuoRuntime(deps) {
     // v15 S1: 响应窗口面 (声明入口 / UI 门禁 / 各窗口 gate 谓词)
     guhuoResponseAvailable: guhuoResponseAvailable,
     guhuoResponseTypes: guhuoResponseTypes,
+    guhuoResponseMenu: guhuoResponseMenu,
     guhuoResponsePossible: guhuoResponsePossible,
     declareGuhuoResponse: declareGuhuoResponse
   };

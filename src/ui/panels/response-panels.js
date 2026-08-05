@@ -38,8 +38,13 @@
         els.guhuoResponsePanel.hidden = true;
         return;
       }
-      if (guhuoRespWindow !== kind) {
-        guhuoRespWindow = kind;
+      // 评审收口: 认窗口**对象**而非 kind 字符串 — 同 kind 连开的两个窗口
+      // (无双第二张闪 / AOE 逐席) 之间, 按 kind 比会把上一窗的暂存原样带
+      // 进新窗且确认钮已启用 → 单击即零确认发动蛊惑。requestPlayerResponse
+      // 每次都新建 pending 对象, 对象比即天然区分; 验假重开复用同一对象
+      // (同一次响应决定), 保留暂存也无害 (限次已消耗, 面板随即收起)。
+      if (guhuoRespWindow !== pending) {
+        guhuoRespWindow = pending;
         guhuoRespType = null;
         guhuoRespCover = null;
       }

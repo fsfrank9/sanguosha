@@ -1293,10 +1293,33 @@
       return pending.sourceActor === seat || pending.starterActor === seat;
     }
 
+    // 评审收口: "被我的事件挡住"只是必要条件, 不是充分条件 — 首版无条件
+    // 恒质疑, 于吉用**真牌**声明即可稳定钓走缠怨 (零成本), 此后质疑队列
+    // 恒空、全 16 型可无风险诈。补三条各自独立的赌假理由 (全部公开信息):
+    //   ① 有前科 — 该声明者被质破次数多于被验真次数;
+    //   ② 响应空窗记账 — 该席此前公开证明凑不出这一牌型 (consumeResponse
+    //      的 aiRevealed 遥测, 真实对局中同为公开信息);
+    //   ③ 高赌注 — 赌中即当场终结 (濒死救援) 或对手血线已见底 (打出成功
+    //      他就活下来), 值得用缠怨久期换。
+    function guhuoResponseWorthChallenging(game, seat, gh) {
+      var st = game[seat];
+      if (!st || st.hp < 2) return false; // 缠怨久期风险不可承受
+      if (!guhuoResponseBlocksMe(game, seat, gh)) return false;
+      var declarer = game[gh.actor] || {};
+      if ((declarer.guhuoBusted || 0) > (declarer.guhuoProven || 0)) return true;
+      var revealed = declarer.aiRevealed || {};
+      var needed = (gh.declareType === 'fire_sha' || gh.declareType === 'thunder_sha')
+        ? 'sha' : gh.declareType;
+      if (revealed[needed]) return true;
+      var pending = gh.responsePending || {};
+      if (pending.kind === 'dying-rescue') return true;
+      return declarer.hp <= 1;
+    }
+
     function aiShouldChallengeGuhuo(game, seat, gh) {
       var st = game[seat];
       if (!st || st.chanyuan) return false;
-      if (guhuoResponseBlocksMe(game, seat, gh) && st.hp >= 2) return true;
+      if (guhuoResponseWorthChallenging(game, seat, gh)) return true;
       var declarer = game[gh.actor] || {};
       if ((declarer.guhuoBusted || 0) > (declarer.guhuoProven || 0) && st.hp >= 2
           && StateRuntime.perceivedHostile(game, seat, gh.actor)) return true;
