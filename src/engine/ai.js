@@ -1367,6 +1367,13 @@
       return opts;
     }
 
+    function firstHandCardOfType(hand, type) {
+      for (var i = 0; i < hand.length; i += 1) {
+        if (hand[i] && hand[i].type === type) return hand[i];
+      }
+      return null;
+    }
+
     function aiGuhuoWouldBeChallenged(game, actor) {
       return StateRuntime.aliveSeats(game).some(function (seat) {
         var other = game[seat];
@@ -1382,7 +1389,7 @@
       // ① 真牌恒蛊惑 — 按 EV 序取第一张能声明其本名的真牌。
       for (var i = 0; i < GUHUO_DECLARE_PRIORITY.length; i += 1) {
         var type = GUHUO_DECLARE_PRIORITY[i];
-        var real = hand.find(function (card) { return card.type === type; }); // eslint-disable-line no-loop-func
+        var real = firstHandCardOfType(hand, type);
         if (!real) continue;
         var trueOpts = aiGuhuoDeclareOptions(game, actor, type);
         if (!trueOpts) continue;

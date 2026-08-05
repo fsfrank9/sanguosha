@@ -3,7 +3,7 @@
 //   的声明→质疑→翻验; 验假"视为没有决定如何进行响应"→窗口原样重开;
 //   打出流程无目标步骤; 缠怨在打出流程同样授予; 限次按回合全场复位。
 // 官方文本: official-skill-cache/gltjk-sanguosha-rules/pages/
-// card__hero__neutral.md:334-336 (使用流程 ◆ / 打出流程 ◆ / 属性 ◆);
+// card__hero__neutral.md:326 (正文) / :330 (使用流程 ◆) / :336 (打出流程 ◆);
 // spec 缺口逐条裁定: docs/audit/2026-08-05-guhuo-spec-gaps.md。
 import assert from 'node:assert/strict';
 import { Engine, c } from './helpers/load-engine.mjs';
