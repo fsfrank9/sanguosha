@@ -202,6 +202,11 @@
           // v15 S1: 蛊惑响应声明面板 (响应窗口内的打出/使用流程入口)
           'guhuoResponsePanel', 'guhuoResponseHint', 'guhuoResponseTypes',
           'guhuoResponseCovers', 'guhuoResponseConfirmBtn',
+          // v15 T: 连环重铸钮 (转化面板内)
+          'conversionRecastBtn',
+          // v15 T: 猛进弃牌选择 / 拼点选牌
+          'mengjinPanel', 'mengjinHint', 'mengjinChoices', 'mengjinDeclineBtn',
+          'pindianPanel', 'pindianHint', 'pindianChoices',
           'tuxiConfirmBtn', 'tuxiDeclineBtn',
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
           'cixiongFirePanel', 'cixiongFireHint', 'cixiongFireBtn', 'cixiongFireDeclineBtn',
@@ -460,6 +465,18 @@
             startHint: '仁德：点选要交给对方的手牌后确认；累计两张可回复 1 点体力',
             selectedHint: function (count) { return '仁德：已选 ' + count + ' 张'; },
             emptyMessage: '请选择至少一张牌发动【仁德】。'
+          },
+          // v15 T (火包): 乱击 (袁绍) — 恰好两张同花色手牌当【万箭齐发】。
+          // 走与制衡/反间同一套"技能选牌 → 确认"骨架 (点技能进入选牌模式,
+          // 点两张手牌暂存, 按确定发动)。
+          luanji: {
+            name: '乱击',
+            min: 2,
+            max: 2,
+            cardHint: '选择这张牌用于【乱击】',
+            startHint: '乱击：点选两张花色相同的手牌后确认（当【万箭齐发】使用）',
+            selectedHint: function (count) { return '乱击：已选 ' + count + ' / 2 张'; },
+            emptyMessage: '请选择两张花色相同的手牌发动【乱击】。'
           },
           fanjian: {
             name: '反间',
@@ -771,6 +788,14 @@
         // 为空) 时 tryEnterJijiangTargetMode 返回 false, 落回下方通用直调
         // 路径 (与改动前行为一致 — 因缺目标而 fail, 不崩溃)。
         if (skillId === 'jijiang' && modePanels.tryEnterJijiangTargetMode()) {
+          render();
+          return;
+        }
+        // v15 T (火包): 需座席目标的主动技 (强袭/驱虎/天义) — 进入座席
+        // 点选; 无合法座席时返回 false, 落回下方通用直调 (引擎给出具体
+        // 拒绝理由, 与激将同款)。
+        if (modePanels.tryEnterSeatTargetSkillMode
+            && modePanels.tryEnterSeatTargetSkillMode(skillId)) {
           render();
           return;
         }
@@ -1358,6 +1383,10 @@
         { panelId: 'tuxiPickPanel',         confirmBtnId: 'tuxiConfirmBtn',         cancelBtnId: 'tuxiDeclineBtn' },
         // v14 R1: 蛊惑质疑窗 (确认=质疑 / 取消=不质疑) 与声明面板。
         { panelId: 'guhuoChallengePanel',   confirmBtnId: 'guhuoChallengeBtn',      cancelBtnId: 'guhuoPassBtn' },
+        // v15 T: 猛进 (候选两步化, 取消=不发动) / 拼点 (候选两步化, 无取消 —
+        // 拼点牌是必付成本, 不能放弃)。
+        { panelId: 'mengjinPanel',          confirmBtnId: null,                     cancelBtnId: 'mengjinDeclineBtn' },
+        { panelId: 'pindianPanel',          confirmBtnId: null,                     cancelBtnId: null },
         { panelId: 'guhuoDeclarePanel',     confirmBtnId: 'guhuoConfirmBtn',        cancelBtnId: 'guhuoCancelBtn' },
         // v12 H6: identity3 单目标牌/主动技 座席点选模式 (无 confirm 语义 —
         // 点合法座席直接生效; 取消按钮退出)。

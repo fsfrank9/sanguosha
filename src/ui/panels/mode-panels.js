@@ -107,6 +107,11 @@
             + escapeHtml(conv.asName) + '】使用（' + escapeHtml(conv.skillName || '技能') + '）</button>';
         }).join('');
       }
+      // v15 T: 连环 (庞统) 的"你能重铸梅花手牌" — 可重铸时在转化面板补一个
+      // 重铸钮 (铁索牌自带的重铸仍走铁索面板, 不重复)。
+      var canRecast = !!(game && card && card.type !== 'tiesuo'
+        && Engine.canRecastCard && Engine.canRecastCard(game, 'player', card.id));
+      if (els.conversionRecastBtn) els.conversionRecastBtn.hidden = !canRecast;
       var optionNames = conversions.map(function (conv) { return '【' + conv.asName + '】'; }).join('、');
       if (els.conversionModePanel) els.conversionModePanel.hidden = false;
       if (els.conversionHint) els.conversionHint.textContent = card
@@ -348,6 +353,34 @@
         return;
       }
       var asType = asSha === true ? 'sha' : asSha;
+      // v15 T: 新增转化型 (火计→火攻 / 双雄→决斗 / 连环→铁索连环) 的目标
+      // 由玩家点选 — 候选多于一个时进座席点选, 唯一候选直发 (1v1 恒直发,
+      // 既有 乐/拆/杀 三型路径逐字不变, 零回归)。
+      if (CONVERSION_SEAT_TYPES[asType]) {
+        var convLegal = (Engine.legalTargetsForCard && card)
+          ? Engine.aliveSeats(game).filter(function (seat) {
+            return seat !== 'player' && Engine.isLegalCardTarget
+              && Engine.isLegalCardTarget(game, 'player', virtualForConversion(asType, card), seat);
+          })
+          : [];
+        if (convLegal.length > 1) {
+          hideConversionPanel();
+          startSeatPicker({
+            legalSeats: convLegal,
+            min: 1,
+            max: asType === 'tiesuo' ? 2 : 1,
+            hintText: '【' + CONVERSION_SEAT_TYPES[asType] + '】：点击场上高亮角色选择目标',
+            onComplete: function (seats) {
+              var opts = asType === 'tiesuo' ? { targets: seats } : { target: seats[0] };
+              var seatResult = Engine.playCardAs(game, 'player', cardId, asType, opts);
+              if (!seatResult.ok) game.log.push(seatResult.message);
+              render();
+            }
+          });
+          render();
+          return;
+        }
+      }
       var enemyHpBefore = game.enemy.hp;
       var playerHpBefore = game.player.hp;
       var result = Engine.playCardAs(game, 'player', cardId, asType);
@@ -356,6 +389,18 @@
       if (game.enemy.hp < enemyHpBefore) flashHero('enemy');
       if (game.player.hp < playerHpBefore) flashHero('player');
       render();
+    }
+
+    // v15 T: 需座席目标的转化型 → 中文名 (座席点选提示用)。
+    var CONVERSION_SEAT_TYPES = { huogong: '火攻', juedou: '决斗', tiesuo: '铁索连环' };
+
+    // 目标合法性预检用的虚拟牌 (与引擎 virtualTrickFromCard 同形)。
+    function virtualForConversion(asType, card) {
+      return {
+        id: card.id, type: asType, family: 'trick',
+        name: CONVERSION_SEAT_TYPES[asType] || asType,
+        suit: card.suit, color: card.color, rank: card.rank
+      };
     }
 
     function resolveTiesuo(options) {
@@ -664,6 +709,61 @@
       return true;
     }
 
+    // ═════ v15 T (火包): 需座席目标的主动技 (强袭/驱虎/天义) ═════
+    // 三技共用座席点选骨架: 引擎侧的资格判定 (攻击范围/体力值大于/可拼点)
+    // 决定高亮哪些座席, 点选确认后直调 useSkill。返回 false 表示当前无
+    // 合法座席 → 调用方回退直调 (引擎会给出具体拒绝理由, 不静默)。
+    var SEAT_TARGET_SKILLS = {
+      qiangxi: {
+        label: '强袭',
+        hint: '强袭：点击你攻击范围内的一名角色（成本为失去 1 点体力）',
+        eligible: function (game, seat) {
+          return Engine.canReachWithSha ? Engine.canReachWithSha(game, 'player', seat) : true;
+        }
+      },
+      quhu: {
+        label: '驱虎',
+        hint: '驱虎：点击一名体力值大于你的角色与其拼点',
+        eligible: function (game, seat) {
+          return game[seat].hp > game.player.hp
+            && (!Engine.pindianEligible || Engine.pindianEligible(game, 'player', seat));
+        }
+      },
+      tianyi: {
+        label: '天义',
+        hint: '天义：点击一名角色与其拼点',
+        eligible: function (game, seat) {
+          return !Engine.pindianEligible || Engine.pindianEligible(game, 'player', seat);
+        }
+      }
+    };
+
+    function tryEnterSeatTargetSkillMode(skillId) {
+      var game = getGame();
+      var spec = SEAT_TARGET_SKILLS[skillId];
+      if (!game || !spec) return false;
+      var legalSeats = Engine.aliveSeats(game).filter(function (seat) {
+        return seat !== 'player' && spec.eligible(game, seat);
+      });
+      if (!legalSeats.length) return false;
+      startSeatPicker({
+        legalSeats: legalSeats,
+        needed: 1,
+        hintText: spec.hint,
+        onComplete: function (seats) {
+          var hpBefore = {};
+          Engine.seatList(game).forEach(function (s) { hpBefore[s] = game[s].hp; });
+          var result = Engine.useSkill(game, 'player', skillId, [], { target: seats[0] });
+          if (!result.ok) game.log.push(result.message);
+          Engine.seatList(game).forEach(function (s) {
+            if (game[s].hp < hpBefore[s]) flashHero(s);
+          });
+          render();
+        }
+      });
+      return true;
+    }
+
     // v12 H6: 离间 (貂蝉) — 弃 1 张成本牌 (由 dom-adapter 的 confirmCardSkill
     // 走既有 cardSkillConfig 流程先收好) 后, 依次选两名男性角色 (不含自己)。
     // 返回 false 表示无合法双人组合 (调用方回退旧的直调 useSkill, 会因目标
@@ -893,6 +993,15 @@
       if (els.tiesuoChainEnemyBtn) els.tiesuoChainEnemyBtn.addEventListener('click', function () { stageTiesuo(els.tiesuoChainEnemyBtn, { mode: 'chain', targets: ['enemy'] }); });
       if (els.tiesuoChainSelfBtn) els.tiesuoChainSelfBtn.addEventListener('click', function () { stageTiesuo(els.tiesuoChainSelfBtn, { mode: 'chain', targets: ['player'] }); });
       if (els.tiesuoChainBothBtn) els.tiesuoChainBothBtn.addEventListener('click', function () { stageTiesuo(els.tiesuoChainBothBtn, { mode: 'chain', targets: ['player', 'enemy'] }); });
+      if (els.conversionRecastBtn) els.conversionRecastBtn.addEventListener('click', function () {
+        var recastGame = getGame();
+        var recastId = pendingConversionCardId;
+        if (!recastGame || !recastId) return;
+        hideConversionPanel();
+        var recastResult = Engine.recastHandCard(recastGame, 'player', recastId);
+        if (!recastResult.ok) recastGame.log.push(recastResult.message);
+        render();
+      });
       if (els.tiesuoCancelBtn) els.tiesuoCancelBtn.addEventListener('click', function () { hideTiesuoPanel(); render(); });
       if (els.targetHandBtn) els.targetHandBtn.addEventListener('click', function () { resolveTargetZone('hand'); });
       if (els.targetEquipmentBtn) els.targetEquipmentBtn.addEventListener('click', function () { resolveTargetZone('equipment'); });
@@ -1004,6 +1113,8 @@
       // 高亮查询 (board-panels 渲染用) + 取消。
       tryEnterSeatTargetMode: tryEnterSeatTargetMode,
       tryEnterJijiangTargetMode: tryEnterJijiangTargetMode,
+      // v15 T: 强袭/驱虎/天义 座席点选入口
+      tryEnterSeatTargetSkillMode: tryEnterSeatTargetSkillMode,
       startLijianTargetPicker: startLijianTargetPicker,
       startTiesuoSeatPicker: startTiesuoSeatPicker,
       activeSeatPickerLegalSeats: activeSeatPickerLegalSeats,

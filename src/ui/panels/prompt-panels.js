@@ -397,6 +397,51 @@
         tuxiPickSelection = [];
       }
     }
+    // v15 T: 猛进 (庞德) 弃牌选择 — 手牌为暗牌 (只给"随机弃一张手牌"),
+    // 装备区逐张可指定; "不发动"走取消钮。
+    if (els.mengjinPanel) {
+      if (kind === 'mengjin-pick' && pending.actor === 'player') {
+        els.mengjinPanel.hidden = false;
+        var mjTargetState = getGame() && getGame()[pending.targetActor];
+        if (els.mengjinHint) {
+          els.mengjinHint.textContent = '猛进：你的【杀】被【闪】抵消，可弃置'
+            + ((mjTargetState && mjTargetState.name) || '目标') + '的一张牌。';
+        }
+        if (els.mengjinChoices) {
+          els.mengjinChoices.innerHTML = (pending.zones || []).map(function (zone) {
+            if (zone.zone === 'hand') {
+              return '<button class="mini-card" data-mengjin-zone="hand">随机弃一张手牌（'
+                + zone.count + ' 张）</button>';
+            }
+            return '<button class="mini-card" data-mengjin-zone="equipment" data-mengjin-card-id="'
+              + escapeHtml(zone.cardId) + '">' + escapeHtml(zone.name) + ' '
+              + suitLabel(zone.suit) + (zone.rank || '') + '</button>';
+          }).join('');
+        }
+      } else {
+        els.mengjinPanel.hidden = true;
+      }
+    }
+    // v15 T: 拼点选牌 — 双方各扣置一张手牌比点数 (点数大者赢)。
+    if (els.pindianPanel) {
+      if (kind === 'pindian-card' && pending.actor === 'player') {
+        els.pindianPanel.hidden = false;
+        if (els.pindianHint) {
+          var pdFoeState = getGame() && getGame()[pending.opponentActor];
+          els.pindianHint.textContent = (pending.reason || '拼点') + '：与'
+            + ((pdFoeState && pdFoeState.name) || '对方') + '拼点，点选一张手牌扣置（点数大者赢）。';
+        }
+        if (els.pindianChoices) {
+          els.pindianChoices.innerHTML = (pending.options || []).map(function (opt) {
+            return '<button class="mini-card" data-pindian-card-id="' + escapeHtml(opt.cardId) + '">'
+              + escapeHtml(opt.name) + ' ' + suitLabel(opt.suit)
+              + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
+          }).join('');
+        }
+      } else {
+        els.pindianPanel.hidden = true;
+      }
+    }
     // v14 R1: 蛊惑质疑窗 — AI 于吉背面声明, 玩家决定是否质疑 (质疑真牌
     // 获「缠怨」, 提示如实告知风险; 只显示声明牌名, 不泄露真牌)。
     if (els.guhuoChallengePanel) {
@@ -898,6 +943,28 @@
       var result = Engine.resolvePendingChoice(getGame(), { decline: true });
       if (!result.ok) renderLog();
       render();
+    });
+    // v15 T: 猛进弃牌 (候选两步化 — 点候选 stage, hand-confirm 提交) 与
+    // 拼点选牌 (同款)。
+    if (els.mengjinChoices) els.mengjinChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-mengjin-zone]');
+      if (!btn) return;
+      var zone = btn.getAttribute('data-mengjin-zone');
+      var payload = { zone: zone };
+      if (zone === 'equipment') payload.cardId = btn.getAttribute('data-mengjin-card-id');
+      stage(payload, zone === 'equipment'
+        ? '[data-mengjin-card-id="' + payload.cardId + '"]' : '[data-mengjin-zone="hand"]');
+    });
+    if (els.mengjinDeclineBtn) els.mengjinDeclineBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.pindianChoices) els.pindianChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-pindian-card-id]');
+      if (!btn) return;
+      var cardId = btn.getAttribute('data-pindian-card-id');
+      stage({ cardId: cardId }, '[data-pindian-card-id="' + cardId + '"]');
     });
     // v14 R1: 蛊惑质疑窗事件 (质疑 / 不质疑)。
     if (els.guhuoChallengeBtn) els.guhuoChallengeBtn.addEventListener('click', function () {

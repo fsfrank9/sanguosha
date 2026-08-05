@@ -528,6 +528,8 @@
             <button class="btn small" id="conversionNormalBtn">按原牌使用</button>
             <button class="btn small" id="conversionShaBtn">当【杀】使用</button>
             <span id="conversionExtraChoices"></span>
+            <!-- v15 T: 连环 (庞统) 的"你能重铸梅花手牌" — 可重铸时才显示 -->
+            <button class="btn small" id="conversionRecastBtn" hidden>重铸（摸一张）</button>
             <button class="btn small" id="conversionCancelBtn">取消</button>
           </div>
         </div>
@@ -769,6 +771,20 @@
           <div class="duel-response-actions pending-prompt-panel__actions">
             <button class="btn small" id="duelResponseDeclineBtn">不出【杀】</button>
           </div>
+        </div>
+        <!-- v15 T: 猛进 (庞德) 弃牌选择 — 你使用的【杀】被【闪】抵消时,
+             可弃置目标一张牌 (手牌为暗牌 → 随机; 装备区可指定)。 -->
+        <div class="mengjin-panel pending-prompt-panel" id="mengjinPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="mengjinHint">猛进：是否弃置目标的一张牌？</span>
+          <div class="mengjin-choices pending-prompt-panel__choices" id="mengjinChoices" aria-live="polite"></div>
+          <div class="mengjin-actions pending-prompt-panel__actions">
+            <button class="btn small" id="mengjinDeclineBtn">不发动</button>
+          </div>
+        </div>
+        <!-- v15 T: 拼点选牌 (驱虎/天义 等) — 双方各扣置一张手牌比点数。 -->
+        <div class="pindian-panel pending-prompt-panel" id="pindianPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="pindianHint">拼点：选择一张手牌扣置</span>
+          <div class="pindian-choices pending-prompt-panel__choices" id="pindianChoices" aria-live="polite"></div>
         </div>
         <!-- v15 S1: 蛊惑响应声明面板 — 玩家为于吉且响应窗口 (闪/杀/桃·酒/
              无懈) 挂起时与该窗口并列显示: 选声明牌名 + 盖置手牌, 确认后走

@@ -938,6 +938,83 @@
       var primaryFoeSeat = aiPrimaryFoe(game, actor);
       var target = game[primaryFoeSeat];
 
+      // ═════ v15 T (火包) 主动技启发 ═════
+      // 强袭 (典韦): 弃武器成本优先 (无武器时才用血), 且只在能打死人或
+      // 血线宽裕 (hp>=3) 时才用血; 目标取攻击范围内感知敌对血线最低者。
+      if (hasSkill(self, 'qiangxi') && !self.flags.qiangxiUsed) {
+        var qxTargets = StateRuntime.perceivedHostileFirstPool(game, actor,
+          StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && StateRuntime.canReachWithSha(game, actor, seat);
+          })).slice().sort(function (a, b) { return game[a].hp - game[b].hp; });
+        if (qxTargets.length) {
+          var qxWeapon = self.equipment && self.equipment.weapon;
+          var qxLethal = game[qxTargets[0]].hp <= 1;
+          if (qxWeapon) {
+            return { skillId: 'qiangxi', cardIds: [qxWeapon.id], options: { target: qxTargets[0] } };
+          }
+          if (self.hp >= 3 || qxLethal) {
+            return { skillId: 'qiangxi', cardIds: [], options: { target: qxTargets[0] } };
+          }
+        }
+      }
+
+      // 天义 (太史慈): 手上有【杀】才值得赌 (赢=多一次杀+无距离+多目标,
+      // 没赢=本回合不能出杀); 手上没杀时拼点毫无收益, 不发动。
+      if (hasSkill(self, 'tianyi') && !self.flags.tianyiUsed && !self.flags.tianyiLost) {
+        var tyHasSha = (self.hand || []).some(function (card) { return isShaType(card.type); });
+        var tyTargets = StateRuntime.perceivedHostileFirstPool(game, actor,
+          StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && deps.pindianEligible && deps.pindianEligible(game, actor, seat);
+          }));
+        // 只读公开信息: 对手手牌数越少, 其能拿出的大牌越少 (期望点数更低)。
+        if (tyHasSha && tyTargets.length) {
+          var tyPick = tyTargets.slice().sort(function (a, b) {
+            return (game[a].hand || []).length - (game[b].hand || []).length;
+          })[0];
+          return { skillId: 'tianyi', cardIds: [], options: { target: tyPick } };
+        }
+      }
+
+      // 驱虎 (荀彧): 拼点赢 → 让体力大于己的角色去打别人; 没赢 → 自己吃
+      // 1 伤害。血线见底 (hp<=1) 时不赌。
+      if (hasSkill(self, 'quhu') && !self.flags.quhuUsed && self.hp > 1) {
+        var qhTargets = StateRuntime.perceivedHostileFirstPool(game, actor,
+          StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && game[seat].hp > self.hp
+              && deps.pindianEligible && deps.pindianEligible(game, actor, seat);
+          }));
+        if (qhTargets.length) {
+          var qhPick = qhTargets.slice().sort(function (a, b) {
+            return (game[a].hand || []).length - (game[b].hand || []).length;
+          })[0];
+          return { skillId: 'quhu', cardIds: [], options: { target: qhPick } };
+        }
+      }
+
+      // 乱击 (袁绍): 两张同花色手牌当【万箭齐发】 — 只在"敌方受伤面 >
+      // 己方受伤面"时发动 (万箭打全场, 队友也吃)。
+      if (hasSkill(self, 'luanji')) {
+        var bySuit = {};
+        (self.hand || []).forEach(function (card) {
+          if (!card || !card.suit) return;
+          bySuit[card.suit] = bySuit[card.suit] || [];
+          bySuit[card.suit].push(card);
+        });
+        var luanjiPair = Object.keys(bySuit).map(function (suit) { return bySuit[suit]; })
+          .filter(function (group) { return group.length >= 2; })[0];
+        if (luanjiPair) {
+          var foes = StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && StateRuntime.perceivedHostile(game, actor, seat);
+          }).length;
+          var friends = StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && !StateRuntime.perceivedHostile(game, actor, seat);
+          }).length;
+          if (foes > friends) {
+            return { skillId: 'luanji', cardIds: [luanjiPair[0].id, luanjiPair[1].id], options: {} };
+          }
+        }
+      }
+
       // 观星: free information; fire once per turn whenever deck has cards.
       if (hasSkill(self, 'guanxing') && !self.flags.guanxingUsed && game.deck.length > 0) {
         return { skillId: 'guanxing', cardIds: [], options: {} };

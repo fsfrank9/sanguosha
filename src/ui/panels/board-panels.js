@@ -97,6 +97,15 @@
         // v11 C4 (批次 28): 转化候选泛化 — 杀/乐不思蜀/过河拆桥 统一探测,
         // 面板据 conversions 动态列按钮; 唯一候选时直接按该 asType 转化。
         var conversions = Engine.listCardConversions(view.game, 'player', card);
+        // v15 T: 连环 (庞统) 令梅花手牌"可重铸" — 重铸是与使用并列的第三条
+        // 出路, 有它就必须给玩家选择面 (否则唯一转化候选会被直发, 重铸入口
+        // 永远不可达)。铁索牌自带重铸走既有铁索面板, 不在此处重复。
+        var recastable = !!(Engine.canRecastCard && card && card.type !== 'tiesuo'
+          && view.game.turn === 'player' && view.game.phase === 'play'
+          && Engine.canRecastCard(view.game, 'player', card.id));
+        if (recastable) {
+          return { mode: 'choice', playable: { ok: true, message: '可按原牌使用、转化使用或重铸。' }, normal: normal, conversions: conversions, recastable: true };
+        }
         if (normal.ok && conversions.length) {
           return { mode: 'choice', playable: { ok: true, message: '可按原牌使用，也可发动技能转化使用。' }, normal: normal, conversions: conversions };
         }

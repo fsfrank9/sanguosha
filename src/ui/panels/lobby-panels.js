@@ -283,7 +283,9 @@
             + '<div class="hb-card__head"><span class="hb-card__name">' + escapeHtml(hero.name) + '</span>'
             + '<span class="hb-card__title">' + escapeHtml(hero.title || '') + '</span>'
             + '<span class="hb-card__hp">' + hero.maxHp + ' 勾玉</span>'
-            + (hero.pack === 'wind' ? '<span class="hb-card__pack">风</span>' : '') + '</div>'
+            + (hero.pack === 'wind' ? '<span class="hb-card__pack">风</span>' : '')
+            // v15 T: 火包徽章 (与风包同款)
+            + (hero.pack === 'fire' ? '<span class="hb-card__pack">火</span>' : '') + '</div>'
             + '<ul class="hb-card__skills">' + skills + '</ul></article>';
         }).join('');
         return '<section class="hb-camp hb-camp--' + camp + '"><h3 class="hb-camp__title">' + camp

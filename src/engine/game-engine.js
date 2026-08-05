@@ -2876,8 +2876,11 @@
         legalTargetsForCard: legalTargetsForCard,
         // v14 P2: 方天画戟额外目标前置查询 (AI 多目标启发)
         shaExtraTargetLimit: shaExtraTargetLimit,
-        // v15 T: 拼点出牌启发用的点数比较
+        // v15 T: 拼点出牌启发用的点数比较 + 拼点资格 (天义/驱虎 目标挑选)
         cardRankValue: cardRankValue,
+        pindianEligible: function (game, actor, targetActor) {
+          return PindianRuntime.pindianEligible(game, actor, targetActor);
+        },
         // v14 R1: 蛊惑声明 (AI 于吉 v1 无中启发)
         // v15 S2: 全型声明启发 — 目标枚举与借刀受害者候选同步注入
         playGuhuoDeclare: playGuhuoDeclare,
