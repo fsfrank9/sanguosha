@@ -83,6 +83,45 @@ test('强袭门槛: 目标须在攻击范围内; 成本牌须是自己的武器'
   assert.equal(game.player.hand.length, 1, '零副作用');
 });
 
+test('强袭: 弃装备区武器作成本时不能再用该武器的攻击范围 (glossary__card.md:41)', () => {
+  const game = Engine.newGame({
+    seed: 78011,
+    seats: ['player', 'enemy', 'ally', 'ally2', 'ally3'],
+    roles: { player: '主公', enemy: '反贼', ally: '忠臣', ally2: '反贼', ally3: '内奸' },
+    playerHero: 'dianwei', enemyHero: 'caocao', allyHero: 'liubei',
+    ally2Hero: 'guanyu', ally3Hero: 'lvbu'
+  });
+  game.log = []; game.discard = [];
+  for (const seat of game.seats) {
+    game[seat].hand = []; game[seat].flags = {}; game[seat].judgeArea = [];
+    game[seat].equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
+    game[seat].hp = game[seat].maxHp; game[seat].skillPreferences = {};
+  }
+  game.turn = 'player'; game.phase = 'play';
+  game.player.equipment.weapon = c('zhangba', { id: 'w-range3' }); // 攻击范围 3
+  assert.equal(Engine.distanceBetween(game, 'player', 'ally2'), 2, '远席距离 2');
+  const rejected = Engine.useSkill(game, 'player', 'qiangxi', ['w-range3'], { target: 'ally2' });
+  assert.equal(rejected.ok, false, '弃掉这把武器后攻击范围回落到 1 → 远席不再合法');
+  assert.ok(game.player.equipment.weapon, '拒绝路径零副作用: 武器仍在装备区');
+  assert.equal(game.ally2.hp, game.ally2.maxHp);
+  // 同一把武器不作成本 (改用失体力) 时, 其攻击范围照常可用
+  const viaHp = Engine.useSkill(game, 'player', 'qiangxi', [], { target: 'ally2' });
+  assert.equal(viaHp.ok, true, '失体力成本 → 武器射程照常生效');
+  assert.equal(game.ally2.hp, game.ally2.maxHp - 1);
+});
+
+test('强袭: 手牌里的武器牌同样可作成本 (官方未限定区域)', () => {
+  const game = buildDuel('dianwei');
+  game.player.hand = [c('zhangba', { id: 'hand-weapon' })];
+  assertCardConservation(game, () => {
+    const result = Engine.useSkill(game, 'player', 'qiangxi', ['hand-weapon'], { target: 'enemy' });
+    assert.equal(result.ok, true);
+  });
+  assert.equal(game.player.hp, game.player.maxHp, '弃手牌武器 → 不失体力');
+  assert.ok(game.discard.some((card) => card.id === 'hand-weapon'));
+  assert.equal(game.enemy.hp, game.enemy.maxHp - 1);
+});
+
 // ───── 荀彧 驱虎 / 节命 ─────
 
 test('驱虎: 赢 → 拼点目标对其攻击范围内由荀彧选择的角色造成 1 伤害 (不自伤)', () => {

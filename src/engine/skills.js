@@ -1506,27 +1506,53 @@
         var cardIds = context.cardIds || [];
         if (!self || !hasSkill(self, 'qiangxi')) return null;
         if (self.flags.qiangxiUsed) return fail('【强袭】每回合限一次。');
+        // 成本: 指定了牌 → 弃武器牌 (手牌或装备区均可 — 官方只写"弃置
+        // 一张武器牌", 未限定区域); 不指定 → 失去 1 点体力。
+        var equippedWeapon = self.equipment && self.equipment.weapon;
+        var costCard = null;
+        var costFromEquipment = false;
+        if (cardIds.length > 0) {
+          if (equippedWeapon && cardIds[0] === equippedWeapon.id) {
+            costCard = equippedWeapon;
+            costFromEquipment = true;
+          } else {
+            costCard = (self.hand || []).find(function (item) {
+              return item.id === cardIds[0] && item.family === 'equipment' && item.slot === 'weapon';
+            }) || null;
+          }
+          if (!costCard) return fail('【强袭】的成本只能是一张武器牌。');
+        }
+        // 官方 glossary__card.md:41: "弃置武器牌…作为发动技能的消耗时，
+        // 不能同时用到该武器牌提供的距离、攻击范围或技能" — 弃的是装备区
+        // 那把武器时, 目标须落在**去掉该武器后**的攻击范围内 (缺省 1)。
+        var effectiveRange = costFromEquipment ? 1 : StateRuntime.weaponRange(self);
+        var inRange = function (seat) {
+          return StateRuntime.distanceBetween(game, actor, seat) <= effectiveRange;
+        };
         var targetActor = context.targetActor
-          || StateRuntime.perceivedHostileSeats(game, actor).filter(function (seat) {
-            return StateRuntime.canReachWithSha(game, actor, seat);
-          })[0];
+          || StateRuntime.perceivedHostileSeats(game, actor).filter(inRange)[0];
         if (!targetActor || !game[targetActor]) return fail('请选择攻击范围内的一名角色。');
+        // glossary__value.md:114 "所有其他角色都在 A 的攻击范围内" +
+        // rule__classification.md:69 (存在"攻击范围内没有角色的角色") →
+        // 攻击范围关系只定义在他人之间, 自己不在自己的攻击范围内。
         if (targetActor === actor) return fail('【强袭】不能选择自己。');
         if (game[targetActor].hp <= 0) return fail('目标已阵亡。');
-        // "你攻击范围内的一名角色" — 攻击范围 = 距离 <= 武器射程。
-        if (!StateRuntime.canReachWithSha(game, actor, targetActor)) {
-          return fail('目标不在你的攻击范围内。');
+        if (!inRange(targetActor)) {
+          return fail(costFromEquipment
+            ? '弃置该武器后目标已不在你的攻击范围内。' : '目标不在你的攻击范围内。');
         }
-        // 成本: 指定了武器牌 → 弃武器; 否则失去 1 点体力。
-        var weapon = self.equipment && self.equipment.weapon;
-        var wantsWeaponCost = cardIds.length > 0;
+        var wantsWeaponCost = !!costCard;
         if (wantsWeaponCost) {
-          if (!weapon || cardIds[0] !== weapon.id) return fail('【强袭】的成本只能是你装备区里的武器牌。');
-          takeCard(game, weapon, { zone: 'equipment', actor: actor, slot: 'weapon' });
-          discardCard(game, weapon);
-          // 失去装备区的牌 → 照常结算失去时机 (枭姬等)。
-          if (triggerEquipmentLoss) triggerEquipmentLoss(game, actor, weapon);
-          log(game, actorName(game, actor) + '发动【强袭】，弃置武器【' + weapon.name + '】。');
+          if (costFromEquipment) {
+            takeCard(game, costCard, { zone: 'equipment', actor: actor, slot: 'weapon' });
+            discardCard(game, costCard);
+            // 失去装备区的牌 → 照常结算失去时机 (枭姬等)。
+            if (triggerEquipmentLoss) triggerEquipmentLoss(game, actor, costCard);
+          } else {
+            var removedWeapon = removeCardFromHand(self, costCard.id);
+            if (removedWeapon) discardCard(game, removedWeapon);
+          }
+          log(game, actorName(game, actor) + '发动【强袭】，弃置武器【' + costCard.name + '】。');
         } else {
           self.hp -= 1;
           log(game, actorName(game, actor) + '发动【强袭】，失去 1 点体力。');

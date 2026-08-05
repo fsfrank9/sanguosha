@@ -88,7 +88,7 @@
       ]);
 
       addHeroPack('fire', [
-        { id: 'dianwei', name: '典韦', camp: '魏', gender: 'male', title: '古之恶来', maxHp: 4, quote: '吃我一戟！', skills: [{ id: 'qiangxi', name: '强袭', desc: '出牌阶段可失血或弃武器对距离 1 角色造成伤害。' }] },
+        { id: 'dianwei', name: '典韦', camp: '魏', gender: 'male', title: '古之恶来', maxHp: 4, quote: '吃我一戟！', skills: [{ id: 'qiangxi', name: '强袭', desc: '出牌阶段限一次，失去 1 点体力或弃置一张武器牌，对攻击范围内一名角色造成 1 点伤害。' }] },
         { id: 'xunyu', name: '荀彧', camp: '魏', gender: 'male', title: '王佐之才', maxHp: 3, quote: '驱虎吞狼。', skills: [{ id: 'quhu', name: '驱虎', desc: '拼点令强者伤害他人。' }, { id: 'jieming', name: '节命', desc: '受伤后可令一名角色补手牌至体力上限。' }] },
         { id: 'wolong', name: '卧龙诸葛亮', camp: '蜀', gender: 'male', title: '卧龙', maxHp: 3, quote: '此阵可挡精兵十万。', skills: [{ id: 'bazhen', name: '八阵', desc: '无防具时视为装备八卦阵。' }, { id: 'huoji', name: '火计', desc: '可将红色牌当火攻。' }, { id: 'kanpo', name: '看破', desc: '可将黑色牌当无懈可击。' }] },
         { id: 'pangtong', name: '庞统', camp: '蜀', gender: 'male', title: '凤雏', maxHp: 3, quote: '伤一敌可连其百。', skills: [{ id: 'lianhuan', name: '连环', desc: '可将梅花牌当铁索连环重铸/使用。' }, { id: 'niepan', name: '涅槃', desc: '限定技：濒死时复原并摸牌。' }] },
