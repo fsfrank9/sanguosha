@@ -220,6 +220,20 @@
         // v14 R1: 蛊惑 — 出牌阶段扣置手牌声明使用 (风包现行版, 每名角色
         // 的回合内限一次; cost=playHand: 盖置的手牌按声明结算或验假弃置)。
         guhuo:    { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['playGuhuoDeclare', 'guhuo-challenge'] },
+        // ═════ v15 T: 火包 8 将 13 技 ═════
+        qiangxi:  { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'loseHp',     count: 1 },     hooks: ['onActiveSkill'] },
+        quhu:     { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'rankCompare' },              hooks: ['onActiveSkill', 'pindian:quhu'] },
+        jieming:  { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
+        bazhen:   { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['hasEquipmentEffect'] },
+        huoji:    { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs'] },
+        kanpo:    { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['wuxieOptionForCard', 'consumeWuxie'] },
+        lianhuan: { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs', 'onCanRecast'] },
+        niepan:   { trigger: 'dyingEnter',        frequency: 'oncePerGame',     optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 'all' }, hooks: ['onDyingEnter'] },
+        tianyi:   { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'rankCompare' },              hooks: ['onActiveSkill', 'pindian:tianyi'] },
+        mengjin:  { trigger: 'shaDodged',         frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onShaDodged', 'mengjin-pick'] },
+        shuangxiong: { trigger: 'drawPhase',      frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'reduceDraw', count: 2 },     hooks: ['onDrawPhase', 'onJudgementAfterResolve', 'onCardAs'] },
+        luanji:   { trigger: 'playPhase',         frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 2 },     hooks: ['onActiveSkill'] },
+        xueyi:    { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['handLimit'], lord: true },
       };
 
       for (var _heroId in HERO_CATALOG) {

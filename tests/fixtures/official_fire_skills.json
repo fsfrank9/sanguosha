@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "indexUrl": "https://www.sanguosha.com/hero",
+    "method": "gltjk 官方规则集镜像逐字提取 (镜像已入库 official-skill-cache/gltjk-sanguosha-rules/pages/), 每条 sourceTextRef/sourceTextSha256 为该镜像行的 sha256 — 与风包的\"人工转写\"不同, 本包可逐条复核。",
+    "gidPolicy": "provisional-local: gid 224-231 为本地临时编号 (顺接风包缓存 216-223), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。v15 T (2026-08-05): 与风包同款网络降级条款 — www.sanguosha.com 在本环境仍被网络策略拦截 (CONNECT 403), 按 v14 O4 裁定不主动重试, 网络环境变更时触发回填。"
+  },
+  "pack": "火",
+  "includeFullSkillText": false,
+  "heroes": [
+    {
+      "gid": 224,
+      "name": "典韦",
+      "skills": [
+        "强袭"
+      ]
+    },
+    {
+      "gid": 225,
+      "name": "荀彧",
+      "skills": [
+        "驱虎",
+        "节命"
+      ]
+    },
+    {
+      "gid": 226,
+      "name": "卧龙诸葛亮",
+      "skills": [
+        "八阵",
+        "火计",
+        "看破"
+      ]
+    },
+    {
+      "gid": 227,
+      "name": "庞统",
+      "skills": [
+        "连环",
+        "涅槃"
+      ]
+    },
+    {
+      "gid": 228,
+      "name": "太史慈",
+      "skills": [
+        "天义"
+      ]
+    },
+    {
+      "gid": 229,
+      "name": "庞德",
+      "skills": [
+        "猛进"
+      ]
+    },
+    {
+      "gid": 230,
+      "name": "颜良文丑",
+      "skills": [
+        "双雄"
+      ]
+    },
+    {
+      "gid": 231,
+      "name": "袁绍",
+      "skills": [
+        "乱击",
+        "血裔"
+      ]
+    }
+  ]
+}

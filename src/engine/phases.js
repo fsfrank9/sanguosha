@@ -27,6 +27,8 @@
     state.usedSha = false;
     state.usedOrRespondedSha = false;
     state.shaBonus = 0;
+    // v15 T: 天义"额外次数上限 +1"的回合级计数
+    state.shaExtraUses = 0;
     // v12 I2: 响应空窗记账随新回合 (摸牌) 失效 — 见 consumeResponse。
     state.aiRevealed = null;
     // v11 C8 (批次 32): 妄尊 等回合级手牌上限修正复位
@@ -59,6 +61,7 @@
     // v15 T (火包): 强袭 出牌阶段限一次 / 天义 出牌阶段限一次 +
     // 天义拼点结果的回合级增益 (赢: 杀次数/距离/目标上限; 没赢: 不能使用杀)
     flags.qiangxiUsed = false;
+    flags.quhuUsed = false;
     flags.tianyiUsed = false;
     flags.tianyiWon = false;
     flags.tianyiLost = false;
@@ -86,6 +89,7 @@
     state.usedSha = false;
     state.usedOrRespondedSha = false;
     state.shaBonus = 0;
+    state.shaExtraUses = 0;
     // v11 C8 (批次 32): 回合结束同样清掉手牌上限修正
     state.handLimitDelta = 0;
     var flags = ensureFlags(state);
@@ -110,9 +114,12 @@
     // v15 T (火包): 强袭/天义 每回合限一次 (回合结束侧同步复位);
     // 天义的回合级增益 (次数/距离/目标上限, 或"不能使用杀") 一并清除。
     flags.qiangxiUsed = false;
+    flags.quhuUsed = false;
     flags.tianyiUsed = false;
     flags.tianyiWon = false;
     flags.tianyiLost = false;
+    // 双雄的回合级转化授权同样回合结束清除。
+    flags.shuangxiongColor = null;
   }
 
   export const PhaseRuntime = {

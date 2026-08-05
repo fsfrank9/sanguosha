@@ -57,6 +57,16 @@
     // v14 P1: 多目标链收尾的幂等来源牌弃置 (全区域定位, 真在途才补弃)。
     var discardSourceCardIfPending = deps.discardSourceCardIfPending;
 
+      // v15 T: 天义拼点赢 — "你于此回合内使用【杀】无距离限制且使用
+      // 【杀】的额外目标数上限 +1" (card__hero__wu.md:355)。
+      function tianyiIgnoresDistance(state) {
+        return !!(state && state.flags && state.flags.tianyiWon);
+      }
+
+      function tianyiExtraTargets(state) {
+        return (state && state.flags && state.flags.tianyiWon) ? 1 : 0;
+      }
+
       function isArmorIgnoredBySha(game, sourceActor, card) {
         var source = game[sourceActor];
         return !!(source && isShaCard(card) && hasEquipmentEffect(source, 'ignoreArmorOnSha'));
@@ -156,14 +166,16 @@
           targets.push(resolved);
         }
         if (!targets.length) return { error: '没有合法的【杀】目标。' };
-        var extraLimit = fangtianShaEligible(game, actor, card) ? 2 : 0;
+        var extraLimit = (fangtianShaEligible(game, actor, card) ? 2 : 0)
+          + tianyiExtraTargets(game[actor]);
         if (targets.length > 1 + extraLimit) {
           return { error: '【杀】目标数超过上限（额定 1' + (extraLimit ? ' + 方天画戟额外 ' + extraLimit : '') + '）。' };
         }
         for (var vi = 0; vi < targets.length; vi += 1) {
           var protection = cardTargetProtection(game, actor, targets[vi], card, '杀');
           if (protection) return { error: protection.message };
-          if (!options.ignoreDistance && !canReachWithSha(game, actor, targets[vi])) {
+          if (!options.ignoreDistance && !tianyiIgnoresDistance(game[actor])
+              && !canReachWithSha(game, actor, targets[vi])) {
             return { error: '距离不足，当前武器范围无法对' + actorName(game, targets[vi]) + '使用【杀】。' };
           }
         }
@@ -199,8 +211,14 @@
         var targetProtection = cardTargetProtection(game, actor, targetActor, card, '杀');
         if (targetProtection) return fail(targetProtection.message);
         // v12 G2: 神速的视为使用【杀】"无距离限制" 且不计入出牌阶段次数。
-        if (!options.ignoreDistance && !canReachWithSha(game, actor, targetActor)) return fail('距离不足，当前武器范围无法使用【杀】。');
-        if (!options.skipShaCount) self.usedSha = true;
+        if (!options.ignoreDistance && !tianyiIgnoresDistance(self)
+            && !canReachWithSha(game, actor, targetActor)) return fail('距离不足，当前武器范围无法使用【杀】。');
+        if (!options.skipShaCount) {
+          // v15 T: 天义"额外次数上限 +1" — 已用过时消耗一次额外次数,
+          // 用尽后 usedSha 才恒真 (canPlayCard 的次数闸读同一状态)。
+          if (self.usedSha && (self.shaExtraUses || 0) > 0) self.shaExtraUses -= 1;
+          self.usedSha = true;
+        }
         self.usedOrRespondedSha = true;
         var amount = 1 + (self.shaBonus || 0);
         self.shaBonus = 0;
@@ -334,7 +352,12 @@
         var normalized = normalizeMultiTargets(game, actor, options, card);
         if (normalized.error) return fail(normalized.error);
         var targets = normalized.targets;
-        if (!options.skipShaCount) self.usedSha = true;
+        if (!options.skipShaCount) {
+          // v15 T: 天义"额外次数上限 +1" — 已用过时消耗一次额外次数,
+          // 用尽后 usedSha 才恒真 (canPlayCard 的次数闸读同一状态)。
+          if (self.usedSha && (self.shaExtraUses || 0) > 0) self.shaExtraUses -= 1;
+          self.usedSha = true;
+        }
         self.usedOrRespondedSha = true;
         var amount = 1 + (self.shaBonus || 0);
         self.shaBonus = 0;

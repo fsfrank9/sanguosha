@@ -302,6 +302,17 @@
     return SkillRuntime.hasPassiveEffect(state, 'unlimitedSha') || hasEquipmentEffect(state, 'unlimitedSha');
   }
 
+  // v15 T: 本回合还能不能再使用【杀】 — 咆哮/诸葛连弩 无限, 天义赢的
+  // "额外次数上限 +1" 走 shaExtraUses 计数, 天义没赢的"本回合内不能使用
+  // 【杀】"是硬闸 (优先于一切次数面)。
+  function shaUseAllowed(state) {
+    if (!state) return false;
+    if (state.flags && state.flags.tianyiLost) return false;
+    if (!state.usedSha) return true;
+    if (canUseUnlimitedSha(state)) return true;
+    return (state.shaExtraUses || 0) > 0;
+  }
+
   function weaponRange(state) {
     return state && state.equipment && state.equipment.weapon && state.equipment.weapon.range ? state.equipment.weapon.range : 1;
   }
@@ -427,6 +438,7 @@
     opponent: opponent,
     hasSkill: hasSkill,
     canUseUnlimitedSha: canUseUnlimitedSha,
+    shaUseAllowed: shaUseAllowed,
     hasEquipmentEffect: hasEquipmentEffect,
     sumEquipmentEffect: sumEquipmentEffect,
     weaponRange: weaponRange,

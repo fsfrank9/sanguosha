@@ -90,6 +90,17 @@
     return !!card && card.family === 'trick';
   }
 
+  // v15 T: 牌面点数 → 比较用数值 (A=1 … K=13)。官方拼点比的是"点数",
+  // A 最小、K 最大 (flow__rankcompare.md); 牌面点数字符串是全仓唯一表示,
+  // 此处是唯一的数值化出口。
+  var RANK_ORDER = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+  function cardRankValue(card) {
+    if (!card || card.rank == null) return 0;
+    var idx = RANK_ORDER.indexOf(String(card.rank).toUpperCase());
+    return idx < 0 ? 0 : idx + 1;
+  }
+
   function physicalCardOf(card) {
     return card && card.physicalCard ? card.physicalCard : card;
   }
@@ -280,6 +291,7 @@
     isShaCard: isShaCard,
     isNormalTrickCard: isNormalTrickCard,
     physicalCardOf: physicalCardOf,
+    cardRankValue: cardRankValue,
     findCardZone: findCardZone,
     takeCard: takeCard,
     putCard: putCard,

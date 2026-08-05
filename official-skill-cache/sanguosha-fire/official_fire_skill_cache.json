@@ -1,0 +1,354 @@
+{
+  "schemaVersion": 1,
+  "cacheKind": "sanguosha-official-fire-skills-safe-cache",
+  "pack": "火",
+  "source": {
+    "indexUrl": "https://www.sanguosha.com/hero",
+    "retrieval": "gltjk 官方规则集镜像逐字提取 (镜像已入库 official-skill-cache/gltjk-sanguosha-rules/pages/), 每条 sourceTextRef/sourceTextSha256 为该镜像行的 sha256 — 与风包的\"人工转写\"不同, 本包可逐条复核。",
+    "parser": "gltjk-mirror-extraction",
+    "copyrightPolicy": "仅提交结构化实现规格与逐字文本摘要 (sha256), 不复制官网原文",
+    "gidPolicy": "provisional-local: gid 224-231 为本地临时编号 (顺接风包缓存 216-223), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。v15 T (2026-08-05): 与风包同款网络降级条款 — www.sanguosha.com 在本环境仍被网络策略拦截 (CONNECT 403), 按 v14 O4 裁定不主动重试, 网络环境变更时触发回填。"
+  },
+  "includeFullSkillText": false,
+  "containsOfficialText": false,
+  "containsImplementationSpecs": true,
+  "copyrightPolicy": {
+    "verbatimOfficialSkillText": "omitted from repository cache",
+    "rawLocalCachePath": "official-skill-cache/gltjk-sanguosha-rules/pages/ (已入库镜像)"
+  },
+  "generatedFrom": "v15 T 火包接入批 (2026-08-05)",
+  "heroes": [
+    {
+      "gid": 224,
+      "name": "典韦",
+      "localHeroId": "dianwei",
+      "skills": [
+        {
+          "name": "强袭",
+          "localSkillId": "qiangxi",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "8e07684ed0f2",
+          "sourceTextSha256": "8e07684ed0f2129c3c2e4d8c5b07d270819779193eaace9b61fa886802465814",
+          "sourceLine": "card__hero__wei.md:319",
+          "implementationSpec": {
+            "summary": "出牌阶段限一次，失去1点体力或弃置一张武器牌，对攻击范围内一名角色造成1点伤害。",
+            "timing": "自己的出牌阶段。",
+            "condition": "须选择你攻击范围内的一名其他角色。",
+            "cost": "失去1点体力，或弃置装备区里的武器牌（二选一）。",
+            "effect": "对选择的角色造成1点伤害。",
+            "frequency": "每回合限一次。",
+            "engineHooks": [
+              "onActiveSkill",
+              "flags.qiangxiUsed",
+              "triggerEquipmentLoss",
+              "damage"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 225,
+      "name": "荀彧",
+      "localHeroId": "xunyu",
+      "skills": [
+        {
+          "name": "驱虎",
+          "localSkillId": "quhu",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "5371fa8cc670",
+          "sourceTextSha256": "5371fa8cc6700cb9d7bf2a4b1781a32bbaae983560c246546f748e33e806829f",
+          "sourceLine": "card__hero__wei.md:333",
+          "implementationSpec": {
+            "summary": "出牌阶段限一次，与一名体力值大于你的角色拼点：赢则其对其攻击范围内你选择的一名角色造成1点伤害；没赢则其对你造成1点伤害。",
+            "timing": "自己的出牌阶段。",
+            "condition": "目标角色的体力值须大于你，且双方各有至少一张手牌。",
+            "cost": "与目标拼点（双方各扣置一张手牌）。",
+            "effect": "赢：拼点目标对其攻击范围内、由你选择的一名角色造成1点伤害；没赢：拼点目标对你造成1点伤害。",
+            "frequency": "每回合限一次。",
+            "engineHooks": [
+              "onActiveSkill",
+              "startPindian",
+              "pindian:quhu",
+              "flags.quhuUsed"
+            ]
+          }
+        },
+        {
+          "name": "节命",
+          "localSkillId": "jieming",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "3ebb53ff47e6",
+          "sourceTextSha256": "3ebb53ff47e621910e2ec2d9160469b0ff5304bd97b2a3326254318987e5b686",
+          "sourceLine": "card__hero__wei.md:335",
+          "implementationSpec": {
+            "summary": "每受到1点伤害后，可令一名角色将手牌补至X张（X为其体力上限且至多为5）。",
+            "timing": "你受到伤害后（逐点结算）。",
+            "condition": "无。",
+            "cost": "无。",
+            "effect": "令一名角色摸牌至 min(其体力上限, 5) 张；手牌已达该数则不摸。",
+            "frequency": "每受到1点伤害各一次。",
+            "engineHooks": [
+              "onDamageAfter",
+              "drawCards"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 226,
+      "name": "卧龙诸葛亮",
+      "localHeroId": "wolong",
+      "skills": [
+        {
+          "name": "八阵",
+          "localSkillId": "bazhen",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "4b7a406a10dc",
+          "sourceTextSha256": "4b7a406a10dc2c8c059f8c3e19c93a249e4b563e74bd22784e5d17541cdf6864",
+          "sourceLine": "card__hero__shu.md:336",
+          "implementationSpec": {
+            "summary": "锁定技，装备区里没有防具牌时，视为装备着【八卦阵】。",
+            "timing": "持续生效。",
+            "condition": "装备区里没有防具牌。",
+            "cost": "无。",
+            "effect": "视为装备着【八卦阵】（需要使用/打出【闪】时可判定，红色视为打出【闪】）。",
+            "frequency": "锁定技，持续生效。",
+            "engineHooks": [
+              "hasEquipmentEffect",
+              "VIRTUAL_EQUIPMENT_SKILLS",
+              "tryBaguaDodge"
+            ]
+          }
+        },
+        {
+          "name": "火计",
+          "localSkillId": "huoji",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "f3516817614a",
+          "sourceTextSha256": "f3516817614a99ddd33ba0d994cfca504ded18996d0ae76f80f092f048afe573",
+          "sourceLine": "card__hero__shu.md:338",
+          "implementationSpec": {
+            "summary": "可将一张红色手牌当【火攻】使用。",
+            "timing": "可使用【火攻】的时机。",
+            "condition": "须为红色手牌。",
+            "cost": "该手牌。",
+            "effect": "视为使用【火攻】（结算与普通【火攻】一致，含展示与同花色弃牌成本）。",
+            "frequency": "无限制。",
+            "engineHooks": [
+              "onCardAs",
+              "canPlayCardAs",
+              "playCardAs"
+            ]
+          }
+        },
+        {
+          "name": "看破",
+          "localSkillId": "kanpo",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "ec34c3dbac1c",
+          "sourceTextSha256": "ec34c3dbac1cc832140140eaec35af17208b03658bb09e685108703c4f303fbb",
+          "sourceLine": "card__hero__shu.md:340",
+          "implementationSpec": {
+            "summary": "可将一张黑色手牌当【无懈可击】使用。",
+            "timing": "可使用【无懈可击】的时机（无懈响应窗口）。",
+            "condition": "须为黑色手牌。",
+            "cost": "该手牌。",
+            "effect": "视为使用【无懈可击】。",
+            "frequency": "无限制。",
+            "engineHooks": [
+              "wuxieOptionForCard",
+              "listWuxieOptions",
+              "consumeWuxie"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 227,
+      "name": "庞统",
+      "localHeroId": "pangtong",
+      "skills": [
+        {
+          "name": "连环",
+          "localSkillId": "lianhuan",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "61ca9d2125e7",
+          "sourceTextSha256": "61ca9d2125e738ea97a5edba846c943e7a3837a3b14a5f347816466a8b9eeb3f",
+          "sourceLine": "card__hero__shu.md:322",
+          "implementationSpec": {
+            "summary": "可将一张梅花手牌当【铁索连环】使用；可重铸梅花手牌。",
+            "timing": "可使用【铁索连环】的时机 / 出牌阶段重铸。",
+            "condition": "须为梅花手牌。",
+            "cost": "该手牌。",
+            "effect": "视为使用【铁索连环】（横置或重置至多两名角色）；或重铸该牌并摸一张牌。",
+            "frequency": "无限制。",
+            "engineHooks": [
+              "onCardAs",
+              "onCanRecast",
+              "recastHandCard"
+            ]
+          }
+        },
+        {
+          "name": "涅槃",
+          "localSkillId": "niepan",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "d523d05c4792",
+          "sourceTextSha256": "d523d05c479226994f58e1cda3c35850a281117ac4921a384e7048cf38957af9",
+          "sourceLine": "card__hero__shu.md:324",
+          "implementationSpec": {
+            "summary": "限定技，处于濒死状态时可弃置区域内所有牌，武将牌复原，摸三张牌，体力回复至3点。",
+            "timing": "你处于濒死状态时。",
+            "condition": "本局尚未发动过。",
+            "cost": "弃置你区域里的所有牌。",
+            "effect": "武将牌恢复至游戏开始时的状态（翻回正面、解除横置），摸三张牌，体力值回复至3点。",
+            "frequency": "限定技（每局一次）。",
+            "engineHooks": [
+              "onDyingEnter",
+              "flags.niepanUsed",
+              "drawCards"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 228,
+      "name": "太史慈",
+      "localHeroId": "taishici",
+      "skills": [
+        {
+          "name": "天义",
+          "localSkillId": "tianyi",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "94878b9a80ff",
+          "sourceTextSha256": "94878b9a80ff36a95ee2b6f6248914c71dfb9a7f854fb5ca896ac69513eb7f17",
+          "sourceLine": "card__hero__wu.md:355",
+          "implementationSpec": {
+            "summary": "出牌阶段限一次，与一名角色拼点：赢则本回合【杀】的额外次数上限+1、无距离限制、额外目标数上限+1；没赢则本回合不能使用【杀】。",
+            "timing": "自己的出牌阶段。",
+            "condition": "双方各有至少一张手牌。",
+            "cost": "与目标拼点（双方各扣置一张手牌）。",
+            "effect": "赢：本回合使用【杀】的额外次数上限+1、无距离限制、额外目标数上限+1；没赢：本回合不能使用【杀】。",
+            "frequency": "每回合限一次。",
+            "engineHooks": [
+              "onActiveSkill",
+              "startPindian",
+              "pindian:tianyi",
+              "shaUseAllowed",
+              "flags.tianyiWon/tianyiLost"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 229,
+      "name": "庞德",
+      "localHeroId": "pangde",
+      "skills": [
+        {
+          "name": "猛进",
+          "localSkillId": "mengjin",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "78f4cca7fd79",
+          "sourceTextSha256": "78f4cca7fd7990689f05d555446f1c49b1e61bb86372c1cc689055ed6d7d9503",
+          "sourceLine": "card__hero__neutral.md:225",
+          "implementationSpec": {
+            "summary": "每当你使用的【杀】被目标角色使用的【闪】抵消时，可弃置其一张牌。",
+            "timing": "你使用的【杀】被【闪】抵消时。",
+            "condition": "目标角色的区域里有牌。",
+            "cost": "无。",
+            "effect": "弃置该目标的一张牌（手牌随机、装备区可指定）。",
+            "frequency": "无限制。",
+            "engineHooks": [
+              "onShaDodged",
+              "mengjin-pick",
+              "removeTargetZoneCard"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 230,
+      "name": "颜良文丑",
+      "localHeroId": "yanliangwenchou",
+      "skills": [
+        {
+          "name": "双雄",
+          "localSkillId": "shuangxiong",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "9570d5de6f9b",
+          "sourceTextSha256": "9570d5de6f9b6c6eab8d86e32cbe3ffd377af9b995eb4bcc50c31619a141f5eb",
+          "sourceLine": "card__hero__neutral.md:161",
+          "implementationSpec": {
+            "summary": "摸牌阶段开始时可放弃摸牌并判定，获得判定牌；若如此做，本回合可将与判定牌颜色不同的手牌当【决斗】使用。",
+            "timing": "摸牌阶段开始时。",
+            "condition": "无。",
+            "cost": "放弃摸牌阶段的摸牌。",
+            "effect": "进行一次判定并获得判定牌；本回合内可将与之颜色不同的一张手牌当【决斗】使用。",
+            "frequency": "每回合限一次。",
+            "engineHooks": [
+              "onDrawPhase",
+              "onJudgementAfterResolve",
+              "onCardAs",
+              "flags.shuangxiongColor"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 231,
+      "name": "袁绍",
+      "localHeroId": "yuanshao",
+      "skills": [
+        {
+          "name": "乱击",
+          "localSkillId": "luanji",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "410f92d5075e",
+          "sourceTextSha256": "410f92d5075e7e75f7cfda304370bc715dd25f4f4e5c0b0f1338807573156c74",
+          "sourceLine": "card__hero__neutral.md:149",
+          "implementationSpec": {
+            "summary": "可将两张花色相同的手牌当【万箭齐发】使用。",
+            "timing": "可使用【万箭齐发】的时机。",
+            "condition": "两张手牌花色相同。",
+            "cost": "该两张手牌。",
+            "effect": "视为使用【万箭齐发】（逐目标结算，含无懈窗口）。",
+            "frequency": "无限制。",
+            "engineHooks": [
+              "onActiveSkill",
+              "playCardWithRegisteredHandler"
+            ]
+          }
+        },
+        {
+          "name": "血裔",
+          "localSkillId": "xueyi",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "b5864fbb490f",
+          "sourceTextSha256": "b5864fbb490f3817eadfbd904a8aa202fa1a6413b5c86605f2acdc739efff2ac",
+          "sourceLine": "card__hero__neutral.md:151",
+          "implementationSpec": {
+            "summary": "主公技，锁定技，手牌上限+2X（X为其他群势力角色数）。",
+            "timing": "持续生效。",
+            "condition": "你是主公（身份场）。",
+            "cost": "无。",
+            "effect": "手牌上限增加 2×存活的其他群势力角色数。",
+            "frequency": "锁定技，持续生效。",
+            "engineHooks": [
+              "handLimit",
+              "xueyiHandLimitBonus"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "failures": []
+}

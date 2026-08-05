@@ -1262,6 +1262,26 @@
       return paused;
     }
 
+    // ═════ v15 T: 拼点出牌启发 ═════
+    // 只读自己的手牌 (不读对手手牌/暗牌 — 架构红线): 驱虎/天义 两个消费方
+    // 都是"赢有收益、没赢有代价", 故一律出点数最大的牌争胜; 同点数时保留
+    // 高价值牌 (桃/无懈/杀) — 拼点牌无论输赢都会离手, 能省则省。
+    function aiPickPindianCard(game, seat, pd) {
+      var state = game[seat];
+      var hand = (state && state.hand) || [];
+      if (!hand.length) return null;
+      var best = null;
+      var bestKey = null;
+      hand.forEach(function (card) {
+        var rank = deps.cardRankValue ? deps.cardRankValue(card) : 0;
+        // 同点数时的让位序: 价值越低越优先拿去拼点。
+        var value = card.type === 'tao' ? 3 : (card.type === 'wuxie' ? 2 : (card.type === 'shan' ? 1 : 0));
+        var key = rank * 10 - value;
+        if (bestKey === null || key > bestKey) { bestKey = key; best = card; }
+      });
+      return best;
+    }
+
     // ═════ v14 R1: 蛊惑博弈 (v1 启发) ═════
 
     // 质疑立场: 缺省不质疑 (质疑真牌吃永久「缠怨」)。三个确定性触发面
@@ -1467,6 +1487,8 @@
       aiChooseSkillAction: aiChooseSkillAction,
       aiTakeAction: aiTakeAction,
       aiDiscardCandidates: aiDiscardCandidates,
+      // v15 T: 拼点出牌启发
+      aiPickPindianCard: aiPickPindianCard,
       // v14 R1: 蛊惑博弈 (质疑立场 + 声明启发)
       aiShouldChallengeGuhuo: aiShouldChallengeGuhuo,
       aiMaybeDeclareGuhuo: aiMaybeDeclareGuhuo,

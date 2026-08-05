@@ -85,13 +85,26 @@
       WUXIE_CONTINUATIONS[trickName] = fn;
     }
 
+    // v15 T: 看破 (卧龙诸葛亮) — "你可以将一张黑色手牌当【无懈可击】使用"
+    // (card__hero__shu.md:340)。候选枚举/开窗门槛/消费三处共用本谓词,
+    // 颜色走 effectiveCardColor (红颜的黑桃视为红桃 → 不可当无懈)。
+    function wuxieOptionForCard(state, card) {
+      if (!card) return null;
+      if (card.type === 'wuxie') return { via: null };
+      if (hasSkill(state, 'kanpo') && StateRuntime.effectiveCardColor(state, card) === 'black') {
+        return { via: '看破' };
+      }
+      return null;
+    }
+
     function listWuxieOptions(state) {
       if (!state || !state.hand) return [];
       var opts = [];
       state.hand.forEach(function (card) {
-        if (card && card.type === 'wuxie') {
+        var via = wuxieOptionForCard(state, card);
+        if (via) {
           opts.push({
-            cardId: card.id, via: null, name: card.name,
+            cardId: card.id, via: via.via, name: card.name,
             suit: card.suit, rank: card.rank
           });
         }
@@ -1497,6 +1510,7 @@
       duelShaRequired: duelShaRequired,
       registerWuxieContinuation: registerWuxieContinuation,
       listWuxieOptions: listWuxieOptions,
+      wuxieOptionForCard: wuxieOptionForCard,
       hasWuxieResponseAvailable: hasWuxieResponseAvailable,
       checkWuxieAndContinue: checkWuxieAndContinue,
       advanceWuxieChain: advanceWuxieChain,

@@ -11,6 +11,7 @@
       import { createShaFlowRuntime } from './sha-flow.js';
       import { createEquipmentRuntime } from './equipment.js';
       import { createGuhuoRuntime } from './guhuo.js';
+      import { createPindianRuntime } from './pindian.js';
       import { createJudgeAreaRuntime } from './judge-area.js';
       import { installStandardSkillHandlers, PLAY_PHASE_ACTIVE_SKILLS } from './skills.js';
       import { HERO_CATALOG, HEROES } from '../data/heroes.js';
@@ -28,6 +29,8 @@
       var isShaCard = CardRuntime.isShaCard;
       var isNormalTrickCard = CardRuntime.isNormalTrickCard;
       var physicalCardOf = CardRuntime.physicalCardOf;
+      // v15 T: 拼点点数比较 (A=1 … K=13)
+      var cardRankValue = CardRuntime.cardRankValue;
       // v11 A2: 牌移动原语 — 所有"牌离开/进入区域"的站点统一走这四个出口。
       var findCardZone = CardRuntime.findCardZone;
       var takeCard = CardRuntime.takeCard;
@@ -366,6 +369,25 @@
       var resumeSuspendedTurnFlowIfReady = ResponseRuntime.resumeSuspendedTurnFlowIfReady;
       var finishPendingChoiceResolution = ResponseRuntime.finishPendingChoiceResolution;
       var pendingChoiceGuard = ResponseRuntime.pendingChoiceGuard;
+      // v15 T: 拼点域 (驱虎/天义 前置; 后续烈刃/制霸/间书 同框架)。
+      var PindianRuntime = createPindianRuntime({
+        log: log,
+        fail: fail,
+        success: success,
+        actorName: actorName,
+        cardRankValue: cardRankValue,
+        removeCardFromHand: removeCardFromHand,
+        discardCard: discardCard,
+        findCardZone: findCardZone,
+        setPendingChoice: setPendingChoice,
+        registerResponseKind: registerResponseKind,
+        // AI 拼点出牌启发经晚绑定回环 (AIRuntime 在其后创建)。
+        aiPickPindianCard: function (game, seat, pd) {
+          return AIRuntime.aiPickPindianCard(game, seat, pd);
+        }
+      });
+      var startPindian = PindianRuntime.startPindian;
+
       var resolveResponseChoice = ResponseRuntime.resolveResponseChoice;
 
       // L2: 决斗/南蛮/万箭/火攻 等锦囊在使用时已进入弃牌堆, 伤害结算收尾时
@@ -650,6 +672,7 @@
 
       function consumeWuxie(game, actor, reason, preferredCardId) {
         var card;
+        var wuxieVia = null; // v15 T: 看破等转化来源 (日志用)
         // v15 S1: 蛊惑声明的【无懈可击】(响应中的使用流程) — 牌面已亮出,
         // 实体牌在处理区, 直接顶替手牌扫描。
         var guhuoWuxie = takeGuhuoResponseCard(game, actor, ['wuxie']);
@@ -657,18 +680,32 @@
           card = guhuoWuxie.physical;
         } else if (preferredCardId) {
           // v10 V5: 玩家指定用哪张无懈 (面板候选选定)
+          // v15 T: 看破 — 黑色手牌同样可指定 (候选/门槛/消费三处共用
+          // TricksRuntime.wuxieOptionForCard 谓词)。
           var state = game[actor];
-          var idx = state.hand.findIndex(function (c) {
-            return c.id === preferredCardId && c.type === 'wuxie';
-          });
-          if (idx < 0) return false;
+          var picked = (state.hand || []).find(function (c) { return c.id === preferredCardId; });
+          if (!picked || !TricksRuntime.wuxieOptionForCard(state, picked)) return false;
+          wuxieVia = TricksRuntime.wuxieOptionForCard(state, picked).via;
           card = takeCard(game, preferredCardId, { zone: 'hand', actor: actor });
         } else {
           card = removeFirstCardOfType(game[actor], 'wuxie');
+          if (!card) {
+            // v15 T: 无真无懈时看破转化兜底 (AI / auto 路径)。
+            var kanpoPick = ((game[actor] || {}).hand || []).find(function (c) {
+              var opt = TricksRuntime.wuxieOptionForCard(game[actor], c);
+              return opt && opt.via;
+            });
+            if (kanpoPick) {
+              wuxieVia = TricksRuntime.wuxieOptionForCard(game[actor], kanpoPick).via;
+              card = takeCard(game, kanpoPick.id, { zone: 'hand', actor: actor });
+            }
+          }
         }
         if (!card) return false;
         discardCard(game, card);
-        log(game, actorName(game, actor) + (guhuoWuxie ? '发动【蛊惑】，将【' + card.name + '】当' : '打出')
+        log(game, actorName(game, actor)
+          + (guhuoWuxie ? '发动【蛊惑】，将【' + card.name + '】当'
+            : (wuxieVia ? '发动【' + wuxieVia + '】，将【' + card.name + '】当' : '打出'))
           + '【无懈可击】抵消' + reason + '。');
         SkillRuntime.runHook(skillRegistry, 'onCardUse', {
           game: game,
@@ -953,6 +990,24 @@
       // registerResponseKind 注册块 / processPreparePhase / 导出表零改动。
       var SkillDomain = installStandardSkillHandlers(skillRegistry, {
         hasSkill: hasSkill,
+        // v15 T: 拼点 (驱虎/天义) — 发起入口与效果注册 (拼点域后置装配,
+        // 包装注入)。
+        startPindian: function (game, actor, targetActor, opts) {
+          return PindianRuntime.startPindian(game, actor, targetActor, opts);
+        },
+        registerPindianContinuation: function (key, handler) {
+          return PindianRuntime.registerPindianContinuation(key, handler);
+        },
+        pindianEligible: function (game, actor, targetActor) {
+          return PindianRuntime.pindianEligible(game, actor, targetActor);
+        },
+        cardRankValue: cardRankValue,
+        // v15 T: 乱击 — 虚拟【万箭齐发】走普通使用校验与结算入口
+        // (函数声明提升, 运行期调用 — 与既有晚绑定注入同款)。
+        canPlayCard: function (game, actor, card) { return canPlayCard(game, actor, card); },
+        playCardWithRegisteredHandler: function (game, actor, card, options, self) {
+          return playCardWithRegisteredHandler(game, actor, card, options, self);
+        },
         opponent: opponent,
         actorName: actorName,
         seatList: seatList,
@@ -1450,7 +1505,12 @@
         // v7 PR-10/11: 1V1 顺手牵羊 / 兵粮寸断 都已取消距离限制 — v12 H3:
         // 该变体仅限 duel 模式; identity3 恢复官方距离 ≤1 (trickDistanceLimited)。
         if (isShaCard(card) && !legalTargetsForCard(game, actor, card).some(function (seat) { return seat !== actor; })) return fail('距离不足，当前武器范围无法使用【杀】。');
-        if (isShaCard(card) && self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
+        // v15 T: 次数/禁用闸统一走 shaUseAllowed (天义赢的额外次数 +1 与
+        // 天义没赢的"本回合不能使用【杀】"都在其中)。
+        if (isShaCard(card) && !StateRuntime.shaUseAllowed(self)) {
+          return fail(self.flags && self.flags.tianyiLost
+            ? '【天义】拼点没赢，本回合不能使用【杀】。' : '本回合已经使用过【杀】。');
+        }
         if (card.type === 'tao') {
           // v13 J0-4 (PR #165 玩家实测缺陷 4): 出牌阶段【桃】收口为标准语义 —
           // 仅"自己已受伤"可使用且目标恒为自己; 濒死救援走独立求桃队列
@@ -2493,7 +2553,10 @@
         if (!conversion) return fail('当前武将不能这样转化。');
         // 路径分支：杀 走原有 canPlayCard 检查；乐/拆 走各自虚拟卡检查
         if (asType === 'sha') {
-          if (self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
+          if (!StateRuntime.shaUseAllowed(self)) {
+            return fail(self.flags && self.flags.tianyiLost
+              ? '【天义】拼点没赢，本回合不能使用【杀】。' : '本回合已经使用过【杀】。');
+          }
           var playableSha = canPlayCard(game, actor, virtualShaFromCard(original));
           if (!playableSha.ok) return playableSha;
           playableSha.skillName = conversion.skillName;
@@ -2813,6 +2876,8 @@
         legalTargetsForCard: legalTargetsForCard,
         // v14 P2: 方天画戟额外目标前置查询 (AI 多目标启发)
         shaExtraTargetLimit: shaExtraTargetLimit,
+        // v15 T: 拼点出牌启发用的点数比较
+        cardRankValue: cardRankValue,
         // v14 R1: 蛊惑声明 (AI 于吉 v1 无中启发)
         // v15 S2: 全型声明启发 — 目标枚举与借刀受害者候选同步注入
         playGuhuoDeclare: playGuhuoDeclare,
@@ -2856,6 +2921,8 @@
         canPlayCard: canPlayCard,
         canPlayCardAs: canPlayCardAs,
         listCardConversions: listCardConversions,
+        // v15 T: 拼点资格查询 (UI 目标高亮 / AI 决策用)
+        pindianEligible: PindianRuntime.pindianEligible,
         // v15 T: 重铸入口与可重铸谓词 (UI 手牌菜单 / AI 决策用)
         recastHandCard: recastHandCard,
         canRecastCard: function (game, actor, cardOrId) {

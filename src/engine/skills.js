@@ -28,6 +28,13 @@
         var putCard = deps.putCard;
         var markHandOrigin = deps.markHandOrigin;
         var judge = deps.judge;
+        // v15 T: 拼点 (驱虎/天义)
+        var startPindian = deps.startPindian;
+        var registerPindianContinuation = deps.registerPindianContinuation;
+        var pindianEligible = deps.pindianEligible;
+        // v15 T: 乱击 — 双牌合成虚拟【万箭齐发】走普通使用校验与结算入口
+        var canPlayCard = deps.canPlayCard;
+        var playCardWithRegisteredHandler = deps.playCardWithRegisteredHandler;
         var resolveJudgementCard = deps.resolveJudgementCard;
         var setPendingChoice = deps.setPendingChoice;
         var requestPlayerResponse = deps.requestPlayerResponse;
@@ -278,6 +285,255 @@
       // 顺带勘正反馈的同款叠字 ("一张手牌牌")。
       function zoneLabel(zone) {
         return zone === '手牌' ? '手牌' : zone + '牌';
+      }
+
+      // ═════ v15 T (火包): 驱虎 (荀彧) ═════
+      // 官方逐字 (card__hero__wei.md:333): "出牌阶段限一次，你可以与一名
+      // 体力值大于你的角色拼点：当你赢后，其对其攻击范围内你选择的一名
+      // 角色造成1点伤害；当你没赢后，其对你造成1点伤害。"
+      // 注意伤害来源恒为**拼点目标** (荀彧只是选受害者), 且赢的分支里
+      // 受害者必须在拼点目标的攻击范围内。
+      function triggerQuhuActiveSkill(context) {
+        if (context.skillId !== 'quhu') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        if (!self || !hasSkill(self, 'quhu')) return null;
+        if (self.flags.quhuUsed) return fail('【驱虎】每回合限一次。');
+        var targetActor = context.targetActor;
+        if (!targetActor) {
+          // 缺省: 体力值大于自己且可拼点的敌对席首位。
+          targetActor = StateRuntime.perceivedHostileFirstPool(game, actor,
+            StateRuntime.aliveSeats(game).filter(function (seat) {
+              return seat !== actor && game[seat].hp > self.hp && pindianEligible(game, actor, seat);
+            }))[0];
+        }
+        if (!targetActor || !game[targetActor]) return fail('请选择一名体力值大于你的角色。');
+        if (game[targetActor].hp <= self.hp) return fail('【驱虎】的目标体力值必须大于你。');
+        if (!pindianEligible(game, actor, targetActor)) return fail('拼点需要双方各有至少一张手牌。');
+        self.flags.quhuUsed = true;
+        return startPindian(game, actor, targetActor, {
+          key: 'quhu',
+          reason: '【驱虎】拼点',
+          ctx: { victimHint: context.options && context.options.victim }
+        });
+      }
+
+      registerPindianContinuation('quhu', function (game, outcome) {
+        var actor = outcome.actor;
+        var targetActor = outcome.target;
+        if (!game[targetActor] || game[targetActor].hp <= 0) return success('驱虎结算完成（拼点目标已阵亡）。');
+        if (!outcome.won) {
+          // "当你没赢后，其对你造成1点伤害"
+          damage(game, actor, 1, targetActor, '【驱虎】');
+          return success('驱虎结算完成。');
+        }
+        // "当你赢后，其对其攻击范围内你选择的一名角色造成1点伤害"
+        var candidates = StateRuntime.aliveSeats(game).filter(function (seat) {
+          return seat !== targetActor && StateRuntime.canReachWithSha(game, targetActor, seat);
+        });
+        if (!candidates.length) return success('驱虎：拼点目标的攻击范围内没有角色。');
+        var hint = outcome.ctx && outcome.ctx.victimHint
+          && StateRuntime.resolveSeatOption(game, outcome.ctx.victimHint);
+        var victim = (hint && candidates.indexOf(hint) >= 0) ? hint : null;
+        if (!victim) {
+          // 由荀彧选择受害者 — 只读公开信息。缺省挑选序: 感知敌对优先 →
+          // 血线最低。荀彧自己虽在官方可选面内 (文本未排除), 但缺省绝不
+          // 自伤: 先剔除自己, 只有"射程内只剩荀彧"时才回退到自己。
+          var pickable = candidates.filter(function (seat) { return seat !== actor; });
+          if (!pickable.length) pickable = candidates;
+          var pool = StateRuntime.perceivedHostileFirstPool(game, actor, pickable);
+          victim = pool.slice().sort(function (a, b) { return game[a].hp - game[b].hp; })[0];
+        }
+        damage(game, victim, 1, targetActor, '【驱虎】');
+        return success('驱虎结算完成。');
+      });
+
+      // ═════ v15 T (火包): 天义 (太史慈) ═════
+      // 官方逐字 (card__hero__wu.md:355): "出牌阶段限一次，你可以与一名角色
+      // 拼点：当你赢后，你于此回合内使用【杀】的额外次数上限+1且使用【杀】
+      // 无距离限制且使用【杀】的额外目标数上限+1；当你没赢后，你于此回合内
+      // 不能使用【杀】。"
+      function triggerTianyiActiveSkill(context) {
+        if (context.skillId !== 'tianyi') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        if (!self || !hasSkill(self, 'tianyi')) return null;
+        if (self.flags.tianyiUsed) return fail('【天义】每回合限一次。');
+        var targetActor = context.targetActor;
+        if (!targetActor) {
+          targetActor = StateRuntime.perceivedHostileFirstPool(game, actor,
+            StateRuntime.aliveSeats(game).filter(function (seat) {
+              return seat !== actor && pindianEligible(game, actor, seat);
+            }))[0];
+        }
+        if (!targetActor || !game[targetActor]) return fail('请选择一名角色拼点。');
+        if (!pindianEligible(game, actor, targetActor)) return fail('拼点需要双方各有至少一张手牌。');
+        self.flags.tianyiUsed = true;
+        return startPindian(game, actor, targetActor, { key: 'tianyi', reason: '【天义】拼点' });
+      }
+
+      registerPindianContinuation('tianyi', function (game, outcome) {
+        var self = game[outcome.actor];
+        if (!self) return success('天义结算完成。');
+        self.flags = self.flags || {};
+        if (outcome.won) {
+          self.flags.tianyiWon = true;
+          // "使用【杀】的额外次数上限 +1" — 次数闸读 shaExtraUses
+          // (state.shaUseAllowed), 回合复位由 phases 清零。
+          self.shaExtraUses = (self.shaExtraUses || 0) + 1;
+          log(game, actorName(game, outcome.actor)
+            + '【天义】拼点赢：本回合【杀】的使用次数上限 +1、无距离限制、额外目标数上限 +1。');
+        } else {
+          self.flags.tianyiLost = true;
+          log(game, actorName(game, outcome.actor) + '【天义】拼点没赢：本回合不能使用【杀】。');
+        }
+        return success('天义结算完成。');
+      });
+
+      // ═════ v15 T (火包): 乱击 (袁绍) ═════
+      // 官方逐字 (card__hero__neutral.md:149): "你可以将两张花色相同的手牌
+      // 当【万箭齐发】使用。" 两张牌合成一张虚拟【万箭齐发】 (丈八蛇矛
+      // 的双牌虚拟先例): 组成实体在转化时弃置, 虚拟牌带 virtual 标记 →
+      // discardCard 不再二次入堆 (守恒 H1 口径)。
+      function triggerLuanjiActiveSkill(context) {
+        if (context.skillId !== 'luanji') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        var cardIds = context.cardIds || [];
+        if (!self || !hasSkill(self, 'luanji')) return null;
+        if (cardIds.length !== 2 || cardIds[0] === cardIds[1]) {
+          return fail('【乱击】需要两张花色相同的手牌。');
+        }
+        var picked = cardIds.map(function (id) {
+          return (self.hand || []).find(function (item) { return item.id === id; });
+        });
+        if (!picked[0] || !picked[1]) return fail('选择的手牌不存在。');
+        // "花色相同" — 走 effectiveCardColor 的同源花色视同层 (红颜把黑桃
+        // 视为红桃只改颜色不改花色, 故此处直接比 suit)。
+        if (picked[0].suit !== picked[1].suit) return fail('【乱击】的两张手牌花色必须相同。');
+        var virtualWanjian = {
+          id: 'luanji-' + picked[0].id + '-' + picked[1].id,
+          type: 'wanjian',
+          name: '万箭齐发',
+          family: 'trick',
+          suit: picked[0].suit,
+          color: picked[0].color,
+          rank: picked[0].rank,
+          virtual: true,
+          physicalCards: [picked[0], picked[1]]
+        };
+        var playable = canPlayCard(game, actor, virtualWanjian);
+        if (!playable.ok) return playable;
+        // 先弃组成实体再进结算 (与丈八/转化牌同序: 牌离手 → 使用)。
+        picked.forEach(function (card) {
+          var removed = removeCardFromHand(self, card.id);
+          if (removed) discardCard(game, removed);
+        });
+        log(game, actorName(game, actor) + '发动【乱击】，将两张' + (picked[0].suitLabel || picked[0].suit)
+          + '手牌当【万箭齐发】使用。');
+        return playCardWithRegisteredHandler(game, actor, virtualWanjian, context.options || {}, self);
+      }
+
+      // ═════ v15 T (火包): 双雄 (颜良文丑) ═════
+      // 官方逐字 (card__hero__neutral.md:161): "摸牌阶段开始时，你可以放弃
+      // 摸牌，判定，当判定牌生效后，你获得之，若如此做，你于此回合内可以
+      // 将与之颜色不同的一张手牌当【决斗】使用。"
+      // 判定牌"生效后你获得之" → 判定牌进手牌 (不入弃牌堆); 颜色记在
+      // flags.shuangxiongColor, 回合结束由 resetEndOfTurnState 清除。
+      function triggerShuangxiongDrawPhase(context) {
+        var game = context.game;
+        var actor = context.actor;
+        var self = game[actor];
+        if (!self || !hasSkill(self, 'shuangxiong')) return null;
+        var pref = (self.skillPreferences && self.skillPreferences.shuangxiong)
+          || (actor === 'player' ? 'ask' : 'auto');
+        if (pref === 'decline') return null;
+        // ask 档留待 UI 批接入 (与突袭同款 pendingChoice); 当前 auto:
+        // 手上已有可当决斗的异色牌越多, 放弃摸牌的收益越高 — 简化为
+        // "手牌数 < 3 时不换" (摸两张的确定性收益更高)。
+        if (pref === 'ask' || pref === 'auto') {
+          if ((self.hand || []).length < 3 && pref === 'auto') return null;
+        }
+        var judgeResult = judge(game, actor, '【双雄】');
+        if (!judgeResult) return null;
+        context.drawCount = 0; // 放弃摸牌
+        self.flags = self.flags || {};
+        self.flags.shuangxiongColor = judgeResult.color;
+        // "当判定牌生效后，你获得之" — 认领经 onJudgementAfterResolve 的
+        // claimed 通道 (天妒同款单点), 未认领的判定牌才入弃牌堆。
+        self.flags.shuangxiongClaimPending = true;
+        resolveJudgementCard(game, actor, self, '【双雄】', judgeResult);
+        self.flags.shuangxiongClaimPending = false;
+        log(game, actorName(game, actor) + '发动【双雄】，放弃摸牌并获得判定牌【'
+          + judgeResult.name + '】，本回合可将' + (judgeResult.color === 'red' ? '黑色' : '红色')
+          + '手牌当【决斗】使用。');
+        return { shuangxiongApplied: true };
+      }
+
+      // 双雄的判定牌认领 (与天妒同一 claimed 通道; 只在本次双雄判定的
+      // 结算窗口内认领, 其他判定不受影响)。
+      function triggerShuangxiongClaim(context) {
+        var game = context.game;
+        var actor = context.actor;
+        var state = context.state;
+        var physicalCard = physicalCardOf(context.card);
+        if (!state || !physicalCard || !hasSkill(state, 'shuangxiong')) return null;
+        if (!state.flags || !state.flags.shuangxiongClaimPending) return null;
+        if (context.claimed) return null; // 已被其他技能认领 (如天妒)
+        putCard(game, physicalCard, { zone: 'hand', actor: actor });
+        context.claimed = true;
+        return { claimedJudgementCard: true };
+      }
+
+      // ═════ v15 T (火包): 涅槃 (庞统) ═════
+      // 官方逐字 (card__hero__shu.md:324): "限定技，当你处于濒死状态时，
+      // 你可以弃置你的区域里的所有牌，然后将武将牌恢复至游戏开始时的状态，
+      // 摸三张牌，将体力值回复至3点。"
+      // (:330 的变体写作"恢复至平置状态并重置" — 同义, 取通用版。)
+      // 限定技 = 每局一次 → flags.niepanUsed 永不复位 (不进 phases 复位表)。
+      // "你的区域里的所有牌" = 手牌 + 装备区 + 判定区 (判定区的牌不为角色
+      // 所拥有, 但官方"你的区域里的牌"含判定区 — glossary__zone.md)。
+      function triggerNiepanDyingEnter(context) {
+        var game = context.game;
+        var dyingActor = context.dyingActor;
+        var self = game[dyingActor];
+        if (!self || !hasSkill(self, 'niepan')) return null;
+        self.flags = self.flags || {};
+        if (self.flags.niepanUsed) return null;
+        var pref = (self.skillPreferences && self.skillPreferences.niepan) || 'auto';
+        if (pref === 'decline') {
+          log(game, actorName(game, dyingActor) + '选择不发动【涅槃】。');
+          return null;
+        }
+        self.flags.niepanUsed = true;
+        // ① 弃置区域里的所有牌
+        (self.hand || []).slice().forEach(function (card) {
+          var removed = removeCardFromHand(self, card.id);
+          if (removed) discardCard(game, removed);
+        });
+        ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
+          var equipped = self.equipment && self.equipment[slot];
+          if (!equipped) return;
+          takeCard(game, equipped, { zone: 'equipment', actor: dyingActor, slot: slot });
+          discardCard(game, equipped);
+          if (triggerEquipmentLoss) triggerEquipmentLoss(game, dyingActor, equipped);
+        });
+        (self.judgeArea || []).slice().forEach(function (card) {
+          var removed = takeCard(game, card, { zone: 'judgeArea', actor: dyingActor });
+          if (removed) discardCard(game, removed);
+        });
+        // ② 武将牌恢复至游戏开始时的状态 (翻回正面 + 解除横置)
+        self.turnedOver = false;
+        self.chained = false;
+        // ③ 摸三张 ④ 体力回复至 3 点
+        drawCards(game, dyingActor, 3);
+        self.hp = Math.min(self.maxHp, 3);
+        log(game, actorName(game, dyingActor)
+          + '发动【涅槃】：弃置区域内所有牌，武将牌复原，摸三张牌，体力回复至 ' + self.hp + ' 点。');
+        return { niepanApplied: true };
       }
 
       // ═════ v15 T (火包): 猛进 (庞德) ═════
@@ -2520,6 +2776,42 @@
           return triggerJianxiongDamageAfter(context.game, context.targetActor, context.sourceCard);
         }
       });
+        // v15 T: 驱虎 (荀彧) — 出牌阶段限一次, 与体力值大于己者拼点
+        SkillRuntime.registerSkill(skillRegistry, 'quhu', {
+        onActiveSkill: function (context) {
+          return triggerQuhuActiveSkill(context);
+        }
+      });
+        // v15 T: 天义 (太史慈) — 出牌阶段限一次拼点, 赢则杀增强
+        SkillRuntime.registerSkill(skillRegistry, 'tianyi', {
+        onActiveSkill: function (context) {
+          return triggerTianyiActiveSkill(context);
+        }
+      });
+        // v15 T: 乱击 (袁绍) — 两张同花色手牌当万箭齐发
+        SkillRuntime.registerSkill(skillRegistry, 'luanji', {
+        onActiveSkill: function (context) {
+          return triggerLuanjiActiveSkill(context);
+        }
+      });
+        // v15 T: 双雄 (颜良文丑) — 摸牌阶段改判定并获得判定牌
+        SkillRuntime.registerSkill(skillRegistry, 'shuangxiong', {
+        onDrawPhase: function (context) {
+          return triggerShuangxiongDrawPhase(context);
+        },
+        onJudgementAfterResolve: function (context) {
+          return triggerShuangxiongClaim(context);
+        },
+        onCardAs: function (context) {
+          return triggerShuangxiongCardAs(context);
+        }
+      });
+        // v15 T: 涅槃 (庞统) — 限定技, 濒死时复原
+        SkillRuntime.registerSkill(skillRegistry, 'niepan', {
+        onDyingEnter: function (context) {
+          return triggerNiepanDyingEnter(context);
+        }
+      });
         // v15 T: 火计 (卧龙诸葛亮) — 红色手牌当火攻
         SkillRuntime.registerSkill(skillRegistry, 'huoji', {
         onCardAs: function (context) {
@@ -2535,12 +2827,6 @@
           var state = context.state;
           if (!state || !hasSkill(state, 'lianhuan')) return null;
           return !!(context.card && context.card.suit === 'club');
-        }
-      });
-        // v15 T: 双雄 (颜良文丑) — 回合级授权的异色手牌当决斗
-        SkillRuntime.registerSkill(skillRegistry, 'shuangxiong', {
-        onCardAs: function (context) {
-          return triggerShuangxiongCardAs(context);
         }
       });
         // v15 T: 强袭 (典韦) — 出牌阶段限一次, 失体力/弃武器换 1 点伤害
@@ -2855,8 +3141,11 @@
       }
 
       export const PLAY_PHASE_ACTIVE_SKILLS = {
-        // v15 T (火包): 强袭 (出牌阶段限一次)
+        // v15 T (火包): 强袭/驱虎/天义 (出牌阶段限一次) / 乱击 (双牌当万箭)
         qiangxi: true,
+        quhu: true,
+        tianyi: true,
+        luanji: true,
         zhiheng: true,
         kurou: true,
         rende: true,

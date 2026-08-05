@@ -93,8 +93,9 @@ test('phase runtime resets actor turn state at the start of a turn', () => {
     aiKurouUsed: false,
     luoyi: false,
     jiuUsedThisTurn: false, // v7 PR-8
-    // v15 T (火包): 强袭/天义 每回合限一次 + 天义回合级增益
+    // v15 T (火包): 强袭/驱虎/天义 每回合限一次 + 天义回合级增益
     qiangxiUsed: false,
+    quhuUsed: false,
     tianyiUsed: false,
     tianyiWon: false,
     tianyiLost: false,
