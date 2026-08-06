@@ -20,10 +20,13 @@ function readJson(rel) {
 const CACHE_PATHS = [
   'official-skill-cache/sanguosha-standard/official_standard_skill_cache.json',
   'official-skill-cache/sanguosha-wind/official_wind_skill_cache.json',
+  // v15 T: 火包接入 — 新包 cache/specs 成对追加
+  'official-skill-cache/sanguosha-fire/official_fire_skill_cache.json',
 ];
 const SPECS_PATHS = [
   'tests/fixtures/official_standard_skill_specs.json',
   'tests/fixtures/official_wind_skill_specs.json',
+  'tests/fixtures/official_fire_skill_specs.json',
 ];
 
 function indexByLocalId(docs, specKey) {
@@ -76,11 +79,15 @@ const VALID_TRIGGERS = new Set([
   'dyingEnter',
   // v12 H7: 护驾触发时机 — "当你需要使用或打出【闪】时" (响应求助)
   'needResponse',
+  // v15 T: 猛进触发时机 — "当你使用的【杀】被目标使用的【闪】抵消时"
+  'shaDodged',
 ]);
 const VALID_FREQUENCIES = new Set([
   'oncePerTurn',
   'unlimited',
   'passiveAlways',
+  // v15 T: 涅槃是限定技 (每局一次) — flags.niepanUsed 永不复位
+  'oncePerGame',
 ]);
 const VALID_COST_TYPES = new Set([
   'none',
@@ -94,6 +101,8 @@ const VALID_COST_TYPES = new Set([
   'turnOver',
   // v12 G2: 神速的成本是跳过阶段 (选项二另弃一张装备牌)
   'phaseSkip',
+  // v15 T: 驱虎/天义 的成本是与目标拼点 (双方各扣置一张手牌)
+  'rankCompare',
 ]);
 
 test('every implemented skill has structured metadata with valid tag values', () => {

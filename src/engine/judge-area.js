@@ -132,7 +132,18 @@
           wuxieDoneIdx = -1;
           wuxieResults = {};
         }
+        // v15 T 评审收口 [中]: 判定阶段把整批延时锦囊 splice 出判定区后,
+        // 它们在引擎里是"在途"的 —— 但按官方它们**仍在该角色的判定区里**,
+        // 只是尚未结算。涅槃那类"弃置你的区域里的所有牌"必须够得着它们
+        // (否则被"弃置"的【乐不思蜀】照常生效)。这条活引用让区域清空类
+        // 效果可以认领在途批次; 认领的牌记进 claimed, 循环跳过。
+        var inFlight = game.pauseState.judgeAreaInFlight;
+        if (!inFlight || inFlight.pending !== pending) {
+          inFlight = { actor: actor, pending: pending, claimed: [] };
+          game.pauseState.judgeAreaInFlight = inFlight;
+        }
         for (var i = startIdx; i < pending.length; i += 1) {
+          if (inFlight.claimed.indexOf(pending[i]) >= 0) continue; // 已被区域清空类效果取走
           // v12 H5: 该角色已在判定结算中阵亡 (闪电, 身份场对局继续) —
           // 剩余在途延时锦囊直接置入弃牌堆, 不再为亡者结算。
           if (game[actor].hp <= 0) {
@@ -140,6 +151,7 @@
               discardCard(game, pending[deadRest]);
             }
             if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
+            game.pauseState.judgeAreaInFlight = null;
             return { ok: true };
           }
           var trick = pending[i];
@@ -218,6 +230,7 @@
               discardCard(game, pending[overRest]);
             }
             if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
+            game.pauseState.judgeAreaInFlight = null;
             return { ok: true };
           }
           if (game.pendingChoice) {
@@ -238,6 +251,7 @@
         }
         // Clear the snapshot if we exited cleanly.
         if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
+        game.pauseState.judgeAreaInFlight = null;
         return { ok: true };
       }
 

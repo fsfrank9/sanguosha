@@ -318,3 +318,144 @@ G1 (打出◆缠怨措辞不对称 → 授予)、G4 (验假重开不可再蛊惑
   不能质疑 (G13, 维持现状)。
 - 翻面/阵亡跳过的回合不刷新蛊惑全场额度 (G14, 按"跳过回合 = 没有回合
   开始"处理)。
+
+---
+
+## T 执行记录 (2026-08-05, 火包 8 将 13 技 + 拼点框架)
+
+**范围**: 用户点单"一次完成 T 阶段" → 火包 13 技一批交付 (路线图原允许
+2 批拆分)。前置勘查用 7 个 subagent 并行跑 (6 组逐技能 spec/接缝 +
+1 组 opus 拼点架构), 按 CLAUDE.md 模型分配 (勘查 sonnet, 架构 opus)。
+
+### 新增基建: 拼点 (src/engine/pindian.js)
+
+全新机制, 引擎此前零实现。按 `flow__rankcompare.md` 逐字落地:
+发起者选目标 → 双方各扣置一张手牌入处理区 → 亮出比点数 (**点数相同则
+两名角色都没赢**, 发起者按没赢结算) → "赢/没赢后"效果 → 处理区拼点牌
+入弃牌堆。
+
+- **顺序红线**: 弃置在效果**之后** — `flushPindianCards` 只弃置"结算后
+  仍不在任何区域"的拼点牌, 为林包【烈刃】"获得其拼点牌"预留认领面。
+  若图省事提前弃置, U 阶段接烈刃时必踩。
+- **挂起模型**: 玩家席选牌经 `pendingChoice 'pindian-card'`, AI 席同步
+  选; 双方都是 AI 席时整个拼点同步跑完。选牌期实体牌锚在
+  `pauseState.pindian` (守恒 census 深扫在途面)。
+- **效果注册表**: `registerPindianContinuation(key, handler)` — 拼点
+  框架不认识任何技能 (无懈链 continuation 同款), 后续 烈刃/制霸/间书
+  直接挂。
+- **点数数值化**: `CardRuntime.cardRankValue` 单点出口 (A=1 … K=13)。
+
+### 13 技接入要点
+
+| 技能 | 落点 |
+|------|------|
+| 强袭 | 主动技; 成本二选一 (失 1 体力 / 弃武器, 手牌与装备区皆可); **弃装备武器时按 `glossary__card.md:41` 不能再用该武器的攻击范围** |
+| 驱虎 | 拼点; 赢 = 拼点目标对其攻击范围内由荀彧选的角色造成 1 伤害 (伤害来源恒为拼点目标), 没赢 = 拼点目标对荀彧造成 1 伤害 |
+| 节命 | onDamageAfter 逐点触发, 令一名角色补手牌至 min(体力上限, 5) |
+| 八阵 | `state.js` 新增**虚拟装备层** — "视为装备着某装备牌"挂在 `hasEquipmentEffect` 单点上, 对既有装备面自动一致 |
+| 火计 | 红色**手牌**当火攻 (限手牌, 对照武圣的"红色牌"含装备区) |
+| 看破 | 无懈候选/开窗门槛/消费三处共用 `wuxieOptionForCard` 谓词 |
+| 连环 | 梅花手牌当铁索 + **重铸面** (新增 `canRecastCard`/`recastHandCard` 统一入口与 `onCanRecast` hook) |
+| 涅槃 | 限定技 (`flags.niepanUsed` 永不复位); onDyingEnter 弃区域所有牌 → 武将牌复原 → 摸三 → 体力回复至 3 |
+| 天义 | 拼点; 赢 = 杀额外次数 +1 / 无距离限制 / 额外目标 +1, 没赢 = 本回合不能使用杀。次数与禁用闸收敛到 `StateRuntime.shaUseAllowed` |
+| 猛进 | 新增 `onShaDodged` hook (位序: 贯石斧之后、青龙续杀之前); 玩家席挂 `mengjin-pick` 并由 resolver 续跑闪避分支剩余流程 |
+| 双雄 | 摸牌阶段改判定 + 经 `claimed` 通道获得判定牌 (天妒同一单点), 回合级授权异色手牌当决斗 |
+| 乱击 | 两张同花色手牌合成虚拟【万箭齐发】(丈八双牌虚拟先例) |
+| 血裔 | 主公技锁定技, `handLimit` +2X (X = 存活的其他群势力角色数) |
+
+### 架构面改动 (跨技能)
+
+- `canPlayCardAs` 白名单改由**转化牌工厂表**驱动, 锦囊分支统一交给已
+  注册的结算 handler (无懈链/逐目标/成本询问全部复用), 不再逐型手写 —
+  新增可转化牌名只改一处。既有 杀/乐/拆 三条路径逐字等价。
+- `resolveShaAfterResponse` 拆成 `continueShaDodgeAfterSkills` +
+  `settleShaHit` 两个入口 (猛进 ask 挂起后的续跑面)。
+- 数据面: IMPLEMENTED 54→67 / ACTIVE 12→16; SKILL_METADATA 13 条, 新增
+  三个规范值 (trigger `shaDodged` / frequency `oncePerGame` /
+  cost `rankCompare`); 火包 cache+specs+skills 三份 fixture。
+  **sourceTextRef 取已入库 gltjk 镜像行的 sha256** — 与风包"人工转写、
+  无法复核"不同, 火包每条都可逐条复核。
+
+### spec 缺口裁定
+
+13 条入库 `docs/audit/2026-08-05-fire-pack-spec.md`。其中三条来自并行
+勘查的发现并**改变了实现**: F11 (弃武器作成本后不能用该武器的攻击范围)、
+F12 (成本武器可来自手牌)、F13 ("攻击范围内的角色"不含自己 — 由
+`glossary__value.md:114` 的"所有**其他**角色"与 `rule__classification.md:69`
+"存在攻击范围内没有角色的角色"两条互证)。
+
+勘查报告另有一条建议被**驳回**: 有 agent 依"自己与自己的距离永远是 0"
+推断 P 在自己攻击范围内、驱虎可令 P 自伤。该推断与它自己引用的
+`rule__classification.md:69` 冲突 (若自己恒在自己范围内, "攻击范围内
+没有角色"不可能成立), 按 F13 裁定不采纳。
+
+### 测试与门禁
+
+- `tests/v15_t_fire_pack.test.mjs` 30 例 (13 技逐条 + 门槛 + 守恒 +
+  官方判例钉); `tests/v15_t_pindian.test.mjs` 8 例 (三态/点数序/门槛/
+  挂起在途/兜底/全 AI 同步/AI 出牌启发); `tests/ui_v15_t_fire_pack.test.mjs`
+  8 例 (座席点选/拼点面板/猛进面板/重铸入口/乱击选牌/图鉴翻转)。
+- `tests/v15_t_review_closure.test.mjs` 22 例 (评审报告的每条已修项各一钉)
+  + `ui_v15_t_fire_pack` 追加 4 例 (M3 背靠背窗口 / 四个新面板锚点 /
+  双雄面板 / 涅槃面板)。
+- 全档 198 文件绿; 三基准门禁不降 (v12_i 64.0% ≥55% / M4 5p 67.9%·4p 69.1% /
+  Q2 分布可测移动); UI 测试 3 连跑零失败。
+- 守护测试同步上调: 感知路由计数 3→6、todo 下限 64→50、phase flags 快照。
+
+### 评审收口 (opus 对抗端到端复现, 方法论增补①)
+
+200 局火包全将 soak + 12 个专项复现脚本, 报 **1 高 / 10 中 / 6 低 / 2 存疑**,
+高与中**全修**, 低级 5 条一并修 (L4 点选上限也修), 存疑 2 条一条转实做、
+一条如实归档。新增 `tests/v15_t_review_closure.test.mjs` 22 条回归钉
+(编号与报告一一对应)。
+
+**[高] H1 — 猛进接线的早退吞掉整条闪避分支, 【杀】永久离场。**
+`resolveShaAfterResponse` 在 `onShaDodged` 之后无差别检查 `game.pendingChoice`,
+但闪响应本身就可能已挂起一个与猛进无关的窗口 (`consumeResponse` 派发
+`onShanUsed` → 张角雷击对玩家席开 `leiji-ask`)。于是**局内没有庞德也会早退**,
+而 `pauseState.shaDodgeResume` 只有 `resolveMengjinPickChoice` 认 → 该【杀】
+永不 `settleShaCardAfterOutcome`, 从所有区域消失, 青龙续杀被静默吞掉。
+守恒 census 因深扫 `pauseState` 反而"通过", 现有守护测试抓不到。
+判据改为**钩子自身的挂起信号** (`suspendedForMengjin`)。同一教训随后用在
+涅槃的 `onDyingEnter` 上。
+
+**[中] 10 条**
+
+| # | 缺陷 | 收口 |
+|---|------|------|
+| M1 | 丈八/激将/AI 评分三处出杀闸未迁 `shaUseAllowed` → 天义两个方向都错 | 三处统一走单点 |
+| M2 | 天义"无距离限制 / 额外目标 +1"只落在结算层, 目标枚举面没接 → UI/AI 只拿得到"额外次数 +1" | 新增 `shaUseReachAllowed` (F14) 接进 `isLegalCardTarget`; `shaExtraTargetLimit` 与 `playCardAs` 前置检查改用与结算层同一算式 |
+| M3 | UI staged 槽只在窗口全空时清 → 同 kind 背靠背窗口间残留暂存, 第二窗按"确定"即零确认执行上一窗选择 | 绑定 `pendingChoice` 对象身份 (S 批蛊惑面板同款教训, 这次修在共用槽上, 后续新面板天然免疫) |
+| M4 | `recastHandCard` 缺 `pendingChoiceGuard` (UI 重铸钮直调该函数) | 补守卫 |
+| M5 | `playCardAs` 守恒兜底被 id 语义击穿 — handler 拒绝路径退回的是虚拟牌 (与来源同 id) → 手牌实体被永久改写成另一张牌 | 新增 `CardRuntime.findCardZoneByRef` / `removeCardRefFromZones`, 转化杀与转化锦囊两条兜底都改按对象身份 |
+| M6 | 四个官方"你可以 / 你选择"被实现成自动 (F17) | 涅槃/双雄/驱虎/节命 各接一个 pendingChoice 窗 + UI 面板 |
+| M7 | 看破的自动路径按手牌顺序取第一张黑牌 → 一张【青釭剑】被拿去抵消【过河拆桥】 | 在合格候选里按 AI 弃牌估值取最不值钱的一张 |
+| M8 | AI 强袭启发按当前武器射程选目标, 引擎按 F11 的 `effectiveRange` 校验 → 目标被拒, **整段出牌阶段中断** (200 局 soak 命中 5 次) | 启发按成本档分别算射程 (弃武器档 ≤1 / 失体力档按武器) |
+| M9 | 涅槃在判定阶段弃不到判定区的牌 (整批已 splice 成在途) → 被"弃置"的延时锦囊照常生效 | 新增 `pauseState.judgeAreaInFlight` 活引用, 区域清空类效果可认领在途批次, 判定循环跳过已认领项 |
+| M10 | 强袭失体力致濒死时, 伤害在濒死窗口收束前就落下 | 挂起后由 `resumeSuspendedTurnFlowIfReady` 的 `qiangxiDamage` 分支续跑 |
+
+**[低] 6 条**: L1 引擎日志花色打英文 (牌上从来没有 `suitLabel` 字段) →
+`CardRuntime.suitLabelOf` 单点, 乱击与蛊惑三处改用; L2 `Engine.canReachWithSha`
+未导出致 UI 强袭高亮走 `: true` 兜底; L3 铁索自己是合法目标 (F15);
+L4 技能选牌上限在点选层止住; L5 多目标拒绝文案逐来源列名;
+L6 涅槃体力"回复至 3"改为只升不降 (F16)。
+
+**[存疑] 2 条**: U1 拼点单槽无重入守卫 + 效果挂起时拼点牌已被弃 —— 报告判为
+本批不可达的前瞻项, 但**驱虎受害者改开窗后立即变为可达**, 故转实做
+(重入守卫 + 挂起留账, 见 F2 补充)。U2 (强袭成本致死后伤害是否仍结算) 构造不出
+"典韦死但对局继续"的局面, 如实归档待后续多席场复核。
+
+评审同时确证未被击穿的面: 200 局火包全将 soak 零崩溃/零守恒失败/零区域重复;
+八阵虚拟装备层只落在 `baguaShanJudge` 单点 (其余 8 个 effect 无外溢);
+猛进拆分本身等价 (单目标/方天两目标链/青龙续杀三条路径续跑正确);
+`canPlayCardAs` 泛化后乐不思蜀路径与旧实现逐字一致;
+13 条 `sourceTextRef` 的 sha256 与官方镜像 **13/13 逐条吻合**;
+AI 零全知 (新增五处启发只读公开信息)。
+
+### 已知局限 (如实记录)
+
+- 拼点的"双方同时扣置"实现为逐方收集 (F1), 顺序不产生信息差。
+- 某方在亮出前手牌被拿空 → 按"无牌可扣置"中止拼点 (官方只写了"死亡"的
+  情形, 这条是本仓补的边界裁定)。
+- U2: 强袭成本致自身**死亡** (非濒死) 后伤害是否仍结算 —— 1v1 与 3 席都因
+  终局短路走不到 `damage()`, 未能构造判例, 留待后续多席场复核。

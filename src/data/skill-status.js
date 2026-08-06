@@ -49,7 +49,24 @@
         //   lijian    貂蝉        弃一张牌令两名男性角色虚拟【决斗】
         // 1v1 中主公无同势力队友 / 离间凑不齐两名其他男性 → 全部 no-op,
         // 行为零回归; identity3 起激活。
-        'jijiang', 'hujia', 'huangtian', 'lijian'
+        'jijiang', 'hujia', 'huangtian', 'lijian',
+        // ═════ v15 T: 火包 8 将 13 技 ═════
+        //   强袭 qiangxi   典韦   出牌阶段限一次: 失体力/弃武器 → 1 伤害
+        //   驱虎 quhu      荀彧   出牌阶段限一次: 与体力大于己者拼点
+        //   节命 jieming   荀彧   每受 1 点伤害后令一名角色补手牌至 X
+        //   八阵 bazhen    卧龙   锁定技: 无防具时视为装备八卦阵
+        //   火计 huoji     卧龙   红色手牌当火攻
+        //   看破 kanpo     卧龙   黑色手牌当无懈可击
+        //   连环 lianhuan  庞统   梅花手牌当铁索连环 + 可重铸梅花手牌
+        //   涅槃 niepan    庞统   限定技: 濒死时复原
+        //   天义 tianyi    太史慈 出牌阶段限一次拼点, 赢则杀增强
+        //   猛进 mengjin   庞德   杀被闪抵消时弃目标一张牌
+        //   双雄 shuangxiong 颜良文丑 摸牌阶段改判定并获得, 异色牌当决斗
+        //   乱击 luanji    袁绍   两张同花色手牌当万箭齐发
+        //   血裔 xueyi     袁绍   主公技锁定技: 手牌上限 +2X
+        'qiangxi', 'quhu', 'jieming', 'bazhen', 'huoji', 'kanpo',
+        'lianhuan', 'niepan', 'tianyi', 'mengjin', 'shuangxiong',
+        'luanji', 'xueyi'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,
@@ -58,6 +75,9 @@
       // v12 H7: jijiang (主公主动求杀) / huangtian (群势力给牌, 全场型) /
       // lijian (弃牌挑决斗) 为出牌阶段主动技; hujia 纯响应型不占按钮。
       // v14 R1: guhuo 为出牌阶段主动技 (占技能按钮 → UI 声明面板)。
-      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin', 'jijiang', 'huangtian', 'lijian', 'guhuo'];
+      // v15 T: 火包主动技 — 强袭/驱虎/天义 (出牌阶段主动发动) 与乱击
+      // (选两张同花色手牌); 其余火包技能为触发/锁定/转化类。
+      var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin', 'jijiang', 'huangtian', 'lijian', 'guhuo',
+        'qiangxi', 'quhu', 'tianyi', 'luanji'];
 
       export { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS };

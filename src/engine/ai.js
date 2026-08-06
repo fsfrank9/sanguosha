@@ -559,7 +559,8 @@
       // 酒: 仅当持手中有可用杀且本回合未出过杀 → buff 杀; 否则浪费。
       // v12 I1: 酒+杀 可致死目标 (hp<=2) → 处决连招优先级抬高。
       if (card.type === 'jiu') {
-        var hasShaToBoost = !self.usedSha && self.hand.some(function (c) { return isShaType(c.type); });
+        var hasShaToBoost = StateRuntime.shaUseAllowed(self)
+          && self.hand.some(function (c) { return isShaType(c.type); });
         if (!hasShaToBoost) return -10;
         if (aiFeatureOn(game, actor, 'killPressure') && target && target.hp <= 2
             && aiFoeEstimate(game, actor, foeSeat, 'shan') < 1) {
@@ -573,7 +574,9 @@
       // 半开区间 — 对整数输入与旧 ===0/===1 判定逐值一致)。
       // v12 I1: 处决线 — 目标命悬 (含酒 buff 可致死) 且闪面稀薄 → 最高优先。
       if (isShaType(card.type)) {
-        if (self.usedSha && !canUseUnlimitedSha(self)) return -100;
+        // 评审收口 [中]: 与引擎闸门同口径 (shaUseAllowed) — 否则天义赢后
+        // 引擎放行第二张杀而 AI 评分恒 -100, 额外次数永远用不上。
+        if (!StateRuntime.shaUseAllowed(self)) return -100;
         var targetShans = aiFoeEstimate(game, actor, foeSeat, 'shan');
         if (aiFeatureOn(game, actor, 'killPressure')) {
           var killReach = 1 + (self.shaBonus || 0);
@@ -938,6 +941,95 @@
       var primaryFoeSeat = aiPrimaryFoe(game, actor);
       var target = game[primaryFoeSeat];
 
+      // ═════ v15 T (火包) 主动技启发 ═════
+      // 强袭 (典韦): 弃武器成本优先 (无武器时才用血), 且只在能打死人或
+      // 血线宽裕 (hp>=3) 时才用血; 目标取攻击范围内感知敌对血线最低者。
+      if (hasSkill(self, 'qiangxi') && !self.flags.qiangxiUsed) {
+        // 评审收口 [中]: 两种成本的攻击范围**不同** —
+        // 弃装备区武器作成本时按 glossary__card.md:41 不能再用该武器的
+        // 攻击范围 (引擎按 effectiveRange=1 校验)。此前启发一律按当前武器
+        // 射程选目标 → 挑出的目标被引擎拒, aiTakeAction 返回 ok:false,
+        // 整段出牌阶段就此中断 (200 局火包 soak 命中 5 次)。
+        var qxReach = function (seat, useWeaponRange) {
+          return StateRuntime.distanceBetween(game, actor, seat)
+            <= (useWeaponRange ? StateRuntime.weaponRange(self) : 1);
+        };
+        var qxPool = function (useWeaponRange) {
+          return StateRuntime.perceivedHostileFirstPool(game, actor,
+            StateRuntime.aliveSeats(game).filter(function (seat) {
+              return seat !== actor && game[seat] && game[seat].hp > 0 && qxReach(seat, useWeaponRange);
+            })).slice().sort(function (a, b) { return game[a].hp - game[b].hp; });
+        };
+        var qxWeapon = self.equipment && self.equipment.weapon;
+        // 弃武器档: 目标必须落在"去掉武器后"的范围 (距离 ≤ 1)。
+        var qxWeaponTargets = qxWeapon ? qxPool(false) : [];
+        if (qxWeapon && qxWeaponTargets.length) {
+          return { skillId: 'qiangxi', cardIds: [qxWeapon.id], options: { target: qxWeaponTargets[0] } };
+        }
+        // 失体力档: 武器照常提供射程。
+        var qxHpTargets = qxPool(true);
+        if (qxHpTargets.length && (self.hp >= 3 || game[qxHpTargets[0]].hp <= 1)) {
+          return { skillId: 'qiangxi', cardIds: [], options: { target: qxHpTargets[0] } };
+        }
+      }
+
+      // 天义 (太史慈): 手上有【杀】才值得赌 (赢=多一次杀+无距离+多目标,
+      // 没赢=本回合不能出杀); 手上没杀时拼点毫无收益, 不发动。
+      if (hasSkill(self, 'tianyi') && !self.flags.tianyiUsed && !self.flags.tianyiLost) {
+        var tyHasSha = (self.hand || []).some(function (card) { return isShaType(card.type); });
+        var tyTargets = StateRuntime.perceivedHostileFirstPool(game, actor,
+          StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && deps.pindianEligible && deps.pindianEligible(game, actor, seat);
+          }));
+        // 只读公开信息: 对手手牌数越少, 其能拿出的大牌越少 (期望点数更低)。
+        if (tyHasSha && tyTargets.length) {
+          var tyPick = tyTargets.slice().sort(function (a, b) {
+            return (game[a].hand || []).length - (game[b].hand || []).length;
+          })[0];
+          return { skillId: 'tianyi', cardIds: [], options: { target: tyPick } };
+        }
+      }
+
+      // 驱虎 (荀彧): 拼点赢 → 让体力大于己的角色去打别人; 没赢 → 自己吃
+      // 1 伤害。血线见底 (hp<=1) 时不赌。
+      if (hasSkill(self, 'quhu') && !self.flags.quhuUsed && self.hp > 1) {
+        var qhTargets = StateRuntime.perceivedHostileFirstPool(game, actor,
+          StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && game[seat].hp > self.hp
+              && deps.pindianEligible && deps.pindianEligible(game, actor, seat);
+          }));
+        if (qhTargets.length) {
+          var qhPick = qhTargets.slice().sort(function (a, b) {
+            return (game[a].hand || []).length - (game[b].hand || []).length;
+          })[0];
+          return { skillId: 'quhu', cardIds: [], options: { target: qhPick } };
+        }
+      }
+
+      // 乱击 (袁绍): 两张同花色手牌当【万箭齐发】 — 只在"敌方受伤面 >
+      // 己方受伤面"时发动 (万箭打全场, 队友也吃)。
+      if (hasSkill(self, 'luanji')) {
+        var bySuit = {};
+        (self.hand || []).forEach(function (card) {
+          if (!card || !card.suit) return;
+          bySuit[card.suit] = bySuit[card.suit] || [];
+          bySuit[card.suit].push(card);
+        });
+        var luanjiPair = Object.keys(bySuit).map(function (suit) { return bySuit[suit]; })
+          .filter(function (group) { return group.length >= 2; })[0];
+        if (luanjiPair) {
+          var foes = StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && StateRuntime.perceivedHostile(game, actor, seat);
+          }).length;
+          var friends = StateRuntime.aliveSeats(game).filter(function (seat) {
+            return seat !== actor && !StateRuntime.perceivedHostile(game, actor, seat);
+          }).length;
+          if (foes > friends) {
+            return { skillId: 'luanji', cardIds: [luanjiPair[0].id, luanjiPair[1].id], options: {} };
+          }
+        }
+      }
+
       // 观星: free information; fire once per turn whenever deck has cards.
       if (hasSkill(self, 'guanxing') && !self.flags.guanxingUsed && game.deck.length > 0) {
         return { skillId: 'guanxing', cardIds: [], options: {} };
@@ -1262,6 +1354,26 @@
       return paused;
     }
 
+    // ═════ v15 T: 拼点出牌启发 ═════
+    // 只读自己的手牌 (不读对手手牌/暗牌 — 架构红线): 驱虎/天义 两个消费方
+    // 都是"赢有收益、没赢有代价", 故一律出点数最大的牌争胜; 同点数时保留
+    // 高价值牌 (桃/无懈/杀) — 拼点牌无论输赢都会离手, 能省则省。
+    function aiPickPindianCard(game, seat, pd) {
+      var state = game[seat];
+      var hand = (state && state.hand) || [];
+      if (!hand.length) return null;
+      var best = null;
+      var bestKey = null;
+      hand.forEach(function (card) {
+        var rank = deps.cardRankValue ? deps.cardRankValue(card) : 0;
+        // 同点数时的让位序: 价值越低越优先拿去拼点。
+        var value = card.type === 'tao' ? 3 : (card.type === 'wuxie' ? 2 : (card.type === 'shan' ? 1 : 0));
+        var key = rank * 10 - value;
+        if (bestKey === null || key > bestKey) { bestKey = key; best = card; }
+      });
+      return best;
+    }
+
     // ═════ v14 R1: 蛊惑博弈 (v1 启发) ═════
 
     // 质疑立场: 缺省不质疑 (质疑真牌吃永久「缠怨」)。三个确定性触发面
@@ -1467,6 +1579,8 @@
       aiChooseSkillAction: aiChooseSkillAction,
       aiTakeAction: aiTakeAction,
       aiDiscardCandidates: aiDiscardCandidates,
+      // v15 T: 拼点出牌启发
+      aiPickPindianCard: aiPickPindianCard,
       // v14 R1: 蛊惑博弈 (质疑立场 + 声明启发)
       aiShouldChallengeGuhuo: aiShouldChallengeGuhuo,
       aiMaybeDeclareGuhuo: aiMaybeDeclareGuhuo,

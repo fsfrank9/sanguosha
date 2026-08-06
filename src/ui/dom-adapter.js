@@ -114,7 +114,11 @@
         promptCardChoice: function (card, opts) { return promptCardChoice(card, opts); },
         actorDisplayName: function (actor) { return actorDisplayName(actor); },
         stage: function (payload, selector) {
-          stagedModalChoice = { kind: 'pending', payload: payload, selector: selector };
+          stagedModalChoice = {
+            kind: 'pending', payload: payload, selector: selector,
+            // v15 T 评审收口 [中]: 绑定**这一个** pendingChoice 对象。
+            window: game ? Engine.getPendingChoice(game) : null
+          };
           render();
         }
       });
@@ -127,7 +131,11 @@
         escapeHtml: function (text) { return escapeHtml(text); },
         suitLabel: function (suit) { return suitLabel(suit); },
         stage: function (payload, selector) {
-          stagedModalChoice = { kind: 'pending', payload: payload, selector: selector };
+          stagedModalChoice = {
+            kind: 'pending', payload: payload, selector: selector,
+            // v15 T 评审收口 [中]: 绑定**这一个** pendingChoice 对象。
+            window: game ? Engine.getPendingChoice(game) : null
+          };
           render();
         }
       });
@@ -143,7 +151,11 @@
         suitLabel: function (suit) { return suitLabel(suit); },
         actorDisplayName: function (actor) { return actorDisplayName(actor); },
         stage: function (payload, selector) {
-          stagedModalChoice = { kind: 'pending', payload: payload, selector: selector };
+          stagedModalChoice = {
+            kind: 'pending', payload: payload, selector: selector,
+            // v15 T 评审收口 [中]: 绑定**这一个** pendingChoice 对象。
+            window: game ? Engine.getPendingChoice(game) : null
+          };
           render();
         }
       });
@@ -202,6 +214,16 @@
           // v15 S1: 蛊惑响应声明面板 (响应窗口内的打出/使用流程入口)
           'guhuoResponsePanel', 'guhuoResponseHint', 'guhuoResponseTypes',
           'guhuoResponseCovers', 'guhuoResponseConfirmBtn',
+          // v15 T: 连环重铸钮 (转化面板内)
+          'conversionRecastBtn',
+          // v15 T: 猛进弃牌选择 / 拼点选牌
+          'mengjinPanel', 'mengjinHint', 'mengjinChoices', 'mengjinDeclineBtn',
+          'pindianPanel', 'pindianHint', 'pindianChoices',
+          // v15 T 评审收口: 官方"你可以 / 你选择"的四个决策面。
+          'niepanPanel', 'niepanHint', 'niepanConfirmBtn', 'niepanDeclineBtn',
+          'shuangxiongPanel', 'shuangxiongHint', 'shuangxiongConfirmBtn', 'shuangxiongDeclineBtn',
+          'quhuVictimPanel', 'quhuVictimHint', 'quhuVictimChoices',
+          'jiemingPanel', 'jiemingHint', 'jiemingChoices', 'jiemingDeclineBtn',
           'tuxiConfirmBtn', 'tuxiDeclineBtn',
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
           'cixiongFirePanel', 'cixiongFireHint', 'cixiongFireBtn', 'cixiongFireDeclineBtn',
@@ -333,8 +355,16 @@
         boardPanels.renderBoard(uiView());
         renderPendingChoice();
         // v9 PR-E24: pendingChoice 已消失 (响应面板关闭) → 清掉 stale 的 staged.
-        if (stagedModalChoice && stagedModalChoice.kind === 'pending' &&
-            !(game && Engine.getPendingChoice(game))) {
+        //
+        // v15 T 评审收口 [中]: 判据从"窗口全空"收紧为"**不是当初那个窗口**"。
+        // 只在全空时清, 会让同 kind 背靠背的两个窗口 (青龙续杀/多目标链下的
+        // 两次 'mengjin-pick'; 连续两次 'pindian-card') 之间残留上一窗的暂存
+        // 选择 —— 玩家在第二个窗口直接按"确定"就会零确认执行上一窗的选项
+        // (猛进弃掉本没打算弃的装备; 拼点被 soak 兜底自动锁定最大点数手牌)。
+        // S 批已为蛊惑响应面板按窗口对象身份修过同一类缺陷, 这里修在共用的
+        // staged 槽上, 后续新面板天然免疫。
+        if (stagedModalChoice && stagedModalChoice.kind === 'pending'
+            && (game ? Engine.getPendingChoice(game) : null) !== stagedModalChoice.window) {
           stagedModalChoice = null;
         }
         // v9 PR-E24: renderPendingChoice 每次重建候选 DOM, 重新套用 staged 高亮.
@@ -461,6 +491,18 @@
             selectedHint: function (count) { return '仁德：已选 ' + count + ' 张'; },
             emptyMessage: '请选择至少一张牌发动【仁德】。'
           },
+          // v15 T (火包): 乱击 (袁绍) — 恰好两张同花色手牌当【万箭齐发】。
+          // 走与制衡/反间同一套"技能选牌 → 确认"骨架 (点技能进入选牌模式,
+          // 点两张手牌暂存, 按确定发动)。
+          luanji: {
+            name: '乱击',
+            min: 2,
+            max: 2,
+            cardHint: '选择这张牌用于【乱击】',
+            startHint: '乱击：点选两张花色相同的手牌后确认（当【万箭齐发】使用）',
+            selectedHint: function (count) { return '乱击：已选 ' + count + ' / 2 张'; },
+            emptyMessage: '请选择两张花色相同的手牌发动【乱击】。'
+          },
           fanjian: {
             name: '反间',
             min: 1,
@@ -550,7 +592,12 @@
         var index = selectedSkillCardIds.indexOf(cardId);
         if (index >= 0) selectedSkillCardIds.splice(index, 1);
         else if (config.max === 1) selectedSkillCardIds = [cardId];
-        else selectedSkillCardIds.push(cardId);
+        // 评审收口 [低 L4]: 有限上限 (乱击 max=2) 在点选层就止住 — 此前只有
+        // max===1 走替换、其余无条件 push, 玩家能选到 3 张, 确认时才被引擎
+        // 拒。满额后再点新牌视为"换掉最早那张", 与 max===1 的替换语义一致。
+        else if (Number.isFinite(config.max) && selectedSkillCardIds.length >= config.max) {
+          selectedSkillCardIds = selectedSkillCardIds.slice(1).concat([cardId]);
+        } else selectedSkillCardIds.push(cardId);
         if (els.zhihengHint) els.zhihengHint.textContent = config.selectedHint(selectedSkillCardIds.length);
         render();
       }
@@ -771,6 +818,14 @@
         // 为空) 时 tryEnterJijiangTargetMode 返回 false, 落回下方通用直调
         // 路径 (与改动前行为一致 — 因缺目标而 fail, 不崩溃)。
         if (skillId === 'jijiang' && modePanels.tryEnterJijiangTargetMode()) {
+          render();
+          return;
+        }
+        // v15 T (火包): 需座席目标的主动技 (强袭/驱虎/天义) — 进入座席
+        // 点选; 无合法座席时返回 false, 落回下方通用直调 (引擎给出具体
+        // 拒绝理由, 与激将同款)。
+        if (modePanels.tryEnterSeatTargetSkillMode
+            && modePanels.tryEnterSeatTargetSkillMode(skillId)) {
           render();
           return;
         }
@@ -1358,6 +1413,16 @@
         { panelId: 'tuxiPickPanel',         confirmBtnId: 'tuxiConfirmBtn',         cancelBtnId: 'tuxiDeclineBtn' },
         // v14 R1: 蛊惑质疑窗 (确认=质疑 / 取消=不质疑) 与声明面板。
         { panelId: 'guhuoChallengePanel',   confirmBtnId: 'guhuoChallengeBtn',      cancelBtnId: 'guhuoPassBtn' },
+        // v15 T: 猛进 (候选两步化, 取消=不发动) / 拼点 (候选两步化, 无取消 —
+        // 拼点牌是必付成本, 不能放弃)。
+        { panelId: 'mengjinPanel',          confirmBtnId: null,                     cancelBtnId: 'mengjinDeclineBtn' },
+        { panelId: 'pindianPanel',          confirmBtnId: null,                     cancelBtnId: null },
+        // v15 T 评审收口: 涅槃/双雄 是二选一按钮型; 驱虎受害者是必选
+        // (赢已成事实, 伤害必落, 只是选谁 → 无 cancel); 节命可逐点放弃。
+        { panelId: 'niepanPanel',           confirmBtnId: 'niepanConfirmBtn',       cancelBtnId: 'niepanDeclineBtn' },
+        { panelId: 'shuangxiongPanel',      confirmBtnId: 'shuangxiongConfirmBtn',  cancelBtnId: 'shuangxiongDeclineBtn' },
+        { panelId: 'quhuVictimPanel',       confirmBtnId: null,                     cancelBtnId: null },
+        { panelId: 'jiemingPanel',          confirmBtnId: null,                     cancelBtnId: 'jiemingDeclineBtn' },
         { panelId: 'guhuoDeclarePanel',     confirmBtnId: 'guhuoConfirmBtn',        cancelBtnId: 'guhuoCancelBtn' },
         // v12 H6: identity3 单目标牌/主动技 座席点选模式 (无 confirm 语义 —
         // 点合法座席直接生效; 取消按钮退出)。

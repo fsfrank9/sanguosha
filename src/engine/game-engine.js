@@ -11,6 +11,7 @@
       import { createShaFlowRuntime } from './sha-flow.js';
       import { createEquipmentRuntime } from './equipment.js';
       import { createGuhuoRuntime } from './guhuo.js';
+      import { createPindianRuntime } from './pindian.js';
       import { createJudgeAreaRuntime } from './judge-area.js';
       import { installStandardSkillHandlers, PLAY_PHASE_ACTIVE_SKILLS } from './skills.js';
       import { HERO_CATALOG, HEROES } from '../data/heroes.js';
@@ -28,6 +29,8 @@
       var isShaCard = CardRuntime.isShaCard;
       var isNormalTrickCard = CardRuntime.isNormalTrickCard;
       var physicalCardOf = CardRuntime.physicalCardOf;
+      // v15 T: 拼点点数比较 (A=1 … K=13)
+      var cardRankValue = CardRuntime.cardRankValue;
       // v11 A2: 牌移动原语 — 所有"牌离开/进入区域"的站点统一走这四个出口。
       var findCardZone = CardRuntime.findCardZone;
       var takeCard = CardRuntime.takeCard;
@@ -100,6 +103,12 @@
         // resolver 收尾), 快照补记 hook 后的最终 drawCount。
         if (game.pauseState && game.pauseState.tuxiAsk && game.pendingChoice) {
           game.pauseState.tuxiAsk.drawCount = drawContext.drawCount;
+          return { suspended: true };
+        }
+        // v15 T 评审收口: 双雄玩家 ask 同款 (发动=放弃摸牌, 摸与否由 resolver
+        // 收尾), 快照补记 hook 后的最终 drawCount。
+        if (game.pauseState && game.pauseState.shuangxiongAsk && game.pendingChoice) {
+          game.pauseState.shuangxiongAsk.drawCount = drawContext.drawCount;
           return { suspended: true };
         }
         return drawCards(game, actor, drawContext.drawCount);
@@ -349,6 +358,13 @@
         continueTurnAfterPreparePhase: function (game, actor) { return continueTurnAfterPreparePhase(game, actor); },
         // v12 H2: AOE 逐座席队列被濒死救援挂起后的续跑 (锦囊域后置装配, 包装注入)
         resumeAOETargets: function (game) { return TricksRuntime.advanceAOETargets(game); },
+        // v15 T 评审收口: 强袭成本致濒死时的伤害段续跑 (SkillDomain 后置
+        // 装配, 晚绑定包装 — 与 tricks/judge-area 的既有先例一致)。
+        resumeQiangxiDamage: function (game, saved) {
+          return SkillDomain.resumeQiangxiDamage(game, saved);
+        },
+        // v15 T 评审收口: 拼点效果挂起后的补弃 (PindianRuntime 后置装配)。
+        flushPindianCards: function (game) { return PindianRuntime.flushPindianCards(game); },
         // audit4-L5: 决斗链被插入结算挂起后的续跑 (锦囊域后置装配, 包装注入)
         resumeDuelChain: function (game) { return TricksRuntime.advanceDuelChain(game); },
         // v12 H 复核修复: 铁索传导环被濒死救援挂起后的续跑 (伤害域后置装配, 包装注入)
@@ -366,6 +382,25 @@
       var resumeSuspendedTurnFlowIfReady = ResponseRuntime.resumeSuspendedTurnFlowIfReady;
       var finishPendingChoiceResolution = ResponseRuntime.finishPendingChoiceResolution;
       var pendingChoiceGuard = ResponseRuntime.pendingChoiceGuard;
+      // v15 T: 拼点域 (驱虎/天义 前置; 后续烈刃/制霸/间书 同框架)。
+      var PindianRuntime = createPindianRuntime({
+        log: log,
+        fail: fail,
+        success: success,
+        actorName: actorName,
+        cardRankValue: cardRankValue,
+        removeCardFromHand: removeCardFromHand,
+        discardCard: discardCard,
+        findCardZone: findCardZone,
+        setPendingChoice: setPendingChoice,
+        registerResponseKind: registerResponseKind,
+        // AI 拼点出牌启发经晚绑定回环 (AIRuntime 在其后创建)。
+        aiPickPindianCard: function (game, seat, pd) {
+          return AIRuntime.aiPickPindianCard(game, seat, pd);
+        }
+      });
+      var startPindian = PindianRuntime.startPindian;
+
       var resolveResponseChoice = ResponseRuntime.resolveResponseChoice;
 
       // L2: 决斗/南蛮/万箭/火攻 等锦囊在使用时已进入弃牌堆, 伤害结算收尾时
@@ -650,6 +685,7 @@
 
       function consumeWuxie(game, actor, reason, preferredCardId) {
         var card;
+        var wuxieVia = null; // v15 T: 看破等转化来源 (日志用)
         // v15 S1: 蛊惑声明的【无懈可击】(响应中的使用流程) — 牌面已亮出,
         // 实体牌在处理区, 直接顶替手牌扫描。
         var guhuoWuxie = takeGuhuoResponseCard(game, actor, ['wuxie']);
@@ -657,18 +693,44 @@
           card = guhuoWuxie.physical;
         } else if (preferredCardId) {
           // v10 V5: 玩家指定用哪张无懈 (面板候选选定)
+          // v15 T: 看破 — 黑色手牌同样可指定 (候选/门槛/消费三处共用
+          // TricksRuntime.wuxieOptionForCard 谓词)。
           var state = game[actor];
-          var idx = state.hand.findIndex(function (c) {
-            return c.id === preferredCardId && c.type === 'wuxie';
-          });
-          if (idx < 0) return false;
+          var picked = (state.hand || []).find(function (c) { return c.id === preferredCardId; });
+          if (!picked || !TricksRuntime.wuxieOptionForCard(state, picked)) return false;
+          wuxieVia = TricksRuntime.wuxieOptionForCard(state, picked).via;
           card = takeCard(game, preferredCardId, { zone: 'hand', actor: actor });
         } else {
           card = removeFirstCardOfType(game[actor], 'wuxie');
+          if (!card) {
+            // v15 T: 无真无懈时看破转化兜底 (AI / auto 路径)。
+            //
+            // 评审收口 [中]: 此前是 hand.find —— 按手牌顺序取第一张黑牌,
+            // 不估值。卧龙的开窗门槛对任何锦囊恒真, 于是一张【青釭剑】就被
+            // 拿去抵消【过河拆桥】。改为在合格候选里取"最不值钱"的一张
+            // (复用 AI 的弃牌估值单点; AIRuntime 后置装配, 缺席时退回原顺序)。
+            var kanpoCandidates = ((game[actor] || {}).hand || []).filter(function (c) {
+              var opt = TricksRuntime.wuxieOptionForCard(game[actor], c);
+              return opt && opt.via;
+            });
+            if (kanpoCandidates.length > 1 && AIRuntime && AIRuntime.scoreCardForAI) {
+              kanpoCandidates = kanpoCandidates.slice().sort(function (a, b) {
+                return AIRuntime.scoreCardForAI(game, actor, a)
+                  - AIRuntime.scoreCardForAI(game, actor, b);
+              });
+            }
+            var kanpoPick = kanpoCandidates[0];
+            if (kanpoPick) {
+              wuxieVia = TricksRuntime.wuxieOptionForCard(game[actor], kanpoPick).via;
+              card = takeCard(game, kanpoPick.id, { zone: 'hand', actor: actor });
+            }
+          }
         }
         if (!card) return false;
         discardCard(game, card);
-        log(game, actorName(game, actor) + (guhuoWuxie ? '发动【蛊惑】，将【' + card.name + '】当' : '打出')
+        log(game, actorName(game, actor)
+          + (guhuoWuxie ? '发动【蛊惑】，将【' + card.name + '】当'
+            : (wuxieVia ? '发动【' + wuxieVia + '】，将【' + card.name + '】当' : '打出'))
           + '【无懈可击】抵消' + reason + '。');
         SkillRuntime.runHook(skillRegistry, 'onCardUse', {
           game: game,
@@ -953,6 +1015,27 @@
       // registerResponseKind 注册块 / processPreparePhase / 导出表零改动。
       var SkillDomain = installStandardSkillHandlers(skillRegistry, {
         hasSkill: hasSkill,
+        // v15 T 评审收口: 涅槃 ask 挂起后重入濒死循环 (DamageDyingRuntime
+        // 早于本处装配, 直绑即可)。
+        processDyingNext: DamageDyingRuntime.processDyingNext,
+        // v15 T: 拼点 (驱虎/天义) — 发起入口与效果注册 (拼点域后置装配,
+        // 包装注入)。
+        startPindian: function (game, actor, targetActor, opts) {
+          return PindianRuntime.startPindian(game, actor, targetActor, opts);
+        },
+        registerPindianContinuation: function (key, handler) {
+          return PindianRuntime.registerPindianContinuation(key, handler);
+        },
+        pindianEligible: function (game, actor, targetActor) {
+          return PindianRuntime.pindianEligible(game, actor, targetActor);
+        },
+        cardRankValue: cardRankValue,
+        // v15 T: 乱击 — 虚拟【万箭齐发】走普通使用校验与结算入口
+        // (函数声明提升, 运行期调用 — 与既有晚绑定注入同款)。
+        canPlayCard: function (game, actor, card) { return canPlayCard(game, actor, card); },
+        playCardWithRegisteredHandler: function (game, actor, card, options, self) {
+          return playCardWithRegisteredHandler(game, actor, card, options, self);
+        },
         opponent: opponent,
         actorName: actorName,
         seatList: seatList,
@@ -994,6 +1077,11 @@
         randomSuit: randomSuit,
         removeOwnCardFromAnyZone: removeOwnCardFromAnyZone,
         removeTargetZoneCard: removeTargetZoneCard,
+        // v15 T: 猛进 ask 挂起后续跑闪避分支剩余流程 (杀链域后置装配,
+        // 包装注入 — 与 resumeAOETargets 等既有晚绑定同款)。
+        continueShaDodgeAfterSkills: function (game, actor, card, amount, targetActor) {
+          return ShaFlowRuntime.continueShaDodgeAfterSkills(game, actor, card, amount, targetActor);
+        },
         restoreZhuqueIdentity: restoreZhuqueIdentity,
         selectActiveSkillResult: selectActiveSkillResult,
         setPhase: setPhase,
@@ -1016,6 +1104,10 @@
       var triggerLuoshenPrepare = SkillDomain.triggerLuoshenPrepare;
       var getGuanxingPreview = SkillDomain.getGuanxingPreview;
       var resolveFankuiPickChoice = SkillDomain.resolveFankuiPickChoice;
+      var resolveMengjinPickChoice = SkillDomain.resolveMengjinPickChoice;
+      var resolveNiepanAskChoice = SkillDomain.resolveNiepanAskChoice;
+      var resolveQuhuVictimChoice = SkillDomain.resolveQuhuVictimChoice;
+      var resolveJiemingPickChoice = SkillDomain.resolveJiemingPickChoice;
       var resolveYaowuRewardChoice = SkillDomain.resolveYaowuRewardChoice;
       var resolveGanglieFireChoice = SkillDomain.resolveGanglieFireChoice;
       var resolveGanglieSourceChoice = SkillDomain.resolveGanglieSourceChoice;
@@ -1039,6 +1131,15 @@
       registerResponseKind('guanxing-reorder', resolveGuanxingChoice);
       registerResponseKind('fanjian-guess', resolveFanjianGuessChoice);
       registerResponseKind('fankui-pick', resolveFankuiPickChoice);
+      // v15 T: 猛进 (庞德) 选牌窗 — resolver 收尾后续跑闪避分支剩余流程。
+      registerResponseKind('mengjin-pick', resolveMengjinPickChoice);
+      // v15 T 评审收口: 涅槃 (庞统) 濒死询问窗 — 官方"你可以", 玩家席不再
+      // 无条件抢在【桃】窗口之前烧掉限定技。
+      registerResponseKind('niepan-ask', resolveNiepanAskChoice);
+      // v15 T 评审收口: 驱虎赢后的受伤角色由荀彧选 (官方"你选择的一名角色",
+      // 选择发生在赢之后); 节命逐点询问受益者 (官方"你可以令一名角色…")。
+      registerResponseKind('quhu-victim', resolveQuhuVictimChoice);
+      registerResponseKind('jieming-pick', resolveJiemingPickChoice);
       registerResponseKind('ganglie-fire', resolveGanglieFireChoice);
       registerResponseKind('ganglie-source-choice', resolveGanglieSourceChoice);
       registerResponseKind('qilin-pick', resolveQilinPickChoice);
@@ -1046,6 +1147,8 @@
       registerResponseKind('cixiong-choose', resolveCixiongChoose);
       // v14 Q3: 突袭摸牌阶段真 ask
       registerResponseKind('tuxi-pick', resolveTuxiPickChoice);
+      // v15 T 评审收口: 双雄摸牌阶段真 ask (官方"你可以放弃摸牌")。
+      registerResponseKind('shuangxiong-ask', resolveShuangxiongAskChoice);
       registerResponseKind('jiedao-decision', resolveJiedaoDecisionChoice);
       registerResponseKind('wugu-pick', resolveWuguPickChoice);
       registerResponseKind('guohe-1v1-pick', resolveGuohe1v1PickChoice);
@@ -1442,7 +1545,12 @@
         // v7 PR-10/11: 1V1 顺手牵羊 / 兵粮寸断 都已取消距离限制 — v12 H3:
         // 该变体仅限 duel 模式; identity3 恢复官方距离 ≤1 (trickDistanceLimited)。
         if (isShaCard(card) && !legalTargetsForCard(game, actor, card).some(function (seat) { return seat !== actor; })) return fail('距离不足，当前武器范围无法使用【杀】。');
-        if (isShaCard(card) && self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
+        // v15 T: 次数/禁用闸统一走 shaUseAllowed (天义赢的额外次数 +1 与
+        // 天义没赢的"本回合不能使用【杀】"都在其中)。
+        if (isShaCard(card) && !StateRuntime.shaUseAllowed(self)) {
+          return fail(self.flags && self.flags.tianyiLost
+            ? '【天义】拼点没赢，本回合不能使用【杀】。' : '本回合已经使用过【杀】。');
+        }
         if (card.type === 'tao') {
           // v13 J0-4 (PR #165 玩家实测缺陷 4): 出牌阶段【桃】收口为标准语义 —
           // 仅"自己已受伤"可使用且目标恒为自己; 濒死救援走独立求桃队列
@@ -1575,9 +1683,16 @@
           if (card.type === 'shandian') {
             return !(seatState.judgeArea || []).some(function (judge) { return judge && judge.type === 'shandian'; });
           }
+          // 评审收口 [低 L3]: 【铁索连环】官方"使用目标：一至两名角色"
+          // (card__scroll.md:232) — 没有"其他"限定, 自己是合法目标 (横置
+          // 自己换连营/苦肉类收益是常规打法)。结算 handler 本就不排除自己,
+          // 只有这条枚举谓词漏了 → 连环转化铁索时玩家点不到自己。
+          if (card.type === 'tiesuo') return true;
           return false;
         }
-        if (isShaCard(card)) return canReachWithSha(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
+        // 评审收口 [中]: 使用【杀】的距离面走 shaUseReachAllowed (天义无
+        // 距离限制) — 这条正是 UI 高亮与 aiShaTargetSeat 读的谓词。
+        if (isShaCard(card)) return StateRuntime.shaUseReachAllowed(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
         if (card.type === 'tao') return false; // v13 J0-4: 出牌阶段【桃】目标恒为自己
         // v13 K2 (座席泛化桶销账): 【酒】使用方法Ⅰ按官方语义放开他指 —
         // gltjk card__basic.md:58 (军争/国-标) "使用目标: 包括你在内的一名
@@ -1678,6 +1793,37 @@
 
       registerResponseKind('wanjian-response', resolveWanjianResponseChoice);
 
+      // v15 T: 重铸 — 官方把"重铸"列为独立于使用/打出的操作 (出牌阶段
+      // 弃置该牌并摸一张)。既有面只有【铁索连环】自带重铸; 连环 (庞统)
+      // 令"梅花手牌"也能重铸 (card__hero__shu.md:322 逐字)。判定统一走
+      // 本谓词 + onCanRecast hook, 技能侧只声明"哪些牌可重铸"。
+      function canRecastCard(game, actor, card) {
+        if (!card) return false;
+        if (card.type === 'tiesuo') return true;
+        return SkillRuntime.runHook(skillRegistry, 'onCanRecast', {
+          game: game, actor: actor, state: game[actor], card: card
+        }).some(function (entry) { return entry.result === true; });
+      }
+
+      function recastHandCard(game, actor, cardId) {
+        // 评审收口 [中]: 与同族公开入口 (playCard / playCardAs / useSkill /
+        // endTurn / discardSelected) 同守卫 — UI 的重铸钮直调本函数, 缺守卫
+        // 时挂起中 (过河选牌/濒死…) 照样能弃一摸一。
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
+        var self = game[actor];
+        if (!self) return fail('未知角色。');
+        if (game.turn !== actor || game.phase !== 'play') return fail('只能在自己的出牌阶段重铸。');
+        var card = (self.hand || []).find(function (item) { return item.id === cardId; });
+        if (!card) return fail('找不到这张手牌。');
+        if (!canRecastCard(game, actor, card)) return fail('这张牌不能重铸。');
+        removeCardFromHand(self, cardId);
+        discardCard(game, card);
+        log(game, actorName(game, actor) + '重铸【' + card.name + '】，摸一张牌。');
+        drawCards(game, actor, 1);
+        return success('重铸完成。');
+      }
+
       function playCard(game, actor, cardId, options) {
         var pendingGuard = pendingChoiceGuard(game);
         if (pendingGuard) return pendingGuard;
@@ -1685,6 +1831,11 @@
         options = options || {};
         if (!self) return fail('未知角色。');
         var card = self.hand.find(function (item) { return item.id === cardId; });
+        // v15 T: 非铁索牌的重铸请求经统一入口 (连环的梅花重铸面) —
+        // 铁索自身的重铸仍走既有 handler 分支, 行为逐字不变。
+        if (options.mode === 'recast' && card && card.type !== 'tiesuo') {
+          return recastHandCard(game, actor, cardId);
+        }
         var playable = canPlayCard(game, actor, card);
         if (!playable.ok) return playable;
         // v12 H1: 区域/成本预校验对齐显式目标 (缺省 1v1 对手)。
@@ -2224,6 +2375,24 @@
         return finishDrawPhaseAndAdvance(game, actor);
       }
 
+      // v15 T 评审收口: 双雄 ask resolver — { decline } / 空决策 = 放弃发动
+      // 照常摸牌 (soak 决策表 {} 兜底安全); 其余即发动 (放弃摸牌 → 判定 →
+      // 获得判定牌 → 本回合异色手牌可当【决斗】)。与突袭同款收尾。
+      function resolveShuangxiongAskChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.shuangxiongAsk;
+        if (!saved) return fail('找不到【双雄】询问的暂停状态。');
+        var actor = pending.actor;
+        game.pauseState.shuangxiongAsk = null;
+        var shell = { game: game, actor: actor, drawCount: saved.drawCount == null ? 2 : saved.drawCount };
+        if (decision && (decision.decline || decision.skip)) {
+          log(game, actorName(game, actor) + '选择不发动【双雄】。');
+        } else {
+          SkillDomain.applyShuangxiongDrawPhase(game, actor, shell);
+        }
+        if (shell.drawCount > 0) drawCards(game, actor, shell.drawCount);
+        return finishDrawPhaseAndAdvance(game, actor);
+      }
+
       function finishPlayPhase(game) {
         var pendingGuard = pendingChoiceGuard(game);
         if (pendingGuard) return pendingGuard;
@@ -2393,7 +2562,14 @@
         cardIds = cardIds || [];
         if (!self) return fail('未知角色。');
         if (!hasEquipmentEffect(self, 'zhangbaTwoHandSha')) return fail('未装备【丈八蛇矛】。');
-        if (self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
+        // 评审收口 [中]: 丈八两手当杀是**使用**【杀】的又一入口, 次数/禁用闸
+        // 必须与 playCard / playCardAs / 诸葛连弩 同走 shaUseAllowed 单点 —
+        // 否则天义两个方向都错 (没赢的"本回合不能使用【杀】"被绕过, 赢的
+        // 额外次数用不上)。
+        if (!StateRuntime.shaUseAllowed(self)) {
+          return fail(self.flags && self.flags.tianyiLost
+            ? '【天义】拼点没赢，本回合不能使用【杀】。' : '本回合已经使用过【杀】。');
+        }
         if (cardIds.length !== 2) return fail('需要选择两张手牌。');
         var first = removeCardFromHand(self, cardIds[0]);
         var second = removeCardFromHand(self, cardIds[1]);
@@ -2443,37 +2619,36 @@
           original = cardOrId;
         }
         if (!original) return fail('找不到这张牌。');
-        // v8 PR-C1: 国色把方片当乐; v11 C3: 奇袭把黑牌当拆 — asType 白名单
-        if (asType !== 'sha' && asType !== 'lebusishu' && asType !== 'guohe') {
-          return fail('当前只支持转化为【杀】、【乐不思蜀】或【过河拆桥】。');
+        // v8 PR-C1: 国色把方片当乐; v11 C3: 奇袭把黑牌当拆;
+        // v15 T: 火计→火攻 / 连环→铁索连环 / 双雄→决斗 — 白名单改由
+        // 转化牌工厂表驱动 (新增牌名只改一处)。
+        if (asType !== 'sha' && !CARD_AS_TRICK_SPECS[asType]) {
+          return fail('不支持转化为该牌名。');
         }
         var cardAsContext = { mode: 'proactive', game: game, actor: actor, state: self, card: original, asType: asType };
         var conversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', cardAsContext));
         if (!conversion) return fail('当前武将不能这样转化。');
         // 路径分支：杀 走原有 canPlayCard 检查；乐/拆 走各自虚拟卡检查
         if (asType === 'sha') {
-          if (self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
+          if (!StateRuntime.shaUseAllowed(self)) {
+            return fail(self.flags && self.flags.tianyiLost
+              ? '【天义】拼点没赢，本回合不能使用【杀】。' : '本回合已经使用过【杀】。');
+          }
           var playableSha = canPlayCard(game, actor, virtualShaFromCard(original));
           if (!playableSha.ok) return playableSha;
           playableSha.skillName = conversion.skillName;
           playableSha.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【杀】使用。';
           return playableSha;
         }
-        if (asType === 'guohe') {
-          // v11 C3: 奇袭 — 复用普通过河拆桥的 canPlayCard 检查
-          // (对方两区皆空 / 回合与阶段限制在那里统一把关)。
-          var playableGuohe = canPlayCard(game, actor, virtualGuoheFromCard(original));
-          if (!playableGuohe.ok) return playableGuohe;
-          playableGuohe.skillName = conversion.skillName;
-          playableGuohe.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【过河拆桥】使用。';
-          return playableGuohe;
-        }
-        // lebusishu
-        var playableLebu = canPlayCard(game, actor, virtualLebusishuFromCard(original));
-        if (!playableLebu.ok) return playableLebu;
-        playableLebu.skillName = conversion.skillName;
-        playableLebu.message = '发动【' + conversion.skillName + '】，将【' + original.name + '】当【乐不思蜀】使用。';
-        return playableLebu;
+        // v15 T: 锦囊/延时类一律走同一条 — 虚拟牌交给普通 canPlayCard
+        // 把关 (目标存在性/阶段/距离/∃合法目标 等在那里统一判定)。
+        var virtualTrick = virtualTrickFromCard(asType, original);
+        var playableTrick = canPlayCard(game, actor, virtualTrick);
+        if (!playableTrick.ok) return playableTrick;
+        playableTrick.skillName = conversion.skillName;
+        playableTrick.message = '发动【' + conversion.skillName + '】，将【' + original.name
+          + '】当【' + virtualTrick.name + '】使用。';
+        return playableTrick;
       }
 
       function playCardAs(game, actor, cardId, asType, options) {
@@ -2492,12 +2667,12 @@
         // resolveTrickTargetActor (显式 options.target 优先, 缺省敌对座席池,
         // 1v1 恒对手零回归); 目标解析前置于牌移出区域之前, 失败零副作用。
         var asTargetActor = null;
-        if (asType === 'lebusishu') {
-          asTargetActor = resolveTrickTargetActor(game, actor, virtualLebusishuFromCard(original), options);
-          if (!asTargetActor) return fail('无效的【乐不思蜀】目标。');
-        } else if (asType === 'guohe') {
-          asTargetActor = resolveTrickTargetActor(game, actor, virtualGuoheFromCard(original), options);
-          if (!asTargetActor) return fail('无效的【过河拆桥】目标。');
+        // v15 T: 指向型锦囊 (乐/拆/火攻/决斗) 统一前置解析; 铁索连环无
+        // 单目标面 (1-2 名或重铸), 目标在结算期由 handler 处理。
+        if (asType !== 'sha' && asType !== 'tiesuo' && CARD_AS_TRICK_SPECS[asType]) {
+          var asVirtual = virtualTrickFromCard(asType, original);
+          asTargetActor = resolveTrickTargetActor(game, actor, asVirtual, options);
+          if (!asTargetActor) return fail('无效的【' + asVirtual.name + '】目标。');
         } else if (asType === 'sha') {
           // v13 K5 (review 修复): 杀转化同样前置解析 — playSha 的距离/保护
           // 校验失败时不退牌, 而此处来源牌已 removeOwnCardFromAnyZone 移出
@@ -2509,12 +2684,15 @@
           // 逐席合法性全部在移牌前预判 (opus 实证: 此前 playShaMultiTarget
           // 移牌后拒绝无回滚, 来源实体凭空消失)。
           if (Array.isArray(options && options.targets) && options.targets.length > 1) {
-            if (hit.zone !== 'hand' || (self.hand || []).length !== 1
-                || !hasEquipmentEffect(self, 'fangtianLastHandBonus')) {
-              return fail('【杀】目标数超过上限（额定 1）。');
-            }
-            if (options.targets.length > 3) {
-              return fail('【杀】目标数超过上限（额定 1 + 方天画戟额外 2）。');
+            // 评审收口 [中]: 上限此前硬编码方天 → 天义赢后的转化杀 (武圣/
+            // 龙胆/火计…) 拿不到"额外目标数上限 +1"。改为与结算层
+            // (normalizeMultiTargets) 同一算式: 方天资格 2 + 天义 1。
+            var preFangtian = hit.zone === 'hand' && (self.hand || []).length === 1
+              && hasEquipmentEffect(self, 'fangtianLastHandBonus');
+            var preExtra = (preFangtian ? 2 : 0) + ShaFlowRuntime.tianyiExtraTargets(self);
+            if (preExtra <= 0) return fail('【杀】目标数超过上限（额定 1）。');
+            if (options.targets.length > 1 + preExtra) {
+              return fail('【杀】目标数超过上限（额定 1 + 额外 ' + preExtra + '）。');
             }
             var preVirtualSha = virtualShaFromCard(original);
             var preSeen = {};
@@ -2535,43 +2713,87 @@
         // cleared if it came from equipment (relevant for 关羽 卸下武器当杀).
         removeOwnCardFromAnyZone(self, cardId, game);
         log(game, actorName(game, actor) + playable.message);
-        if (asType === 'lebusishu') {
-          // v8 PR-C1: 国色 把方片当乐。v13 J0-2: 与普通乐不思蜀一致 — 放置
-          // 时直接置入判定区, 无懈窗口移至判定阶段生效前 (delayed-judge)。
-          var virtualLebu = virtualLebusishuFromCard(original);
-          virtualLebu.delayedSource = actor;
-          putCard(game, virtualLebu, { zone: 'judgeArea', actor: asTargetActor });
-          log(game, actorName(game, actor) + '将【乐不思蜀】置入' + actorName(game, asTargetActor) + '的判定区。');
-          return success('延时锦囊已放置。');
-        }
-        if (asType === 'guohe') {
-          // v11 C3 (批次 27): 奇袭 黑牌当拆 — 与普通过河拆桥一致: 先弃置来源
-          // 实体牌 (discardCard 经 physicalCardOf 落原牌), 再走无懈链 →
-          // guohe continuation (1v1 两选项 pick / options.targetZone 照常)。
-          var virtualGuoheCard = virtualGuoheFromCard(original);
-          discardCard(game, virtualGuoheCard);
-          return checkWuxieAndContinue(game, asTargetActor, '【过河拆桥】', 'guohe', {
-            actor: actor, card: virtualGuoheCard, options: options || {}, targetActor: asTargetActor
-          });
+        // v15 T: 其余锦囊转化统一交给已注册的结算 handler — 与普通出牌
+        // 完全同路 (无懈链/逐目标/成本询问一律复用), 不再逐型手写。
+        // (奇袭黑牌当拆的 v11 C3 路径即此条的特例, 行为逐字一致。)
+        if (CARD_AS_TRICK_SPECS[asType]) {
+          var virtualTrickCard = virtualTrickFromCard(asType, original);
+          var trickOptions = Object.assign({}, options || {});
+          if (asTargetActor) trickOptions.target = asTargetActor;
+          var trickResult = playCardWithRegisteredHandler(game, actor, virtualTrickCard, trickOptions, self);
+          // 守恒兜底: handler 拒绝且实体不在任何区域 → 退回原区域
+          // (playCardAs 的杀分支同款不变量)。
+          //
+          // 评审收口 [中]: 判据改按**对象身份**。handler 的拒绝路径退的是
+          // 它收到的虚拟牌 (与 original 同 id) — 按 id 的 findCardZone 会
+          // 误判"来源已归位"而不回滚, 手牌里那张【杀】就被永久换成了
+          // 【铁索连环】。铁索是唯一未在 playCardAs 前置解析目标的转化型,
+          // 故当前只有它可达; 判据修在共用出口上, 新增转化型天然免疫。
+          if (trickResult && !trickResult.ok) {
+            CardRuntime.removeCardRefFromZones(game, virtualTrickCard);
+            if (!CardRuntime.findCardZoneByRef(game, original)) {
+              putCard(game, original, hit.zone === 'equipment'
+                ? { zone: 'equipment', actor: actor, slot: hit.slot }
+                : { zone: 'hand', actor: actor });
+            }
+          }
+          return trickResult;
         }
         // v13 K2/K5: options 透传 + 前置解析出的合法目标显式传入 (缺省与
         // 显式路径均已过 isLegalCardTarget, playSha 内部校验恒通过,
         // 1v1 行为不变)。
-        var conversionShaResult = playSha(game, actor, virtualShaFromCard(original),
+        var conversionVirtualSha = virtualShaFromCard(original);
+        var conversionShaResult = playSha(game, actor, conversionVirtualSha,
           Object.assign({}, options, { target: asTargetActor }));
         // v14 P 评审收口兜底: 预检已覆盖全部已知拒绝面; 若未来新增校验令
         // playSha 在移牌后仍拒绝, 来源实体退回原区域 (在途还原), 不留
         // 守恒泄漏 (playShaCardHandler 同款)。
-        if (conversionShaResult && !conversionShaResult.ok && !findCardZone(game, original)) {
-          putCard(game, original, hit.zone === 'equipment'
-            ? { zone: 'equipment', actor: actor, slot: hit.slot }
-            : { zone: 'hand', actor: actor });
+        // v15 T 评审收口: 判据同上改按对象身份 (虚拟杀与来源同 id)。
+        if (conversionShaResult && !conversionShaResult.ok) {
+          CardRuntime.removeCardRefFromZones(game, conversionVirtualSha);
+          if (!CardRuntime.findCardZoneByRef(game, original)) {
+            putCard(game, original, hit.zone === 'equipment'
+              ? { zone: 'equipment', actor: actor, slot: hit.slot }
+              : { zone: 'hand', actor: actor });
+          }
         }
         return conversionShaResult;
       }
 
       // v8 PR-C1: 国色把方片视为乐不思蜀 — 构造虚拟卡 (保留原 suit / rank /
       // physical card 以便弃牌正确; type/name/family 改为 lebusishu)
+      // ═════ v15 T: 转化牌工厂表 ═════
+      // 新增可转化牌名只需在此加一行 (火计→火攻 / 连环→铁索连环 /
+      // 双雄→决斗)。既有三型 (杀/乐/拆) 的构造字段逐字保持不变 —
+      // 杀走 makeTestCard 且名字带"（当杀）", 锦囊走字面对象。
+      var CARD_AS_TRICK_SPECS = {
+        lebusishu: { name: '乐不思蜀', family: 'delayed' },
+        guohe: { name: '过河拆桥', family: 'trick' },
+        huogong: { name: '火攻', family: 'trick' },
+        tiesuo: { name: '铁索连环', family: 'trick' },
+        juedou: { name: '决斗', family: 'trick' }
+      };
+
+      function virtualTrickFromCard(asType, original) {
+        var spec = CARD_AS_TRICK_SPECS[asType];
+        if (!spec) return null;
+        return {
+          id: original.id,
+          type: asType,
+          name: spec.name,
+          family: spec.family,
+          suit: original.suit,
+          color: original.color,
+          rank: original.rank,
+          physicalCard: original
+        };
+      }
+
+      function virtualCardAs(asType, original) {
+        if (asType === 'sha') return virtualShaFromCard(original);
+        return virtualTrickFromCard(asType, original);
+      }
+
       function virtualLebusishuFromCard(original) {
         return {
           id: original.id,
@@ -2606,7 +2828,11 @@
       var PROACTIVE_CARD_AS_TYPES = [
         { asType: 'sha', asName: '杀' },
         { asType: 'lebusishu', asName: '乐不思蜀' },
-        { asType: 'guohe', asName: '过河拆桥' }
+        { asType: 'guohe', asName: '过河拆桥' },
+        // v15 T (火包): 火计 → 火攻 / 连环 → 铁索连环 / 双雄 → 决斗
+        { asType: 'huogong', asName: '火攻' },
+        { asType: 'tiesuo', asName: '铁索连环' },
+        { asType: 'juedou', asName: '决斗' }
       ];
 
       function listCardConversions(game, actor, cardOrId) {
@@ -2744,6 +2970,11 @@
         legalTargetsForCard: legalTargetsForCard,
         // v14 P2: 方天画戟额外目标前置查询 (AI 多目标启发)
         shaExtraTargetLimit: shaExtraTargetLimit,
+        // v15 T: 拼点出牌启发用的点数比较 + 拼点资格 (天义/驱虎 目标挑选)
+        cardRankValue: cardRankValue,
+        pindianEligible: function (game, actor, targetActor) {
+          return PindianRuntime.pindianEligible(game, actor, targetActor);
+        },
         // v14 R1: 蛊惑声明 (AI 于吉 v1 无中启发)
         // v15 S2: 全型声明启发 — 目标枚举与借刀受害者候选同步注入
         playGuhuoDeclare: playGuhuoDeclare,
@@ -2777,6 +3008,10 @@
         makeTestCard: makeTestCard,
         newGame: newGame,
         distanceBetween: distanceBetween,
+        // v15 T 评审收口 [低 L2]: 攻击范围谓词的公开出口 — UI 的强袭座席
+        // 高亮读的就是 `Engine.canReachWithSha`, 而它此前没在公开面上 →
+        // 一路走 `: true` 兜底, 3+ 席场会把射程外座席也点亮 (点了才被拒)。
+        canReachWithSha: canReachWithSha,
         equipCard: equipCard,
         loseEquipment: loseEquipment,
         getTargetZoneCards: getTargetZoneCards,
@@ -2787,6 +3022,17 @@
         canPlayCard: canPlayCard,
         canPlayCardAs: canPlayCardAs,
         listCardConversions: listCardConversions,
+        // v15 T: 拼点资格查询 (UI 目标高亮 / AI 决策用)
+        pindianEligible: PindianRuntime.pindianEligible,
+        // v15 T: 重铸入口与可重铸谓词 (UI 手牌菜单 / AI 决策用)
+        recastHandCard: recastHandCard,
+        canRecastCard: function (game, actor, cardOrId) {
+          var state = game && game[actor];
+          var card = typeof cardOrId === 'string'
+            ? (state && (state.hand || []).find(function (item) { return item.id === cardOrId; }))
+            : cardOrId;
+          return canRecastCard(game, actor, card);
+        },
         playCard: playCard,
         playCardAs: playCardAs,
         useSkill: useSkill,

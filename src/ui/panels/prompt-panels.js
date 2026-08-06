@@ -397,6 +397,116 @@
         tuxiPickSelection = [];
       }
     }
+    // v15 T: 猛进 (庞德) 弃牌选择 — 手牌为暗牌 (只给"随机弃一张手牌"),
+    // 装备区逐张可指定; "不发动"走取消钮。
+    if (els.mengjinPanel) {
+      if (kind === 'mengjin-pick' && pending.actor === 'player') {
+        els.mengjinPanel.hidden = false;
+        var mjTargetState = getGame() && getGame()[pending.targetActor];
+        if (els.mengjinHint) {
+          els.mengjinHint.textContent = '猛进：你的【杀】被【闪】抵消，可弃置'
+            + ((mjTargetState && mjTargetState.name) || '目标') + '的一张牌。';
+        }
+        if (els.mengjinChoices) {
+          els.mengjinChoices.innerHTML = (pending.zones || []).map(function (zone) {
+            if (zone.zone === 'hand') {
+              return '<button class="mini-card" data-mengjin-zone="hand">随机弃一张手牌（'
+                + zone.count + ' 张）</button>';
+            }
+            return '<button class="mini-card" data-mengjin-zone="equipment" data-mengjin-card-id="'
+              + escapeHtml(zone.cardId) + '">' + escapeHtml(zone.name) + ' '
+              + suitLabel(zone.suit) + (zone.rank || '') + '</button>';
+          }).join('');
+        }
+      } else {
+        els.mengjinPanel.hidden = true;
+      }
+    }
+    // v15 T: 拼点选牌 — 双方各扣置一张手牌比点数 (点数大者赢)。
+    if (els.pindianPanel) {
+      if (kind === 'pindian-card' && pending.actor === 'player') {
+        els.pindianPanel.hidden = false;
+        if (els.pindianHint) {
+          var pdFoeState = getGame() && getGame()[pending.opponentActor];
+          els.pindianHint.textContent = (pending.reason || '拼点') + '：与'
+            + ((pdFoeState && pdFoeState.name) || '对方') + '拼点，点选一张手牌扣置（点数大者赢）。';
+        }
+        if (els.pindianChoices) {
+          els.pindianChoices.innerHTML = (pending.options || []).map(function (opt) {
+            return '<button class="mini-card" data-pindian-card-id="' + escapeHtml(opt.cardId) + '">'
+              + escapeHtml(opt.name) + ' ' + suitLabel(opt.suit)
+              + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
+          }).join('');
+        }
+      } else {
+        els.pindianPanel.hidden = true;
+      }
+    }
+    // ═════ v15 T 评审收口: 官方"你可以 / 你选择"的四个决策面 ═════
+    // 涅槃 (濒死限定技) — 二选一按钮, 无候选。
+    if (els.niepanPanel) {
+      if (kind === 'niepan-ask' && pending.actor === 'player') {
+        els.niepanPanel.hidden = false;
+        if (els.niepanHint) {
+          els.niepanHint.textContent = '涅槃（限定技，每局一次）：弃置你区域里的所有牌（手牌 '
+            + (pending.handCount || 0) + ' 张 / 装备 ' + (pending.equipmentCount || 0)
+            + ' 张 / 判定区 ' + (pending.judgeAreaCount || 0)
+            + ' 张），武将牌复原，摸三张牌，体力回复至 3 点。';
+        }
+      } else {
+        els.niepanPanel.hidden = true;
+      }
+    }
+    // 双雄 (摸牌阶段放不放弃摸牌) — 二选一按钮, 无候选。
+    if (els.shuangxiongPanel) {
+      if (kind === 'shuangxiong-ask' && pending.actor === 'player') {
+        els.shuangxiongPanel.hidden = false;
+        if (els.shuangxiongHint) {
+          els.shuangxiongHint.textContent = '双雄：可放弃摸牌（' + (pending.drawCount || 0)
+            + ' 张）改为判定并获得判定牌，本回合可将与之颜色不同的一张手牌当【决斗】使用。';
+        }
+      } else {
+        els.shuangxiongPanel.hidden = true;
+      }
+    }
+    // 驱虎赢后的受伤角色 — 必选 (伤害已成事实, 只是选谁), 点候选即提交。
+    if (els.quhuVictimPanel) {
+      if (kind === 'quhu-victim' && pending.actor === 'player') {
+        els.quhuVictimPanel.hidden = false;
+        if (els.quhuVictimHint) {
+          var qhTargetState = getGame() && getGame()[pending.targetActor];
+          els.quhuVictimHint.textContent = '驱虎：拼点赢 — 选择'
+            + ((qhTargetState && qhTargetState.name) || '拼点目标')
+            + '攻击范围内受到 1 点伤害的角色。';
+        }
+        if (els.quhuVictimChoices) {
+          els.quhuVictimChoices.innerHTML = (pending.candidates || []).map(function (entry) {
+            return '<button class="mini-card" data-quhu-victim="' + escapeHtml(entry.seat) + '">'
+              + escapeHtml(entry.name) + '（' + entry.hp + ' 血）</button>';
+          }).join('');
+        }
+      } else {
+        els.quhuVictimPanel.hidden = true;
+      }
+    }
+    // 节命 (逐点选受益者) — 点候选 stage, hand-confirm 提交; 可逐点放弃。
+    if (els.jiemingPanel) {
+      if (kind === 'jieming-pick' && pending.actor === 'player') {
+        els.jiemingPanel.hidden = false;
+        if (els.jiemingHint) {
+          els.jiemingHint.textContent = '节命（第 ' + (pending.pointIndex || 1) + ' / '
+            + (pending.totalPoints || 1) + ' 点）：可令一名角色将手牌补至其体力上限（至多 5）张。';
+        }
+        if (els.jiemingChoices) {
+          els.jiemingChoices.innerHTML = (pending.candidates || []).map(function (entry) {
+            return '<button class="mini-card" data-jieming-seat="' + escapeHtml(entry.seat) + '">'
+              + escapeHtml(entry.name) + '（补 ' + entry.gain + ' 张 → ' + entry.limit + '）</button>';
+          }).join('');
+        }
+      } else {
+        els.jiemingPanel.hidden = true;
+      }
+    }
     // v14 R1: 蛊惑质疑窗 — AI 于吉背面声明, 玩家决定是否质疑 (质疑真牌
     // 获「缠怨」, 提示如实告知风险; 只显示声明牌名, 不泄露真牌)。
     if (els.guhuoChallengePanel) {
@@ -895,6 +1005,69 @@
     });
     if (els.tuxiDeclineBtn) els.tuxiDeclineBtn.addEventListener('click', function () {
       tuxiPickSelection = [];
+      var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    // v15 T: 猛进弃牌 (候选两步化 — 点候选 stage, hand-confirm 提交) 与
+    // 拼点选牌 (同款)。
+    if (els.mengjinChoices) els.mengjinChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-mengjin-zone]');
+      if (!btn) return;
+      var zone = btn.getAttribute('data-mengjin-zone');
+      var payload = { zone: zone };
+      if (zone === 'equipment') payload.cardId = btn.getAttribute('data-mengjin-card-id');
+      stage(payload, zone === 'equipment'
+        ? '[data-mengjin-card-id="' + payload.cardId + '"]' : '[data-mengjin-zone="hand"]');
+    });
+    if (els.mengjinDeclineBtn) els.mengjinDeclineBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.pindianChoices) els.pindianChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-pindian-card-id]');
+      if (!btn) return;
+      var cardId = btn.getAttribute('data-pindian-card-id');
+      stage({ cardId: cardId }, '[data-pindian-card-id="' + cardId + '"]');
+    });
+    // v15 T 评审收口: 涅槃 / 双雄 / 驱虎受害者 / 节命 的四个决策面事件。
+    if (els.niepanConfirmBtn) els.niepanConfirmBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), {});
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.niepanDeclineBtn) els.niepanDeclineBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.shuangxiongConfirmBtn) els.shuangxiongConfirmBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), {});
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.shuangxiongDeclineBtn) els.shuangxiongDeclineBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.quhuVictimChoices) els.quhuVictimChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-quhu-victim]');
+      if (!btn) return;
+      // 必选面: 点即提交 (没有"不选"这个出路, 与耀武/五谷同款)。
+      var result = Engine.resolvePendingChoice(getGame(),
+        { victim: btn.getAttribute('data-quhu-victim') });
+      if (!result.ok) renderLog();
+      render();
+    });
+    if (els.jiemingChoices) els.jiemingChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-jieming-seat]');
+      if (!btn) return;
+      var seat = btn.getAttribute('data-jieming-seat');
+      stage({ target: seat }, '[data-jieming-seat="' + seat + '"]');
+    });
+    if (els.jiemingDeclineBtn) els.jiemingDeclineBtn.addEventListener('click', function () {
       var result = Engine.resolvePendingChoice(getGame(), { decline: true });
       if (!result.ok) renderLog();
       render();
