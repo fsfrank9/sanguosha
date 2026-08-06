@@ -142,6 +142,23 @@
       if (savedAOE && resumeAOETargets) {
         return resumeAOETargets(game);
       }
+      // v15 T 评审收口: 拼点"赢/没赢后"效果挂起 (驱虎选受伤角色 / 未来
+      // 烈刃认领拼点牌) → 选择排空后补弃处理区里未被认领的拼点牌。官方
+      // 顺序是「效果在前, 弃置在后」, 所以不能在效果挂起时就弃。这条只是
+      // 收尾记账, 不推进任何流程, 放在推进型分支之间任意位置都安全。
+      if (game.pauseState && game.pauseState.pindianCards && deps.flushPindianCards) {
+        deps.flushPindianCards(game);
+      }
+      // v15 T 评审收口 [中]: 强袭以"失去 1 点体力"为成本且成本致自身濒死时,
+      // 濒死结算 (求桃窗口) 尚未收束就把伤害打出去了 —— 官方是「先付成本
+      // (含其引发的濒死结算), 再造成伤害」。挂起后由此处续跑伤害段。
+      // 位序: 在 AOE 之后 (主动技效果是最外层), 在判定区续跑之前。
+      var savedQiangxi = game.pauseState && game.pauseState.qiangxiDamage;
+      if (savedQiangxi && deps.resumeQiangxiDamage) {
+        game.pauseState.qiangxiDamage = null;
+        var qxResult = deps.resumeQiangxiDamage(game, savedQiangxi);
+        if (game.pendingChoice) return qxResult || success('回合暂停，等待玩家选择。');
+      }
       var savedJudge = game.pauseState && game.pauseState.judgeArea;
       if (!savedJudge) return null;
       // v13 J0-2: 判定前无懈挂起 settle 后续跑 (wuxieSettled, 由

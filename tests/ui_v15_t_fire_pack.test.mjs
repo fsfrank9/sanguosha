@@ -155,6 +155,70 @@ test('T UI 图鉴: 火包 8 将徽章与技能状态已翻转 (零"看起来有�
   assert.equal(Engine.IMPLEMENTED_SKILL_IDS.includes('xueyi'), true);
 });
 
+// ───── 评审收口 (opus 对抗复现) 的 UI 回归钉 ─────
+
+test('T UI 评审收口 M3: 同 kind 背靠背窗口之间不得残留暂存选择', () => {
+  const game = startDuel('pangde', 'caocao');
+  game.player.hand = [c('sha', { id: 'p-s1' }), c('sha', { id: 'p-s2' })];
+  game.player.equipment.weapon = c('qinglong', { id: 'p-qinglong' }); // 续杀 → 两次猛进窗
+  game.enemy.hand = [c('shan', { id: 'e-shan1' }), c('shan', { id: 'e-shan2' }),
+    c('sha', { id: 'e-keep' })];
+  game.enemy.equipment.armor = c('bagua', { id: 'e-bagua' });
+  UI.render();
+  Engine.playCard(game, 'player', 'p-s1', { target: 'enemy' });
+  UI.render();
+  assert.equal($('mengjinPanel').hidden, false, '窗口 1');
+  // 窗口 1: 暂存"弃装备(八卦阵)", 然后改点"不发动"
+  $('mengjinChoices').dispatchClick({ 'data-mengjin-card-id': 'e-bagua' });
+  $('mengjinDeclineBtn').click();
+  UI.render();
+  const armorBefore = !!game.enemy.equipment.armor;
+  if (!$('mengjinPanel').hidden) {
+    // 窗口 2 (青龙续杀): 直接按确定 — 不得沿用窗口 1 的暂存选择
+    $('handConfirmBtn').click();
+    assert.equal(!!game.enemy.equipment.armor, armorBefore,
+      '零确认执行上一窗选择的缺陷不得复发');
+  }
+});
+
+test('T UI 评审收口 M6: 涅槃/双雄/驱虎/节命 四个决策面板的静态锚点与 dispatch 接线', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  for (const id of ['niepanPanel', 'shuangxiongPanel', 'quhuVictimPanel', 'jiemingPanel']) {
+    assert.match(html, new RegExp('id="' + id + '" hidden'), id + ' 节点存在且默认隐藏');
+  }
+  const adapter = fs.readFileSync(new URL('../src/ui/dom-adapter.js', import.meta.url), 'utf8');
+  for (const id of ['niepanPanel', 'shuangxiongPanel', 'quhuVictimPanel', 'jiemingPanel']) {
+    assert.match(adapter, new RegExp("'" + id + "'"), id + ' 已注册进 els');
+    assert.match(adapter, new RegExp("panelId: '" + id + "'"), id + ' 已入 dispatch 表');
+  }
+});
+
+test('T UI 评审收口 M6: 双雄摸牌阶段面板 — "正常摸牌"按钮不再被强制放弃摸牌', () => {
+  const game = startDuel('yanliangwenchou', 'caocao');
+  game.phase = 'judge';
+  UI.render();
+  Engine.advancePhase(game);
+  UI.render();
+  assert.equal($('shuangxiongPanel').hidden, false, '摸牌阶段开窗');
+  $('shuangxiongDeclineBtn').click();
+  assert.equal(game.player.hand.length, 2, '正常摸两张');
+  assert.equal($('shuangxiongPanel').hidden, true, '面板收起');
+});
+
+test('T UI 评审收口 M6: 涅槃面板 — 濒死时二选一, 不发动则限定技保留', () => {
+  const game = startDuel('pangtong', 'caocao');
+  game.player.hp = 1;
+  game.player.hand = [c('tao', { id: 'ui-tao' })];
+  game.enemy.hand = [c('sha', { id: 'ui-sha' })];
+  game.turn = 'enemy';
+  UI.render();
+  Engine.playCard(game, 'enemy', 'ui-sha', { target: 'player' });
+  UI.render();
+  assert.equal($('niepanPanel').hidden, false, '涅槃询问面板出现');
+  $('niepanDeclineBtn').click();
+  assert.equal(game.player.flags.niepanUsed, undefined, '不发动 → 限定技保留');
+});
+
 await runTests();
 
 console.log('\nv15 T 火包 UI 用例通过。');

@@ -130,9 +130,34 @@ test('驱虎: 赢 → 拼点目标对其攻击范围内由荀彧选择的角色�
   game.enemy.hand = [c('sha', { id: 'e-3', rank: '3' })];
   assert.ok(game.enemy.hp > game.player.hp, '门槛: 目标体力值大于荀彧');
   Engine.useSkill(game, 'player', 'quhu', [], { target: 'enemy' });
-  assertCardConservation(game, () => Engine.resolvePendingChoice(game, { cardId: 'p-K' }));
+  assertCardConservation(game, () => {
+    Engine.resolvePendingChoice(game, { cardId: 'p-K' });
+    // 评审收口: 官方"其对其攻击范围内**你选择**的一名角色" — 选择发生在
+    // 赢之后, 故玩家席在此开窗 (候选多于一个时)。
+    const pick = Engine.getPendingChoice(game);
+    assert.equal(pick.kind, 'quhu-victim', '赢后开窗由荀彧选受伤角色');
+    assert.ok(pick.candidates.some((entry) => entry.seat === 'ally'));
+    Engine.resolvePendingChoice(game, { victim: 'ally' });
+  });
   assert.equal(game.player.hp, game.player.maxHp, '赢 → 荀彧不受伤');
   assert.equal(game.ally.hp, game.ally.maxHp - 1, '伤害落在荀彧选择的角色身上');
+});
+
+test('驱虎: 赢后的受伤角色选择 — 非法座席重挂, 荀彧自己在可选面内 (官方未排除)', () => {
+  const game = build3({ player: 'xunyu', enemy: 'lvbu', ally: 'guanyu' });
+  game.player.hand = [c('sha', { id: 'q-K', rank: 'K' })];
+  game.enemy.hand = [c('sha', { id: 'q-3', rank: '3' })];
+  Engine.useSkill(game, 'player', 'quhu', [], { target: 'enemy' });
+  Engine.resolvePendingChoice(game, { cardId: 'q-K' });
+  const pick = Engine.getPendingChoice(game);
+  assert.ok(pick.candidates.some((entry) => entry.seat === 'player'), '荀彧自己在候选中');
+  // 拼点目标本人不在其自己的攻击范围内 (F13)
+  assert.ok(!pick.candidates.some((entry) => entry.seat === 'enemy'), '拼点目标本人不在候选中');
+  const bad = Engine.resolvePendingChoice(game, { victim: 'enemy' });
+  assert.equal(bad.ok, false, '非法座席被拒');
+  assert.equal(Engine.getPendingChoice(game).kind, 'quhu-victim', '窗口重挂');
+  Engine.resolvePendingChoice(game, { victim: 'player' });
+  assert.equal(game.player.hp, game.player.maxHp - 1, '可以选自己 (官方未排除)');
 });
 
 test('驱虎: 没赢 → 拼点目标对荀彧造成 1 点伤害', () => {
@@ -157,9 +182,35 @@ test('节命: 每受到 1 点伤害后令一名角色补手牌至 min(体力上�
   game.turn = 'enemy';
   game.player.hand = [];
   game.enemy.hand = [c('sha', { id: 'e-sha' })];
-  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'e-sha', { target: 'player' }));
+  assertCardConservation(game, () => {
+    Engine.playCard(game, 'enemy', 'e-sha', { target: 'player' });
+    // 评审收口: 官方"你**可以**令**一名角色**…" → 玩家席逐点开窗选受益者。
+    const pick = Engine.getPendingChoice(game);
+    assert.equal(pick.kind, 'jieming-pick', '玩家席逐点开窗');
+    assert.equal(pick.totalPoints, 1);
+    Engine.resolvePendingChoice(game, { target: 'player' });
+  });
   assert.equal(game.player.hand.length, Math.min(game.player.maxHp, 5), '补至体力上限张');
   assert.ok(game.log.some((line) => /发动【节命】/.test(line)));
+});
+
+test('节命: 逐点开窗 — 2 点伤害开两次, 可逐点 decline', () => {
+  const game = buildDuel('xunyu');
+  game.turn = 'enemy';
+  game.player.hand = [];
+  game.enemy.hand = [c('sha', { id: 'e-fire', type: 'fire_sha' })];
+  game.player.equipment.armor = c('tengjia', { id: 'tj' }); // 藤甲: 火伤 +1 → 2 点
+  Engine.playCard(game, 'enemy', 'e-fire', { target: 'player' });
+  const first = Engine.getPendingChoice(game);
+  assert.equal(first.kind, 'jieming-pick');
+  assert.equal(first.totalPoints, 2, '2 点伤害 → 逐点处理');
+  Engine.resolvePendingChoice(game, { decline: true });
+  const second = Engine.getPendingChoice(game);
+  assert.equal(second.kind, 'jieming-pick', '第二点继续开窗');
+  assert.equal(second.pointIndex, 2);
+  Engine.resolvePendingChoice(game, { decline: true });
+  assert.equal(Engine.getPendingChoice(game), null, '两点都放弃 → 窗口排空');
+  assert.equal(game.player.hand.length, 0, '逐点 decline → 不补牌');
 });
 
 test('节命: 手牌已达上限时不摸 ("补至"只摸不弃)', () => {
@@ -169,6 +220,7 @@ test('节命: 手牌已达上限时不摸 ("补至"只摸不弃)', () => {
   game.enemy.hand = [c('sha', { id: 'e-sha2' })];
   const before = game.player.hand.length;
   Engine.playCard(game, 'enemy', 'e-sha2', { target: 'player' });
+  if (Engine.getPendingChoice(game)) Engine.resolvePendingChoice(game, { target: 'player' });
   assert.ok(game.player.hand.length <= before, '不因节命弃牌, 也不超额补');
 });
 

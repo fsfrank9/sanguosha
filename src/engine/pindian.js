@@ -50,6 +50,11 @@
         return fail('拼点需要双方各有至少一张手牌。');
       }
       if (!game.pauseState) game.pauseState = {};
+      // v15 T 评审收口 [存疑 U1 转实做]: 单槽重入守卫。当前两个消费者
+      // (驱虎/天义) 都是受 pendingChoiceGuard 保护的出牌阶段主动技, 走不到
+      // 这里; 但本模块明写了要承载后续 烈刃/制霸/间书 — 那些是响应/受伤
+      // 时机, 嵌套拼点可达, 静默覆写会让外层的拼点牌永久悬空。
+      if (game.pauseState.pindian) return fail('已有拼点正在进行中。');
       game.pauseState.pindian = {
         actor: actor,
         target: targetActor,
@@ -150,6 +155,11 @@
       };
       var continuation = pd.key && PINDIAN_CONTINUATIONS[pd.key];
       var result = continuation ? continuation(game, outcome) : success('拼点结算完成。');
+      // 官方顺序是「"赢/没赢后"效果 → 处理区拼点牌入弃牌堆」。效果挂起时
+      // (驱虎赢后由荀彧选受伤角色 / 未来烈刃的"获得其拼点牌") 还不能弃 —
+      // 否则认领面在窗口打开时就已经没牌可认。挂起时留账, 由
+      // resumeSuspendedTurnFlowIfReady 在选择排空后 flush。
+      if (game.pendingChoice) return result;
       flushPindianCards(game);
       return result;
     }
@@ -191,6 +201,9 @@
     return {
       startPindian: startPindian,
       pindianEligible: pindianEligible,
-      registerPindianContinuation: registerPindianContinuation
+      registerPindianContinuation: registerPindianContinuation,
+      // v15 T 评审收口: "赢/没赢后"效果挂起时留账, 选择排空后由
+      // resumeSuspendedTurnFlowIfReady 补 flush (官方顺序: 效果在前)。
+      flushPindianCards: flushPindianCards
     };
   }

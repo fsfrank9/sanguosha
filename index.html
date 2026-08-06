@@ -786,6 +786,35 @@
           <span class="badge pending-prompt-panel__hint" id="pindianHint">拼点：选择一张手牌扣置</span>
           <div class="pindian-choices pending-prompt-panel__choices" id="pindianChoices" aria-live="polite"></div>
         </div>
+        <!-- v15 T 评审收口: 官方"你可以 / 你选择"的四个决策面 —
+             涅槃 (濒死限定技发不发) / 双雄 (摸牌阶段放不放弃摸牌) /
+             驱虎 (赢后由荀彧选受伤角色) / 节命 (逐点选受益者)。
+             四者共用同一套 pending-prompt-panel 骨架。 -->
+        <div class="niepan-panel pending-prompt-panel" id="niepanPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="niepanHint">涅槃：限定技，是否发动？</span>
+          <div class="niepan-actions pending-prompt-panel__actions">
+            <button class="btn small" id="niepanConfirmBtn">发动【涅槃】</button>
+            <button class="btn small" id="niepanDeclineBtn">不发动</button>
+          </div>
+        </div>
+        <div class="shuangxiong-panel pending-prompt-panel" id="shuangxiongPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="shuangxiongHint">双雄：是否放弃摸牌？</span>
+          <div class="shuangxiong-actions pending-prompt-panel__actions">
+            <button class="btn small" id="shuangxiongConfirmBtn">发动【双雄】</button>
+            <button class="btn small" id="shuangxiongDeclineBtn">正常摸牌</button>
+          </div>
+        </div>
+        <div class="quhu-panel pending-prompt-panel" id="quhuVictimPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="quhuVictimHint">驱虎：选择受到伤害的角色</span>
+          <div class="quhu-choices pending-prompt-panel__choices" id="quhuVictimChoices" aria-live="polite"></div>
+        </div>
+        <div class="jieming-panel pending-prompt-panel" id="jiemingPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="jiemingHint">节命：令一名角色补手牌</span>
+          <div class="jieming-choices pending-prompt-panel__choices" id="jiemingChoices" aria-live="polite"></div>
+          <div class="jieming-actions pending-prompt-panel__actions">
+            <button class="btn small" id="jiemingDeclineBtn">本点不发动</button>
+          </div>
+        </div>
         <!-- v15 S1: 蛊惑响应声明面板 — 玩家为于吉且响应窗口 (闪/杀/桃·酒/
              无懈) 挂起时与该窗口并列显示: 选声明牌名 + 盖置手牌, 确认后走
              打出流程/响应中的使用流程 (质疑链复用)。窗口所需牌名由引擎

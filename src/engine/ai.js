@@ -945,19 +945,31 @@
       // 强袭 (典韦): 弃武器成本优先 (无武器时才用血), 且只在能打死人或
       // 血线宽裕 (hp>=3) 时才用血; 目标取攻击范围内感知敌对血线最低者。
       if (hasSkill(self, 'qiangxi') && !self.flags.qiangxiUsed) {
-        var qxTargets = StateRuntime.perceivedHostileFirstPool(game, actor,
-          StateRuntime.aliveSeats(game).filter(function (seat) {
-            return seat !== actor && StateRuntime.canReachWithSha(game, actor, seat);
-          })).slice().sort(function (a, b) { return game[a].hp - game[b].hp; });
-        if (qxTargets.length) {
-          var qxWeapon = self.equipment && self.equipment.weapon;
-          var qxLethal = game[qxTargets[0]].hp <= 1;
-          if (qxWeapon) {
-            return { skillId: 'qiangxi', cardIds: [qxWeapon.id], options: { target: qxTargets[0] } };
-          }
-          if (self.hp >= 3 || qxLethal) {
-            return { skillId: 'qiangxi', cardIds: [], options: { target: qxTargets[0] } };
-          }
+        // 评审收口 [中]: 两种成本的攻击范围**不同** —
+        // 弃装备区武器作成本时按 glossary__card.md:41 不能再用该武器的
+        // 攻击范围 (引擎按 effectiveRange=1 校验)。此前启发一律按当前武器
+        // 射程选目标 → 挑出的目标被引擎拒, aiTakeAction 返回 ok:false,
+        // 整段出牌阶段就此中断 (200 局火包 soak 命中 5 次)。
+        var qxReach = function (seat, useWeaponRange) {
+          return StateRuntime.distanceBetween(game, actor, seat)
+            <= (useWeaponRange ? StateRuntime.weaponRange(self) : 1);
+        };
+        var qxPool = function (useWeaponRange) {
+          return StateRuntime.perceivedHostileFirstPool(game, actor,
+            StateRuntime.aliveSeats(game).filter(function (seat) {
+              return seat !== actor && game[seat] && game[seat].hp > 0 && qxReach(seat, useWeaponRange);
+            })).slice().sort(function (a, b) { return game[a].hp - game[b].hp; });
+        };
+        var qxWeapon = self.equipment && self.equipment.weapon;
+        // 弃武器档: 目标必须落在"去掉武器后"的范围 (距离 ≤ 1)。
+        var qxWeaponTargets = qxWeapon ? qxPool(false) : [];
+        if (qxWeapon && qxWeaponTargets.length) {
+          return { skillId: 'qiangxi', cardIds: [qxWeapon.id], options: { target: qxWeaponTargets[0] } };
+        }
+        // 失体力档: 武器照常提供射程。
+        var qxHpTargets = qxPool(true);
+        if (qxHpTargets.length && (self.hp >= 3 || game[qxHpTargets[0]].hp <= 1)) {
+          return { skillId: 'qiangxi', cardIds: [], options: { target: qxHpTargets[0] } };
         }
       }
 

@@ -337,17 +337,46 @@
           && StateRuntime.resolveSeatOption(game, outcome.ctx.victimHint);
         var victim = (hint && candidates.indexOf(hint) >= 0) ? hint : null;
         if (!victim) {
-          // 由荀彧选择受害者 — 只读公开信息。缺省挑选序: 感知敌对优先 →
-          // 血线最低。荀彧自己虽在官方可选面内 (文本未排除), 但缺省绝不
-          // 自伤: 先剔除自己, 只有"射程内只剩荀彧"时才回退到自己。
+          // 评审收口 [中]: 官方"其对其攻击范围内**你选择**的一名角色造成
+          // 1 点伤害" —— 选择发生在**赢之后** (拼点前谁也不知道会不会赢),
+          // 所以玩家席在这里开窗, 而不是靠事先传 victim。候选唯一时直接
+          // 成局 (无可选内容, 不打断节奏)。
           var pickable = candidates.filter(function (seat) { return seat !== actor; });
           if (!pickable.length) pickable = candidates;
+          if (actor === 'player' && candidates.length > 1
+              && !(game[actor].skillPreferences && game[actor].skillPreferences.quhu === 'auto')) {
+            setPendingChoice(game, {
+              kind: 'quhu-victim',
+              actor: actor,
+              targetActor: targetActor,
+              candidates: candidates.map(function (seat) {
+                return { seat: seat, name: game[seat].name, hp: game[seat].hp };
+              })
+            });
+            log(game, '等待' + actorName(game, actor) + '选择【驱虎】的受伤角色。');
+            return success('等待【驱虎】选择受伤角色。');
+          }
+          // 缺省挑选序 (AI / auto): 只读公开信息 — 感知敌对优先 → 血线最低。
+          // 荀彧自己虽在官方可选面内 (文本未排除), 但缺省绝不自伤。
           var pool = StateRuntime.perceivedHostileFirstPool(game, actor, pickable);
           victim = pool.slice().sort(function (a, b) { return game[a].hp - game[b].hp; })[0];
         }
         damage(game, victim, 1, targetActor, '【驱虎】');
         return success('驱虎结算完成。');
       });
+
+      // 驱虎受害者选择 resolver — decision: { victim: seat }。
+      // 非法/缺省一律重挂 (与突袭同款), 不静默兜底。
+      function resolveQuhuVictimChoice(game, pending, decision) {
+        var legal = (pending.candidates || []).map(function (entry) { return entry.seat; });
+        var victim = StateRuntime.resolveSeatOption(game, decision && decision.victim);
+        if (!victim || legal.indexOf(victim) < 0 || !game[victim] || game[victim].hp <= 0) {
+          setPendingChoice(game, pending);
+          return fail('请从【驱虎】的候选中选择一名角色。');
+        }
+        damage(game, victim, 1, pending.targetActor, '【驱虎】');
+        return success('驱虎结算完成。');
+      }
 
       // ═════ v15 T (火包): 天义 (太史慈) ═════
       // 官方逐字 (card__hero__wu.md:355): "出牌阶段限一次，你可以与一名角色
@@ -451,12 +480,33 @@
         var pref = (self.skillPreferences && self.skillPreferences.shuangxiong)
           || (actor === 'player' ? 'ask' : 'auto');
         if (pref === 'decline') return null;
-        // ask 档留待 UI 批接入 (与突袭同款 pendingChoice); 当前 auto:
-        // 手上已有可当决斗的异色牌越多, 放弃摸牌的收益越高 — 简化为
-        // "手牌数 < 3 时不换" (摸两张的确定性收益更高)。
-        if (pref === 'ask' || pref === 'auto') {
-          if ((self.hand || []).length < 3 && pref === 'auto') return null;
+        // 评审收口 [中]: 官方"摸牌阶段开始时，你**可以**放弃摸牌…"
+        // (card__hero__neutral.md:161)。此前 'ask' 档不开窗、还跳过了 auto
+        // 的门槛判断 → 玩家席**每回合被强制**放弃摸牌。改为与突袭同款的
+        // 真 ask (pendingChoice 'shuangxiong-ask', 摸牌由 resolver 收尾);
+        // 显式 'auto'/'always' 保留直发路径 (soak/基准不受扰)。
+        if (pref === 'ask') {
+          if (!game.pauseState) game.pauseState = {};
+          game.pauseState.shuangxiongAsk = { actor: actor, drawCount: context.drawCount };
+          setPendingChoice(game, {
+            kind: 'shuangxiong-ask',
+            actor: actor,
+            handCount: (self.hand || []).length,
+            drawCount: context.drawCount
+          });
+          log(game, '等待' + actorName(game, actor) + '决定是否发动【双雄】。');
+          return { suspendedForShuangxiong: true };
         }
+        // auto: 手上已有可当决斗的异色牌越多, 放弃摸牌的收益越高 — 简化为
+        // "手牌数 < 3 时不换" (摸两张的确定性收益更高)。
+        if (pref === 'auto' && (self.hand || []).length < 3) return null;
+        return applyShuangxiongDrawPhase(game, actor, context);
+      }
+
+      // 双雄的效果体 (判定 → 放弃摸牌 → 认领判定牌 → 授权异色当决斗)。
+      // ask 档由 resolveShuangxiongAskChoice 调用 (context 为轻量壳)。
+      function applyShuangxiongDrawPhase(game, actor, context) {
+        var self = game[actor];
         var judgeResult = judge(game, actor, '【双雄】');
         if (!judgeResult) return null;
         context.drawCount = 0; // 放弃摸牌
@@ -472,6 +522,7 @@
           + '手牌当【决斗】使用。');
         return { shuangxiongApplied: true };
       }
+
 
       // 双雄的判定牌认领 (与天妒同一 claimed 通道; 只在本次双雄判定的
       // 结算窗口内认领, 其他判定不受影响)。
@@ -1619,11 +1670,32 @@
         }
         self.flags.qiangxiUsed = true;
         // 失去体力可能致自身濒死 → 濒死结算先跑 (loseHp 语义); 伤害在其后。
-        if (!wantsWeaponCost && self.hp <= 0) enterDying(game, actor);
+        if (!wantsWeaponCost && self.hp <= 0) {
+          enterDying(game, actor);
+          // 评审收口 [中]: 濒死结算挂起 (求桃窗口) 时不能就这么把伤害打
+          // 出去 —— 官方是"先付成本 (含其引发的濒死结算), 再造成伤害"。
+          // 挂起后由 resumeSuspendedTurnFlowIfReady 的 qiangxiDamage 分支续跑。
+          if (game.pendingChoice) {
+            if (!game.pauseState) game.pauseState = {};
+            game.pauseState.qiangxiDamage = { actor: actor, targetActor: targetActor };
+            return success('等待【强袭】成本引发的濒死结算。');
+          }
+        }
+        return applyQiangxiDamage(game, actor, targetActor);
+      }
+
+      // 强袭的伤害段 (成本已付) — 同步路径直调, 濒死挂起路径由
+      // resumeSuspendedTurnFlowIfReady 经 resumeQiangxiDamage 续跑。
+      function applyQiangxiDamage(game, actor, targetActor) {
         if (game.phase === 'gameover') return success('强袭结算完成。');
+        if (!game[actor] || game[actor].hp <= 0) return success('强袭发动者已阵亡。');
         if (!game[targetActor] || game[targetActor].hp <= 0) return success('强袭目标已不在场。');
         damage(game, targetActor, 1, actor, '【强袭】');
         return success('强袭完成。');
+      }
+
+      function resumeQiangxiDamage(game, saved) {
+        return applyQiangxiDamage(game, saved.actor, saved.targetActor);
       }
 
       // ═════ v15 T (火包): 节命 (荀彧) ═════
@@ -1637,10 +1709,23 @@
         var self = game[targetActor];
         if (!self || !hasSkill(self, 'jieming') || game.phase === 'gameover') return null;
         if (context.amount <= 0) return null;
-        var pref = (self.skillPreferences && self.skillPreferences.jieming) || 'auto';
+        // 评审收口 [中]: 官方"你**可以**令**一名角色**将手牌补至 X 张" —
+        // 发动与否、给谁, 都是发动者的选择。玩家席改逐点开窗 (与遗计同款
+        // 的 pauseState 逐点迭代), AI 席仍走 auto 启发。
+        var pref = (self.skillPreferences && self.skillPreferences.jieming)
+          || (targetActor === 'player' ? 'ask' : 'auto');
         if (pref === 'decline') {
           log(game, actorName(game, targetActor) + '选择不发动【节命】。');
           return null;
+        }
+        if (pref === 'ask') {
+          game.pauseState = game.pauseState || {};
+          game.pauseState.jieming = {
+            actor: targetActor,
+            remainingPoints: context.amount,
+            totalPoints: context.amount
+          };
+          return fireNextJiemingPoint(game);
         }
         for (var point = 0; point < context.amount; point += 1) {
           if (self.hp <= 0 && game.phase !== 'gameover') {
@@ -1658,6 +1743,81 @@
             + '将手牌补至 ' + limit + ' 张。');
         }
         return { jiemingApplied: true };
+      }
+
+      // 节命逐点开窗 (遗计 fireNextYijiPoint 同构)。候选 = 全部存活座席
+      // (官方"一名角色"含自己、含敌人), 面板只带公开信息 (手牌数/体力上限)。
+      function fireNextJiemingPoint(game) {
+        var saved = game.pauseState && game.pauseState.jieming;
+        if (!saved) return null;
+        var actor = saved.actor;
+        if (!game[actor] || game.phase === 'gameover' || saved.remainingPoints <= 0) {
+          game.pauseState.jieming = null;
+          return { jiemingApplied: true };
+        }
+        var candidates = StateRuntime.aliveSeats(game).map(function (seat) {
+          var st = game[seat];
+          var limit = Math.min(st.maxHp, 5);
+          return {
+            seat: seat, name: st.name, limit: limit,
+            handCount: (st.hand || []).length,
+            gain: Math.max(0, limit - (st.hand || []).length)
+          };
+        });
+        setPendingChoice(game, {
+          kind: 'jieming-pick',
+          actor: actor,
+          pointIndex: saved.totalPoints - saved.remainingPoints + 1,
+          totalPoints: saved.totalPoints,
+          candidates: candidates
+        });
+        log(game, '等待' + actorName(game, actor) + '决定是否发动【节命】（第 '
+          + (saved.totalPoints - saved.remainingPoints + 1) + ' / ' + saved.totalPoints + ' 点）。');
+        return { suspendedForJieming: true };
+      }
+
+      // 节命的单点效果 (令 beneficiary 把手牌补至 min(体力上限, 5))。
+      function applyJiemingPoint(game, actor, beneficiary) {
+        var st = game[beneficiary];
+        if (!st) return false;
+        var limit = Math.min(st.maxHp, 5);
+        var need = limit - (st.hand || []).length;
+        if (need <= 0) {
+          log(game, actorName(game, actor) + '发动【节命】，' + actorName(game, beneficiary)
+            + '的手牌已达 ' + limit + ' 张，无需补牌。');
+          return true;
+        }
+        drawCards(game, beneficiary, need);
+        log(game, actorName(game, actor) + '发动【节命】，令' + actorName(game, beneficiary)
+          + '将手牌补至 ' + limit + ' 张。');
+        return true;
+      }
+
+      // 节命 ask resolver — decision: { target: seat } 发动本点 /
+      // { decline: true } 本点放弃 (逐点独立, 与遗计同款)。
+      function resolveJiemingPickChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.jieming;
+        if (!saved) return fail('找不到【节命】询问的暂停状态。');
+        var actor = pending.actor;
+        var d = decision || {};
+        if (d.decline || d.skip) {
+          log(game, actorName(game, actor) + '选择本点不发动【节命】。');
+        } else {
+          var legal = (pending.candidates || []).map(function (entry) { return entry.seat; });
+          var beneficiary = StateRuntime.resolveSeatOption(game, d.target);
+          if (!beneficiary || legal.indexOf(beneficiary) < 0) {
+            setPendingChoice(game, pending);
+            return fail('请指定一名角色发动【节命】，或 decline 放弃本点。');
+          }
+          applyJiemingPoint(game, actor, beneficiary);
+        }
+        saved.remainingPoints -= 1;
+        if (saved.remainingPoints > 0) {
+          var next = fireNextJiemingPoint(game);
+          if (next && next.suspendedForJieming) return success('继续【节命】下一点。');
+        }
+        game.pauseState.jieming = null;
+        return success('节命结算完成。');
       }
 
       // 受益者挑选: 显式偏好座席优先 (skillPreferences.jiemingTarget), 否则
@@ -3222,6 +3382,10 @@
           resolveFankuiPickChoice: resolveFankuiPickChoice,
           resolveMengjinPickChoice: resolveMengjinPickChoice,
           resolveNiepanAskChoice: resolveNiepanAskChoice,
+          resumeQiangxiDamage: resumeQiangxiDamage,
+          applyShuangxiongDrawPhase: applyShuangxiongDrawPhase,
+          resolveQuhuVictimChoice: resolveQuhuVictimChoice,
+          resolveJiemingPickChoice: resolveJiemingPickChoice,
           resolveYaowuRewardChoice: resolveYaowuRewardChoice,
           resolveGanglieFireChoice: resolveGanglieFireChoice,
           resolveGanglieSourceChoice: resolveGanglieSourceChoice,

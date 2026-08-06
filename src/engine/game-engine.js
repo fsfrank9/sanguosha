@@ -105,6 +105,12 @@
           game.pauseState.tuxiAsk.drawCount = drawContext.drawCount;
           return { suspended: true };
         }
+        // v15 T 评审收口: 双雄玩家 ask 同款 (发动=放弃摸牌, 摸与否由 resolver
+        // 收尾), 快照补记 hook 后的最终 drawCount。
+        if (game.pauseState && game.pauseState.shuangxiongAsk && game.pendingChoice) {
+          game.pauseState.shuangxiongAsk.drawCount = drawContext.drawCount;
+          return { suspended: true };
+        }
         return drawCards(game, actor, drawContext.drawCount);
       }
 
@@ -352,6 +358,13 @@
         continueTurnAfterPreparePhase: function (game, actor) { return continueTurnAfterPreparePhase(game, actor); },
         // v12 H2: AOE 逐座席队列被濒死救援挂起后的续跑 (锦囊域后置装配, 包装注入)
         resumeAOETargets: function (game) { return TricksRuntime.advanceAOETargets(game); },
+        // v15 T 评审收口: 强袭成本致濒死时的伤害段续跑 (SkillDomain 后置
+        // 装配, 晚绑定包装 — 与 tricks/judge-area 的既有先例一致)。
+        resumeQiangxiDamage: function (game, saved) {
+          return SkillDomain.resumeQiangxiDamage(game, saved);
+        },
+        // v15 T 评审收口: 拼点效果挂起后的补弃 (PindianRuntime 后置装配)。
+        flushPindianCards: function (game) { return PindianRuntime.flushPindianCards(game); },
         // audit4-L5: 决斗链被插入结算挂起后的续跑 (锦囊域后置装配, 包装注入)
         resumeDuelChain: function (game) { return TricksRuntime.advanceDuelChain(game); },
         // v12 H 复核修复: 铁索传导环被濒死救援挂起后的续跑 (伤害域后置装配, 包装注入)
@@ -691,10 +704,22 @@
           card = removeFirstCardOfType(game[actor], 'wuxie');
           if (!card) {
             // v15 T: 无真无懈时看破转化兜底 (AI / auto 路径)。
-            var kanpoPick = ((game[actor] || {}).hand || []).find(function (c) {
+            //
+            // 评审收口 [中]: 此前是 hand.find —— 按手牌顺序取第一张黑牌,
+            // 不估值。卧龙的开窗门槛对任何锦囊恒真, 于是一张【青釭剑】就被
+            // 拿去抵消【过河拆桥】。改为在合格候选里取"最不值钱"的一张
+            // (复用 AI 的弃牌估值单点; AIRuntime 后置装配, 缺席时退回原顺序)。
+            var kanpoCandidates = ((game[actor] || {}).hand || []).filter(function (c) {
               var opt = TricksRuntime.wuxieOptionForCard(game[actor], c);
               return opt && opt.via;
             });
+            if (kanpoCandidates.length > 1 && AIRuntime && AIRuntime.scoreCardForAI) {
+              kanpoCandidates = kanpoCandidates.slice().sort(function (a, b) {
+                return AIRuntime.scoreCardForAI(game, actor, a)
+                  - AIRuntime.scoreCardForAI(game, actor, b);
+              });
+            }
+            var kanpoPick = kanpoCandidates[0];
             if (kanpoPick) {
               wuxieVia = TricksRuntime.wuxieOptionForCard(game[actor], kanpoPick).via;
               card = takeCard(game, kanpoPick.id, { zone: 'hand', actor: actor });
@@ -1081,6 +1106,8 @@
       var resolveFankuiPickChoice = SkillDomain.resolveFankuiPickChoice;
       var resolveMengjinPickChoice = SkillDomain.resolveMengjinPickChoice;
       var resolveNiepanAskChoice = SkillDomain.resolveNiepanAskChoice;
+      var resolveQuhuVictimChoice = SkillDomain.resolveQuhuVictimChoice;
+      var resolveJiemingPickChoice = SkillDomain.resolveJiemingPickChoice;
       var resolveYaowuRewardChoice = SkillDomain.resolveYaowuRewardChoice;
       var resolveGanglieFireChoice = SkillDomain.resolveGanglieFireChoice;
       var resolveGanglieSourceChoice = SkillDomain.resolveGanglieSourceChoice;
@@ -1109,6 +1136,10 @@
       // v15 T 评审收口: 涅槃 (庞统) 濒死询问窗 — 官方"你可以", 玩家席不再
       // 无条件抢在【桃】窗口之前烧掉限定技。
       registerResponseKind('niepan-ask', resolveNiepanAskChoice);
+      // v15 T 评审收口: 驱虎赢后的受伤角色由荀彧选 (官方"你选择的一名角色",
+      // 选择发生在赢之后); 节命逐点询问受益者 (官方"你可以令一名角色…")。
+      registerResponseKind('quhu-victim', resolveQuhuVictimChoice);
+      registerResponseKind('jieming-pick', resolveJiemingPickChoice);
       registerResponseKind('ganglie-fire', resolveGanglieFireChoice);
       registerResponseKind('ganglie-source-choice', resolveGanglieSourceChoice);
       registerResponseKind('qilin-pick', resolveQilinPickChoice);
@@ -1116,6 +1147,8 @@
       registerResponseKind('cixiong-choose', resolveCixiongChoose);
       // v14 Q3: 突袭摸牌阶段真 ask
       registerResponseKind('tuxi-pick', resolveTuxiPickChoice);
+      // v15 T 评审收口: 双雄摸牌阶段真 ask (官方"你可以放弃摸牌")。
+      registerResponseKind('shuangxiong-ask', resolveShuangxiongAskChoice);
       registerResponseKind('jiedao-decision', resolveJiedaoDecisionChoice);
       registerResponseKind('wugu-pick', resolveWuguPickChoice);
       registerResponseKind('guohe-1v1-pick', resolveGuohe1v1PickChoice);
@@ -2339,6 +2372,24 @@
         // 评审收口: == null 判缺省而非 falsy 兜底 — 快照 drawCount=0 (未来
         // 某技能压零) 时放弃发动应摸 0 张, 不得被 || 吞成 2。
         drawCards(game, actor, saved.drawCount == null ? 2 : saved.drawCount);
+        return finishDrawPhaseAndAdvance(game, actor);
+      }
+
+      // v15 T 评审收口: 双雄 ask resolver — { decline } / 空决策 = 放弃发动
+      // 照常摸牌 (soak 决策表 {} 兜底安全); 其余即发动 (放弃摸牌 → 判定 →
+      // 获得判定牌 → 本回合异色手牌可当【决斗】)。与突袭同款收尾。
+      function resolveShuangxiongAskChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.shuangxiongAsk;
+        if (!saved) return fail('找不到【双雄】询问的暂停状态。');
+        var actor = pending.actor;
+        game.pauseState.shuangxiongAsk = null;
+        var shell = { game: game, actor: actor, drawCount: saved.drawCount == null ? 2 : saved.drawCount };
+        if (decision && (decision.decline || decision.skip)) {
+          log(game, actorName(game, actor) + '选择不发动【双雄】。');
+        } else {
+          SkillDomain.applyShuangxiongDrawPhase(game, actor, shell);
+        }
+        if (shell.drawCount > 0) drawCards(game, actor, shell.drawCount);
         return finishDrawPhaseAndAdvance(game, actor);
       }
 

@@ -219,6 +219,11 @@
           // v15 T: 猛进弃牌选择 / 拼点选牌
           'mengjinPanel', 'mengjinHint', 'mengjinChoices', 'mengjinDeclineBtn',
           'pindianPanel', 'pindianHint', 'pindianChoices',
+          // v15 T 评审收口: 官方"你可以 / 你选择"的四个决策面。
+          'niepanPanel', 'niepanHint', 'niepanConfirmBtn', 'niepanDeclineBtn',
+          'shuangxiongPanel', 'shuangxiongHint', 'shuangxiongConfirmBtn', 'shuangxiongDeclineBtn',
+          'quhuVictimPanel', 'quhuVictimHint', 'quhuVictimChoices',
+          'jiemingPanel', 'jiemingHint', 'jiemingChoices', 'jiemingDeclineBtn',
           'tuxiConfirmBtn', 'tuxiDeclineBtn',
           'dyingRescuePanel', 'dyingRescueHint', 'dyingRescueChoices', 'dyingRescueDeclineBtn',
           'cixiongFirePanel', 'cixiongFireHint', 'cixiongFireBtn', 'cixiongFireDeclineBtn',
@@ -1412,6 +1417,12 @@
         // 拼点牌是必付成本, 不能放弃)。
         { panelId: 'mengjinPanel',          confirmBtnId: null,                     cancelBtnId: 'mengjinDeclineBtn' },
         { panelId: 'pindianPanel',          confirmBtnId: null,                     cancelBtnId: null },
+        // v15 T 评审收口: 涅槃/双雄 是二选一按钮型; 驱虎受害者是必选
+        // (赢已成事实, 伤害必落, 只是选谁 → 无 cancel); 节命可逐点放弃。
+        { panelId: 'niepanPanel',           confirmBtnId: 'niepanConfirmBtn',       cancelBtnId: 'niepanDeclineBtn' },
+        { panelId: 'shuangxiongPanel',      confirmBtnId: 'shuangxiongConfirmBtn',  cancelBtnId: 'shuangxiongDeclineBtn' },
+        { panelId: 'quhuVictimPanel',       confirmBtnId: null,                     cancelBtnId: null },
+        { panelId: 'jiemingPanel',          confirmBtnId: null,                     cancelBtnId: 'jiemingDeclineBtn' },
         { panelId: 'guhuoDeclarePanel',     confirmBtnId: 'guhuoConfirmBtn',        cancelBtnId: 'guhuoCancelBtn' },
         // v12 H6: identity3 单目标牌/主动技 座席点选模式 (无 confirm 语义 —
         // 点合法座席直接生效; 取消按钮退出)。
