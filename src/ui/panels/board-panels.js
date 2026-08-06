@@ -281,11 +281,21 @@
           text = '电脑会按准备、判定、摸牌、出牌、弃牌、结束阶段自动行动。';
         }
 
-        els.statusTitle.textContent = title;
-        els.statusText.textContent = text;
+        // W1 (2026-06-09 审计 backlog:83 显式裁决 → **做**): #statusBanner
+        // 整块自 v9 PR-E13 起 `display: none` (layout.css:209), 其中的
+        // statusTitle / statusText / deckInfo 三处写入**玩家一个字都看不到**。
+        // 三条信息各自的**可见**去处:
+        //   胜负横幅 → 下方 els.playerState / els.enemyState 的"胜利/败北"章;
+        //   牌堆计数 → #playerSkillDeckInfo (v9 PR-E15 迁至技能卡右上)。
+        // 保留写入 (措辞仍被 ui_k3_identity45 / ui_l_identity_choice 钉住,
+        // 且横幅日后若重新可见即刻复用), 但加上存在性守卫 —— 它们是**装饰性**
+        // 的, 不该在节点缺失时把整个渲染带崩。
+        if (els.statusTitle) els.statusTitle.textContent = title;
+        if (els.statusText) els.statusText.textContent = text;
         var deckText = '牌堆 ' + view.game.deck.length + ' · 弃牌 ' + view.game.discard.length;
-        els.deckInfo.textContent = deckText;
-        // v9 PR-E15: 用户反馈数字应在 "武将技能卡最右边往上一点".
+        if (els.deckInfo) els.deckInfo.textContent = deckText;
+        // v9 PR-E15: 用户反馈数字应在 "武将技能卡最右边往上一点". 这一处才是
+        // 玩家真正看得到的牌堆/弃牌计数。
         if (els.playerSkillDeckInfo) els.playerSkillDeckInfo.textContent = deckText;
         if (els.handDiscardBtn) {
           els.handDiscardBtn.disabled = !isPlayerTurn || isGameOver || view.enemyThinking;

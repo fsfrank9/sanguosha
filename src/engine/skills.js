@@ -3463,7 +3463,16 @@
             cardId: fanjianCard.id,
             cardName: fanjianCard.name
           });
-          return { suspendedForFanjian: true };
+          // W1 (v14 P4 滚动候选回收): 此处原本裸返 { suspendedForFanjian: true }
+          // —— 没有 ok 字段。useSkill 经 selectActiveSkillResult 原样上抛,
+          // aiTakeAction 的 `skillResult.ok` 读到 undefined, runAITurn 的
+          // `if (!action.ok) return action` 就把这个畸形对象当成失败结果返回
+          // 给调用方 (1200 种子 fuzz 复现面在案, 基线 2c56ed0 同现)。
+          // onActiveSkill 的返回值是**结果**不是 hook 信号 —— 与其余主动技
+          // 一致改为 success(), 挂起标记作为附加字段随行。
+          var fanjianPaused = success('等待' + actorName(game, targetActor) + '猜测【反间】的花色。');
+          fanjianPaused.suspendedForFanjian = true;
+          return fanjianPaused;
         }
         // AI target: blind random guess from {spade, heart, club, diamond}.
         return applyFanjianGuess(game, actor, targetActor, fanjianCard, randomSuit(game));
@@ -3803,9 +3812,20 @@
         return continueTurnAfterPreparePhase(game, actor);
       }
 
+      // W1 (2026-06-09 审计 backlog:81 显式裁决 → **做**): 官方逐字是
+      // "若你未于出牌阶段内使用或打出过【杀】, 你**可以**跳过弃牌阶段"
+      // (card__hero__wu.md:61) —— 是可选技。此前引擎无条件跳过, 与"可以"
+      // 不符。2026-06-09 的评估("1v1 跳弃牌永远最优, 纯规则洁癖")在 3-5 人
+      // 身份场下已不再是全部图景 (例: 想留在弃牌阶段把牌喂给对手的固政,
+      // 或单纯不想暴露"我这回合没出杀"), 且成本只有一个偏好闸。
       function triggerKejiBeforeDiscard(game, actor, context) {
         var state = game[actor];
         if (!state || !hasSkill(state, 'keji') || state.usedOrRespondedSha) return false;
+        var kejiPref = (state.skillPreferences && state.skillPreferences.keji) || 'auto';
+        if (kejiPref === 'decline') {
+          log(game, actorName(game, actor) + '选择不发动【克己】，照常进入弃牌阶段。');
+          return false;
+        }
         setPhase(game, actor, 'finish');
         log(game, actorName(game, actor) + '发动【克己】，本回合未使用或打出【杀】，跳过弃牌阶段。');
         if (context) {
