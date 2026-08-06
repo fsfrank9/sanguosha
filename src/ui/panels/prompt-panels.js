@@ -12,6 +12,28 @@
     var renderLog = ctx.renderLog;
     var escapeHtml = ctx.escapeHtml;
     var suitLabel = ctx.suitLabel;
+
+    // v15 U (林包): 两个两段选择面板的本地暂存 (英魂 选项+目标 / 乱武 杀+目标)。
+    // 窗口收起时清零 —— 见 refresh* 里的 pending 身份校验 (v15 T M3 教训:
+    // 同 kind 背靠背窗口之间不得残留暂存)。
+    var yinghunOption = null;
+    var yinghunSeat = null;
+    var yinghunWindow = null;
+    var luanwuCardId = null;
+    var luanwuSeat = null;
+    var luanwuWindow = null;
+
+    function refreshYinghunConfirm() {
+      if (els.yinghunConfirmBtn) {
+        els.yinghunConfirmBtn.disabled = !(yinghunOption && yinghunSeat);
+      }
+    }
+
+    function refreshLuanwuConfirm() {
+      if (els.luanwuConfirmBtn) {
+        els.luanwuConfirmBtn.disabled = !(luanwuCardId && luanwuSeat);
+      }
+    }
     var stage = ctx.stage;
     var promptCardChoice = ctx.promptCardChoice;
     var actorDisplayName = ctx.actorDisplayName;
@@ -506,6 +528,102 @@
       } else {
         els.jiemingPanel.hidden = true;
       }
+    }
+    // ═════ v15 U (林包) 六个决策窗 ═════
+    if (els.benghuaiPanel) {
+      if (kind === 'benghuai-choice' && pending.actor === 'player') {
+        els.benghuaiPanel.hidden = false;
+        if (els.benghuaiHint) {
+          els.benghuaiHint.textContent = '崩坏（锁定技）：你不是体力值最小的角色（体力 '
+            + pending.hp + ' / 上限 ' + pending.maxHp + '），须选择一项。';
+        }
+      } else { els.benghuaiPanel.hidden = true; }
+    }
+    if (els.fangzhuPanel) {
+      if (kind === 'fangzhu-pick' && pending.actor === 'player') {
+        els.fangzhuPanel.hidden = false;
+        if (els.fangzhuHint) {
+          els.fangzhuHint.textContent = '放逐：可令一名其他角色摸 ' + (pending.drawCount || 0)
+            + ' 张牌，然后将其武将牌翻面。';
+        }
+        if (els.fangzhuChoices) {
+          els.fangzhuChoices.innerHTML = (pending.candidates || []).map(function (entry) {
+            return '<button class="mini-card" data-fangzhu-seat="' + escapeHtml(entry.seat) + '">'
+              + escapeHtml(entry.name) + '（' + entry.hp + ' 血'
+              + (entry.turnedOver ? '，已翻面' : '') + '）</button>';
+          }).join('');
+        }
+      } else { els.fangzhuPanel.hidden = true; }
+    }
+    if (els.yinghunPanel) {
+      if (kind === 'yinghun-choice' && pending.actor === 'player') {
+        if (yinghunWindow !== pending) { yinghunWindow = pending; yinghunOption = null; yinghunSeat = null; }
+        els.yinghunPanel.hidden = false;
+        var yhX = pending.x || 1;
+        if (els.yinghunHint) {
+          els.yinghunHint.textContent = '英魂（X = ' + yhX + '）：先选一项，再选目标。';
+        }
+        if (els.yinghunOptions) {
+          els.yinghunOptions.innerHTML =
+            '<button class="mini-card" data-yinghun-option="1">① 摸 ' + yhX + ' 张，弃 1 张</button>'
+            + '<button class="mini-card" data-yinghun-option="2">② 摸 1 张，弃 ' + yhX + ' 张</button>';
+        }
+        if (els.yinghunChoices) {
+          els.yinghunChoices.innerHTML = (pending.candidates || []).map(function (entry) {
+            return '<button class="mini-card" data-yinghun-seat="' + escapeHtml(entry.seat) + '">'
+              + escapeHtml(entry.name) + '（手牌 ' + entry.handCount + '）</button>';
+          }).join('');
+        }
+        refreshYinghunConfirm();
+      } else { els.yinghunPanel.hidden = true; }
+    }
+    if (els.haoshiPanel) {
+      if (kind === 'haoshi-give' && pending.actor === 'player') {
+        els.haoshiPanel.hidden = false;
+        if (els.haoshiHint) {
+          els.haoshiHint.textContent = '好施：多名角色并列手牌最少，选择一名接受你的 '
+            + (pending.giveCount || 0) + ' 张手牌。';
+        }
+        if (els.haoshiChoices) {
+          els.haoshiChoices.innerHTML = (pending.candidates || []).map(function (entry) {
+            return '<button class="mini-card" data-haoshi-seat="' + escapeHtml(entry.seat) + '">'
+              + escapeHtml(entry.name) + '（手牌 ' + entry.handCount + '）</button>';
+          }).join('');
+        }
+      } else { els.haoshiPanel.hidden = true; }
+    }
+    if (els.zaiqiPanel) {
+      if (kind === 'zaiqi-ask' && pending.actor === 'player') {
+        els.zaiqiPanel.hidden = false;
+        if (els.zaiqiHint) {
+          els.zaiqiHint.textContent = '再起：可放弃摸牌（' + (pending.drawCount || 0)
+            + ' 张），改为亮出牌堆顶 ' + (pending.x || 0)
+            + ' 张，按其中红桃张数回复体力并获得其余的牌。';
+        }
+      } else { els.zaiqiPanel.hidden = true; }
+    }
+    if (els.luanwuPanel) {
+      if (kind === 'luanwu-sha' && pending.actor === 'player') {
+        if (luanwuWindow !== pending) { luanwuWindow = pending; luanwuCardId = null; luanwuSeat = null; }
+        els.luanwuPanel.hidden = false;
+        if (els.luanwuHint) {
+          els.luanwuHint.textContent = '乱武：需对距离最小的角色使用一张【杀】，否则失去 1 点体力。';
+        }
+        if (els.luanwuTargets) {
+          els.luanwuTargets.innerHTML = (pending.targets || []).map(function (entry) {
+            return '<button class="mini-card" data-luanwu-seat="' + escapeHtml(entry.seat) + '">'
+              + escapeHtml(entry.name) + '（' + entry.hp + ' 血）</button>';
+          }).join('');
+        }
+        if (els.luanwuChoices) {
+          els.luanwuChoices.innerHTML = (pending.options || []).map(function (opt) {
+            return '<button class="mini-card" data-luanwu-card-id="' + escapeHtml(opt.cardId) + '">'
+              + escapeHtml(opt.name) + ' ' + suitLabel(opt.suit)
+              + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
+          }).join('') || '<span class="mini-card">没有可用的【杀】</span>';
+        }
+        refreshLuanwuConfirm();
+      } else { els.luanwuPanel.hidden = true; }
     }
     // v14 R1: 蛊惑质疑窗 — AI 于吉背面声明, 玩家决定是否质疑 (质疑真牌
     // 获「缠怨」, 提示如实告知风险; 只显示声明牌名, 不泄露真牌)。
@@ -1070,6 +1188,99 @@
     if (els.jiemingDeclineBtn) els.jiemingDeclineBtn.addEventListener('click', function () {
       var result = Engine.resolvePendingChoice(getGame(), { decline: true });
       if (!result.ok) renderLog();
+      render();
+    });
+    // ═════ v15 U (林包) 六个决策窗事件 ═════
+    // 崩坏: 锁定技二选一, 点即提交。
+    if (els.benghuaiHpBtn) els.benghuaiHpBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), { choice: 'hp' });
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.benghuaiMaxHpBtn) els.benghuaiMaxHpBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), { choice: 'maxHp' });
+      if (!r.ok) renderLog();
+      render();
+    });
+    // 放逐 / 好施: 点候选即提交 (单段选择)。
+    if (els.fangzhuChoices) els.fangzhuChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-fangzhu-seat]');
+      if (!btn) return;
+      var r = Engine.resolvePendingChoice(getGame(), { target: btn.getAttribute('data-fangzhu-seat') });
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.fangzhuDeclineBtn) els.fangzhuDeclineBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.haoshiChoices) els.haoshiChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-haoshi-seat]');
+      if (!btn) return;
+      var r = Engine.resolvePendingChoice(getGame(), { target: btn.getAttribute('data-haoshi-seat') });
+      if (!r.ok) renderLog();
+      render();
+    });
+    // 英魂: 两段暂存 (选项 + 目标) 后按确认。
+    if (els.yinghunOptions) els.yinghunOptions.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-yinghun-option]');
+      if (!btn) return;
+      yinghunOption = Number(btn.getAttribute('data-yinghun-option')) === 2 ? 2 : 1;
+      refreshYinghunConfirm();
+    });
+    if (els.yinghunChoices) els.yinghunChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-yinghun-seat]');
+      if (!btn) return;
+      yinghunSeat = btn.getAttribute('data-yinghun-seat');
+      refreshYinghunConfirm();
+    });
+    if (els.yinghunConfirmBtn) els.yinghunConfirmBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), { option: yinghunOption, target: yinghunSeat });
+      yinghunOption = null; yinghunSeat = null;
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.yinghunDeclineBtn) els.yinghunDeclineBtn.addEventListener('click', function () {
+      yinghunOption = null; yinghunSeat = null;
+      var r = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!r.ok) renderLog();
+      render();
+    });
+    // 再起: 二选一。
+    if (els.zaiqiConfirmBtn) els.zaiqiConfirmBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), {});
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.zaiqiDeclineBtn) els.zaiqiDeclineBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!r.ok) renderLog();
+      render();
+    });
+    // 乱武: 两段暂存 (目标 + 杀) 后按确认; 取消 = 失去 1 点体力。
+    if (els.luanwuTargets) els.luanwuTargets.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-luanwu-seat]');
+      if (!btn) return;
+      luanwuSeat = btn.getAttribute('data-luanwu-seat');
+      refreshLuanwuConfirm();
+    });
+    if (els.luanwuChoices) els.luanwuChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-luanwu-card-id]');
+      if (!btn) return;
+      luanwuCardId = btn.getAttribute('data-luanwu-card-id');
+      refreshLuanwuConfirm();
+    });
+    if (els.luanwuConfirmBtn) els.luanwuConfirmBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), { cardId: luanwuCardId, target: luanwuSeat });
+      luanwuCardId = null; luanwuSeat = null;
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.luanwuDeclineBtn) els.luanwuDeclineBtn.addEventListener('click', function () {
+      luanwuCardId = null; luanwuSeat = null;
+      var r = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!r.ok) renderLog();
       render();
     });
     // v14 R1: 蛊惑质疑窗事件 (质疑 / 不质疑)。

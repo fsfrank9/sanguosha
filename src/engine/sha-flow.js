@@ -554,8 +554,34 @@
 
       // v11 C1: 无双 — 锁定技。吕布的【杀】需目标依次两张【闪】; 决斗中
       // 吕布的对手每轮需依次打出两张【杀】。
-      function shanRequiredAgainstSha(game, sourceActor) {
-        return hasSkill(game[sourceActor], 'wushuang') ? 2 : 1;
+      //
+      // v15 U: 本函数是"抵消这张【杀】需要几张【闪】"的**单点**。签名补上
+      // targetActor —— 无双只看来源, 但董卓【肉林】是**双向**的:
+      //   肉林① 你(董卓)使用【杀】指定**女性**目标后 → 该目标需两张;
+      //   肉林② 你(董卓)成为**女性角色**使用的【杀】的目标后 → 你需两张。
+      // 两条都要同时读来源与目标, 只看来源的旧签名表达不了。
+      // 与无双同场时取最大值 (官方无"叠加"表述, 两技都只是把需求置为 2)。
+      function shanRequiredAgainstSha(game, sourceActor, targetActor) {
+        var source = game[sourceActor];
+        var target = targetActor ? game[targetActor] : null;
+        var needed = hasSkill(source, 'wushuang') ? 2 : 1;
+        if (target) {
+          // 肉林①: 来源是董卓, 目标是女性。
+          if (hasSkill(source, 'roulin') && target.gender === 'female') needed = Math.max(needed, 2);
+          // 肉林②: 目标是董卓, 来源是女性。
+          if (hasSkill(target, 'roulin') && source && source.gender === 'female') needed = Math.max(needed, 2);
+        }
+        return needed;
+      }
+
+      // 需两张【闪】时的日志文案 (无双/肉林 各自具名, 不再一律写"无双")。
+      function doubleShanReasonLabel(game, sourceActor, targetActor) {
+        var source = game[sourceActor];
+        var target = targetActor ? game[targetActor] : null;
+        if (hasSkill(source, 'wushuang')) return '无双';
+        if (target && hasSkill(source, 'roulin') && target.gender === 'female') return '肉林';
+        if (target && hasSkill(target, 'roulin') && source && source.gender === 'female') return '肉林';
+        return '无双';
       }
 
       // v14 P1: presetLock — 多目标链在锁定阶段已按目标预结算 onNeedResponse
@@ -614,7 +640,7 @@
           // 先给判定机会 (红=视为打出闪, 免出手牌; 可用 skillPreferences.bagua
           // ='decline' 关闭), 判定失败/无八卦才回到手牌响应窗口; 窗口内放弃
           // 后不再补试八卦 (机会已在窗前给过)。无双两张需求逐张先试八卦。
-          var askShanNeeded = shanRequiredAgainstSha(game, actor);
+          var askShanNeeded = shanRequiredAgainstSha(game, actor, targetActor);
           var askBaguaPaid = 0;
           while (askBaguaPaid < askShanNeeded && tryBaguaDodge(game, targetActor, ignoreArmor)) {
             askBaguaPaid += 1;
@@ -640,9 +666,10 @@
         var dodged = false;
         if (!responseContext.responseLocked) {
           // v11 C1: 无双 — 需依次两张【闪】(每一张都可由八卦判定替代)。
-          var shanNeeded = shanRequiredAgainstSha(game, actor);
+          var shanNeeded = shanRequiredAgainstSha(game, actor, targetActor);
           if (shanNeeded > 1) {
-            log(game, '【无双】锁定：' + actorName(game, targetActor) + '需依次使用两张【闪】。');
+            log(game, '【' + doubleShanReasonLabel(game, actor, targetActor) + '】锁定：'
+              + actorName(game, targetActor) + '需依次使用两张【闪】。');
           }
           dodged = true;
           for (var shanIndex = 0; shanIndex < shanNeeded; shanIndex += 1) {
@@ -915,7 +942,14 @@
         // 天香 ask 挂起时回调随重入结算延迟触发, 时序与决策一致。
         damage(game, targetActor, amount, actor, '【' + card.name + '】', card, null, {
           afterDamageSettled: function (g, landed) {
-            if (landed) applyWeaponHitEffects(g, actor, targetActor);
+            if (!landed) return;
+            applyWeaponHitEffects(g, actor, targetActor);
+            // v15 U: "每当你使用【杀】对目标角色造成伤害后" (祝融【烈刃】)。
+            // 挂在 landed 回调里 —— 被天香转移/被防具防止时不触发, 与麒麟弓
+            // 那类"对目标角色造成伤害时"的命中特效同一判据。
+            SkillRuntime.runHook(skillRegistry, 'onShaDamageDealt', {
+              game: g, actor: actor, targetActor: targetActor, card: card, amount: amount
+            });
           }
         });
         return success(target.name + '受到攻击。');

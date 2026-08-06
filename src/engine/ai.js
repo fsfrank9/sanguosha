@@ -973,6 +973,39 @@
         }
       }
 
+      // v15 U (林包) 主动技启发 —— 只读公开信息 (手牌**数**/体力/势力/感知立场)。
+      // 缔盟 (鲁肃): 把手牌最多的**感知敌对**座席与手牌最少的座席对调, 净损敌人;
+      // 成本 X = 两人手牌差, 自己手牌不够就不发动。
+      if (hasSkill(self, 'dimeng') && !self.flags.dimengUsed) {
+        var dmOthers = StateRuntime.aliveSeats(game).filter(function (seat) { return seat !== actor; });
+        if (dmOthers.length >= 2) {
+          var dmSorted = dmOthers.slice().sort(function (a, b) {
+            return (game[b].hand || []).length - (game[a].hand || []).length;
+          });
+          var richest = dmSorted[0];
+          var poorest = dmSorted[dmSorted.length - 1];
+          var dmCost = (game[richest].hand || []).length - (game[poorest].hand || []).length;
+          // 只有"富者是敌、贫者是友"时才是净收益; 且成本不能压垮自己的手牌。
+          if (dmCost > 0 && dmCost <= Math.max(0, (self.hand || []).length - 1)
+              && StateRuntime.perceivedHostile(game, actor, richest)
+              && !StateRuntime.perceivedHostile(game, actor, poorest)) {
+            return { skillId: 'dimeng', cardIds: [], options: { targetA: richest, targetB: poorest } };
+          }
+        }
+      }
+
+      // 乱武 (贾诩): 限定技, 全场每人对最近者出杀否则掉血 —— 对自己零伤害。
+      // 血线判据只读公开的体力值: 场上有至少两名感知敌对座席、且其中有人
+      // 血线 <= 2 (掉 1 血就可能濒死) 时才值得烧掉限定技。
+      if (hasSkill(self, 'luanwu') && !self.flags.luanwuUsed) {
+        var lwFoes = StateRuntime.perceivedHostileSeats(game, actor).filter(function (seat) {
+          return game[seat] && game[seat].hp > 0;
+        });
+        if (lwFoes.length >= 2 && lwFoes.some(function (seat) { return game[seat].hp <= 2; })) {
+          return { skillId: 'luanwu', cardIds: [], options: {} };
+        }
+      }
+
       // 天义 (太史慈): 手上有【杀】才值得赌 (赢=多一次杀+无距离+多目标,
       // 没赢=本回合不能出杀); 手上没杀时拼点毫无收益, 不发动。
       if (hasSkill(self, 'tianyi') && !self.flags.tianyiUsed && !self.flags.tianyiLost) {

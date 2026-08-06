@@ -349,6 +349,33 @@
   // canReachWithSha。此前该加成只落在 playSha 的结算层, 目标枚举面
   // (isLegalCardTarget → UI 高亮 / AI aiShaTargetSeat) 没接 → 官方三项
   // 收益里 UI/AI 实际只拿得到"额外次数 +1"。
+  // v15 U: 完杀 (贾诩, card__hero__neutral.md:197) —— "锁定技，不处于濒死
+  // 状态的其他角色于你的回合内不能使用【桃】。"
+  //
+  // 逐字拆解 (三个限定缺一不可):
+  //   ① "**其他**角色": 贾诩自己不受限;
+  //   ② "**不处于濒死状态**的": 濒死者本人仍可对自己用【桃】自救 —— 被禁的是
+  //      场外的救援者, 以及出牌阶段用桃回血的人;
+  //   ③ "于**你的回合内**": 只在贾诩的回合内生效, 别人回合不禁。
+  // 只针对【桃】—— 【酒】(濒死救援方法Ⅱ) 与急救转化的桃**另议**, 见 U 批
+  // spec 简报的裁定 (急救是"将红色牌当【桃】使用", 属使用【桃】, 同样被禁;
+  // 【酒】不是【桃】, 不禁)。
+  function wanshaBlocksTaoUse(game, userActor, dyingActor) {
+    if (!game) return false;
+    var turnActor = game.turn;
+    if (!turnActor || !game[turnActor]) return false;
+    // 评审收口: 贾诩阵亡后完杀立即失效 (rule__principle.md — 角色死亡后
+    // 其技能不再生效)。回合可能仍挂在亡者名下 (死于自己回合中)。
+    if (game[turnActor].hp <= 0) return false;
+    if (!hasSkill(game[turnActor], 'wansha')) return false;
+    if (userActor === turnActor) return false;            // ① 贾诩自己不受限
+    // ② 使用者本人正处于濒死状态 → 不受限。濒死者恒为 pauseState.dying.actor。
+    var dying = (game.pauseState && game.pauseState.dying)
+      ? game.pauseState.dying.actor : dyingActor;
+    if (dying && userActor === dying) return false;
+    return true;
+  }
+
   function shaUseReachAllowed(game, actor, targetActor) {
     var self = game[actor];
     if (self && self.flags && self.flags.tianyiWon) return true;
@@ -457,6 +484,7 @@
     distanceBetween: distanceBetween,
     canReachWithSha: canReachWithSha,
     shaUseReachAllowed: shaUseReachAllowed,
+    wanshaBlocksTaoUse: wanshaBlocksTaoUse,
     firstActorFromRoles: firstActorFromRoles,
     handLimit: handLimit,
     effectiveCardSuit: effectiveCardSuit,

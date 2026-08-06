@@ -66,7 +66,29 @@
         //   血裔 xueyi     袁绍   主公技锁定技: 手牌上限 +2X
         'qiangxi', 'quhu', 'jieming', 'bazhen', 'huoji', 'kanpo',
         'lianhuan', 'niepan', 'tianyi', 'mengjin', 'shuangxiong',
-        'luanji', 'xueyi'
+        'luanji', 'xueyi',
+        // v15 U (林包 8 将 18 技):
+        //   断粮 duanliang 徐晃 非锦囊黑色牌当兵粮寸断; 兵粮距离放宽到 2
+        //   行殇 xingshang 曹丕 其他角色死亡时获得其所有牌
+        //   放逐 fangzhu   曹丕 受伤后令一名其他角色摸 X 张并翻面
+        //   颂威 songwei   曹丕 主公技: 其他魏势力黑色判定生效后你摸一张
+        //   英魂 yinghun   孙坚 准备阶段 摸X弃一 / 摸一弃X 二选一
+        //   好施 haoshi    鲁肃 摸牌阶段多摸两张, >5 张给一半
+        //   缔盟 dimeng    鲁肃 弃 X 张令两名其他角色交换手牌
+        //   祸首 huoshou   孟获 南蛮对你无效; 你代替成为南蛮伤害来源
+        //   再起 zaiqi     孟获 放弃摸牌亮 X 张, 红桃回血其余获得
+        //   巨象 juxiang   祝融 南蛮对你无效; 结算完毕的南蛮你获得之
+        //   烈刃 lieren    祝融 杀造成伤害后拼点, 赢则获得其一张牌
+        //   完杀 wansha    贾诩 你的回合内非濒死的其他角色不能用桃
+        //   乱武 luanwu    贾诩 限定技: 所有其他角色对最近者用杀否则失血
+        //   帷幕 weimu     贾诩 你不是黑色锦囊牌的合法目标
+        //   酒池 jiuchi    董卓 黑桃手牌当酒
+        //   肉林 roulin    董卓 与女性角色互相出杀时需两张闪抵消
+        //   崩坏 benghuai  董卓 结束阶段非最小体力则失血或减上限
+        //   暴虐 baonue    董卓 主公技: 群势力受伤后来源判定黑桃你回血
+        'duanliang', 'xingshang', 'fangzhu', 'songwei', 'yinghun',
+        'haoshi', 'dimeng', 'huoshou', 'zaiqi', 'juxiang', 'lieren',
+        'wansha', 'luanwu', 'weimu', 'jiuchi', 'roulin', 'benghuai', 'baonue'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,
@@ -78,6 +100,9 @@
       // v15 T: 火包主动技 — 强袭/驱虎/天义 (出牌阶段主动发动) 与乱击
       // (选两张同花色手牌); 其余火包技能为触发/锁定/转化类。
       var ACTIVE_SKILL_IDS = ['zhiheng', 'kurou', 'rende', 'fanjian', 'guanxing', 'qingnang', 'luoshen', 'jieyin', 'jijiang', 'huangtian', 'lijian', 'guhuo',
-        'qiangxi', 'quhu', 'tianyi', 'luanji'];
+        'qiangxi', 'quhu', 'tianyi', 'luanji',
+        // v15 U: 林包主动技 — 缔盟 (选两名其他角色 + 弃 X 张) 与
+        // 乱武 (限定技, 出牌阶段全场发动); 其余林包技能为触发/锁定/转化类。
+        'dimeng', 'luanwu'];
 
       export { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS };

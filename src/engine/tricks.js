@@ -1197,15 +1197,49 @@
           card: card,
           responseType: responseType,
           title: title,
-          order: seatsFrom(game, actor, false),
+          // v15 U 评审收口 [P1]: 帷幕 (贾诩) 是**目标合法性**类技能
+          // (flow__condition.md:101 明确把【帷幕】列在"对使用牌选择目标的
+          // 合法性能产生影响的技能"里) —— 黑色的南蛮/万箭根本不能指定贾诩
+          // 为目标, 所以在**建队列**时就过滤掉, 而不是在 shouldSkip 里当
+          // "无效"处理 (那是祸首①/巨象①/藤甲 的语义, 两者不同)。
+          order: seatsFrom(game, actor, false).filter(function (seat) {
+            return deps.isLegalCardTarget
+              ? deps.isLegalCardTarget(game, actor, card, seat) : true;
+          }),
           idx: 0
         };
+        // v15 U 祸首②: 伤害来源在"指定目标后"确立一次 (快照)。
+        game.pauseState.aoe.damageSourceActor = resolveAoeDamageSource(game, game.pauseState.aoe);
         return advanceAOETargets(game);
       }
 
       // v13 K2: AOE 驱动改走 advanceTargetQueue 泛化骨架。效果体 (八卦先行/
       // 玩家 ask/consumeResponse/激将护驾/伤害) 保持在驱动侧 (needsWuxieDedup
       // 语义: 无懈开窗后同 idx 重入本函数), 语句与重构前逐行一致。
+      // v15 U: 祸首② (孟获, shu.md:396) — "每当**其他角色**使用【南蛮入侵】
+      // 指定目标后，你代替其成为此【南蛮入侵】造成的伤害的来源。"
+      // ◆旁注 (:400) 把效果本质写成"每名目标角色需打出【杀】，否则受到发动
+      // 此次【祸首②】的角色造成的1点伤害" —— 即只换**伤害来源**, 不换牌、
+      // 不换使用者。判例 (:404: 曹操没打出杀 → 受孟获造成的 1 点伤害 → 可
+      // 发动奸雄获得该【南蛮入侵】) 正说明: 奸雄读的是"造成伤害的牌", 那张
+      // 牌仍是原来的南蛮 —— 所以此处只改 damage() 的 sourceActor 参数。
+      // 孟获自己用南蛮时不触发 ("其他角色")。
+      // 触发时点是"**指定目标后**"一次, 不是逐次伤害时重新判定 —— 官方判例
+      // (:404) 的措辞是"孟获在张春华使用【南蛮入侵】指定目标后会触发【祸首②】,
+      // 轮到对曹操进行结算时…"。故来源在 AOE 开局**快照**一次 (存于
+      // aoe.damageSourceActor), 中途孟获阵亡也不改已确立的来源。
+      function resolveAoeDamageSource(game, aoe) {
+        if (!aoe || !aoe.card || aoe.card.type !== 'nanman') return aoe.sourceActor;
+        var holder = StateRuntime.aliveSeats(game).find(function (seat) {
+          return seat !== aoe.sourceActor && hasSkill(game[seat], 'huoshou');
+        });
+        return holder || aoe.sourceActor;
+      }
+
+      function aoeDamageSourceFor(game, aoe) {
+        return aoe && aoe.damageSourceActor ? aoe.damageSourceActor : aoe.sourceActor;
+      }
+
       function aoeEffectForCurrent(game, aoe, targetActor) {
         var responseType = aoe.responseType;
         var title = aoe.title;
@@ -1236,7 +1270,10 @@
               kind: 'wanjian-response',
               actor: 'player',
               pauseKey: 'wanjianResponse',
-              source: { sourceActor: aoe.sourceActor, title: title, card: aoe.card },
+              // v15 U 评审收口 [P0]: 挂起快照里的 sourceActor 是 resolver 之后
+              // 用来 damage() 的来源 —— 必须带**替换后**的祸首来源, 否则南蛮的
+              // 玩家蛊惑窗 / 激将求助 两条路径上祸首②静默失效。
+              source: { sourceActor: aoeDamageSourceFor(game, aoe), title: title, card: aoe.card },
               options: listShanResponseOptions(aoeTarget),
               meta: { sourceActor: aoe.sourceActor, sourceName: title },
               logMessage: '等待' + actorName(game, 'player') + '决定是否打出【闪】响应【' + title + '】。',
@@ -1255,7 +1292,10 @@
             kind: 'aoe-sha-response',
             actor: 'player',
             pauseKey: 'aoeShaResponse',
-            source: { sourceActor: aoe.sourceActor, title: title, card: aoe.card },
+            // v15 U 评审收口 [P0]: 挂起快照里的 sourceActor 是 resolver 之后
+              // 用来 damage() 的来源 —— 必须带**替换后**的祸首来源, 否则南蛮的
+              // 玩家蛊惑窗 / 激将求助 两条路径上祸首②静默失效。
+              source: { sourceActor: aoeDamageSourceFor(game, aoe), title: title, card: aoe.card },
             options: listShaResponseOptions(game.player),
             meta: { sourceActor: aoe.sourceActor, sourceName: title },
             logMessage: '等待' + actorName(game, 'player') + '决定是否打出【杀】响应【' + title + '】。',
@@ -1275,7 +1315,7 @@
               kind: aoeAidSkill + '-aid',
               actor: 'player',
               pauseKey: 'lordAidAOE',
-              source: { lordActor: targetActor, title: title, responseType: responseType, sourceActor: aoe.sourceActor, card: aoe.card },
+              source: { lordActor: targetActor, title: title, responseType: responseType, sourceActor: aoeDamageSourceFor(game, aoe), card: aoe.card },
               options: responseType === 'sha' ? listShaResponseOptions(game.player) : listShanResponseOptions(game.player),
               meta: { lordActor: targetActor, sourceName: title, aidSkill: aoeAidSkill },
               logMessage: '等待' + actorName(game, 'player') + '决定是否响应【' + (aoeAidSkill === 'jijiang' ? '激将' : '护驾') + '】。',
@@ -1285,7 +1325,7 @@
           if (tryLordAidSync && tryLordAidSync(game, targetActor, aoeAidSkill, '【' + title + '】')) {
             log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
           } else {
-            damage(game, targetActor, 1, aoe.sourceActor, '【' + title + '】', aoe.card);
+            damage(game, targetActor, 1, aoeDamageSourceFor(game, aoe), '【' + title + '】', aoe.card);
             // 濒死救援等选择挂起 → 保留 aoe 队列, 选择排空后续跑剩余座席
             if (game.pendingChoice) {
               return success('【' + title + '】等待濒死结算…');
@@ -1327,6 +1367,16 @@
             log(game, actorName(game, targetActor) + '的【藤甲】令【' + aoe.title + '】无效。');
             return true;
           }
+          // v15 U: 祸首①(孟获) / 巨象①(祝融) — 锁定技"【南蛮入侵】对你无效"
+          // (shu.md:396 / :440)。与藤甲同层短路: 不开响应窗、不进伤害层。
+          // 注意"无效"≠"不是合法目标" —— 目标仍被指定, 只是效果不生效, 所以
+          // 巨象②的判例 (全场两人, 对唯一目标祝融无效, 该南蛮入弃后祝融仍
+          // 获得之) 才成立: 它仍是一次完整的"使用并结算完毕"。
+          if (aoe.card && aoe.card.type === 'nanman'
+              && (hasSkill(targetState, 'huoshou') || hasSkill(targetState, 'juxiang'))) {
+            log(game, actorName(game, targetActor) + '的锁定技令【' + aoe.title + '】对其无效。');
+            return true;
+          }
           return false;
         },
         wuxieReason: function (game, aoe, targetActor) {
@@ -1335,10 +1385,40 @@
         wuxieKind: 'aoe-target',
         effect: aoeEffectForCurrent,
         onDrain: function (game, aoe) {
+          settleJuxiangClaim(game, aoe);
           game.pauseState.aoe = null;
           return success(aoe.title + '结算完成。');
         }
       };
+
+      // v15 U: 巨象② (祝融, shu.md:440) — "每当其他角色使用的【南蛮入侵】
+      // **因结算完毕而置入弃牌堆后**，你获得之。"
+      //
+      // 本仓的建模细节: playAOE 在开局就把来源牌 discardCard 进弃牌堆
+      // (:1187), 整个逐席结算期间它都躺在弃牌堆里。所以"因结算完毕而入弃"
+      // 的可观测等价时刻就是**队列排空**这一刻, 且判据是"此刻它还在弃牌堆
+      // 里吗" —— 这恰好自动满足官方的两条排除:
+      //   - 判例 :450 (曹操受伤后死亡, 该南蛮随其手牌被弃): 那张牌早被奸雄
+      //     拿走过, 死亡弃置是另一条路径, 此刻不在弃牌堆的"结算完毕"位上;
+      //   - 奸雄/其他"获得造成伤害的牌"抢先拿走 → 它不在弃牌堆 → 不触发。
+      // ◆旁注 :444 的"非转化"排除则看**实体牌本身是不是南蛮**: 用别的牌
+      // 转化出的虚拟南蛮其 physicalCard 不是 nanman (判例 :452 奇策 /
+      // :454 蛊惑 由此排除)。
+      function settleJuxiangClaim(game, aoe) {
+        if (!aoe || !aoe.card) return;
+        var physical = CardRuntime.physicalCardOf(aoe.card);
+        if (!physical || physical.type !== 'nanman') return;
+        var holder = StateRuntime.aliveSeats(game).find(function (seat) {
+          return seat !== aoe.sourceActor && hasSkill(game[seat], 'juxiang');
+        });
+        if (!holder) return;
+        var idx = game.discard.indexOf(physical);
+        if (idx < 0) return; // 已被奸雄等拿走 / 走了别的路径 → 不触发
+        var taken = CardRuntime.takeCard(game, physical, { zone: 'discard' });
+        if (!taken) return;
+        CardRuntime.putCard(game, taken, { zone: 'hand', actor: holder });
+        log(game, actorName(game, holder) + '发动【巨象】，获得结算完毕的【南蛮入侵】。');
+      }
 
       function advanceAOETargets(game) {
         var aoe = game.pauseState && game.pauseState.aoe;

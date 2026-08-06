@@ -1,0 +1,428 @@
+{
+  "schemaVersion": 1,
+  "cacheKind": "sanguosha-official-lin-skills-safe-cache",
+  "pack": "林",
+  "source": {
+    "indexUrl": "https://www.sanguosha.com/hero",
+    "retrieval": "gltjk 官方规则集镜像逐字提取 (镜像已入库 official-skill-cache/gltjk-sanguosha-rules/pages/), 每条 sourceTextRef/sourceTextSha256 为该镜像行的 sha256 — 与风包的\"人工转写\"不同, 本包可逐条复核。",
+    "parser": "gltjk-mirror-extraction",
+    "copyrightPolicy": "仅提交结构化实现规格与逐字文本摘要 (sha256), 不复制官网原文",
+    "gidPolicy": "provisional-local: gid 232-239 为本地临时编号 (顺接火包缓存 224-231), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。v15 U (2026-08-06): 与风/火包同款网络降级条款 — www.sanguosha.com 在本环境仍被网络策略拦截 (CONNECT 403), 按 v14 O4 裁定不主动重试, 网络环境变更时触发回填。"
+  },
+  "includeFullSkillText": false,
+  "containsOfficialText": false,
+  "containsImplementationSpecs": true,
+  "copyrightPolicy": {
+    "verbatimOfficialSkillText": "omitted from repository cache",
+    "rawLocalCachePath": "official-skill-cache/gltjk-sanguosha-rules/pages/ (已入库镜像)"
+  },
+  "generatedFrom": "v15 U 林包接入批 (2026-08-06)",
+  "heroes": [
+    {
+      "gid": 232,
+      "name": "徐晃",
+      "localHeroId": "xuhuang",
+      "skills": [
+        {
+          "name": "断粮",
+          "localSkillId": "duanliang",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "e7f224790fc4",
+          "sourceLine": "card__hero__wei.md:277",
+          "implementationSpec": {
+            "summary": "将一张不为锦囊牌的黑色牌当【兵粮寸断】使用；能对距离为2的角色使用【兵粮寸断】。",
+            "timing": "出牌阶段（转化使用）。",
+            "condition": "所用之牌为黑色且不是锦囊牌（含装备区）。",
+            "cost": "打出该牌作为转化来源。",
+            "effect": "视为使用【兵粮寸断】；兵粮的距离上限由 1 放宽为 2。",
+            "frequency": "无次数限制。",
+            "engineHooks": [
+              "onCardAs",
+              "CARD_AS_TRICK_SPECS.bingliang",
+              "trickDistanceLimitFor"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 233,
+      "name": "曹丕",
+      "localHeroId": "caopi",
+      "skills": [
+        {
+          "name": "行殇",
+          "localSkillId": "xingshang",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "62bdec7f5b11",
+          "sourceLine": "card__hero__wei.md:349",
+          "implementationSpec": {
+            "summary": "每当其他角色死亡时，你可以获得其所有牌。",
+            "timing": "其他角色死亡时（弃置其牌之前）。",
+            "condition": "死亡者不是你。",
+            "cost": "无。",
+            "effect": "获得该角色手牌、装备区、判定区里的所有牌。",
+            "frequency": "无次数限制。",
+            "engineHooks": [
+              "onDeath",
+              "settleDeath"
+            ]
+          }
+        },
+        {
+          "name": "放逐",
+          "localSkillId": "fangzhu",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "926506bdc0bb",
+          "sourceLine": "card__hero__wei.md:351",
+          "implementationSpec": {
+            "summary": "每当你受到伤害后，你可以令一名其他角色摸X张牌（X为你已损失的体力值），然后其翻面。",
+            "timing": "你受到伤害后。",
+            "condition": "场上有其他存活角色。",
+            "cost": "无。",
+            "effect": "目标摸 X 张牌后将武将牌翻面。",
+            "frequency": "无次数限制。",
+            "engineHooks": [
+              "onDamageAfter",
+              "fangzhu-pick",
+              "turnedOver"
+            ]
+          }
+        },
+        {
+          "name": "颂威",
+          "localSkillId": "songwei",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "3daa2e6e85ba",
+          "sourceLine": "card__hero__wei.md:353",
+          "implementationSpec": {
+            "summary": "主公技，每当其他魏势力角色的黑色判定牌生效后，其可以令你摸一张牌。",
+            "timing": "其他魏势力角色的判定牌生效后。",
+            "condition": "你为主公；判定牌为黑色；判定者非你且为魏势力。",
+            "cost": "无。",
+            "effect": "你摸一张牌。",
+            "frequency": "无次数限制。",
+            "engineHooks": [
+              "onJudgementAfterResolve",
+              "roles.主公"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 234,
+      "name": "孙坚",
+      "localHeroId": "sunjian",
+      "skills": [
+        {
+          "name": "英魂",
+          "localSkillId": "yinghun",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "10c42e0761a7",
+          "sourceLine": "card__hero__wu.md:279",
+          "implementationSpec": {
+            "summary": "准备阶段开始时，若你已受伤，你可以选择一项：1.令一名其他角色摸X张牌然后弃置一张牌；2.令一名其他角色摸一张牌然后弃置X张牌。（X为你已损失的体力值）",
+            "timing": "你的准备阶段开始时。",
+            "condition": "你已受伤（X≥1）。",
+            "cost": "无。",
+            "effect": "按所选项令目标摸牌并弃牌。",
+            "frequency": "每回合限一次（准备阶段）。",
+            "engineHooks": [
+              "onPreparePhase",
+              "yinghun-choice"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 235,
+      "name": "鲁肃",
+      "localHeroId": "lusu",
+      "skills": [
+        {
+          "name": "好施",
+          "localSkillId": "haoshi",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "68bf7202be79",
+          "sourceLine": "card__hero__wu.md:455",
+          "implementationSpec": {
+            "summary": "摸牌阶段，你可以多摸两张牌，然后若你的手牌数大于5，你将一半的手牌交给一名手牌最少的其他角色。",
+            "timing": "你的摸牌阶段。",
+            "condition": "无。",
+            "cost": "摸牌后若手牌>5 则交出一半。",
+            "effect": "本阶段摸牌数 +2；随后按条件交牌（一半向下取整）。",
+            "frequency": "每回合限一次（摸牌阶段）。",
+            "engineHooks": [
+              "onDrawPhase",
+              "settleHaoshi",
+              "haoshi-give"
+            ]
+          }
+        },
+        {
+          "name": "缔盟",
+          "localSkillId": "dimeng",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "d98644e15bb2",
+          "sourceLine": "card__hero__wu.md:457",
+          "implementationSpec": {
+            "summary": "出牌阶段限一次，你可以选择两名其他角色并弃置X张牌（X为这两名角色手牌数的差），令这两名角色交换手牌。",
+            "timing": "你的出牌阶段。",
+            "condition": "场上有至少两名其他存活角色；你的手牌数不少于 X。",
+            "cost": "弃置 X 张牌（X 为两名目标手牌数之差）。",
+            "effect": "两名目标交换全部手牌。",
+            "frequency": "每回合限一次。",
+            "engineHooks": [
+              "onActiveSkill",
+              "swapHands",
+              "flags.dimengUsed"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 236,
+      "name": "孟获",
+      "localHeroId": "menghuo",
+      "skills": [
+        {
+          "name": "祸首",
+          "localSkillId": "huoshou",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "c2189470ef7c",
+          "sourceLine": "card__hero__shu.md:396",
+          "implementationSpec": {
+            "summary": "锁定技，【南蛮入侵】对你无效；锁定技，每当其他角色使用【南蛮入侵】指定目标后，你代替其成为此【南蛮入侵】造成的伤害的来源。",
+            "timing": "其他角色使用【南蛮入侵】指定目标后。",
+            "condition": "该【南蛮入侵】非你使用。",
+            "cost": "无（锁定技）。",
+            "effect": "南蛮对你无效；南蛮造成的伤害来源改为你。",
+            "frequency": "锁定技，恒定生效。",
+            "engineHooks": [
+              "AOE_QUEUE_HOOKS.shouldSkip",
+              "aoeDamageSourceFor"
+            ]
+          }
+        },
+        {
+          "name": "再起",
+          "localSkillId": "zaiqi",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "dc9138c4fc5c",
+          "sourceLine": "card__hero__shu.md:406",
+          "implementationSpec": {
+            "summary": "摸牌阶段开始时，若你已受伤，你可以放弃摸牌，亮出牌堆顶的X张牌（X为你已损失的体力值），然后回复等同于其中红桃牌数的体力，将这些红桃牌置入弃牌堆，获得其余的牌。",
+            "timing": "你的摸牌阶段开始时。",
+            "condition": "你已受伤（X≥1）。",
+            "cost": "放弃本阶段摸牌。",
+            "effect": "亮出牌堆顶 X 张；红桃张数即回复体力量并入弃牌堆，其余获得。",
+            "frequency": "每回合限一次（摸牌阶段）。",
+            "engineHooks": [
+              "onDrawPhase",
+              "zaiqi-ask",
+              "applyZaiqi"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 237,
+      "name": "祝融",
+      "localHeroId": "zhurong",
+      "skills": [
+        {
+          "name": "巨象",
+          "localSkillId": "juxiang",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "305d5fe3c182",
+          "sourceLine": "card__hero__shu.md:440",
+          "implementationSpec": {
+            "summary": "锁定技，【南蛮入侵】对你无效；锁定技，每当其他角色使用的【南蛮入侵】因结算完毕而置入弃牌堆后，你获得之。",
+            "timing": "其他角色使用的【南蛮入侵】结算完毕入弃牌堆后。",
+            "condition": "该南蛮为非转化的实体【南蛮入侵】且非你使用；结算完毕时它确在弃牌堆。",
+            "cost": "无（锁定技）。",
+            "effect": "南蛮对你无效；你获得该【南蛮入侵】。",
+            "frequency": "锁定技，恒定生效。",
+            "engineHooks": [
+              "AOE_QUEUE_HOOKS.shouldSkip",
+              "settleJuxiangClaim"
+            ]
+          }
+        },
+        {
+          "name": "烈刃",
+          "localSkillId": "lieren",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "2bba62111976",
+          "sourceLine": "card__hero__shu.md:456",
+          "implementationSpec": {
+            "summary": "每当你使用【杀】对目标角色造成伤害后，你可以与其拼点，当你赢后，你获得其一张牌。",
+            "timing": "你使用的【杀】对目标造成伤害后。",
+            "condition": "伤害确实落在目标身上；双方各有手牌可拼点。",
+            "cost": "与目标拼点（各扣置一张手牌）。",
+            "effect": "赢则获得该目标区域里的一张牌。",
+            "frequency": "无次数限制。",
+            "engineHooks": [
+              "onShaDamageDealt",
+              "startPindian",
+              "registerPindianContinuation"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 238,
+      "name": "贾诩",
+      "localHeroId": "jiaxu",
+      "skills": [
+        {
+          "name": "完杀",
+          "localSkillId": "wansha",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "4702fab9b0fe",
+          "sourceLine": "card__hero__neutral.md:197",
+          "implementationSpec": {
+            "summary": "锁定技，不处于濒死状态的其他角色于你的回合内不能使用【桃】。",
+            "timing": "你的回合内。",
+            "condition": "使用者不是你且不处于濒死状态。",
+            "cost": "无（锁定技）。",
+            "effect": "该角色不能使用【桃】（含急救转化的桃）；【酒】不受限。",
+            "frequency": "锁定技，恒定生效。",
+            "engineHooks": [
+              "wanshaBlocksTaoUse",
+              "isLegalCardTarget",
+              "attemptDyingRescue"
+            ]
+          }
+        },
+        {
+          "name": "乱武",
+          "localSkillId": "luanwu",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "9f69b6a5c2aa",
+          "sourceLine": "card__hero__neutral.md:199",
+          "implementationSpec": {
+            "summary": "限定技，出牌阶段，你可以选择所有其他角色，这些角色各需对距离最小的另一名角色使用【杀】，否则失去1点体力。",
+            "timing": "你的出牌阶段。",
+            "condition": "场上有其他存活角色；本局尚未发动过。",
+            "cost": "无。",
+            "effect": "逐席推进：各角色对其距离最小的另一名角色使用【杀】，否则失去 1 点体力。",
+            "frequency": "限定技，每局一次。",
+            "engineHooks": [
+              "onActiveSkill",
+              "pauseState.luanwu",
+              "luanwu-sha"
+            ]
+          }
+        },
+        {
+          "name": "帷幕",
+          "localSkillId": "weimu",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "fcfb71146b1e",
+          "sourceLine": "card__hero__neutral.md:201",
+          "implementationSpec": {
+            "summary": "锁定技，你不是黑色锦囊牌的合法目标。",
+            "timing": "指定目标时。",
+            "condition": "该牌为黑色锦囊牌（含延时类锦囊）。",
+            "cost": "无（锁定技）。",
+            "effect": "你不能被指定为该牌的目标。",
+            "frequency": "锁定技，恒定生效。",
+            "engineHooks": [
+              "isLegalCardTarget",
+              "weimuBlocksCard"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 239,
+      "name": "董卓",
+      "localHeroId": "dongzhuo",
+      "skills": [
+        {
+          "name": "酒池",
+          "localSkillId": "jiuchi",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "26352bae9bbc",
+          "sourceLine": "card__hero__neutral.md:175",
+          "implementationSpec": {
+            "summary": "你可以将一张黑桃手牌当【酒】使用。",
+            "timing": "出牌阶段（转化使用）。",
+            "condition": "所用之牌为黑桃手牌。",
+            "cost": "打出该牌作为转化来源。",
+            "effect": "视为使用【酒】（缺省目标为自己）。",
+            "frequency": "受【酒】自身的每回合限一次约束。",
+            "engineHooks": [
+              "onCardAs",
+              "CARD_AS_TRICK_SPECS.jiu"
+            ]
+          }
+        },
+        {
+          "name": "肉林",
+          "localSkillId": "roulin",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "dbb2ca9b900f",
+          "sourceLine": "card__hero__neutral.md:177",
+          "implementationSpec": {
+            "summary": "锁定技，你使用【杀】指定女性目标后，其需依次使用两张【闪】抵消；你成为女性角色使用的【杀】的目标后，你需依次使用两张【闪】才能抵消。",
+            "timing": "【杀】指定目标后。",
+            "condition": "一方为你、另一方为女性角色。",
+            "cost": "无（锁定技）。",
+            "effect": "抵消该【杀】所需的【闪】数改为 2。",
+            "frequency": "锁定技，恒定生效。",
+            "engineHooks": [
+              "shanRequiredAgainstSha"
+            ]
+          }
+        },
+        {
+          "name": "崩坏",
+          "localSkillId": "benghuai",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "5c5f697c9508",
+          "sourceLine": "card__hero__neutral.md:183",
+          "implementationSpec": {
+            "summary": "锁定技，结束阶段开始时，若你不是体力值最小的角色，你选择一项：1.失去1点体力；2.减1点体力上限。",
+            "timing": "你的结束阶段开始时。",
+            "condition": "你不是体力值最小的角色。",
+            "cost": "无（锁定技，但选项由你选）。",
+            "effect": "失去 1 点体力，或减 1 点体力上限。",
+            "frequency": "锁定技，每回合结束时判定。",
+            "engineHooks": [
+              "onTurnEnd",
+              "benghuai-choice"
+            ]
+          }
+        },
+        {
+          "name": "暴虐",
+          "localSkillId": "baonue",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "c7387185bd5f",
+          "sourceLine": "card__hero__neutral.md:185",
+          "implementationSpec": {
+            "summary": "主公技，每当其他角色造成伤害后，若受到此伤害的角色为群势力，来源可以判定，若结果为黑桃，你回复1点体力。",
+            "timing": "其他角色造成伤害后。",
+            "condition": "你为主公；受伤者为群势力；来源不是你。",
+            "cost": "来源进行一次判定。",
+            "effect": "判定为黑桃则你回复 1 点体力。",
+            "frequency": "无次数限制。",
+            "engineHooks": [
+              "onDamageAfter",
+              "judge",
+              "roles.主公"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
