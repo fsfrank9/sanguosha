@@ -364,6 +364,9 @@
     if (!game) return false;
     var turnActor = game.turn;
     if (!turnActor || !game[turnActor]) return false;
+    // 评审收口: 贾诩阵亡后完杀立即失效 (rule__principle.md — 角色死亡后
+    // 其技能不再生效)。回合可能仍挂在亡者名下 (死于自己回合中)。
+    if (game[turnActor].hp <= 0) return false;
     if (!hasSkill(game[turnActor], 'wansha')) return false;
     if (userActor === turnActor) return false;            // ① 贾诩自己不受限
     // ② 使用者本人正处于濒死状态 → 不受限。濒死者恒为 pauseState.dying.actor。

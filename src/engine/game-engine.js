@@ -375,6 +375,8 @@
         },
         // v15 T 评审收口: 拼点效果挂起后的补弃 (PindianRuntime 后置装配)。
         flushPindianCards: function (game) { return PindianRuntime.flushPindianCards(game); },
+        // v15 U 评审收口: 乱武逐席链的续跑入口 (SkillDomain 后置装配)。
+        advanceLuanwu: function (game) { return SkillDomain.advanceLuanwu(game); },
         // audit4-L5: 决斗链被插入结算挂起后的续跑 (锦囊域后置装配, 包装注入)
         resumeDuelChain: function (game) { return TricksRuntime.advanceDuelChain(game); },
         // v12 H 复核修复: 铁索传导环被濒死救援挂起后的续跑 (伤害域后置装配, 包装注入)
@@ -762,6 +764,12 @@
       // consumeWuxie/requestPlayerResponse 为函数声明/已装配别名, 提升与
       // 装配顺序保证前向引用安全。
       var TricksRuntime = createTricksRuntime({
+        // v15 U 评审收口: AOE 建队列时的目标合法性过滤 (帷幕等"目标合法性"
+        // 类技能, flow__condition.md:101)。晚绑定包装 — isLegalCardTarget
+        // 声明在本处之后。
+        isLegalCardTarget: function (game, actor, card, seat) {
+          return isLegalCardTarget(game, actor, card, seat);
+        },
         // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
         guhuoResponsePossible: guhuoResponsePossible,
         // v15 S 收口: 借刀持刀者使用杀 — 声明牌注入取用口 (不走 consumeResponse)

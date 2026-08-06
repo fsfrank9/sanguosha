@@ -142,6 +142,16 @@
       if (savedAOE && resumeAOETargets) {
         return resumeAOETargets(game);
       }
+      // v15 U 评审收口 [P0]: 乱武逐席链 —— 某席的强制【杀】引出濒死/闪响应
+      // 等挂起时, 选择排空后必须续跑剩余座席。此前 advanceLuanwu 只被自己的
+      // resolver 调用, 一旦链在**非玩家窗口**处挂起 (例如被打的人濒死求桃),
+      // pauseState.luanwu 就永久悬空, 后面的座席一个都不结算。
+      // 位序: 在 aoe 之后 (乱武是最外层的主动技效果, 内层链先收敛)。
+      var savedLuanwu = game.pauseState && game.pauseState.luanwu;
+      if (savedLuanwu && deps.advanceLuanwu) {
+        var luanwuResult = deps.advanceLuanwu(game);
+        if (game.pendingChoice) return luanwuResult || success('回合暂停，等待玩家选择。');
+      }
       // v15 T 评审收口: 拼点"赢/没赢后"效果挂起 (驱虎选受伤角色 / 未来
       // 烈刃认领拼点牌) → 选择排空后补弃处理区里未被认领的拼点牌。官方
       // 顺序是「效果在前, 弃置在后」, 所以不能在效果挂起时就弃。这条只是

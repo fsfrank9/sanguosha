@@ -1197,9 +1197,19 @@
           card: card,
           responseType: responseType,
           title: title,
-          order: seatsFrom(game, actor, false),
+          // v15 U 评审收口 [P1]: 帷幕 (贾诩) 是**目标合法性**类技能
+          // (flow__condition.md:101 明确把【帷幕】列在"对使用牌选择目标的
+          // 合法性能产生影响的技能"里) —— 黑色的南蛮/万箭根本不能指定贾诩
+          // 为目标, 所以在**建队列**时就过滤掉, 而不是在 shouldSkip 里当
+          // "无效"处理 (那是祸首①/巨象①/藤甲 的语义, 两者不同)。
+          order: seatsFrom(game, actor, false).filter(function (seat) {
+            return deps.isLegalCardTarget
+              ? deps.isLegalCardTarget(game, actor, card, seat) : true;
+          }),
           idx: 0
         };
+        // v15 U 祸首②: 伤害来源在"指定目标后"确立一次 (快照)。
+        game.pauseState.aoe.damageSourceActor = resolveAoeDamageSource(game, game.pauseState.aoe);
         return advanceAOETargets(game);
       }
 
@@ -1214,12 +1224,20 @@
       // 发动奸雄获得该【南蛮入侵】) 正说明: 奸雄读的是"造成伤害的牌", 那张
       // 牌仍是原来的南蛮 —— 所以此处只改 damage() 的 sourceActor 参数。
       // 孟获自己用南蛮时不触发 ("其他角色")。
-      function aoeDamageSourceFor(game, aoe) {
+      // 触发时点是"**指定目标后**"一次, 不是逐次伤害时重新判定 —— 官方判例
+      // (:404) 的措辞是"孟获在张春华使用【南蛮入侵】指定目标后会触发【祸首②】,
+      // 轮到对曹操进行结算时…"。故来源在 AOE 开局**快照**一次 (存于
+      // aoe.damageSourceActor), 中途孟获阵亡也不改已确立的来源。
+      function resolveAoeDamageSource(game, aoe) {
         if (!aoe || !aoe.card || aoe.card.type !== 'nanman') return aoe.sourceActor;
         var holder = StateRuntime.aliveSeats(game).find(function (seat) {
           return seat !== aoe.sourceActor && hasSkill(game[seat], 'huoshou');
         });
         return holder || aoe.sourceActor;
+      }
+
+      function aoeDamageSourceFor(game, aoe) {
+        return aoe && aoe.damageSourceActor ? aoe.damageSourceActor : aoe.sourceActor;
       }
 
       function aoeEffectForCurrent(game, aoe, targetActor) {
@@ -1252,7 +1270,10 @@
               kind: 'wanjian-response',
               actor: 'player',
               pauseKey: 'wanjianResponse',
-              source: { sourceActor: aoe.sourceActor, title: title, card: aoe.card },
+              // v15 U 评审收口 [P0]: 挂起快照里的 sourceActor 是 resolver 之后
+              // 用来 damage() 的来源 —— 必须带**替换后**的祸首来源, 否则南蛮的
+              // 玩家蛊惑窗 / 激将求助 两条路径上祸首②静默失效。
+              source: { sourceActor: aoeDamageSourceFor(game, aoe), title: title, card: aoe.card },
               options: listShanResponseOptions(aoeTarget),
               meta: { sourceActor: aoe.sourceActor, sourceName: title },
               logMessage: '等待' + actorName(game, 'player') + '决定是否打出【闪】响应【' + title + '】。',
@@ -1271,7 +1292,10 @@
             kind: 'aoe-sha-response',
             actor: 'player',
             pauseKey: 'aoeShaResponse',
-            source: { sourceActor: aoe.sourceActor, title: title, card: aoe.card },
+            // v15 U 评审收口 [P0]: 挂起快照里的 sourceActor 是 resolver 之后
+              // 用来 damage() 的来源 —— 必须带**替换后**的祸首来源, 否则南蛮的
+              // 玩家蛊惑窗 / 激将求助 两条路径上祸首②静默失效。
+              source: { sourceActor: aoeDamageSourceFor(game, aoe), title: title, card: aoe.card },
             options: listShaResponseOptions(game.player),
             meta: { sourceActor: aoe.sourceActor, sourceName: title },
             logMessage: '等待' + actorName(game, 'player') + '决定是否打出【杀】响应【' + title + '】。',
@@ -1291,7 +1315,7 @@
               kind: aoeAidSkill + '-aid',
               actor: 'player',
               pauseKey: 'lordAidAOE',
-              source: { lordActor: targetActor, title: title, responseType: responseType, sourceActor: aoe.sourceActor, card: aoe.card },
+              source: { lordActor: targetActor, title: title, responseType: responseType, sourceActor: aoeDamageSourceFor(game, aoe), card: aoe.card },
               options: responseType === 'sha' ? listShaResponseOptions(game.player) : listShanResponseOptions(game.player),
               meta: { lordActor: targetActor, sourceName: title, aidSkill: aoeAidSkill },
               logMessage: '等待' + actorName(game, 'player') + '决定是否响应【' + (aoeAidSkill === 'jijiang' ? '激将' : '护驾') + '】。',

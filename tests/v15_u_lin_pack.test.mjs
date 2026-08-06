@@ -511,6 +511,67 @@ test('暴虐: 受伤者非群势力 → 不触发', () => {
   assert.equal(game.player.hp, hpBefore, '非群势力 → 不判定不回血');
 });
 
+// ───── 评审收口回归钉 (opus 前置勘查 + 对抗复现) ─────
+
+test('收口 A2 [牌守恒]: 乱武摸到杀但无合法目标 → 牌退回手牌, 不得消失', () => {
+  const game = trio(['jiaxu', 'caocao', 'liubei']);
+  game.enemy.hand = [c('sha', { id: 'lw-x' })];
+  game.ally.hand = [];
+  const before = collectCardCensus(game).ids.length;
+  Engine.useSkill(game, 'player', 'luanwu', [], {});
+  const census = collectCardCensus(game);
+  assert.equal(census.ids.length, before, 'ID 守恒');
+  assert.deepEqual(census.duplicates || [], [], '零区域重复');
+});
+
+test('收口 A1: 乱武链已接进 resumeSuspendedTurnFlowIfReady (源码锚点)', () => {
+  const text = fs.readFileSync(new URL('../src/engine/response.js', import.meta.url), 'utf8');
+  assert.match(text, /pauseState\.luanwu/, '乱武链必须有续跑分支, 否则挂起后永久悬空');
+});
+
+test('收口 A3: 祸首的伤害来源在挂起快照里也已替换 (源码锚点)', () => {
+  const text = fs.readFileSync(new URL('../src/engine/tricks.js', import.meta.url), 'utf8');
+  assert.equal((text.split('sourceActor: aoe.sourceActor').length - 1), 2,
+    '仅 meta 里的两处显示用途保留裸 sourceActor; source 快照必须走 aoeDamageSourceFor');
+});
+
+test('收口 B1: 帷幕挡黑色 AOE (flow__condition.md:101 目标合法性类技能)', () => {
+  const game = trio(['jiaxu', 'caocao', 'liubei']);
+  game.enemy.hand = [c('nanman', { id: 'nm-black', suit: 'spade', color: 'black' })];
+  game.turn = 'enemy';
+  const before = game.player.hp;
+  Engine.playCard(game, 'enemy', 'nm-black', {});
+  assert.equal(game.player.hp, before, '黑色南蛮不能指定贾诩');
+  assert.equal(game.ally.hp, game.ally.maxHp - 1, '其他座席照常结算');
+});
+
+test('收口 B1b: 红色 AOE 不受帷幕影响', () => {
+  const game = trio(['jiaxu', 'caocao', 'liubei']);
+  game.enemy.hand = [c('nanman', { id: 'nm-red', suit: 'heart', color: 'red' })];
+  game.turn = 'enemy';
+  Engine.playCard(game, 'enemy', 'nm-red', {});
+  assert.equal(game.player.hp, game.player.maxHp - 1, '红色锦囊照常打贾诩');
+});
+
+test('收口 B4: 贾诩阵亡后完杀立即失效', () => {
+  const game = trio(['jiaxu', 'caocao', 'liubei']);
+  game.turn = 'player';
+  game.player.hp = 0;
+  game.enemy.hp = game.enemy.maxHp - 1;
+  const tao = c('tao', { id: 'wt' });
+  assert.equal(Engine.isLegalCardTarget(game, 'enemy', tao, 'enemy'), true,
+    '贾诩已亡 → 其锁定技不再生效');
+});
+
+test('收口 B5: 乱武不绕开距离/目标合法性 (flow__condition.md:107 判例)', () => {
+  const text = fs.readFileSync(new URL('../src/engine/skills.js', import.meta.url), 'utf8');
+  const luanwu = text.slice(text.indexOf('function applyLuanwuForSeat'),
+    text.indexOf('function resolveLuanwuShaChoice'));
+  // 注释里会提到 ignoreDistance (说明为什么**不**传), 所以只钉实际调用。
+  assert.ok(!/playSha\(game, seat, shaCard, \{[^}]*ignoreDistance/.test(luanwu),
+    '乱武不在"改变使用牌的距离限制"的官方技能名单里; 用不出去就失 1 点体力');
+});
+
 await runTests();
 
 console.log('\nv15 U 林包 18 技用例通过。');

@@ -2098,12 +2098,20 @@
         if (shaCard && target) {
           log(game, actorName(game, seat) + '被【乱武】驱使，对' + actorName(game, target)
             + '使用【' + shaCard.name + '】。');
-          // 目标由距离决定, 不受攻击范围约束 → ignoreDistance。
-          var result = deps.playSha(game, seat, shaCard, { target: target, ignoreDistance: true, skipShaCount: true });
+          // 评审收口: 原先传了 ignoreDistance —— **无官方依据**。
+          // flow__condition.md:99 列举"对使用牌的距离合法性能产生影响的技能",
+          // 乱武不在其中; 而 :107 的判例更是明说 "A 受到【同疾】的影响不能
+          // 对马岱使用【杀】, **必须执行失去1点体力的效果**" —— 用不出去就
+          // 掉血, 而不是绕开合法性硬用。故按普通使用流程走。
+          var result = deps.playSha(game, seat, shaCard, { target: target, skipShaCount: true });
           if (result && result.ok) return result;
-          // 使用被拒 (目标保护等) → 退牌并按"否则"失去 1 点体力。
+          // 使用被拒 (距离/目标保护等) → 退牌并按"否则"失去 1 点体力。
           putCard(game, shaCard, { zone: 'hand', actor: seat });
           log(game, '【乱武】：' + actorName(game, seat) + '的【杀】不合法，改为失去 1 点体力。');
+        } else if (shaCard) {
+          // 评审收口 [牌守恒红线]: 摸到了杀但没有合法目标 —— 此前直接落到
+          // 掉血分支, 那张已离手的杀**凭空消失**。必须退回手牌。
+          putCard(game, shaCard, { zone: 'hand', actor: seat });
         }
         state.hp -= 1;
         log(game, actorName(game, seat) + '未对距离最小的角色使用【杀】，因【乱武】失去 1 点体力。');
