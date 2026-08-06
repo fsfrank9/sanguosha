@@ -17,6 +17,7 @@ const SPEC_FIXTURE_PATHS = [
   'tests/fixtures/official_wind_skill_specs.json',
   // v15 T: 火包接入 — 审计按 pack 列表合并加载
   'tests/fixtures/official_fire_skill_specs.json',
+  'tests/fixtures/official_lin_skill_specs.json',
 ].map((rel) => path.join(root, rel));
 const REQUIRED_SPEC_FIELDS = [
   'summary',

@@ -1206,6 +1206,22 @@
       // v13 K2: AOE 驱动改走 advanceTargetQueue 泛化骨架。效果体 (八卦先行/
       // 玩家 ask/consumeResponse/激将护驾/伤害) 保持在驱动侧 (needsWuxieDedup
       // 语义: 无懈开窗后同 idx 重入本函数), 语句与重构前逐行一致。
+      // v15 U: 祸首② (孟获, shu.md:396) — "每当**其他角色**使用【南蛮入侵】
+      // 指定目标后，你代替其成为此【南蛮入侵】造成的伤害的来源。"
+      // ◆旁注 (:400) 把效果本质写成"每名目标角色需打出【杀】，否则受到发动
+      // 此次【祸首②】的角色造成的1点伤害" —— 即只换**伤害来源**, 不换牌、
+      // 不换使用者。判例 (:404: 曹操没打出杀 → 受孟获造成的 1 点伤害 → 可
+      // 发动奸雄获得该【南蛮入侵】) 正说明: 奸雄读的是"造成伤害的牌", 那张
+      // 牌仍是原来的南蛮 —— 所以此处只改 damage() 的 sourceActor 参数。
+      // 孟获自己用南蛮时不触发 ("其他角色")。
+      function aoeDamageSourceFor(game, aoe) {
+        if (!aoe || !aoe.card || aoe.card.type !== 'nanman') return aoe.sourceActor;
+        var holder = StateRuntime.aliveSeats(game).find(function (seat) {
+          return seat !== aoe.sourceActor && hasSkill(game[seat], 'huoshou');
+        });
+        return holder || aoe.sourceActor;
+      }
+
       function aoeEffectForCurrent(game, aoe, targetActor) {
         var responseType = aoe.responseType;
         var title = aoe.title;
@@ -1285,7 +1301,7 @@
           if (tryLordAidSync && tryLordAidSync(game, targetActor, aoeAidSkill, '【' + title + '】')) {
             log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
           } else {
-            damage(game, targetActor, 1, aoe.sourceActor, '【' + title + '】', aoe.card);
+            damage(game, targetActor, 1, aoeDamageSourceFor(game, aoe), '【' + title + '】', aoe.card);
             // 濒死救援等选择挂起 → 保留 aoe 队列, 选择排空后续跑剩余座席
             if (game.pendingChoice) {
               return success('【' + title + '】等待濒死结算…');
@@ -1327,6 +1343,16 @@
             log(game, actorName(game, targetActor) + '的【藤甲】令【' + aoe.title + '】无效。');
             return true;
           }
+          // v15 U: 祸首①(孟获) / 巨象①(祝融) — 锁定技"【南蛮入侵】对你无效"
+          // (shu.md:396 / :440)。与藤甲同层短路: 不开响应窗、不进伤害层。
+          // 注意"无效"≠"不是合法目标" —— 目标仍被指定, 只是效果不生效, 所以
+          // 巨象②的判例 (全场两人, 对唯一目标祝融无效, 该南蛮入弃后祝融仍
+          // 获得之) 才成立: 它仍是一次完整的"使用并结算完毕"。
+          if (aoe.card && aoe.card.type === 'nanman'
+              && (hasSkill(targetState, 'huoshou') || hasSkill(targetState, 'juxiang'))) {
+            log(game, actorName(game, targetActor) + '的锁定技令【' + aoe.title + '】对其无效。');
+            return true;
+          }
           return false;
         },
         wuxieReason: function (game, aoe, targetActor) {
@@ -1335,10 +1361,40 @@
         wuxieKind: 'aoe-target',
         effect: aoeEffectForCurrent,
         onDrain: function (game, aoe) {
+          settleJuxiangClaim(game, aoe);
           game.pauseState.aoe = null;
           return success(aoe.title + '结算完成。');
         }
       };
+
+      // v15 U: 巨象② (祝融, shu.md:440) — "每当其他角色使用的【南蛮入侵】
+      // **因结算完毕而置入弃牌堆后**，你获得之。"
+      //
+      // 本仓的建模细节: playAOE 在开局就把来源牌 discardCard 进弃牌堆
+      // (:1187), 整个逐席结算期间它都躺在弃牌堆里。所以"因结算完毕而入弃"
+      // 的可观测等价时刻就是**队列排空**这一刻, 且判据是"此刻它还在弃牌堆
+      // 里吗" —— 这恰好自动满足官方的两条排除:
+      //   - 判例 :450 (曹操受伤后死亡, 该南蛮随其手牌被弃): 那张牌早被奸雄
+      //     拿走过, 死亡弃置是另一条路径, 此刻不在弃牌堆的"结算完毕"位上;
+      //   - 奸雄/其他"获得造成伤害的牌"抢先拿走 → 它不在弃牌堆 → 不触发。
+      // ◆旁注 :444 的"非转化"排除则看**实体牌本身是不是南蛮**: 用别的牌
+      // 转化出的虚拟南蛮其 physicalCard 不是 nanman (判例 :452 奇策 /
+      // :454 蛊惑 由此排除)。
+      function settleJuxiangClaim(game, aoe) {
+        if (!aoe || !aoe.card) return;
+        var physical = CardRuntime.physicalCardOf(aoe.card);
+        if (!physical || physical.type !== 'nanman') return;
+        var holder = StateRuntime.aliveSeats(game).find(function (seat) {
+          return seat !== aoe.sourceActor && hasSkill(game[seat], 'juxiang');
+        });
+        if (!holder) return;
+        var idx = game.discard.indexOf(physical);
+        if (idx < 0) return; // 已被奸雄等拿走 / 走了别的路径 → 不触发
+        var taken = CardRuntime.takeCard(game, physical, { zone: 'discard' });
+        if (!taken) return;
+        CardRuntime.putCard(game, taken, { zone: 'hand', actor: holder });
+        log(game, actorName(game, holder) + '发动【巨象】，获得结算完毕的【南蛮入侵】。');
+      }
 
       function advanceAOETargets(game) {
         var aoe = game.pauseState && game.pauseState.aoe;

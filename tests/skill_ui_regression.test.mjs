@@ -49,9 +49,9 @@ test('unimplemented skills are visible but explicitly disabled as todo, not sile
   const todoSkills = collectSkills().filter(({ skill }) => skill.status === 'todo');
   // v8 PR-C1..C5 升级 5 个标准包技能 (guose/liuli/jijiu/qingnang/luoshen)
   // 为 implemented, 所以 todo 下限从 80 降至 70; v12 G2 再入 6 技 (神速/红颜/
-  // 天香/雷击/鬼道/不屈) → 降至 64; v15 T 火包 13 技接入 → 降至 50
-  // (剩余未实现仍多于此 — 林/山/SP 三包)。
-  assert.ok(todoSkills.length >= 50, 'expanded hero pool should still mark not-yet-implemented skills as todo');
+  // 天香/雷击/鬼道/不屈) → 降至 64; v15 T 火包 13 技接入 → 降至 50;
+  // v15 U 林包 18 技接入 → 降至 30 (剩余未实现仍多于此 — 山/SP 两包)。
+  assert.ok(todoSkills.length >= 30, 'expanded hero pool should still mark not-yet-implemented skills as todo');
   assert.equal(Engine.HERO_CATALOG.xuchu.skills[0].status, 'implemented');
   // v12 H7: 激将随身份场激活 (display → implemented)。
   // v14 R1: 蛊惑经用户裁定按风包现行版立项接入 (todo → implemented,

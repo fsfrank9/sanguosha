@@ -1031,6 +1031,7 @@
         // v15 U: 英魂"令其弃置 N 张"的被动弃牌选牌 (AIRuntime 后置装配,
         // 晚绑定包装 — 与 scoreCardForAI 同款先例)。
         reshuffleIfNeeded: reshuffleIfNeeded,
+        playSha: function (game, a, card, opts) { return playSha(game, a, card, opts); },
         aiDiscardCandidates: function (game, seat) {
           return AIRuntime.aiDiscardCandidates
             ? AIRuntime.aiDiscardCandidates(game, seat) : null;
@@ -1126,6 +1127,7 @@
       var resolveQuhuVictimChoice = SkillDomain.resolveQuhuVictimChoice;
       var resolveJiemingPickChoice = SkillDomain.resolveJiemingPickChoice;
       var resolveBenghuaiChoice = SkillDomain.resolveBenghuaiChoice;
+      var resolveLuanwuShaChoice = SkillDomain.resolveLuanwuShaChoice;
       var resolveFangzhuPickChoice = SkillDomain.resolveFangzhuPickChoice;
       var resolveYinghunChoice = SkillDomain.resolveYinghunChoice;
       var resolveYaowuRewardChoice = SkillDomain.resolveYaowuRewardChoice;
@@ -1162,6 +1164,8 @@
       registerResponseKind('jieming-pick', resolveJiemingPickChoice);
       // v15 U: 崩坏 (董卓) 锁定技的二选一 (失体力 / 减体力上限)。
       registerResponseKind('benghuai-choice', resolveBenghuaiChoice);
+      // v15 U: 乱武 (贾诩) 逐席窗口 — 使用一张杀, 或失去 1 点体力 (路线图 G12)。
+      registerResponseKind('luanwu-sha', resolveLuanwuShaChoice);
       // v15 U: 放逐 (曹丕) 选目标 / 英魂 (孙坚) 选项 + 目标。
       registerResponseKind('fangzhu-pick', resolveFangzhuPickChoice);
       registerResponseKind('yinghun-choice', resolveYinghunChoice);

@@ -1995,6 +1995,141 @@
         return { baonueApplied: true };
       }
 
+      // ═════ v15 U (林包): 贾诩 乱武 ═════
+      // 官方逐字 (card__hero__neutral.md:199): "限定技，出牌阶段，你可以选择
+      // 所有其他角色，这些角色各需对距离最小的另一名角色使用【杀】，否则失去
+      // 1点体力。"
+      //
+      // 口径四点:
+      //  ① 限定技 → flags.luanwuUsed 永不复位 (涅槃 niepanUsed 先例);
+      //  ② "距离最小的**另一名**角色" —— 距离以**该角色自己**为原点算, 不是
+      //     以贾诩; 且排除其自身。并列最小时由该角色选 (官方"选择"归属行动者);
+      //  ③ 是"**使用**【杀】"而非"打出" —— 走 playSha 使用流程 (借刀先例),
+      //     且目标由距离决定而非攻击范围 → 传 ignoreDistance 绕开射程闸;
+      //  ④ 逐席推进要能挂起 (玩家席需开窗选牌与目标), 用 pauseState.luanwu
+      //     链 (与 aoe/shaChain/duelChain 同款)。
+      function triggerLuanwuActiveSkill(context) {
+        if (context.skillId !== 'luanwu') return null;
+        var game = context.game;
+        var actor = context.actor;
+        var self = context.state;
+        if (!self || !hasSkill(self, 'luanwu')) return null;
+        if (self.flags.luanwuUsed) return fail('【乱武】是限定技，每局限一次。');
+        var order = StateRuntime.seatsFrom(game, actor, false).filter(function (seat) {
+          return game[seat] && game[seat].hp > 0;
+        });
+        if (!order.length) return fail('【乱武】没有其他角色可选。');
+        self.flags.luanwuUsed = true;
+        log(game, actorName(game, actor) + '发动限定技【乱武】，所有其他角色需对距离最小的另一名角色使用【杀】。');
+        if (!game.pauseState) game.pauseState = {};
+        game.pauseState.luanwu = { actor: actor, order: order, idx: 0 };
+        return advanceLuanwu(game);
+      }
+
+      // 该角色的"距离最小的另一名角色"候选 (可能并列)。
+      function luanwuNearestTargets(game, seat) {
+        var others = StateRuntime.aliveSeats(game).filter(function (other) { return other !== seat; });
+        if (!others.length) return [];
+        var min = others.reduce(function (acc, other) {
+          return Math.min(acc, StateRuntime.distanceBetween(game, seat, other));
+        }, Infinity);
+        return others.filter(function (other) {
+          return StateRuntime.distanceBetween(game, seat, other) === min;
+        });
+      }
+
+      function advanceLuanwu(game) {
+        var chain = game.pauseState && game.pauseState.luanwu;
+        if (!chain) return success('乱武结算完成。');
+        while (chain.idx < chain.order.length) {
+          if (game.phase === 'gameover') { game.pauseState.luanwu = null; return success('游戏结束。'); }
+          var seat = chain.order[chain.idx];
+          var state = game[seat];
+          if (!state || state.hp <= 0) { chain.idx += 1; continue; }
+          var targets = luanwuNearestTargets(game, seat);
+          if (!targets.length) { chain.idx += 1; continue; }
+          if (seat === 'player') {
+            // 玩家席开窗: 选一张可用的【杀】与一名距离最小的目标, 或放弃 (失 1 体力)。
+            var shaOptions = (state.hand || []).filter(function (card) {
+              return isShaType(card.type);
+            }).map(function (card) {
+              return { cardId: card.id, name: card.name, suit: card.suit, rank: card.rank };
+            });
+            setPendingChoice(game, {
+              kind: 'luanwu-sha',
+              actor: seat,
+              options: shaOptions,
+              targets: targets.map(function (t) {
+                return { seat: t, name: game[t].name, hp: game[t].hp };
+              })
+            });
+            log(game, '等待' + actorName(game, seat) + '决定【乱武】的响应。');
+            return success('等待【乱武】响应。');
+          }
+          applyLuanwuForSeat(game, seat, null, null);
+          chain.idx += 1;
+          if (game.pendingChoice) return success('【乱武】等待结算…');
+        }
+        game.pauseState.luanwu = null;
+        return success('乱武结算完成。');
+      }
+
+      // 单座席的乱武结算: 能用杀就用 (目标限距离最小者), 否则失去 1 点体力。
+      function applyLuanwuForSeat(game, seat, cardId, targetSeat) {
+        var state = game[seat];
+        if (!state) return null;
+        var targets = luanwuNearestTargets(game, seat);
+        var target = targetSeat && targets.indexOf(targetSeat) >= 0 ? targetSeat : null;
+        if (!target) {
+          // 缺省: 感知敌对优先 (只读公开信息)。
+          target = StateRuntime.perceivedHostileFirstPool(game, seat, targets)[0] || targets[0];
+        }
+        var shaCard = null;
+        if (cardId) {
+          shaCard = (state.hand || []).find(function (card) { return card.id === cardId && isShaType(card.type); });
+          if (shaCard) shaCard = removeCardFromHand(state, cardId);
+        } else {
+          shaCard = removeFirstCardOfType(state, 'sha')
+            || removeFirstCardOfType(state, 'fire_sha')
+            || removeFirstCardOfType(state, 'thunder_sha');
+        }
+        if (shaCard && target) {
+          log(game, actorName(game, seat) + '被【乱武】驱使，对' + actorName(game, target)
+            + '使用【' + shaCard.name + '】。');
+          // 目标由距离决定, 不受攻击范围约束 → ignoreDistance。
+          var result = deps.playSha(game, seat, shaCard, { target: target, ignoreDistance: true, skipShaCount: true });
+          if (result && result.ok) return result;
+          // 使用被拒 (目标保护等) → 退牌并按"否则"失去 1 点体力。
+          putCard(game, shaCard, { zone: 'hand', actor: seat });
+          log(game, '【乱武】：' + actorName(game, seat) + '的【杀】不合法，改为失去 1 点体力。');
+        }
+        state.hp -= 1;
+        log(game, actorName(game, seat) + '未对距离最小的角色使用【杀】，因【乱武】失去 1 点体力。');
+        if (state.hp <= 0) enterDying(game, seat);
+        return { luanwuLostHp: true };
+      }
+
+      // 乱武玩家席 resolver — { cardId, target } 使用杀 / { decline } 失 1 体力。
+      function resolveLuanwuShaChoice(game, pending, decision) {
+        var seat = pending.actor;
+        var d = decision || {};
+        var chain = game.pauseState && game.pauseState.luanwu;
+        if (d.decline || d.skip || !d.cardId) {
+          applyLuanwuForSeat(game, seat, null, StateRuntime.resolveSeatOption(game, d.target));
+        } else {
+          var legalTargets = (pending.targets || []).map(function (t) { return t.seat; });
+          var target = StateRuntime.resolveSeatOption(game, d.target);
+          if (target && legalTargets.indexOf(target) < 0) {
+            setPendingChoice(game, pending);
+            return fail('【乱武】只能对距离最小的角色使用【杀】。');
+          }
+          applyLuanwuForSeat(game, seat, d.cardId, target || legalTargets[0]);
+        }
+        if (chain) chain.idx += 1;
+        if (game.pendingChoice) return success('【乱武】等待结算…');
+        return advanceLuanwu(game);
+      }
+
       // ═════ v15 T (火包): 转化类技能 ═════
       // 火计 (卧龙诸葛亮, card__hero__shu.md:338): "你可以将一张红色手牌当
       // 【火攻】使用。" — 限手牌 (对照武圣的"红色牌"含装备区)。
@@ -3756,6 +3891,9 @@
         SkillRuntime.registerSkill(skillRegistry, 'songwei', {
         onJudgementAfterResolve: function (context) { return triggerSongweiJudgementAfterResolve(context); }
       });
+        SkillRuntime.registerSkill(skillRegistry, 'luanwu', {
+        onActiveSkill: function (context) { return triggerLuanwuActiveSkill(context); }
+      });
         SkillRuntime.registerSkill(skillRegistry, 'lieren', {
         onShaDamageDealt: function (context) { return triggerLierenShaDamageDealt(context); }
       });
@@ -4088,6 +4226,8 @@
           applyHaoshiGive: applyHaoshiGive,
           settleHaoshi: settleHaoshi,
           applyZaiqi: applyZaiqi,
+          resolveLuanwuShaChoice: resolveLuanwuShaChoice,
+          advanceLuanwu: advanceLuanwu,
           resolveYaowuRewardChoice: resolveYaowuRewardChoice,
           resolveGanglieFireChoice: resolveGanglieFireChoice,
           resolveGanglieSourceChoice: resolveGanglieSourceChoice,

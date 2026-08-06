@@ -22,11 +22,14 @@ const CACHE_PATHS = [
   'official-skill-cache/sanguosha-wind/official_wind_skill_cache.json',
   // v15 T: 火包接入 — 新包 cache/specs 成对追加
   'official-skill-cache/sanguosha-fire/official_fire_skill_cache.json',
+  // v15 U: 林包接入
+  'official-skill-cache/sanguosha-lin/official_lin_skill_cache.json',
 ];
 const SPECS_PATHS = [
   'tests/fixtures/official_standard_skill_specs.json',
   'tests/fixtures/official_wind_skill_specs.json',
   'tests/fixtures/official_fire_skill_specs.json',
+  'tests/fixtures/official_lin_skill_specs.json',
 ];
 
 function indexByLocalId(docs, specKey) {
@@ -81,6 +84,8 @@ const VALID_TRIGGERS = new Set([
   'needResponse',
   // v15 T: 猛进触发时机 — "当你使用的【杀】被目标使用的【闪】抵消时"
   'shaDodged',
+  // v15 U: 行殇触发时机 — "每当其他角色死亡时"
+  'death',
 ]);
 const VALID_FREQUENCIES = new Set([
   'oncePerTurn',
