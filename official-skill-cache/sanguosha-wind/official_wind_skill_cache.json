@@ -7,7 +7,8 @@
     "retrieval": "pending-crawl: 风包详情页尚未爬取; 条目由官方实体版规则文本人工转写。",
     "parser": "manual-transcription",
     "copyrightPolicy": "local gitignored development cache; do not commit official prose",
-    "gidPolicy": "provisional-local: gid 216-223 为本地临时编号 (顺接标准包缓存 214-215), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。v13 J4 (2026-07-16) 核对尝试: 本执行环境网络策略拦截 www.sanguosha.com (代理 403), 无法爬取官方索引页 — 如实记录降级, 临时编号保留, 待可直连官网的环境回填。J 尾批 (2026-07-17) 重试: 同一网络策略仍拦截 (CONNECT 403), 降级状态不变。"
+    "gidPolicy": "provisional-local: gid 216-223 为本地临时编号 (顺接标准包缓存 214-215), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。v13 J4 (2026-07-16) 核对尝试: 本执行环境网络策略拦截 www.sanguosha.com (代理 403), 无法爬取官方索引页 — 如实记录降级, 临时编号保留, 待可直连官网的环境回填。J 尾批 (2026-07-17) 重试: 同一网络策略仍拦截 (CONNECT 403), 降级状态不变。",
+    "rawCachePolicy": "cache-first: keep official prose only in the gitignored local cache; regenerate this public spec fixture from cache and fetch official pages only when the cache is missing or stale. 风包爬取待补: 当前条目由风包官方实体规则文本人工转写生成, sourceTextRef/sourceTextSha256 为该转写文本的 sha256, 首次爬取官方页面时必须复核。 v15 W2 第五轮审计已用入库的 gltjk 镜像 (official-skill-cache/gltjk-sanguosha-rules/pages/) 对全部 11 技逐条复核, 兑现上句的\"首次爬取官方页面时必须复核\"。**换版本的前提是整张武将牌的技能集一致** —— 只挑技能行不看技能集会得到一个任何官方版本都不存在的武将 (本轮的教训: 曾据（风）曹仁的\"据守摸一张\"改小本仓曹仁, 但（风）曹仁是\"据守+【解围】\"的双技重做卡, 本仓这张单技曹仁对应的是摸三张的四个版本, 已还原)。据此复核结论: 雷击更正为（风）版 (黑色/1 点雷电 + 张角回复 1 点体力, neutral.md:272) —— 张角的风与旧风技能集相同 (雷击/鬼道/黄天), 且 v14 R1 已就蛊惑确立\"取风包**现行**版\"的先例; 其余 10 技与镜像逐字一致或本就等价。"
   },
   "includeFullSkillText": false,
   "containsOfficialText": false,
@@ -217,21 +218,22 @@
           "name": "雷击",
           "localSkillId": "leiji",
           "implementationStatus": "implemented",
-          "sourceTextRef": "c2034327c035",
+          "sourceTextRef": "79cb60969b67",
           "sourceTextSha256": "c2034327c035570bc6658e04bac7de35bb62ed7cd1301ab4378f75fe0c581ee2",
           "implementationSpec": {
-            "summary": "使用或打出【闪】时可令一名其他角色判定，黑桃则受2点雷电伤害。",
+            "summary": "使用或打出【闪】时可令一名其他角色判定，黑色则对其造成 1 点雷电伤害并回复 1 点体力。",
             "timing": "当你使用或打出【闪】时（含八卦视为打出）。",
             "condition": "场上存在其他存活角色。",
             "cost": "无成本，可选发动。",
-            "effect": "令一名其他角色进行判定：若结果为黑桃，你对其造成2点雷电伤害。",
+            "effect": "判定黑色 → 对该角色造成 1 点雷电伤害，且张角回复 1 点体力；非黑色无事发生。",
             "frequency": "每次使用或打出【闪】均可发动。",
             "engineHooks": [
               "onShanUsed",
               "judge",
               "damage.thunder"
             ]
-          }
+          },
+          "sourceLine": "card__hero__neutral.md:272"
         },
         {
           "name": "鬼道",

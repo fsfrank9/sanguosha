@@ -237,7 +237,8 @@ test('雷击 3p: 张角为第三席时目标不再恒为 player (敌对优先)',
   const playerHp = game.player.hp;
   const r = Engine.playCard(game, 'player', 'p-sha', { target: 'ally' });
   assert.equal(r.ok, true, r.message);
-  assert.equal(game.enemy.hp, enemyHp - 2, '雷击目标 = 敌对座席 enemy (2 点雷伤)');
+  // W2 (F6): 雷击按风包现行版更正为 1 点雷电伤害 (本测钉的是**目标选择**, 与伤害量无关)。
+  assert.equal(game.enemy.hp, enemyHp - 1, '雷击目标 = 敌对座席 enemy (1 点雷伤)');
   assert.equal(game.player.hp, playerHp, 'player (同阵营) 未被误指');
 });
 

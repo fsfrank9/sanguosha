@@ -209,7 +209,7 @@ function armLeijiAsk(game, judgeCard) {
   UI.render();
 }
 
-test('雷击面板: 玩家出闪后挂 leiji-ask → 面板可见 → 点座席暂存 + 确定 → 判定黑桃命中', () => {
+test('雷击面板: 玩家出闪后挂 leiji-ask → 面板可见 → 点座席暂存 + 确定 → 判定黑色命中', () => {
   const game = startGameViaUI('zhangjiao', 'liubei');
   armLeijiAsk(game, c('sha', { id: 'ui-lj-judge', suit: 'spade', rank: '4' }));
 
@@ -224,7 +224,8 @@ test('雷击面板: 玩家出闪后挂 leiji-ask → 面板可见 → 点座席�
   $('handConfirmBtn').click();
 
   assert.equal(game.pendingChoice, null, '确定后提交');
-  assert.equal(game.enemy.hp, enemyHpBefore - 2, '判定黑桃 → 2 点雷电伤害');
+  // W2 (F6): 雷击按风包现行版更正 (黑色 / 1 点雷电 / 张角回复 1 点体力)。
+  assert.equal(game.enemy.hp, enemyHpBefore - 1, '判定黑色 → 1 点雷电伤害');
   assert.equal($('leijiAskPanel').hidden, true, '面板关闭');
 });
 
@@ -262,7 +263,8 @@ test('雷击→鬼道链: 判定红桃 → 鬼道独立面板 (事由【雷击�
   $('handConfirmBtn').click();
 
   assert.equal(game.pendingChoice, null, '改判已提交');
-  assert.equal(game.enemy.hp, enemyHpBefore - 2, '黑桃替换 → 雷击命中 2 点雷伤');
+  // W2 (F6): 雷击按风包现行版更正 (黑色 / 1 点雷电 / 张角回复 1 点体力)。
+  assert.equal(game.enemy.hp, enemyHpBefore - 1, '黑色替换 → 雷击命中 1 点雷伤');
   // 张角三修: 鬼道 "替换" → 张角获得原判定牌 (进手牌)。
   assert.ok(game.player.hand.some((card) => card.id === 'ui-lj-judge3'), '原判定牌被张角获得 (进手牌)');
   assert.ok(game.discard.some((card) => card.id === 'ui-lj-spade'), '替换牌进弃牌堆');

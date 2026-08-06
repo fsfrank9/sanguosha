@@ -83,14 +83,15 @@ test('R2: leiji-ask decline → 不判定不掉血, 牌堆不消耗', () => {
   assert.ok(game.log.some((l) => l.includes('选择不发动【雷击】')));
 });
 
-test('R3: leiji-ask 指定目标 → 判定黑桃, 目标受 2 点雷电伤害', () => {
+test('R3: leiji-ask 指定目标 → 判定黑色, 目标受 1 点雷电伤害', () => {
   const game = buildGame();
   game.deck.push(c('sha', { id: 'leiji-judge', suit: 'spade', rank: '4' }));
   enemyShaPlayerShan(game);
   const enemyHpBefore = game.enemy.hp;
   const resolveResult = assertCardConservation(game, () => Engine.resolvePendingChoice(game, { target: 'enemy' }));
   assert.equal(resolveResult.ok, true, resolveResult.message);
-  assert.equal(game.enemy.hp, enemyHpBefore - 2, '判定黑桃 → 2 点雷电伤害');
+  // W2 (F6): 雷击按风包现行版更正 (黑色 / 1 点雷电 / 张角回复 1 点体力)。
+  assert.equal(game.enemy.hp, enemyHpBefore - 1, '判定黑色 → 1 点雷电伤害');
   assert.ok(game.discard.some((x) => x.id === 'leiji-judge'), '判定牌进弃牌堆');
   assert.equal(game.pendingChoice, null);
   assert.ok(game.log.some((l) => l.includes('雷电')));
@@ -103,7 +104,8 @@ test('R4: leiji-ask {auto:true} (soak 驱动兜底) → 敌先池目标, 与旧�
   const enemyHpBefore = game.enemy.hp;
   const resolveResult = assertCardConservation(game, () => Engine.resolvePendingChoice(game, { auto: true }));
   assert.equal(resolveResult.ok, true, resolveResult.message);
-  assert.equal(game.enemy.hp, enemyHpBefore - 2, 'auto → 敌对座席');
+  // W2 (F6): 雷击按风包现行版更正为 1 点雷电伤害。
+  assert.equal(game.enemy.hp, enemyHpBefore - 1, 'auto → 敌对座席');
 });
 
 test('R5: leiji=auto 显式偏好 → 保留旧直发口径 (不挂 pendingChoice)', () => {
@@ -115,7 +117,8 @@ test('R5: leiji=auto 显式偏好 → 保留旧直发口径 (不挂 pendingChoic
   const playResult = assertCardConservation(game, () => enemyShaPlayerShan(game));
   assert.equal(playResult.ok, true, playResult.message);
   assert.equal(game.pendingChoice, null, '不挂起');
-  assert.equal(game.enemy.hp, enemyHpBefore - 2, '直发命中');
+  // W2 (F6): 雷击按风包现行版更正为 1 点雷电伤害。
+  assert.equal(game.enemy.hp, enemyHpBefore - 1, '直发命中');
 });
 
 test('R6: 无效目标 → fail 且重挂, 重选合法目标可继续 (选择不丢失)', () => {
@@ -128,7 +131,8 @@ test('R6: 无效目标 → fail 且重挂, 重选合法目标可继续 (选择�
   const enemyHpBefore = game.enemy.hp;
   const retry = assertCardConservation(game, () => Engine.resolvePendingChoice(game, { target: 'enemy' }));
   assert.equal(retry.ok, true, retry.message);
-  assert.equal(game.enemy.hp, enemyHpBefore - 2, '重选合法目标后正常结算');
+  // W2 (F6): 雷击按风包现行版更正为 1 点雷电伤害。
+  assert.equal(game.enemy.hp, enemyHpBefore - 1, '重选合法目标后正常结算');
 });
 
 // ───── 2+3. 雷击内嵌判定 × 鬼道/鬼才 改判 ────────────────────────────
@@ -148,7 +152,8 @@ test('R7: 雷击判定红桃 → 鬼道 ask 挂起, 玩家打出黑桃替换 →
   assert.equal(game.enemy.hp, enemyHpBefore, '改判未决, 伤害未结算');
   resolveResult = assertCardConservation(game, () => Engine.resolvePendingChoice(game, { cardId: 'g-spade' }));
   assert.equal(resolveResult.ok, true, resolveResult.message);
-  assert.equal(game.enemy.hp, enemyHpBefore - 2, '黑桃替换后命中 → 2 点雷电伤害');
+  // W2 (F6): 雷击按风包现行版更正 (黑色 / 1 点雷电 / 张角回复 1 点体力)。
+  assert.equal(game.enemy.hp, enemyHpBefore - 1, '黑色替换后命中 → 1 点雷电伤害');
   // 张角三修: 鬼道 "替换" → 张角获得原判定牌 (进手牌), 非弃置。
   assert.ok(game.player.hand.some((x) => x.id === 'leiji-judge'), '原判定牌被张角获得 (进手牌)');
   assert.ok(!game.discard.some((x) => x.id === 'leiji-judge'), '原判定牌不进弃牌堆');
@@ -167,7 +172,8 @@ test('R8: 雷击判定黑桃 → 鬼道 ask 放弃 ({cardId:null}) → 原判定
   const enemyHpBefore = game.enemy.hp;
   const resolveResult = assertCardConservation(game, () => Engine.resolvePendingChoice(game, { cardId: null }));
   assert.equal(resolveResult.ok, true, resolveResult.message);
-  assert.equal(game.enemy.hp, enemyHpBefore - 2, '放弃改判, 原黑桃判定命中 — 用户实测"黑桃不命中"根因回归');
+  // W2 (F6): 雷击按风包现行版更正为 1 点雷电伤害。
+  assert.equal(game.enemy.hp, enemyHpBefore - 1, '放弃改判, 原黑桃判定命中 — 用户实测"黑桃不命中"根因回归');
   assert.ok(game.player.hand.some((x) => x.id === 'g-club'), '手牌毫发无损 (不再被 auto 乱换)');
   assert.ok(game.log.some((l) => l.includes('选择不发动【鬼道】')));
 });
@@ -199,7 +205,8 @@ test('R10: AI 张角雷击判定已黑桃 → 鬼道不动 (不再亲手换掉�
   const playerHpBefore = game.player.hp;
   const playResult = assertCardConservation(game, () => Engine.playCard(game, 'player', 'p-sha'));
   assert.equal(playResult.ok, true, playResult.message);
-  assert.equal(game.player.hp, playerHpBefore - 2, '黑桃判定保留 → AI 雷击命中玩家');
+  // W2 (F6): 雷击按风包现行版更正为 1 点雷电伤害。
+  assert.equal(game.player.hp, playerHpBefore - 1, '黑桃判定保留 → AI 雷击命中玩家');
   assert.ok(game.enemy.hand.some((x) => x.id === 'ai-club'), '梅花未被浪费');
   assert.ok(!game.log.some((l) => l.includes('【鬼道】')), '鬼道未发动');
 });
@@ -213,7 +220,8 @@ test('R11: AI 张角雷击判定红桃且手有黑桃 → 鬼道替换成黑桃�
   const playerHpBefore = game.player.hp;
   const playResult = assertCardConservation(game, () => Engine.playCard(game, 'player', 'p-sha'));
   assert.equal(playResult.ok, true, playResult.message);
-  assert.equal(game.player.hp, playerHpBefore - 2, '鬼道补黑桃 → 雷击命中');
+  // W2 (F6): 雷击按风包现行版更正为 1 点雷电伤害。
+  assert.equal(game.player.hp, playerHpBefore - 1, '鬼道补黑桃 → 雷击命中');
   assert.ok(game.log.some((l) => l.includes('【鬼道】')));
   assert.ok(game.discard.some((x) => x.id === 'ai-spade'), '黑桃替换牌结算后进弃牌堆');
 });

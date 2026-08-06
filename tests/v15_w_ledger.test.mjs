@@ -275,4 +275,60 @@ test('W2 官方判例 glossary__flow.md:15 — 五席下额外回合插队后轮
   assert.equal(game.extraTurnReturnSeat, 'enemy', '之后回到 A 的下家 B — 即 E-B-C-D-E-A');
 });
 
+// ───── W2 F7: 暴虐是"造成伤害后"(来源侧), 伤害致死不该令其失效 ─────
+test('W2-F7: 伤害致死时暴虐仍结算 (来源侧时机不受"受害者存活"约束)', () => {
+  const game = Engine.newGame({
+    seed: 95050, seats: ['player', 'enemy', 'ally', 'ally2'],
+    roles: { player: '主公', enemy: '反贼', ally: '反贼', ally2: '忠臣' },
+    playerHero: 'dongzhuo', enemyHero: 'zhangjiao', allyHero: 'huaxiong', ally2Hero: 'huatuo',
+  });
+  game.log = []; game.discard = [];
+  for (const seat of game.seats) {
+    game[seat].hand = []; game[seat].judgeArea = []; game[seat].flags = {}; game[seat].skillPreferences = {};
+    game[seat].equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
+    game[seat].hp = game[seat].maxHp;
+  }
+  // 判定牌控成黑桃 (牌堆顶是数组末尾)。
+  game.deck = Array.from({ length: 10 }, (_, i) => c('sha', { id: 'bn' + i }))
+    .concat([c('sha', { id: 'bn-judge', suit: 'spade', rank: '9' })]);
+  game.player.hp = game.player.maxHp - 2;   // 董卓受伤, 回血可观测
+  game.enemy.hp = 1;                        // 张角(群) 一刀致死
+  game.enemy.skillPreferences.leiji = 'decline';
+  game.ally.hand = [c('sha', { id: 'bn-kill' })];   // 华雄(群) 动手 = "其他角色造成伤害"
+  game.turn = 'ally'; game.phase = 'play';
+  game.pendingChoice = null; game.pendingChoiceQueue = []; game.pauseState = {};
+  const lordHpBefore = game.player.hp;
+  Engine.playCard(game, 'ally', 'bn-kill', { target: 'enemy' });
+  while (game.pendingChoice) Engine.resolvePendingChoice(game, { decline: true });
+  assert.ok(game.enemy.hp <= 0, '张角被一刀带走');
+  assert.ok(game.log.some((line) => line.includes('【暴虐】')),
+    '暴虐仍应结算 —— 此前整条 onDamageAfter 派发被"受害者存活"一起闸住, '
+    + '而"造成伤害后"是来源侧时机, 恰恰最常发生在致死那一刀上');
+  assert.equal(game.player.hp, lordHpBefore + 1, '黑桃判定 → 董卓回复 1 点体力');
+});
+
+test('W2-F7: 受害侧的"受到伤害后"技能在目标死亡后仍不触发 (未被误放开)', () => {
+  const game = Engine.newGame({
+    seed: 95051, seats: ['player', 'enemy', 'ally'],
+    roles: { player: '主公', enemy: '反贼', ally: '反贼' },
+    playerHero: 'caocao', enemyHero: 'simayi', allyHero: 'huatuo',
+  });
+  game.log = []; game.discard = [];
+  for (const seat of game.seats) {
+    game[seat].hand = []; game[seat].judgeArea = []; game[seat].flags = {}; game[seat].skillPreferences = {};
+    game[seat].equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
+    game[seat].hp = game[seat].maxHp;
+  }
+  game.deck = Array.from({ length: 10 }, (_, i) => c('sha', { id: 'fk-d' + i }));
+  game.enemy.hp = 1;                       // 司马懿(反馈) 一刀致死
+  game.player.hand = [c('sha', { id: 'fk-kill' }), c('tao', { id: 'fk-loot' })];
+  game.turn = 'player'; game.phase = 'play';
+  game.pendingChoice = null; game.pendingChoiceQueue = []; game.pauseState = {};
+  Engine.playCard(game, 'player', 'fk-kill', { target: 'enemy' });
+  while (game.pendingChoice) Engine.resolvePendingChoice(game, { decline: true });
+  assert.ok(game.enemy.hp <= 0, '司马懿阵亡');
+  assert.ok(!game.log.some((line) => line.includes('【反馈】')),
+    '反馈是受害侧"受到伤害后", 死后不触发 (flow__damage.md:97) — 拆时机不得把它一起放开');
+});
+
 runTests(import.meta.url);
