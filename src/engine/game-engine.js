@@ -89,7 +89,28 @@
         var index = randomHandIndex(game, from);
         var card = moveCard(game, from.hand[index], { zone: 'hand', actor: fromActor }, { zone: 'hand', actor: toActor });
         log(game, actorName(game, toActor) + (reason || '获得') + actorName(game, fromActor) + '的一张手牌。');
+        notifyCardLoss(game, fromActor);
         return card;
+      }
+
+      // ── v15 V: "失去牌后" 单点 (屯田) ──
+      // 官方 屯田 是"每当你于回合外失去牌后"。引擎此前没有失牌时机, 这里
+      // 补一个显式广播点, 由**牌确实已离开该角色区域之后**的出口调用:
+      //   · takeHandCard        (被顺手牵羊/反馈/巧变等获得手牌)
+      //   · removeTargetZoneCard(被拆/被顺/被弃 —— 目标区域任意一张)
+      //   · consumeResponse     (打出闪/无懈等响应牌; 回合外失牌的主力来源)
+      //   · discardSelected / discardExcess (弃牌阶段; 屯田自身按"回合外"过滤)
+      // 重入保护: 屯田会在 hook 里判定, 判定牌入弃牌堆 / 被天妒收走都可能
+      // 再次走到上面的出口 —— 没有闸就会无限递归。
+      function notifyCardLoss(game, actor) {
+        if (!game || !game[actor] || game.phase === 'gameover') return;
+        if (game.cardLossInFlight) return;
+        game.cardLossInFlight = true;
+        try {
+          SkillRuntime.runHook(skillRegistry, 'onCardLost', { game: game, actor: actor });
+        } finally {
+          game.cardLossInFlight = false;
+        }
       }
 
       function performDrawPhase(game, actor) {
@@ -215,6 +236,13 @@
             if (card && card.id === cardId) return { card: card, zone: 'equipment', slot: slot };
           }
         }
+        // v15 V: 武将牌上的"田"区 (邓艾 屯田)。只有 canPlayCardAs / playCardAs
+        // 两条转化路径走本函数, 且各技能的 onCardAs hook 自己把关来源区域
+        // (急袭只认"田"), 所以这里放开不会让"田"当普通牌打出。响应扫描
+        // (firstMatchingOwnCard) 刻意**不**覆盖"田" —— 否则"田"里的【闪】会
+        // 被自动打出去。
+        var tianHit = (state.tian || []).find(function (c) { return c.id === cardId; });
+        if (tianHit) return { card: tianHit, zone: 'tian' };
         return null;
       }
 
@@ -236,6 +264,15 @@
         if (!hit) return null;
         if (hit.zone === 'hand') {
           return removeCardFromHand(state, cardId);
+        }
+        // v15 V: "田"离场 (急袭把一张"田"当【顺手牵羊】使用)。
+        if (hit.zone === 'tian') {
+          var ownerOfTian = seatOfState(game, state);
+          if (game && ownerOfTian) {
+            return takeCard(game, cardId, { zone: 'tian', actor: ownerOfTian });
+          }
+          state.tian = (state.tian || []).filter(function (c) { return c.id !== cardId; });
+          return hit.card;
         }
         // equipment — M2: 制衡/苦肉/武圣转化等把装备区牌当成本, 同样是"失去
         // 装备" — 传入 game 的调用方会触发失去时机 (白银狮子回血)。
@@ -377,6 +414,8 @@
         flushPindianCards: function (game) { return PindianRuntime.flushPindianCards(game); },
         // v15 U 评审收口: 乱武逐席链的续跑入口 (SkillDomain 后置装配)。
         advanceLuanwu: function (game) { return SkillDomain.advanceLuanwu(game); },
+        // v15 V: 放权 —— onTurnEnd 挂起后的回合收尾 + 额外回合派发续跑。
+        resumeTurnEndAndAdvance: function (game) { return resumeTurnEndAndAdvance(game); },
         // audit4-L5: 决斗链被插入结算挂起后的续跑 (锦囊域后置装配, 包装注入)
         resumeDuelChain: function (game) { return TricksRuntime.advanceDuelChain(game); },
         // v12 H 复核修复: 铁索传导环被濒死救援挂起后的续跑 (伤害域后置装配, 包装注入)
@@ -692,6 +731,8 @@
             : (response.card && StateRuntime.effectiveCardColor(game[actor], response.card) === 'black' ? [response.card] : []);
           if (blackCards.length > 0) triggerYinyueQiang(game, actor);
         }
+        // v15 V: 打出响应牌 = 失去牌 (屯田的主力触发源, 回合外过滤在技能侧)
+        notifyCardLoss(game, actor);
         return true;
       }
 
@@ -1104,6 +1145,8 @@
         randomSuit: randomSuit,
         removeOwnCardFromAnyZone: removeOwnCardFromAnyZone,
         removeTargetZoneCard: removeTargetZoneCard,
+        // v15 V: 直谏 — 把手牌区的装备牌置入他人装备区 (顶替旧装备照常入弃牌堆)。
+        equipCard: equipCard,
         // v15 T: 猛进 ask 挂起后续跑闪避分支剩余流程 (杀链域后置装配,
         // 包装注入 — 与 resumeAOETargets 等既有晚绑定同款)。
         continueShaDodgeAfterSkills: function (game, actor, card, amount, targetActor) {
@@ -1135,6 +1178,10 @@
       var resolveNiepanAskChoice = SkillDomain.resolveNiepanAskChoice;
       var resolveQuhuVictimChoice = SkillDomain.resolveQuhuVictimChoice;
       var resolveJiemingPickChoice = SkillDomain.resolveJiemingPickChoice;
+      // v15 V (山包)
+      var resolveTiaoxinDemandChoice = SkillDomain.resolveTiaoxinDemandChoice;
+      var resolveZhijiChoice = SkillDomain.resolveZhijiChoice;
+      var resolveFangquanGrantChoice = SkillDomain.resolveFangquanGrantChoice;
       var resolveBenghuaiChoice = SkillDomain.resolveBenghuaiChoice;
       var resolveLuanwuShaChoice = SkillDomain.resolveLuanwuShaChoice;
       var resolveFangzhuPickChoice = SkillDomain.resolveFangzhuPickChoice;
@@ -1200,6 +1247,15 @@
       registerResponseKind('luoshen-continue', resolveLuoshenContinueChoice);
       // v11 C7 (批次 31): 耀武 — 伤害来源的奖励二选一
       registerResponseKind('yaowu-reward', resolveYaowuRewardChoice);
+      // ── v15 V (山包) ──
+      // 挑衅: 被指定者选"对姜维出杀"还是"被弃一张牌"。
+      registerResponseKind('tiaoxin-demand', resolveTiaoxinDemandChoice);
+      // 志继: 觉醒后的"回复 1 点体力 / 摸两张牌"二选一。
+      registerResponseKind('zhiji-choice', resolveZhijiChoice);
+      // 放权: 回合结束时"弃一张手牌令一名其他角色获得额外回合"。
+      registerResponseKind('fangquan-grant', resolveFangquanGrantChoice);
+      // 享乐: 杀的**来源**决定是否弃一张基本牌 (resolver 在杀结算链域)。
+      registerResponseKind('xiangle-cost', ShaFlowRuntime.resolveXiangleCostChoice);
 
       // ───── v12 H7: 主公技·激将/护驾 求助框架 ─────
       // 主公需要打出【杀】(激将, 蜀) / 【闪】(护驾, 魏) 而自身打不出时,
@@ -1552,16 +1608,21 @@
         }
         if (!picked || !picked.card) return null;
         if (zone === 'hand') {
-          return { card: takeCard(game, picked.card, { zone: 'hand', actor: targetActor }), zone: '手牌' };
+          var takenHand = takeCard(game, picked.card, { zone: 'hand', actor: targetActor });
+          notifyCardLoss(game, targetActor); // v15 V: 屯田
+          return { card: takenHand, zone: '手牌' };
         }
         if (zone === 'equipment') {
           takeCard(game, picked.card, { zone: 'equipment', actor: targetActor, slot: picked.slot });
           // M2: 被拆/被顺/被反馈拿走装备同样是"失去装备区里的牌"
           triggerEquipmentLoss(game, targetActor, picked.card);
+          notifyCardLoss(game, targetActor); // v15 V: 屯田
           return { card: picked.card, zone: '装备区' };
         }
         if (zone === 'judge') {
-          return { card: takeCard(game, picked.card, { zone: 'judgeArea', actor: targetActor }), zone: '判定区' };
+          var takenJudge = takeCard(game, picked.card, { zone: 'judgeArea', actor: targetActor });
+          notifyCardLoss(game, targetActor); // v15 V: 屯田
+          return { card: takenJudge, zone: '判定区' };
         }
         return null;
       }
@@ -2073,6 +2134,16 @@
           });
       }
 
+      // v15 V: 普通锦囊的 "指定目标后" 时机 (flow__use.md step 5)。
+      // 目前唯一消费者是 激昂 (孙策) —— 它只关心【决斗】与红色【杀】, 后者
+      // 走既有的 onShaTargeted, 所以这里只需要决斗一处接入点。
+      function runTrickTargetedHooks(game, actor, card, targetActor) {
+        if (game.phase === 'gameover') return;
+        SkillRuntime.runHook(skillRegistry, 'onTrickTargeted', {
+          game: game, sourceActor: actor, targetActor: targetActor, card: card
+        });
+      }
+
       function playJuedouCardHandler(game, actor, card, options, self) {
           // v10 V5: 走无懈链框架. WUXIE_CONTINUATIONS['juedou'] 注册在 trick 区下方.
           // v12 H1: options.target 显式目标 (缺省 1v1 对手), 无懈首询者 = 目标。
@@ -2081,6 +2152,7 @@
             putCard(game, card, { zone: 'hand', actor: actor });
             return fail('无效的【决斗】目标。');
           }
+          runTrickTargetedHooks(game, actor, card, duelTargetActor);
           return checkWuxieAndContinue(game, duelTargetActor, '【决斗】', 'juedou', {
             actor: actor, card: card, options: options, targetActor: duelTargetActor
           });
@@ -2426,8 +2498,33 @@
 
       // v14 Q3: 摸牌阶段收尾 + 推进出牌/弃牌 — 自 continueTurnAfterJudgeArea
       // 尾部拆出, 供 突袭 ask resolver 重入 (语句与拆出前逐行一致)。
+      // ── v15 V: 出牌阶段开始前 (放权) ──
+      // 官方 放权 是"你可以跳过出牌阶段" —— 决策点在摸牌阶段结束、出牌阶段
+      // 开始之前。引擎既有的跳过出口是 flags.skipPlay (神速/乐不思蜀 共用),
+      // 本 hook 就是让技能有机会在 nextPlayablePhase 读它之前写它。
+      function runBeforePlayPhaseHooks(game, actor) {
+        if (game.phase === 'gameover' || !game[actor]) return;
+        SkillRuntime.runHook(skillRegistry, 'onBeforePlayPhase', { game: game, actor: actor });
+      }
+
+      // ── v15 V: 弃牌阶段结束时 (固政) ──
+      // discardedCards = 本阶段内该角色因弃置而失去的手牌 (recordDiscardPhaseLoss
+      // 记账)。传的是**牌对象引用**, 技能侧据此在弃牌堆里定位 (中途被别的
+      // 技能拿走的不再计入)。
+      function runDiscardPhaseEndHooks(game, actor) {
+        if (game.phase === 'gameover' || !game[actor]) return;
+        var flags = game[actor].flags || {};
+        SkillRuntime.runHook(skillRegistry, 'onDiscardPhaseEnd', {
+          game: game,
+          actor: actor,
+          discardedCards: (flags.discardPhaseCards || []).slice()
+        });
+        flags.discardPhaseCards = [];
+      }
+
       function finishDrawPhaseAndAdvance(game, actor) {
         var state = game[actor];
+        runBeforePlayPhaseHooks(game, actor);
         setPhase(game, actor, nextPlayablePhase(state));
         log(game, actorName(game, actor) + '进入' + (game.phase === 'play' ? '出牌' : '弃牌') + '阶段。');
         return success('回合开始。');
@@ -2573,7 +2670,19 @@
           }
         }
         log(game, actorName(game, actor) + '弃置 ' + discarded.length + ' 张牌，满足手牌上限。');
+        recordDiscardPhaseLoss(game, actor, discarded);
         return success('弃牌完成。');
+      }
+
+      // v15 V: 固政 (张昭张纮) 要"其于此阶段内因其弃置而失去过的手牌", 所以
+      // 弃牌阶段的弃牌要按回合记账。存在 state.flags 上, 随 setPhase 进入
+      // 弃牌阶段时清空 (见 setPhase), 由 onDiscardPhaseEnd 消费。
+      function recordDiscardPhaseLoss(game, actor, cards) {
+        var state = game[actor];
+        if (!state || game.phase !== 'discard' || !cards || !cards.length) return;
+        state.flags = state.flags || {};
+        state.flags.discardPhaseCards = (state.flags.discardPhaseCards || []).concat(cards);
+        notifyCardLoss(game, actor); // v15 V: 屯田 (回合外过滤在技能侧)
       }
 
       function getDiscardCount(game, actor) {
@@ -2614,6 +2723,7 @@
           }
         }
         log(game, actorName(game, actor) + '弃置 ' + discarded.length + ' 张牌，满足手牌上限。');
+        recordDiscardPhaseLoss(game, actor, discarded);
         return success('弃牌完成。');
       }
 
@@ -2640,6 +2750,7 @@
           return success('进入摸牌阶段。');
         }
         if (game.phase === 'draw') {
+          runBeforePlayPhaseHooks(game, actor);
           setPhase(game, actor, nextPlayablePhase(game[actor]));
           log(game, actorName(game, actor) + '进入' + (game.phase === 'play' ? '出牌' : '弃牌') + '阶段。');
           return success('进入' + (game.phase === 'play' ? '出牌' : '弃牌') + '阶段。');
@@ -2647,6 +2758,7 @@
         if (game.phase === 'play') return finishPlayPhase(game);
         if (game.phase === 'discard') {
           if (needsDiscard(game, actor)) return fail('需要先弃置 ' + getDiscardCount(game, actor) + ' 张牌。');
+          runDiscardPhaseEndHooks(game, actor);
           setPhase(game, actor, 'finish');
           log(game, actorName(game, actor) + '进入结束阶段。');
           return success('进入结束阶段。');
@@ -2675,16 +2787,73 @@
           // 酒他指的加成泄漏到后续回合 (使用者饮酒喂人后本回合内反伤
           // 阵亡等场景)。
           clearAllShaBonus(game);
+          // v15 V: 阵亡早退同样要派发已排队的额外回合 (放权 的受赠者可能
+          // 正是杀死回合角色的人), 否则队列会一直压着不消费。
+          var deadExtra = takeNextExtraTurn(game);
+          if (deadExtra) {
+            log(game, actorName(game, deadExtra) + '获得一个额外的回合。');
+            game.extraTurnReturnSeat = game.extraTurnReturnSeat || nextSeat(game, ending);
+            return startTurn(game, deadExtra);
+          }
+          var deadResume = game.extraTurnReturnSeat;
+          if (deadResume) {
+            game.extraTurnReturnSeat = null;
+            return startTurn(game, deadResume);
+          }
           return startTurn(game, nextSeat(game, ending));
         }
         SkillRuntime.runHook(skillRegistry, 'onTurnEnd', {
           game: game,
           actor: ending
         });
+        // v15 V: 放权 的额外回合窗口开在"此回合结束时" → onTurnEnd 里可能
+        // 挂起 (玩家选给谁)。挂起时不推进回合, 由 resolver 收尾后续跑。
+        if (game.pendingChoice) {
+          game.pauseState = game.pauseState || {};
+          game.pauseState.turnEndPending = { actor: ending };
+          return success('回合结束时机等待玩家选择…');
+        }
+        return finishTurnAndAdvance(game, ending);
+      }
+
+      // v15 V: 回合结束收尾 + 额外回合派发的单点。
+      // 官方 放权: "其获得一个额外的回合" —— 额外回合插在本回合之后, 结束
+      // 后回合仍从**原回合角色**的下家继续 (不改变座次环推进基准)。
+      function finishTurnAndAdvance(game, ending) {
         resetEndOfTurnState(game[ending]);
         clearAllShaBonus(game);
         log(game, actorName(game, ending) + '结束回合。');
+        var extra = takeNextExtraTurn(game);
+        if (extra) {
+          log(game, actorName(game, extra) + '获得一个额外的回合。');
+          // 额外回合结束后回到原本的下家 —— 记在栈上, startTurn 结束时读。
+          game.extraTurnReturnSeat = game.extraTurnReturnSeat || nextSeat(game, ending);
+          return startTurn(game, extra);
+        }
+        var resume = game.extraTurnReturnSeat;
+        if (resume) {
+          game.extraTurnReturnSeat = null;
+          return startTurn(game, resume);
+        }
         return startTurn(game, nextSeat(game, ending));
+      }
+
+      function takeNextExtraTurn(game) {
+        var queue = game.pendingExtraTurns;
+        while (queue && queue.length) {
+          var seat = queue.shift();
+          if (game[seat] && game[seat].hp > 0) return seat;
+        }
+        return null;
+      }
+
+      // v15 V: 放权 的 onTurnEnd 挂起收尾后由 resolver 调用, 接着走原
+      // completeTurn 的剩余步骤 (复位 → 额外回合 / 下家)。
+      function resumeTurnEndAndAdvance(game) {
+        var saved = game.pauseState && game.pauseState.turnEndPending;
+        if (!saved) return null;
+        game.pauseState.turnEndPending = null;
+        return finishTurnAndAdvance(game, saved.actor);
       }
 
       function endTurn(game) {
@@ -2924,6 +3093,8 @@
         // 注册的 playJiuCardHandler (与锦囊分支同一个 handler 派发出口)。
         jiu: { name: '酒', family: 'basic' },
         guohe: { name: '过河拆桥', family: 'trick' },
+        // v15 V: 急袭 (邓艾, 凿险授予) 把一张"田"当【顺手牵羊】使用。
+        shunshou: { name: '顺手牵羊', family: 'trick' },
         huogong: { name: '火攻', family: 'trick' },
         tiesuo: { name: '铁索连环', family: 'trick' },
         juedou: { name: '决斗', family: 'trick' }
@@ -2990,7 +3161,9 @@
         { asType: 'juedou', asName: '决斗' },
         // v15 U (林包): 断粮 → 兵粮寸断 / 酒池 → 酒
         { asType: 'bingliang', asName: '兵粮寸断' },
-        { asType: 'jiu', asName: '酒' }
+        { asType: 'jiu', asName: '酒' },
+        // v15 V (山包): 急袭 → 顺手牵羊 (来源是"田", 不是手牌)
+        { asType: 'shunshou', asName: '顺手牵羊' }
       ];
 
       function listCardConversions(game, actor, cardOrId) {
@@ -3008,7 +3181,9 @@
       // v12 H7: 全场型主公技 — 技能在主公身上, 但由其他座席发动 (黄天:
       // 其他群势力交牌)。useSkill 的持有校验对这类技能放宽为"场上存在
       // 持有该技能的主公", 发动资格由技能 handler 自行校验。
-      var LORD_WIDE_SKILLS = { huangtian: true };
+      // v15 V: 制霸 (孙策) 同型 —— 技能在主公身上, 由其他吴势力角色在自己的
+      // 出牌阶段发起拼点。势力/次数/主公拒绝拼点等资格由 handler 自校验。
+      var LORD_WIDE_SKILLS = { huangtian: true, zhiba: true };
 
       function lordWideSkillAvailable(game, skillId) {
         if (!LORD_WIDE_SKILLS[skillId]) return false;

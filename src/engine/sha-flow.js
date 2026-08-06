@@ -306,14 +306,22 @@
       // 候选不排除本杀的其他既有目标 — 判例 rule__principle.md: 转移给
       // 既有目标 B 合法, B 被连续结算两次。
       function runLiuliStage(game, actor, card, targetActor) {
+        // v15 V: 本时机在流离链上会**重跑**, 且转移可能绕回已经过时机的座席
+        // (判例允许转移给既有目标)。"指定目标后"每张牌对每名目标只结算一次,
+        // 所以把本次链内已过时机的座席交给 hook 自行去重 (激昂)。
+        // 刻意用**调用内局部量**而不是往牌对象上挂标记 —— 挂在牌上会永久
+        // 残留, 那张实体牌下次被使用时该技能会被静默吞掉。
+        var previousTargets = [];
         while (true) {
           var hookContext = {
             game: game,
             sourceActor: actor,
             targetActor: targetActor,
             target: game[targetActor],
-            card: card
+            card: card,
+            previousTargets: previousTargets.slice()
           };
+          previousTargets.push(targetActor);
           var results = SkillRuntime.runHook(skillRegistry, 'onShaTargeted', hookContext);
           // 评审收口: 挂起检测收窄到本时机自己的询问 kind — 未来其他
           // onShaTargeted 注册者/弃牌副作用产生异类 pending 时不误吞
@@ -624,6 +632,40 @@
           log(game, actorName(game, targetActor) + '的【藤甲】令普通【杀】无效。');
           settleShaCardAfterOutcome(game, card);
           return success('藤甲免疫普通杀。');
+        }
+
+        // ── v15 V: 享乐 (刘禅) 有效性检测 ──
+        // 官方 flow__use.md 的时机序把"使用结算内的有效性检测"排在
+        // step 5 "指定目标后" 之后 —— 本文件 v14 Q3 注释正是以**享乐判例**
+        // 为据把 铁骑/烈弓 锁定前移的。所以享乐闸口设在仁王/藤甲同层、
+        // responseLocked 计算之后, 结果只有两种:
+        //   ① 来源弃掉一张基本牌 → 此【杀】照常结算;
+        //   ② 来源选择否 / 已死亡 / 无基本牌 → 此【杀】对该目标无效。
+        // presetLock.xiangleSettled: 玩家来源 ask 收尾后重入本函数的免检标记
+        // (否则 resolver 续跑会二次索要基本牌)。
+        if (!(presetLock && presetLock.xiangleSettled)) {
+          var xiangleResults = SkillRuntime.runHook(skillRegistry, 'onShaEffectiveness', {
+            game: game,
+            sourceActor: actor,
+            targetActor: targetActor,
+            target: target,
+            card: card,
+            amount: amount,
+            responseLocked: responseContext.responseLocked
+          });
+          // v15 T H1 的教训: 不用 `if (game.pendingChoice)` 判断"我这一跳是否
+          // 挂起了" —— 那个槽位可能已被无关窗口占用。只认自己的挂起信号。
+          var xiangleAsked = xiangleResults.some(function (entry) {
+            return entry && entry.result && entry.result.suspendedForXiangle;
+          });
+          if (xiangleAsked) return success('等待【享乐】的弃牌决定…');
+          var xiangleCancelled = xiangleResults.some(function (entry) {
+            return entry && entry.result && entry.result.cancelSha;
+          });
+          if (xiangleCancelled) {
+            settleShaCardAfterOutcome(game, card);
+            return success('【享乐】令此【杀】无效。');
+          }
         }
 
         // v9 PR-E25: 玩家是【杀】目标 + skillPreferences.shanResponse==='ask' +
@@ -1014,9 +1056,44 @@
         return resolveShaAfterResponse(game, actor, card, amount, dodged, saved.targetActor);
       }
 
+      // v15 V: 享乐 — 来源为玩家时的"是否弃一张基本牌"询问收尾。
+      // decision { cardId } / { use } 弃牌放行; { decline } 或无牌 → 此杀无效。
+      function resolveXiangleCostChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.xiangleCost;
+        if (!saved) return fail('找不到【享乐】的暂停状态。');
+        var d = decision || {};
+        var source = game[saved.actor];
+        var paid = null;
+        if (!d.decline && !d.skip && source) {
+          var basics = (source.hand || []).filter(function (item) { return item.family === 'basic'; });
+          if (d.cardId) {
+            var picked = basics.find(function (item) { return item.id === d.cardId; });
+            if (!picked) {
+              setPendingChoice(game, pending);
+              return fail('【享乐】需要弃置一张基本牌，或 decline 放弃此【杀】。');
+            }
+            paid = removeCardFromHand(source, picked.id);
+          } else if (basics.length) {
+            paid = removeCardFromHand(source, basics[0].id);
+          }
+        }
+        game.pauseState.xiangleCost = null;
+        if (!paid) {
+          log(game, actorName(game, saved.actor) + '未弃置基本牌，【享乐】令此【杀】对'
+            + actorName(game, saved.targetActor) + '无效。');
+          settleShaCardAfterOutcome(game, saved.card);
+          return success('【享乐】令此【杀】无效。');
+        }
+        discardCard(game, paid);
+        log(game, actorName(game, saved.actor) + '弃置基本牌【' + paid.name + '】以抵消【享乐】。');
+        return continueShaAfterCixiong(game, saved.actor, saved.card, saved.amount, saved.targetActor,
+          { responseLocked: !!saved.responseLocked, xiangleSettled: true });
+      }
+
     return {
       playSha: playSha,
       continueShaAfterCixiong: continueShaAfterCixiong,
+      resolveXiangleCostChoice: resolveXiangleCostChoice,
       resolveShaAfterResponse: resolveShaAfterResponse,
       tryBaguaDodge: tryBaguaDodge,
       listShanResponseOptions: listShanResponseOptions,
