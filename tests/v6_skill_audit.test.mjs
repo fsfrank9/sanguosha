@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HERO_CATALOG, IMPLEMENTED_SKILL_IDS } from './helpers/load-engine.mjs';
+import { HERO_CATALOG, IMPLEMENTED_SKILL_IDS, SKILL_METADATA } from './helpers/load-engine.mjs';
 
 // v6 skill-audit harness. Default-enforced as of Phase 6A. The harness prints
 // a markdown report of schema completeness vs official-spec coverage for every
@@ -18,6 +18,8 @@ const SPEC_FIXTURE_PATHS = [
   // v15 T: 火包接入 — 审计按 pack 列表合并加载
   'tests/fixtures/official_fire_skill_specs.json',
   'tests/fixtures/official_lin_skill_specs.json',
+  // v15 V: 山包接入
+  'tests/fixtures/official_shan_skill_specs.json',
 ].map((rel) => path.join(root, rel));
 const REQUIRED_SPEC_FIELDS = [
   'summary',
@@ -59,6 +61,13 @@ function findSkillInCatalog(skillId) {
     const hero = HERO_CATALOG[heroId];
     const skill = hero.skills?.find((s) => s.id === skillId);
     if (skill) return { heroId, skill };
+  }
+  // v15 V: 派生技能 (如【急袭】—— 只能由【凿险】觉醒授予) 没有武将牌归属,
+  // 把它塞进任何武将的 skills 列表都会让英雄图鉴谎报开局技能。这类技能的
+  // schema 直接查 SKILL_METADATA 本体, 授予方 (grantedBy) 必须真实存在。
+  const meta = SKILL_METADATA[skillId];
+  if (meta && meta.grantedBy) {
+    return { heroId: `<granted by ${meta.grantedBy}>`, skill: meta, granted: true };
   }
   return null;
 }

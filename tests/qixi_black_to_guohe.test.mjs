@@ -141,11 +141,15 @@ test('反例: 非出牌回合不能发动', () => {
 test('回归: 未注册的 asType 仍被白名单拒绝', () => {
   const game = buildGame();
   game.player.hand = [c('sha', { id: 'black-sha', suit: 'spade', color: 'black' })];
+  // v15 T: 白名单改由转化牌工厂表驱动, 拒绝文案随之统一。
+  // v15 V: 顺手牵羊已随【急袭】进入工厂表 → 换用仍未注册的【无中生有】
+  // 验白名单闸; 顺手牵羊改验下一层 (甘宁没有能转出它的技能)。
+  const unregistered = Engine.playCardAs(game, 'player', 'black-sha', 'wuzhong');
+  assert.equal(unregistered.ok, false);
+  assert.match(unregistered.message, /不支持转化/);
   const r = Engine.playCardAs(game, 'player', 'black-sha', 'shunshou');
   assert.equal(r.ok, false);
-  // v15 T: 白名单改由转化牌工厂表驱动, 拒绝文案随之统一 (行为不变 —
-  // 顺手牵羊仍不是任何已注册技能的转化目标)。
-  assert.match(r.message, /不支持转化/);
+  assert.match(r.message, /当前武将不能这样转化/);
 });
 
 test('回归: 甘宁的黑牌不能当乐不思蜀 (国色不外溢)', () => {

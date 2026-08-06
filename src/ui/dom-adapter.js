@@ -230,6 +230,12 @@
           'zaiqiPanel', 'zaiqiHint', 'zaiqiConfirmBtn', 'zaiqiDeclineBtn',
           'luanwuPanel', 'luanwuHint', 'luanwuTargets', 'luanwuChoices',
           'luanwuConfirmBtn', 'luanwuDeclineBtn',
+          // v15 V (山包) 四个决策窗
+          'tiaoxinPanel', 'tiaoxinHint', 'tiaoxinChoices', 'tiaoxinDeclineBtn',
+          'zhijiPanel', 'zhijiHint', 'zhijiHealBtn', 'zhijiDrawBtn',
+          'fangquanPanel', 'fangquanHint', 'fangquanCards', 'fangquanChoices',
+          'fangquanConfirmBtn', 'fangquanDeclineBtn',
+          'xianglePanel', 'xiangleHint', 'xiangleChoices', 'xiangleDeclineBtn',
           'shuangxiongPanel', 'shuangxiongHint', 'shuangxiongConfirmBtn', 'shuangxiongDeclineBtn',
           'quhuVictimPanel', 'quhuVictimHint', 'quhuVictimChoices',
           'jiemingPanel', 'jiemingHint', 'jiemingChoices', 'jiemingDeclineBtn',
@@ -1437,6 +1443,13 @@
         { panelId: 'haoshiPanel',           confirmBtnId: null,                     cancelBtnId: null },
         { panelId: 'zaiqiPanel',            confirmBtnId: 'zaiqiConfirmBtn',        cancelBtnId: 'zaiqiDeclineBtn' },
         { panelId: 'luanwuPanel',           confirmBtnId: 'luanwuConfirmBtn',       cancelBtnId: 'luanwuDeclineBtn' },
+        // v15 V (山包): 志继是觉醒技二选一 (锁定, 无放弃出路 → 两个按钮都在
+        // confirm/cancel 位); 挑衅/享乐点牌即提交, 只有"不发动"在 cancel 位;
+        // 放权是两段选择 + 确认。
+        { panelId: 'tiaoxinPanel',          confirmBtnId: null,                     cancelBtnId: 'tiaoxinDeclineBtn' },
+        { panelId: 'zhijiPanel',            confirmBtnId: 'zhijiHealBtn',           cancelBtnId: 'zhijiDrawBtn' },
+        { panelId: 'fangquanPanel',         confirmBtnId: 'fangquanConfirmBtn',     cancelBtnId: 'fangquanDeclineBtn' },
+        { panelId: 'xianglePanel',          confirmBtnId: null,                     cancelBtnId: 'xiangleDeclineBtn' },
         { panelId: 'shuangxiongPanel',      confirmBtnId: 'shuangxiongConfirmBtn',  cancelBtnId: 'shuangxiongDeclineBtn' },
         { panelId: 'quhuVictimPanel',       confirmBtnId: null,                     cancelBtnId: null },
         { panelId: 'jiemingPanel',          confirmBtnId: null,                     cancelBtnId: 'jiemingDeclineBtn' },

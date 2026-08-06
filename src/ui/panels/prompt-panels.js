@@ -22,6 +22,11 @@
     var luanwuCardId = null;
     var luanwuSeat = null;
     var luanwuWindow = null;
+    // v15 V: 放权是两段选择 (弃哪张手牌 + 给谁额外回合) → 与英魂/乱武同款
+    // 本地暂存, 换窗口即清。
+    var fangquanCardId = null;
+    var fangquanSeat = null;
+    var fangquanWindow = null;
 
     function refreshYinghunConfirm() {
       if (els.yinghunConfirmBtn) {
@@ -32,6 +37,12 @@
     function refreshLuanwuConfirm() {
       if (els.luanwuConfirmBtn) {
         els.luanwuConfirmBtn.disabled = !(luanwuCardId && luanwuSeat);
+      }
+    }
+
+    function refreshFangquanConfirm() {
+      if (els.fangquanConfirmBtn) {
+        els.fangquanConfirmBtn.disabled = !(fangquanCardId && fangquanSeat);
       }
     }
     var stage = ctx.stage;
@@ -624,6 +635,80 @@
         }
         refreshLuanwuConfirm();
       } else { els.luanwuPanel.hidden = true; }
+    }
+    // ═════ v15 V (山包) 四个决策窗 ═════
+    if (els.tiaoxinPanel) {
+      if (kind === 'tiaoxin-demand' && pending.actor === 'player') {
+        els.tiaoxinPanel.hidden = false;
+        if (els.tiaoxinHint) {
+          var txSource = pending.sourceActor && game[pending.sourceActor];
+          els.tiaoxinHint.textContent = '挑衅：'
+            + ((txSource && txSource.name) || '对方')
+            + ' 令你选择是否对其使用一张【杀】；选择否则被其弃置一张牌。';
+        }
+        if (els.tiaoxinChoices) {
+          els.tiaoxinChoices.innerHTML = (pending.options || []).map(function (opt) {
+            return '<button class="mini-card" data-tiaoxin-card-id="' + escapeHtml(opt.cardId) + '">'
+              + escapeHtml(opt.name) + ' ' + suitLabel(opt.suit)
+              + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
+          }).join('') || '<span class="mini-card">没有可用的【杀】</span>';
+        }
+      } else { els.tiaoxinPanel.hidden = true; }
+    }
+    if (els.zhijiPanel) {
+      if (kind === 'zhiji-choice' && pending.actor === 'player') {
+        els.zhijiPanel.hidden = false;
+        if (els.zhijiHint) {
+          els.zhijiHint.textContent = '志继（觉醒技）：你没有手牌（体力 '
+            + pending.hp + ' / 上限 ' + pending.maxHp
+            + '），选择一项，然后减 1 点体力上限并获得【观星】。';
+        }
+      } else { els.zhijiPanel.hidden = true; }
+    }
+    if (els.fangquanPanel) {
+      if (kind === 'fangquan-grant' && pending.actor === 'player') {
+        if (fangquanWindow !== pending) {
+          fangquanWindow = pending; fangquanCardId = null; fangquanSeat = null;
+        }
+        els.fangquanPanel.hidden = false;
+        if (els.fangquanHint) {
+          els.fangquanHint.textContent = '放权：你已跳过出牌阶段，可弃置一张手牌并'
+            + '令一名其他角色获得一个额外的回合。';
+        }
+        if (els.fangquanCards) {
+          els.fangquanCards.innerHTML = (pending.cards || []).map(function (opt) {
+            return '<button class="mini-card" data-fangquan-card-id="' + escapeHtml(opt.cardId) + '">'
+              + escapeHtml(opt.name) + ' ' + suitLabel(opt.suit)
+              + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
+          }).join('');
+        }
+        if (els.fangquanChoices) {
+          els.fangquanChoices.innerHTML = (pending.candidates || []).map(function (entry) {
+            return '<button class="mini-card" data-fangquan-seat="' + escapeHtml(entry.seat) + '">'
+              + escapeHtml(entry.name) + '（' + entry.hp + ' 血）</button>';
+          }).join('');
+        }
+        refreshFangquanConfirm();
+      } else { els.fangquanPanel.hidden = true; }
+    }
+    if (els.xianglePanel) {
+      if (kind === 'xiangle-cost' && pending.actor === 'player') {
+        els.xianglePanel.hidden = false;
+        if (els.xiangleHint) {
+          var xlTarget = pending.targetActor && game[pending.targetActor];
+          els.xiangleHint.textContent = '享乐：'
+            + ((xlTarget && xlTarget.name) || '目标')
+            + ' 令你选择是否弃置一张基本牌；选择否则此【'
+            + (pending.shaName || '杀') + '】对其无效。';
+        }
+        if (els.xiangleChoices) {
+          els.xiangleChoices.innerHTML = (pending.options || []).map(function (opt) {
+            return '<button class="mini-card" data-xiangle-card-id="' + escapeHtml(opt.cardId) + '">'
+              + escapeHtml(opt.name) + ' ' + suitLabel(opt.suit)
+              + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
+          }).join('') || '<span class="mini-card">没有基本牌可弃</span>';
+        }
+      } else { els.xianglePanel.hidden = true; }
     }
     // v14 R1: 蛊惑质疑窗 — AI 于吉背面声明, 玩家决定是否质疑 (质疑真牌
     // 获「缠怨」, 提示如实告知风险; 只显示声明牌名, 不泄露真牌)。
@@ -1243,6 +1328,67 @@
     });
     if (els.yinghunDeclineBtn) els.yinghunDeclineBtn.addEventListener('click', function () {
       yinghunOption = null; yinghunSeat = null;
+      var r = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!r.ok) renderLog();
+      render();
+    });
+    // ── v15 V (山包) 四个决策窗的提交 ──
+    // 挑衅 / 享乐: 点牌即提交 (单段)。
+    if (els.tiaoxinChoices) els.tiaoxinChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-tiaoxin-card-id]');
+      if (!btn) return;
+      var r = Engine.resolvePendingChoice(getGame(), { cardId: btn.getAttribute('data-tiaoxin-card-id') });
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.tiaoxinDeclineBtn) els.tiaoxinDeclineBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.zhijiHealBtn) els.zhijiHealBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), { option: 'heal' });
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.zhijiDrawBtn) els.zhijiDrawBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), { option: 'draw' });
+      if (!r.ok) renderLog();
+      render();
+    });
+    // 放权: 两段暂存 (弃哪张 + 给谁) 后按确认。
+    if (els.fangquanCards) els.fangquanCards.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-fangquan-card-id]');
+      if (!btn) return;
+      fangquanCardId = btn.getAttribute('data-fangquan-card-id');
+      refreshFangquanConfirm();
+    });
+    if (els.fangquanChoices) els.fangquanChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-fangquan-seat]');
+      if (!btn) return;
+      fangquanSeat = btn.getAttribute('data-fangquan-seat');
+      refreshFangquanConfirm();
+    });
+    if (els.fangquanConfirmBtn) els.fangquanConfirmBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), { cardId: fangquanCardId, target: fangquanSeat });
+      fangquanCardId = null; fangquanSeat = null;
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.fangquanDeclineBtn) els.fangquanDeclineBtn.addEventListener('click', function () {
+      fangquanCardId = null; fangquanSeat = null;
+      var r = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.xiangleChoices) els.xiangleChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-xiangle-card-id]');
+      if (!btn) return;
+      var r = Engine.resolvePendingChoice(getGame(), { cardId: btn.getAttribute('data-xiangle-card-id') });
+      if (!r.ok) renderLog();
+      render();
+    });
+    if (els.xiangleDeclineBtn) els.xiangleDeclineBtn.addEventListener('click', function () {
       var r = Engine.resolvePendingChoice(getGame(), { decline: true });
       if (!r.ok) renderLog();
       render();

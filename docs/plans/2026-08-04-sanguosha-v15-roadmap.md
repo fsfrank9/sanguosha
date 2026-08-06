@@ -528,3 +528,95 @@ AI 零全知 (新增五处启发只读公开信息)。
 - 行殇: 给濒死者【桃】会自救、给【闪】会闪避 —— 都死不了, 行殇自然不触发;
 - 巨象: 拿曹操当第一个目标时奸雄会抢走那张南蛮, 测的就不是"自己用不触发";
 - 乱武: 官方**不保护发动者**, 原断言"贾诩自己不受影响"是错的。
+
+---
+
+## V 执行记录 (2026-08-06, 山包 7 将 15 技 + 左慈推迟)
+
+**范围**: 用户点单"一次性完成 V 阶段" → 山包一批交付 (路线图原允许 2-3 批)。
+8 将 17 技中**接入 7 将 15 技** (+ 凿险授予的派生技【急袭】= 16 个技能 id);
+**左慈 化身 / 新生 经路线图明列的独立成本评估门后推迟**。已实现技能
+85 → **101**。
+
+### 左慈成本评估门 (路线图明列的决策项) — 结论: 推迟
+
+化身需要三条**横切基建**, 都不是"再写一个 hook"能解决的:
+
+| 基建 | 度量 | 现状 |
+|------|------|------|
+| 动态技能**三态**层 (本体 / 化身获得且有效 / 化身获得但无效) | 全仓 **138 处 `hasSkill(` 调用点** | 无单一裁决入口; `state.skills` 是单层数组, 表达不了"拥有但无效" |
+| 性别 · 势力**覆写单点** | 全仓 **11 处直读 `gender`/`camp`** (雌雄/离间/结姻/黄天/制霸/激将/护驾/肉林…) | **没有任何单点**, 要先造覆写层再改这 11 处 |
+| 场外武将牌堆 | `newGame` 只实例化参战武将 | 无"游戏外武将牌"概念, 亦无回合开始/结束换化身的交互面 |
+
+【新生】脱离化身后**零可观测效果** (只给化身牌堆供货), 单独实现等于零 →
+一并推迟。二者在 fixture 里显式 `implementationStatus: "deferred"` + 写明
+`deferralReason`, 图鉴按 todo 渲染, **不进 IMPLEMENTED 名单** (宁缺毋滥)。
+其余 7 将不受连累 —— 这正是路线图设这道门的用意。
+
+### 新增的引擎面 (山包要求的横切基建)
+
+| 面 | 位置 | 为什么必须新造 |
+|----|------|----------------|
+| `onCardLost` + `notifyCardLoss` 单点 | `game-engine.js` | 屯田是"于**回合外失去牌后**"; 既有 `handLoss` 是连营专用的"失去**最后一张手牌**"。四个调用点: `takeHandCard` / `removeTargetZoneCard` / `consumeResponse` / 弃牌阶段记账。**`cardLossInFlight` 重入闸**必需 —— 屯田会在 hook 里判定, 判定牌离场又会走回这些出口 |
+| `'tian'` zone + `state.tian` | `card-runtime.js` / `state.js` | "田"是与不屈"创"同形的武将牌上置牌区; **已接入守恒 census**, 漏掉就是造牌口子 |
+| `runAwakening` 觉醒技骨架 + `awakening` 元数据 | `skills.js` / `heroes.js` | 觉醒技同时是**锁定**(必须发动) 和**一次性**(每局一次), 与既有 "mandatory ⇒ passiveAlways" 不变量冲突 → 放宽为"mandatory 且 awakening ⇒ oncePerGame", 而不是把它们错标 |
+| `StateRuntime.grantSkill` / `stripAllSkills` | `state.js` | 四个觉醒技授予新技能 + 断肠剥夺全部技能。**单层**写入; 化身要的是三态层, 故意没在这里硬凑 |
+| `onShaEffectiveness` | `sha-flow.js` | 享乐是**有效性检测**层 (官方 `flow__use.md` 时机序), 不是"成为目标时" —— 本文件 v14 Q3 注释正是**以享乐判例**为据把铁骑/烈弓前移的 |
+| `onBeforePlayPhase` | `game-engine.js` | 放权要在 `nextPlayablePhase` 读 `flags.skipPlay` 之前写它 |
+| `onDiscardPhaseEnd` + `flags.discardPhaseCards` | `game-engine.js` / `phases.js` | 固政只认"其于**此阶段内**因**其弃置**而失去过的手牌", 不能只看弃牌堆尾部 |
+| `game.pendingExtraTurns` + `finishTurnAndAdvance` | `game-engine.js` | 引擎此前没有额外回合。额外回合插在本回合后, **结束后仍回原回合角色的下家** (`extraTurnReturnSeat`) |
+| `onTrickTargeted` | `game-engine.js` | 激昂的【决斗】方向; 红【杀】方向复用既有 `onShaTargeted` |
+| `LORD_WIDE_SKILLS.zhiba` | `game-engine.js` | 制霸是继黄天之后第二个"全场型主公技"(技能在主公身上, 由其他座席发动) |
+| `CARD_AS_TRICK_SPECS.shunshou` | `game-engine.js` | 急袭的转化目标 |
+
+### spec 缺口裁定
+
+12 条 (S1-S12) 入库 `docs/audit/2026-08-06-shan-pack-spec.md`。两条 spec 提取
+的坑如实记录: **蔡文姬有两张武将牌** (山包"异乡的孤女" `neutral.md:389` vs
+SP"金璧之才" `wei.md:599`, 断肠逐字不同 —— v15 U 的 SP 贾诩同款陷阱);
+**急袭没有独立条目** (内嵌在凿险的括注里, 也不属于任何武将牌 → 新增
+`grantedBy` 标记, 四方审计据此改查 metadata 本体)。
+
+**一条如实登记的功能缺口**: 巧变只接入了**跳过摸牌阶段**分支; 官方的"跳过
+出牌阶段 → 把一名角色判定区/装备区里的一张牌置入另一名角色的判定区/装备区"
+需要一个四段选择的新交互面, 与本批其余 15 技无共用基建 → 单独立项, 已写进
+fixture 的 `deviations` 字段与 spec 简报, **不是静默省略**。
+
+### 评审收口 (对抗式自审, 本批未起 subagent)
+
+方法论①的对抗复现本批由主会话自行执行 (会话级指令明确要求不主动起
+subagent)。实测出 3 条并全部收口:
+
+| # | 缺陷 | 收口 |
+|---|------|------|
+| C1 [P1, **静默吞技**] | 激昂的流离去重原本把标记挂在**牌对象**上 (`card.jiangFired`) —— 永不清除, 那张实体牌下次被使用时激昂被静默吞掉 | 改为 `runLiuliStage` 的**调用内局部量** `previousTargets` 经 hook context 下发; 加"同一实体杀隔回合再用仍触发"回归钉 |
+| C2 [P1, **既有悬挂**] | 回合结束时机挂起 (崩坏玩家席) 后, `completeTurn` 仍无条件 `startTurn`, 被 `pendingChoiceGuard` 挡回 → 回合**永久停在 finish**, 选择解决后也没有续跑分支。**这是 v15 U 就有的面**, 本批的放权额外回合机制一并收口 | `pauseState.turnEndPending` + `resumeTurnEndAndAdvance`, 挂在 `resumeSuspendedTurnFlowIfReady` 最外层; 加崩坏回归钉 (改前实测停在 `turn=player, phase=finish`) |
+| C3 [P2, 官方判例] | 制霸被主公拒绝时**没有**计入发起者的次数 | `card__hero__wu.md:305` 明写"被拒绝计入其出牌阶段限制的发动次数" → `flags.zhibaUsed` 记在拒绝分支之前; 加判例钉 |
+
+另外几处经复核确认实现正确: 屯田在**空牌堆触发洗牌**时守恒不破 (在途战利品
+牌不在任何区域, 洗牌只动 discard→deck); 直谏顶替旧装备走 `equipCard` 出口,
+旧装备照常入弃牌堆且守恒; 断肠先于行殇结算 (注册序), 曹丕杀死蔡文姬时拿不到
+遗产; 享乐在多目标杀链上挂起后经 `xiangleSettled` 免检重入, 不会二次索要
+基本牌。
+
+### 三条测试自纠 (写错后按引擎实况更正)
+
+- 悲歌: 给受伤者设 `maxHp - 2` 会让这一刀直接打进濒死, "若其存活"分支根本
+  测不到 —— 改 `maxHp - 1`;
+- 志继 / 挑衅: `seats` 里名为 `player` 的席位是**人类席**, 觉醒二选一会开窗
+  而不是自动决策 —— AI 分支与玩家开窗分成两个用例各测各的;
+- 牌堆顶是数组**末尾** (`takeCard`/`drawCards` 从尾部取), 控判定花色的
+  helper 一开始写成往头部压, 判定拿到的是别的牌。
+
+### 测试与门禁
+
+- `tests/v15_v_shan_pack.test.mjs` **51 例** (15 技逐条 + sourceTextRef 18/18
+  现算复核 + 左慈 deferred 如实性钉 + 3 条收口回归钉);
+  `tests/ui_v15_v_shan_pack.test.mjs` 10 例。
+- 全档 **202 文件绿**; 三基准不降 (v12_i 64.0% ≥55% / M4 5p 67.9%·4p 69.1% /
+  Q2 分布可测移动)。
+- 守护测试同步: 感知路由计数 9→11 (挑衅/巧变)、todo 下限 30→20、图鉴 todo
+  样本从张郃巧变 (本批翻转) 让位给**左慈化身** (按成本门明确推迟, 是当前
+  名单外最稳定的样本)、`skill_schema` 新增 trigger `cardLost` + cost
+  `reduceMaxHp` + `awakening` 不变量分支、`phase_runtime` 回合复位钉补
+  4 个山包 flag。

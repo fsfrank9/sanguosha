@@ -88,7 +88,30 @@
         //   暴虐 baonue    董卓 主公技: 群势力受伤后来源判定黑桃你回血
         'duanliang', 'xingshang', 'fangzhu', 'songwei', 'yinghun',
         'haoshi', 'dimeng', 'huoshou', 'zaiqi', 'juxiang', 'lieren',
-        'wansha', 'luanwu', 'weimu', 'jiuchi', 'roulin', 'benghuai', 'baonue'
+        'wansha', 'luanwu', 'weimu', 'jiuchi', 'roulin', 'benghuai', 'baonue',
+        // v15 V (山包 8 将 17 技 → 本批接入 7 将 15 技):
+        //   巧变 qiaobian  张郃      弃一张手牌跳过摸牌阶段并拿两人各一张手牌
+        //   屯田 tuntian   邓艾      回合外失去牌后判定, 非红桃置为"田"并缩距离
+        //   凿险 zaoxian   邓艾      觉醒技: "田" ≥3 减 1 上限, 获得"急袭"
+        //   急袭 jixi      (凿险授予) 一张"田"当【顺手牵羊】
+        //   挑衅 tiaoxin   姜维      令攻击范围含你者出杀, 否则弃其一张牌
+        //   志继 zhiji     姜维      觉醒技: 无手牌 → 回血/摸牌 + 减上限 + 观星
+        //   享乐 xiangle   刘禅      锁定技: 来源不弃基本牌则此杀对你无效
+        //   放权 fangquan  刘禅      跳过出牌阶段换一名其他角色的额外回合
+        //   若愚 ruoyu     刘禅      主公技·觉醒技: 体力最小 → 加上限回血 + 激将
+        //   激昂 jiang     孙策      决斗/红杀 指定或成为目标后摸一张
+        //   魂姿 hunzi     孙策      觉醒技: 体力为 1 → 减上限, 获得英姿 + 英魂
+        //   制霸 zhiba     孙策      主公技: 吴势力发起拼点, 其没赢你收两张牌
+        //   直谏 zhijian   张昭张纮  手牌装备置入他人装备区并摸一张
+        //   固政 guzheng   张昭张纮  他人弃牌阶段结束时还一张、余下归你
+        //   悲歌 beige     蔡文姬    杀伤害后弃一张牌令其判定, 四花色四效果
+        //   断肠 duanchang 蔡文姬    锁定技: 你死亡时杀死你的角色失去所有技能
+        // 左慈 (化身/新生) 独立成本评估后本批不接入 —— 化身需要动态技能
+        // 三态层 / 性别·势力覆写单点 / 场外武将牌堆三条横切基建, 见
+        // docs/audit/2026-08-06-shan-pack-spec.md。
+        'qiaobian', 'tuntian', 'zaoxian', 'jixi', 'tiaoxin', 'zhiji',
+        'xiangle', 'fangquan', 'ruoyu', 'jiang', 'hunzi', 'zhiba',
+        'zhijian', 'guzheng', 'beige', 'duanchang'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,
@@ -103,6 +126,10 @@
         'qiangxi', 'quhu', 'tianyi', 'luanji',
         // v15 U: 林包主动技 — 缔盟 (选两名其他角色 + 弃 X 张) 与
         // 乱武 (限定技, 出牌阶段全场发动); 其余林包技能为触发/锁定/转化类。
-        'dimeng', 'luanwu'];
+        'dimeng', 'luanwu',
+        // v15 V: 山包主动技 — 挑衅 (指定一名攻击范围含你的角色) /
+        // 直谏 (选一张手牌装备 + 一名其他角色) / 制霸 (吴势力发起拼点);
+        // 其余山包技能为触发/锁定/觉醒/转化类。
+        'tiaoxin', 'zhijian', 'zhiba'];
 
       export { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS };

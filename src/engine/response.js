@@ -169,6 +169,15 @@
         var qxResult = deps.resumeQiangxiDamage(game, savedQiangxi);
         if (game.pendingChoice) return qxResult || success('回合暂停，等待玩家选择。');
       }
+      // v15 V: 放权 (刘禅) 的额外回合窗口开在"此回合结束时" (onTurnEnd 内),
+      // 挂起时 completeTurn 已经停在半路 —— 复位 / 额外回合派发 / 交棒下家
+      // 全都还没做。选择排空后由此处走完 finishTurnAndAdvance。
+      // 位序: 最外层 (回合级), 排在所有结算内链之后; 一旦续跑就直接开新回合,
+      // 因此必须无条件返回, 不能再往下落到判定区分支。
+      var savedTurnEnd = game.pauseState && game.pauseState.turnEndPending;
+      if (savedTurnEnd && deps.resumeTurnEndAndAdvance) {
+        return deps.resumeTurnEndAndAdvance(game);
+      }
       var savedJudge = game.pauseState && game.pauseState.judgeArea;
       if (!savedJudge) return null;
       // v13 J0-2: 判定前无懈挂起 settle 后续跑 (wuxieSettled, 由
