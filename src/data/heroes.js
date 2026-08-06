@@ -253,6 +253,29 @@
         shuangxiong: { trigger: 'drawPhase',      frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'reduceDraw', count: 2 },     hooks: ['onDrawPhase', 'onJudgementAfterResolve', 'onCardAs'] },
         luanji:   { trigger: 'playPhase',         frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 2 },     hooks: ['onActiveSkill'] },
         xueyi:    { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['handLimit'], lord: true },
+        // ═════ v15 V (山包 7 将 15 技 + 凿险授予的"急袭") ═════
+        // 觉醒技 (凿险/志继/若愚/魂姿) 是**锁定**的一次性技能: 条件满足就
+        // 必须觉醒 → optional:false / mandatory:true / frequency:'oncePerGame'。
+        qiaobian: { trigger: 'drawPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onDrawPhase'] },
+        tuntian:  { trigger: 'cardLost',          frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['onCardLost', 'onJudgementAfterResolve'] },
+        zaoxian:  { trigger: 'preparePhase',      frequency: 'oncePerGame',     optional: false, mandatory: true,  cost: { type: 'reduceMaxHp', count: 1 },    hooks: ['onPreparePhase'], awakening: true },
+        // 急袭 没有武将牌归属 —— 它只能由【凿险】觉醒授予, HERO_CATALOG 里
+        // 任何武将的技能列表都不该出现它 (否则英雄图鉴会把邓艾显示成开局
+        // 三技)。grantedBy 是这类"派生技能"的显式标记, 四方一致性审计据此
+        // 改查 SKILL_METADATA 本体而非武将牌。
+        jixi:     { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs'], grantedBy: 'zaoxian' },
+        tiaoxin:  { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onActiveSkill', 'tiaoxin-demand'] },
+        zhiji:    { trigger: 'preparePhase',      frequency: 'oncePerGame',     optional: false, mandatory: true,  cost: { type: 'reduceMaxHp', count: 1 },    hooks: ['onPreparePhase', 'zhiji-choice'], awakening: true },
+        xiangle:  { trigger: 'shaTargetedAfter',  frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onShaEffectiveness', 'xiangle-cost'] },
+        fangquan: { trigger: 'turnEnd',           frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'phaseSkip' },                hooks: ['onBeforePlayPhase', 'onTurnEnd', 'fangquan-grant'] },
+        ruoyu:    { trigger: 'preparePhase',      frequency: 'oncePerGame',     optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onPreparePhase'], lord: true, awakening: true },
+        jiang:    { trigger: 'shaTargetedAfter',  frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onShaTargeted', 'onTrickTargeted'] },
+        hunzi:    { trigger: 'preparePhase',      frequency: 'oncePerGame',     optional: false, mandatory: true,  cost: { type: 'reduceMaxHp', count: 1 },    hooks: ['onPreparePhase'], awakening: true },
+        zhiba:    { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'rankCompare' },              hooks: ['onActiveSkill', 'pindian:zhiba'], lord: true },
+        zhijian:  { trigger: 'playPhase',         frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'giveHand',   count: 1 },     hooks: ['onActiveSkill'] },
+        guzheng:  { trigger: 'discardPhase',      frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDiscardPhaseEnd'] },
+        beige:    { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onDamageAfter'] },
+        duanchang:{ trigger: 'death',             frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDeath'] },
       };
 
       for (var _heroId in HERO_CATALOG) {

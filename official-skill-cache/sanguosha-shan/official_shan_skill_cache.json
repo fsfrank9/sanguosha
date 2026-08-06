@@ -1,0 +1,426 @@
+{
+  "schemaVersion": 1,
+  "cacheKind": "sanguosha-official-shan-skills-safe-cache",
+  "pack": "山",
+  "source": {
+    "indexUrl": "https://www.sanguosha.com/hero",
+    "retrieval": "gltjk 官方规则集镜像逐字提取 (镜像已入库 official-skill-cache/gltjk-sanguosha-rules/pages/), 每条 sourceTextRef/sourceTextSha256 为该镜像行的 sha256 — 与风包的\"人工转写\"不同, 本包可逐条复核。",
+    "parser": "gltjk-mirror-extraction",
+    "copyrightPolicy": "仅提交结构化实现规格与逐字文本摘要 (sha256), 不复制官网原文",
+    "gidPolicy": "provisional-local: gid 240-247 为本地临时编号 (顺接林包缓存 232-239), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。v15 V (2026-08-06): 与风/火/林包同款网络降级条款 — www.sanguosha.com 在本环境仍被网络策略拦截 (CONNECT 403), 按 v14 O4 裁定不主动重试, 网络环境变更时触发回填。"
+  },
+  "includeFullSkillText": false,
+  "containsOfficialText": false,
+  "containsImplementationSpecs": true,
+  "copyrightPolicy": {
+    "verbatimOfficialSkillText": "omitted from repository cache",
+    "rawLocalCachePath": "official-skill-cache/gltjk-sanguosha-rules/pages/ (已入库镜像)"
+  },
+  "generatedFrom": "v15 V 山包接入批 (2026-08-06)",
+  "heroes": [
+    {
+      "gid": 240,
+      "name": "张郃",
+      "localHeroId": "zhanghe",
+      "skills": [
+        {
+          "name": "巧变",
+          "localSkillId": "qiaobian",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "be8ff8426239",
+          "sourceLine": "card__hero__wei.md:267",
+          "implementationSpec": {
+            "summary": "弃置一张手牌跳过一个阶段（准备/结束阶段除外）；以此法跳过摸牌阶段可选一至两名有手牌的其他角色各获得其一张手牌。",
+            "timing": "摸牌阶段开始时（本作已接入的分支）。",
+            "condition": "拥有至少一张手牌可作为成本。",
+            "cost": "弃置一张手牌。",
+            "effect": "跳过摸牌阶段；随后从至多两名有手牌的其他角色处各获得一张手牌。",
+            "frequency": "每个可跳过的阶段各一次（本作已接入摸牌阶段分支）。",
+            "engineHooks": [
+              "onDrawPhase",
+              "takeHandCard"
+            ],
+            "deviations": "跳过出牌阶段的判定区/装备区移牌分支未接入（需要跨角色判定区/装备区任意搬运的新交互面），已在 docs 简报登记为后续项。"
+          }
+        }
+      ]
+    },
+    {
+      "gid": 241,
+      "name": "邓艾",
+      "localHeroId": "dengai",
+      "skills": [
+        {
+          "name": "屯田",
+          "localSkillId": "tuntian",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "633e86f7e0f6",
+          "sourceLine": "card__hero__wei.md:365",
+          "implementationSpec": {
+            "summary": "于回合外失去牌后可判定，非红桃判定牌置于武将牌上称为\"田\"；与其他角色的距离 -X（X 为\"田\"数）。",
+            "timing": "你于回合外失去牌后。",
+            "condition": "失牌发生在你的回合之外。",
+            "cost": "一次判定。",
+            "effect": "判定牌非红桃 → 置于武将牌上的\"田\"区；每张\"田\"令你与其他角色的距离 -1。",
+            "frequency": "无次数限制。",
+            "engineHooks": [
+              "onCardLost",
+              "onJudgementAfterResolve",
+              "CardRuntime.zone:tian",
+              "StateRuntime.distanceBetween"
+            ]
+          }
+        },
+        {
+          "name": "凿险",
+          "localSkillId": "zaoxian",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "b44218309061",
+          "sourceLine": "card__hero__wei.md:367",
+          "implementationSpec": {
+            "summary": "觉醒技，准备阶段开始时若\"田\"数不小于 3，减 1 点体力上限并获得\"急袭\"。",
+            "timing": "准备阶段开始时。",
+            "condition": "\"田\"区牌数 ≥ 3。",
+            "cost": "减 1 点体力上限。",
+            "effect": "获得\"急袭\"（可将一张\"田\"当【顺手牵羊】使用）。",
+            "frequency": "觉醒技：每局一次，此后永久失效。",
+            "engineHooks": [
+              "onPreparePhase",
+              "StateRuntime.grantSkill",
+              "runAwakening"
+            ]
+          }
+        },
+        {
+          "name": "急袭",
+          "localSkillId": "jixi",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "b44218309061",
+          "sourceLine": "card__hero__wei.md:367",
+          "implementationSpec": {
+            "summary": "（凿险授予）你可以将一张\"田\"当【顺手牵羊】使用。",
+            "timing": "出牌阶段（转化使用）。",
+            "condition": "\"田\"区里有牌。",
+            "cost": "打出一张\"田\"作为转化来源。",
+            "effect": "视为使用【顺手牵羊】。",
+            "frequency": "无次数限制。",
+            "engineHooks": [
+              "onCardAs"
+            ],
+            "sourceNote": "官方文本内嵌于凿险条目括注（wei.md:367），无独立行；sourceTextRef 与凿险同源。"
+          }
+        }
+      ]
+    },
+    {
+      "gid": 242,
+      "name": "姜维",
+      "localHeroId": "jiangwei",
+      "skills": [
+        {
+          "name": "挑衅",
+          "localSkillId": "tiaoxin",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "3b9c39e13fd1",
+          "sourceLine": "card__hero__shu.md:354",
+          "implementationSpec": {
+            "summary": "出牌阶段限一次，令攻击范围内含有你的一名角色选择是否对你使用【杀】，若其选择否则弃置其一张牌。",
+            "timing": "出牌阶段（主动）。",
+            "condition": "存在攻击范围内含有你的其他角色。",
+            "cost": "无。",
+            "effect": "被指定者出杀（走正常使用流程）或被你弃置一张牌。",
+            "frequency": "每回合限一次。",
+            "engineHooks": [
+              "onActiveSkill",
+              "tiaoxin-demand",
+              "StateRuntime.canReachWithSha"
+            ]
+          }
+        },
+        {
+          "name": "志继",
+          "localSkillId": "zhiji",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "f8a7433073f8",
+          "sourceLine": "card__hero__shu.md:356",
+          "implementationSpec": {
+            "summary": "觉醒技，准备阶段开始时若你没有手牌，选择回复 1 点体力或摸两张牌，然后减 1 点体力上限并获得\"观星\"。",
+            "timing": "准备阶段开始时。",
+            "condition": "手牌数为 0。",
+            "cost": "减 1 点体力上限。",
+            "effect": "二选一（回复 1 点体力 / 摸两张牌），随后获得\"观星\"。",
+            "frequency": "觉醒技：每局一次。",
+            "engineHooks": [
+              "onPreparePhase",
+              "zhiji-choice",
+              "StateRuntime.grantSkill"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 243,
+      "name": "刘禅",
+      "localHeroId": "liushan",
+      "skills": [
+        {
+          "name": "享乐",
+          "localSkillId": "xiangle",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "5e9731c595f9",
+          "sourceLine": "card__hero__shu.md:380",
+          "implementationSpec": {
+            "summary": "锁定技，成为其他角色使用的【杀】的目标时，令其选择是否弃置一张基本牌；其选择否或已死亡则此【杀】对你无效。",
+            "timing": "使用结算内的有效性检测（flow__use.md 时机序：在\"指定目标后\"锁定之后）。",
+            "condition": "【杀】的来源为其他角色。",
+            "cost": "无（成本由来源支付）。",
+            "effect": "来源不弃基本牌 → 此【杀】对你无效。",
+            "frequency": "锁定技，每次都生效。",
+            "engineHooks": [
+              "onShaEffectiveness",
+              "xiangle-cost"
+            ]
+          }
+        },
+        {
+          "name": "放权",
+          "localSkillId": "fangquan",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "291c36105fc3",
+          "sourceLine": "card__hero__shu.md:382",
+          "implementationSpec": {
+            "summary": "可跳过出牌阶段；若如此做，此回合结束时可弃置一张手牌并选择一名其他角色，令其获得一个额外的回合。",
+            "timing": "出牌阶段开始前（跳过决策）+ 此回合结束时（额外回合决策）。",
+            "condition": "已跳过出牌阶段且仍有手牌、场上有其他存活角色。",
+            "cost": "跳过出牌阶段 + 弃置一张手牌。",
+            "effect": "一名其他角色获得一个额外的回合。",
+            "frequency": "每回合限一次。",
+            "engineHooks": [
+              "onBeforePlayPhase",
+              "onTurnEnd",
+              "fangquan-grant",
+              "game.pendingExtraTurns"
+            ]
+          }
+        },
+        {
+          "name": "若愚",
+          "localSkillId": "ruoyu",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "1583a08e78a6",
+          "sourceLine": "card__hero__shu.md:384",
+          "implementationSpec": {
+            "summary": "主公技，觉醒技，准备阶段开始时若你是体力值最小的角色，加 1 点体力上限并回复 1 点体力，获得\"激将\"。",
+            "timing": "准备阶段开始时。",
+            "condition": "你是主公且体力值为全场最小（并列亦算）。",
+            "cost": "无。",
+            "effect": "加 1 点体力上限 + 回复 1 点体力 + 获得\"激将\"。",
+            "frequency": "觉醒技：每局一次。",
+            "engineHooks": [
+              "onPreparePhase",
+              "StateRuntime.grantSkill"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 244,
+      "name": "孙策",
+      "localHeroId": "sunce",
+      "skills": [
+        {
+          "name": "激昂",
+          "localSkillId": "jiang",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "49ee70346570",
+          "sourceLine": "card__hero__wu.md:297",
+          "implementationSpec": {
+            "summary": "使用【决斗】或红色【杀】指定目标后，或成为【决斗】或红色【杀】的目标后，可以摸一张牌。",
+            "timing": "指定目标后 / 成为目标后（flow__use.md step 5）。",
+            "condition": "该牌为【决斗】或红色【杀】。",
+            "cost": "无。",
+            "effect": "摸一张牌。",
+            "frequency": "无次数限制（每张牌对每个目标各结算一次）。",
+            "engineHooks": [
+              "onShaTargeted",
+              "onTrickTargeted"
+            ]
+          }
+        },
+        {
+          "name": "魂姿",
+          "localSkillId": "hunzi",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "984fdd026110",
+          "sourceLine": "card__hero__wu.md:299",
+          "implementationSpec": {
+            "summary": "觉醒技，准备阶段开始时若你的体力值为 1，减 1 点体力上限并获得\"英姿\"和\"英魂\"。",
+            "timing": "准备阶段开始时。",
+            "condition": "体力值恰为 1。",
+            "cost": "减 1 点体力上限。",
+            "effect": "获得\"英姿\"与\"英魂\"。",
+            "frequency": "觉醒技：每局一次。",
+            "engineHooks": [
+              "onPreparePhase",
+              "StateRuntime.grantSkill"
+            ]
+          }
+        },
+        {
+          "name": "制霸",
+          "localSkillId": "zhiba",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "4ae4b1f51c4c",
+          "sourceLine": "card__hero__wu.md:301",
+          "implementationSpec": {
+            "summary": "主公技，其他吴势力角色的出牌阶段限一次，其可以与你拼点（若你发动过\"魂姿\"，你可以拒绝此拼点），当其没赢后，你可以获得两张拼点的牌。",
+            "timing": "其他吴势力角色的出牌阶段（由该角色主动发起）。",
+            "condition": "发起者为吴势力且非主公本人；双方各有至少一张手牌。",
+            "cost": "一次拼点（双方各扣置一张手牌）。",
+            "effect": "发起者没赢 → 主公可获得两张拼点的牌。",
+            "frequency": "每名其他吴势力角色每回合限一次。",
+            "engineHooks": [
+              "onActiveSkill",
+              "pindian:zhiba",
+              "startPindian"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 245,
+      "name": "张昭张纮",
+      "localHeroId": "erzhang",
+      "skills": [
+        {
+          "name": "直谏",
+          "localSkillId": "zhijian",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "f1d7241eb205",
+          "sourceLine": "card__hero__wu.md:469",
+          "implementationSpec": {
+            "summary": "出牌阶段，可以将手牌区里的一张装备牌置入一名其他角色的装备区，然后摸一张牌。",
+            "timing": "出牌阶段（主动）。",
+            "condition": "手牌区有装备牌且存在其他存活角色。",
+            "cost": "交出该装备牌。",
+            "effect": "该装备牌进入目标的装备区（顶替的旧装备照常入弃牌堆），你摸一张牌。",
+            "frequency": "无次数限制。",
+            "engineHooks": [
+              "onActiveSkill",
+              "EquipmentRuntime.equipCard"
+            ]
+          }
+        },
+        {
+          "name": "固政",
+          "localSkillId": "guzheng",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "ef0a45dcded6",
+          "sourceLine": "card__hero__wu.md:471",
+          "implementationSpec": {
+            "summary": "其他角色的弃牌阶段结束时，可将弃牌堆里一张其于此阶段因弃置而失去的手牌交给该角色，若如此做则获得弃牌堆里此阶段因弃置而置入的其余牌。",
+            "timing": "其他角色的弃牌阶段结束时。",
+            "condition": "该角色于本弃牌阶段有因弃置而进入弃牌堆且仍在弃牌堆的手牌。",
+            "cost": "归还其中一张给弃牌者。",
+            "effect": "其余该批牌归你。",
+            "frequency": "无次数限制。",
+            "engineHooks": [
+              "onDiscardPhaseEnd",
+              "flags.discardPhaseCards"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "gid": 246,
+      "name": "蔡文姬",
+      "localHeroId": "caiwenji",
+      "skills": [
+        {
+          "name": "悲歌",
+          "localSkillId": "beige",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "b4cc4ca947a8",
+          "sourceLine": "card__hero__neutral.md:391",
+          "implementationSpec": {
+            "summary": "一名角色受到【杀】造成的伤害后若其存活，可弃置一张牌令其判定：红桃回复 1 点体力；方块摸两张牌；梅花来源弃两张牌；黑桃来源翻面。",
+            "timing": "受到【杀】造成的伤害后。",
+            "condition": "伤害来源牌为【杀】且受伤者存活。",
+            "cost": "弃置一张牌。",
+            "effect": "按受伤者的判定花色四选一结算。",
+            "frequency": "无次数限制。",
+            "engineHooks": [
+              "onDamageAfter",
+              "judge"
+            ]
+          }
+        },
+        {
+          "name": "断肠",
+          "localSkillId": "duanchang",
+          "implementationStatus": "implemented",
+          "sourceTextRef": "b58236188901",
+          "sourceLine": "card__hero__neutral.md:393",
+          "implementationSpec": {
+            "summary": "锁定技，当你死亡时，令杀死你的角色失去其所有技能。",
+            "timing": "你死亡时（onDeath，早于弃置所有牌）。",
+            "condition": "存在与你不同的杀死你的角色。",
+            "cost": "无。",
+            "effect": "该角色失去其所有技能。",
+            "frequency": "锁定技。",
+            "engineHooks": [
+              "onDeath",
+              "StateRuntime.stripAllSkills"
+            ],
+            "orderNote": "注册序须早于【行殇】：官方判例是杀死断肠者的角色先失去所有技能，因此曹丕杀死蔡文姬时拿不到牌。"
+          }
+        }
+      ]
+    },
+    {
+      "gid": 247,
+      "name": "左慈",
+      "localHeroId": "zuoci",
+      "skills": [
+        {
+          "name": "化身",
+          "localSkillId": "huashen",
+          "implementationStatus": "deferred",
+          "sourceLine": "card__hero__neutral.md:249",
+          "implementationSpec": {
+            "summary": "游戏开始时随机获得三张未加入游戏的武将牌\"化身\"，可在回合开始/结束时更换，并以化身牌显示的势力与性别为准。",
+            "timing": "游戏开始时 / 回合开始时 / 回合结束时。",
+            "condition": "存在未加入游戏的武将牌。",
+            "cost": "无。",
+            "effect": "获得化身牌上的技能，并以化身牌的势力与性别为准。",
+            "frequency": "无次数限制。",
+            "engineHooks": [],
+            "deferralReason": "需要三条横切基建：① 动态技能三态层（本体技能 / 化身授予 / 被断肠剥夺各自独立，现有 state.skills 无法表达）；② 性别与势力覆写单点（现有 11 处直读 gender/camp、138 处 hasSkill 调用点无统一入口）；③ 场外武将牌堆。见 docs/audit/2026-08-06-shan-pack-spec.md 的成本评估。"
+          },
+          "sourceTextRef": "4ff2c51a56ce"
+        },
+        {
+          "name": "新生",
+          "localSkillId": "xinsheng",
+          "implementationStatus": "deferred",
+          "sourceLine": "card__hero__neutral.md:266",
+          "implementationSpec": {
+            "summary": "每当你受到 1 点伤害后，你可以增加一张\"化身\"牌。",
+            "timing": "受到伤害后。",
+            "condition": "拥有\"化身\"。",
+            "cost": "无。",
+            "effect": "增加一张化身牌。",
+            "frequency": "无次数限制。",
+            "engineHooks": [],
+            "deferralReason": "仅为\"化身\"牌堆供给，脱离化身后无任何可观测效果，随化身一并推迟。"
+          },
+          "sourceTextRef": "8bd2bac5657e"
+        }
+      ]
+    }
+  ]
+}
