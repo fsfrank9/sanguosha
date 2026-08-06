@@ -977,6 +977,14 @@
       var cardId = btn.getAttribute('data-fankui-card-id') || null;
       stage({ zone: zone, cardId: cardId }, cardId ? '[data-fankui-card-id="' + cardId + '"]' : '[data-fankui-zone="' + zone + '"]');
     });
+    // W2 (第五轮审计 F2): 反馈是"你可以获得来源的一张牌" —— 窗口内必须能放弃。
+    // 此前只有"伤害发生前把 skillPreferences.fankui 设成 decline"这一条路,
+    // 窗口一开就下不来 (身份场里司马懿被队友误伤会被迫去偷队友的牌)。
+    if (els.fankuiDeclineBtn) els.fankuiDeclineBtn.addEventListener('click', function () {
+      var r = Engine.resolvePendingChoice(getGame(), { decline: true });
+      if (!r.ok) renderLog();
+      render();
+    });
     // 刚烈 (v6.1): two prompts. ganglie-fire = yes/no for 夏侯惇 to
     // trigger judgement. ganglie-source-choice = source picks 2 cards
     // or takes 1 damage.

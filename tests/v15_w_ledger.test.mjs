@@ -117,4 +117,59 @@ test('W1-c②: #statusBanner 三处写入已加存在性守卫 (装饰性, 不�
   }
 });
 
+// ───── W2 F2: 反馈是"你可以" — 窗口内必须留放弃出路 ─────
+// 官方逐字 card__hero__wei.md:61「每当你受到伤害后，你**可以**获得来源的
+// 一张牌」。此前唯一的放弃路径是伤害发生**前**把 skillPreferences.fankui
+// 设成 decline; 窗口一开 resolver 只认 zone: hand/equipment, 别的一律重挂,
+// UI 面板也只有区域钮。身份场里这不是洁癖: 司马懿被队友误伤会被迫偷队友的牌。
+
+test('W2-F2: 反馈玩家窗口可以放弃 (decline), 来源的牌一张不动', () => {
+  const game = duel('simayi', 'caocao', 95030);
+  game.turn = 'enemy'; game.phase = 'play';
+  game.enemy.hand = [c('sha', { id: 'fk-sha' }), c('tao', { id: 'fk-loot' })];
+  game.player.skillPreferences.shanResponse = 'auto';
+  Engine.playCard(game, 'enemy', 'fk-sha', { target: 'player' });
+  assert.equal(game.pendingChoice && game.pendingChoice.kind, 'fankui-pick', '反馈开窗');
+  const enemyHandBefore = game.enemy.hand.length;
+  const playerHandBefore = game.player.hand.length;
+  const result = Engine.resolvePendingChoice(game, { decline: true });
+  assert.equal(result.ok, true);
+  assert.equal(game.pendingChoice, null, '放弃后窗口收掉 (此前无路可退)');
+  assert.equal(game.enemy.hand.length, enemyHandBefore, '来源手牌不动');
+  assert.equal(game.player.hand.length, playerHandBefore, '自己也没多牌');
+  assert.ok(game.log.some((line) => line.includes('选择不发动【反馈】')));
+});
+
+test('W2-F2: 反馈照常发动仍能获得来源一张牌 (零行为回归)', () => {
+  const game = duel('simayi', 'caocao', 95031);
+  game.turn = 'enemy'; game.phase = 'play';
+  game.enemy.hand = [c('sha', { id: 'fk2-sha' }), c('tao', { id: 'fk2-loot' })];
+  game.player.skillPreferences.shanResponse = 'auto';
+  Engine.playCard(game, 'enemy', 'fk2-sha', { target: 'player' });
+  assert.equal(game.pendingChoice && game.pendingChoice.kind, 'fankui-pick');
+  const playerHandBefore = game.player.hand.length;
+  Engine.resolvePendingChoice(game, { zone: 'hand' });
+  assert.equal(game.player.hand.length, playerHandBefore + 1, '获得来源一张手牌');
+  assert.equal(game.enemy.hand.length, 0);
+});
+
+test('W2-F2: 非法 zone 仍按惯例重挂并报错 (放弃分支不吞掉输入校验)', () => {
+  const game = duel('simayi', 'caocao', 95032);
+  game.turn = 'enemy'; game.phase = 'play';
+  game.enemy.hand = [c('sha', { id: 'fk3-sha' }), c('tao', { id: 'fk3-loot' })];
+  game.player.skillPreferences.shanResponse = 'auto';
+  Engine.playCard(game, 'enemy', 'fk3-sha', { target: 'player' });
+  const bad = Engine.resolvePendingChoice(game, { zone: 'judge' });
+  assert.equal(bad.ok, false);
+  assert.equal(game.pendingChoice && game.pendingChoice.kind, 'fankui-pick', '重挂等待重选');
+});
+
+test('W2-F2: UI 反馈面板有"不发动"钮且入 dispatch 表', () => {
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  assert.match(html, /id="fankuiDeclineBtn"/, '面板有放弃钮');
+  const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
+  assert.match(adapter, /panelId: 'fankuiPromptPanel',[^\n]*cancelBtnId: 'fankuiDeclineBtn'/,
+    '放弃钮登记为该面板的取消钮');
+});
+
 runTests(import.meta.url);

@@ -266,17 +266,29 @@
         var sourceActor = pending.sourceActor;
         var holderState = game[holder];
         if (!holderState) return fail('未知角色。');
-        var zone = decision && decision.zone;
+        var d = decision || {};
+        // W2 (第五轮审计 F2): 反馈官方逐字是"每当你受到伤害后, 你**可以**获得
+        // 来源的一张牌" (card__hero__wei.md:61, sha256 前 12 位 c11735ad316a
+        // 为同族的 :53 行)。此前窗口一开就下不来 —— resolver 只认
+        // zone: hand/equipment, 别的一律重挂; UI 面板也只有区域钮没有"不发动"。
+        // 唯一的放弃出路是**伤害发生前**就把 skillPreferences.fankui 设成
+        // 'decline', 窗口内无路可退。身份场里这不是纯洁癖: 司马懿被队友误伤时
+        // 会被迫去偷队友的牌。补 decline 分支。
+        if (d.decline || d.skip) {
+          log(game, actorName(game, holder) + '选择不发动【反馈】。');
+          return success('反馈未发动。');
+        }
+        var zone = d.zone;
         // M3: 判定区牌不为任何角色所拥有, 反馈不可获得 (glossary__zone.md)。
         if (['hand', 'equipment'].indexOf(zone) < 0) {
           setPendingChoice(game, pending);
-          return fail('请选择有效的区域（hand / equipment）。');
+          return fail('请选择有效的区域（hand / equipment），或放弃发动。');
         }
         // For hand zone we deliberately ignore decision.cardId — engine
         // picks a random hand card, preserving the "opponent's hand
         // contents are hidden when 反馈 is choosing" semantic. equipment
         // zone uses the specific cardId the player clicked.
-        var gained = removeTargetZoneCard(game, sourceActor, zone, zone === 'hand' ? null : decision.cardId);
+        var gained = removeTargetZoneCard(game, sourceActor, zone, zone === 'hand' ? null : d.cardId);
         if (!gained || !gained.card) {
           setPendingChoice(game, pending);
           return fail('找不到目标牌，请重新选择。');
