@@ -172,6 +172,9 @@ test('终局横幅: 身份场主忠方胜 → 玩家 (主公) 显示胜利 (此�
   game.winner = 'lordSide';
   UI.render();
   assert.equal($('statusTitle').textContent, '胜利！', '主忠方胜 → 玩家胜利横幅');
+  // W1: #statusBanner 整块 display:none, 上面那条只钉措辞。玩家真正看得到的
+  // 胜负标记在武将卡的状态章上 —— 一并钉住, 否则测试绿而玩家看不见。
+  assert.match(String($('playerState').innerHTML), /胜利/, '玩家可见面: 武将卡状态章标胜利');
   assert.match($('playerState').innerHTML, /胜利/, '玩家席状态条同步');
 });
 
@@ -181,6 +184,7 @@ test('终局横幅: 内奸单独获胜 → 玩家败北且文案标注内奸', (
   game.winner = 'renegade';
   UI.render();
   assert.equal($('statusTitle').textContent, '败北……');
+  assert.match(String($('playerState').innerHTML), /败北/, '玩家可见面: 武将卡状态章标败北');
   assert.match($('statusText').textContent, /内奸/, '败方文案标注内奸获胜');
 });
 

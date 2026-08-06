@@ -52,8 +52,11 @@ test('v8 PR-A2: qilin-pick 渲染用 promptCardChoice + 标 +1/-1 马 prefix', (
   assert.match(adapterSource, /'-1 马 '/);
 });
 
-test('v8 PR-A2: renderPendingChoice 含 dying-rescue 分支', () => {
-  assert.match(adapterSource, /kind === 'dying-rescue' && pending\.actor === 'player'/);
+// W1 (backlog:76): 提示面板改表驱动后, "含某某 kind 的 if 分支"这种源码形状
+// 断言已经没有对应物 —— 改断言**注册表数据**本身 (比正则匹配代码形状更强:
+// 它验证的是真正驱动渲染的那张表, 而不是某段代码长什么样)。
+test('v8 PR-A2: 提示面板注册表含 dying-rescue 条目', () => {
+  assert.match(adapterSource, /\{ panelId: 'dyingRescuePanel', kind: 'dying-rescue'/);
 });
 
 test('v8 PR-A2: dying-rescue 文案根据 selfRescue 区分 (自救/救他人)', () => {
