@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Engine, c } from './helpers/load-engine.mjs';
+import { CARD_CATALOG } from '../src/data/cards.js';
 import { test, runTests } from './helpers/harness.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -170,6 +171,36 @@ test('W2-F2: UI 反馈面板有"不发动"钮且入 dispatch 表', () => {
   const adapter = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8');
   assert.match(adapter, /panelId: 'fankuiPromptPanel',[^\n]*cancelBtnId: 'fankuiDeclineBtn'/,
     '放弃钮登记为该面板的取消钮');
+});
+
+// ───── W2 覆盖度审查: 全牌型必须有可达的使用出口 ─────
+// audit4 方法论的"覆盖度审查"一环 (当时是 53 技 + 33 牌型零漏审), 本轮
+// 101 技 + 39 牌型。技能侧的覆盖不变量在 skill_schema (W2-F3) 与
+// ui_pending_kind_coverage (W1) 里; 这里补牌型侧。
+test('W2 覆盖度: 39 个牌型逐个有使用出口 (自有 handler / 族共用 / 显式仅响应)', () => {
+  const engineSrc = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
+  const registered = new Set(
+    [...engineSrc.matchAll(/registerPlayHandler\('([a-z_]+)'/g)].map((m) => m[1]),
+  );
+  // playHandlerKey 的族级归并: 杀类 → 'sha', 装备 → 'equipment', 延时 → 'delayed'。
+  const familyKey = { equipment: 'equipment', delayed: 'delayed' };
+  // 仅响应牌: 从不主动使用 (playCard 显式拒绝), 因此不需要 handler。
+  const RESPONSE_ONLY = new Set(['shan', 'wuxie']);
+
+  const missing = [];
+  for (const [type, info] of Object.entries(CARD_CATALOG)) {
+    if (RESPONSE_ONLY.has(type)) continue;
+    const key = /sha$/.test(type) ? 'sha' : (familyKey[info.family] || type);
+    if (!registered.has(key)) missing.push(`${type} (family=${info.family}, 期望 handler key=${key})`);
+  }
+  assert.deepEqual(missing, [],
+    '这些牌型没有任何使用出口 — 玩家拿到了也打不出去: ' + missing.join(', '));
+
+  // 反向: 仅响应牌确实被 playCard 显式拒绝 (而不是悄悄走 default handler)。
+  for (const type of RESPONSE_ONLY) {
+    assert.ok(!registered.has(type), `${type} 是仅响应牌, 不该注册使用 handler`);
+  }
+  assert.match(engineSrc, /只能用于响应，本版会自动打出/, 'playCard 对仅响应牌有显式拒绝');
 });
 
 runTests(import.meta.url);
