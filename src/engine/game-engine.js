@@ -355,12 +355,21 @@
         if (physicalCard) putCard(game, physicalCard, { zone: 'discard' });
       }
 
+      // W1 (2026-06-09 审计 backlog:83 显式裁决 → **做**): 兜底原本是
+      // Math.random() —— 一旦真的走到 (game.random 缺失), 同种子复跑会得到
+      // 不同结果, 而整个守恒 fuzz 档 (1200 种子) 的前提正是"同种子必然同轨"。
+      // 兜底改为**确定性**推导 (按牌堆+弃牌堆规模取模), 无 game.random 时
+      // 依然可复现; 有 game.random 时行为逐字不变。
       function randomSuit(game) {
         var suits = ['spade', 'heart', 'club', 'diamond'];
-        var r = (game.random && typeof game.random === 'function') ? game.random() : Math.random();
-        var idx = Math.floor(r * 4) % 4;
-        if (idx < 0 || idx >= 4) idx = 0;
-        return suits[idx];
+        if (game && game.random && typeof game.random === 'function') {
+          var idx = Math.floor(game.random() * 4) % 4;
+          if (idx < 0 || idx >= 4) idx = 0;
+          return suits[idx];
+        }
+        var deckLen = (game && game.deck && game.deck.length) || 0;
+        var discardLen = (game && game.discard && game.discard.length) || 0;
+        return suits[(deckLen + discardLen) % 4];
       }
 
       // v11 B1: 装备穿/卸/失去时机与武器特效 (麒麟/寒冰/雌雄) 已迁往

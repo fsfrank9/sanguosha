@@ -266,17 +266,29 @@
         var sourceActor = pending.sourceActor;
         var holderState = game[holder];
         if (!holderState) return fail('未知角色。');
-        var zone = decision && decision.zone;
+        var d = decision || {};
+        // W2 (第五轮审计 F2): 反馈官方逐字是"每当你受到伤害后, 你**可以**获得
+        // 来源的一张牌" (card__hero__wei.md:61, sha256 前 12 位 c11735ad316a
+        // 为同族的 :53 行)。此前窗口一开就下不来 —— resolver 只认
+        // zone: hand/equipment, 别的一律重挂; UI 面板也只有区域钮没有"不发动"。
+        // 唯一的放弃出路是**伤害发生前**就把 skillPreferences.fankui 设成
+        // 'decline', 窗口内无路可退。身份场里这不是纯洁癖: 司马懿被队友误伤时
+        // 会被迫去偷队友的牌。补 decline 分支。
+        if (d.decline || d.skip) {
+          log(game, actorName(game, holder) + '选择不发动【反馈】。');
+          return success('反馈未发动。');
+        }
+        var zone = d.zone;
         // M3: 判定区牌不为任何角色所拥有, 反馈不可获得 (glossary__zone.md)。
         if (['hand', 'equipment'].indexOf(zone) < 0) {
           setPendingChoice(game, pending);
-          return fail('请选择有效的区域（hand / equipment）。');
+          return fail('请选择有效的区域（hand / equipment），或放弃发动。');
         }
         // For hand zone we deliberately ignore decision.cardId — engine
         // picks a random hand card, preserving the "opponent's hand
         // contents are hidden when 反馈 is choosing" semantic. equipment
         // zone uses the specific cardId the player clicked.
-        var gained = removeTargetZoneCard(game, sourceActor, zone, zone === 'hand' ? null : decision.cardId);
+        var gained = removeTargetZoneCard(game, sourceActor, zone, zone === 'hand' ? null : d.cardId);
         if (!gained || !gained.card) {
           setPendingChoice(game, pending);
           return fail('找不到目标牌，请重新选择。');
@@ -943,6 +955,13 @@
           log(game, actorName(game, actor) + '选择不发动【据守】。');
           return null;
         }
+        // W2 (第五轮审计 F6 的**反例**, 记录以免后人重踩):
+        // 本轮曾据 card__hero__wei.md:295 的（风）曹仁「摸**一张**牌」把这里
+        // 改成 1, 随后被对抗验证驳回 —— **（风）曹仁是另一张武将牌**: 它是
+        // 据守(摸一张) + **【解围】** 的双技重做版 (:297)。摸三张对应的是
+        // 单技曹仁 (旧风/1V1/3V3/国-标 四个版本一致, :301/:305/:309/:313),
+        // 而本仓的曹仁正是单技卡。只挑技能行不看整张牌的技能集去换版本,
+        // 得到的是一个**任何官方版本都不存在**的弱化曹仁。已还原为摸三张。
         drawCards(game, actor, 3);
         state.turnedOver = !state.turnedOver;
         log(game, actorName(game, actor) + '发动【据守】，摸三张牌并将武将牌' + (state.turnedOver ? '翻面。' : '翻回正面。'));
@@ -1477,6 +1496,8 @@
         var deadActor = context.deadActor;
         var results = [];
         StateRuntime.aliveSeats(game).forEach(function (seat) {
+          // W2 F5: 死亡时机改为按官方轮转序逐席派发 → 只处理轮到的那一席。
+          if (context.resolvingSeat && seat !== context.resolvingSeat) return;
           var state = game[seat];
           if (seat === deadActor || !state || !hasSkill(state, 'xingshang')) return;
           var pref = (state.skillPreferences && state.skillPreferences.xingshang)
@@ -2795,6 +2816,8 @@
         var game = context.game;
         var deadActor = context.deadActor;
         var killer = context.killerActor;
+        // W2 F5: 断肠的持有者就是死者本人 —— 只在轮到他那一席时结算。
+        if (context.resolvingSeat && context.resolvingSeat !== deadActor) return null;
         var dead = game[deadActor];
         if (!dead || !hasSkill(dead, 'duanchang')) return null;
         if (!killer || killer === deadActor || !game[killer]) return null;
@@ -3463,7 +3486,16 @@
             cardId: fanjianCard.id,
             cardName: fanjianCard.name
           });
-          return { suspendedForFanjian: true };
+          // W1 (v14 P4 滚动候选回收): 此处原本裸返 { suspendedForFanjian: true }
+          // —— 没有 ok 字段。useSkill 经 selectActiveSkillResult 原样上抛,
+          // aiTakeAction 的 `skillResult.ok` 读到 undefined, runAITurn 的
+          // `if (!action.ok) return action` 就把这个畸形对象当成失败结果返回
+          // 给调用方 (1200 种子 fuzz 复现面在案, 基线 2c56ed0 同现)。
+          // onActiveSkill 的返回值是**结果**不是 hook 信号 —— 与其余主动技
+          // 一致改为 success(), 挂起标记作为附加字段随行。
+          var fanjianPaused = success('等待' + actorName(game, targetActor) + '猜测【反间】的花色。');
+          fanjianPaused.suspendedForFanjian = true;
+          return fanjianPaused;
         }
         // AI target: blind random guess from {spade, heart, club, diamond}.
         return applyFanjianGuess(game, actor, targetActor, fanjianCard, randomSuit(game));
@@ -3803,9 +3835,20 @@
         return continueTurnAfterPreparePhase(game, actor);
       }
 
+      // W1 (2026-06-09 审计 backlog:81 显式裁决 → **做**): 官方逐字是
+      // "若你未于出牌阶段内使用或打出过【杀】, 你**可以**跳过弃牌阶段"
+      // (card__hero__wu.md:61) —— 是可选技。此前引擎无条件跳过, 与"可以"
+      // 不符。2026-06-09 的评估("1v1 跳弃牌永远最优, 纯规则洁癖")在 3-5 人
+      // 身份场下已不再是全部图景 (例: 想留在弃牌阶段把牌喂给对手的固政,
+      // 或单纯不想暴露"我这回合没出杀"), 且成本只有一个偏好闸。
       function triggerKejiBeforeDiscard(game, actor, context) {
         var state = game[actor];
         if (!state || !hasSkill(state, 'keji') || state.usedOrRespondedSha) return false;
+        var kejiPref = (state.skillPreferences && state.skillPreferences.keji) || 'auto';
+        if (kejiPref === 'decline') {
+          log(game, actorName(game, actor) + '选择不发动【克己】，照常进入弃牌阶段。');
+          return false;
+        }
         setPhase(game, actor, 'finish');
         log(game, actorName(game, actor) + '发动【克己】，本回合未使用或打出【杀】，跳过弃牌阶段。');
         if (context) {
@@ -4076,11 +4119,23 @@
 
         function finishLeijiJudgement(game, actor, targetActor, leijiJudge) {
           var target = game[targetActor];
-          var hit = !!(leijiJudge && leijiJudge.suit === 'spade');
+          // W2 (F6 同源): 雷击原按**旧风/3V3/国-标**版落地 (黑桃 / 2 点雷电);
+          // 张角的**风**版是 card__hero__neutral.md:272
+          // 「…令一名其他角色判定，若结果为**黑色**，你对其造成 **1** 点雷电
+          //   伤害，若如此做，当你造成此伤害时，你**回复 1 点体力**。」
+          // 三处差异 (花色闸 / 伤害量 / 回血) 一并按风版更正。
+          // 花色读裸 color: judge() 已对判定归属者施加过红颜视图 (黑桃视红桃),
+          // 这里再走 effectiveCardColor 会二次施加。与旧代码读裸 .suit 同口径。
+          var hit = !!(leijiJudge && leijiJudge.color === 'black');
           resolveJudgementCard(game, targetActor, target, '【雷击】', leijiJudge);
           if (hit) {
-            log(game, '【雷击】判定为黑桃，' + actorName(game, targetActor) + '受到 2 点雷电伤害。');
-            damage(game, targetActor, 2, actor, '【雷击】', null, 'thunder');
+            log(game, '【雷击】判定为黑色，' + actorName(game, targetActor) + '受到 1 点雷电伤害。');
+            damage(game, targetActor, 1, actor, '【雷击】', null, 'thunder');
+            var source = game[actor];
+            if (source && source.hp > 0 && source.hp < source.maxHp) {
+              source.hp += 1;
+              log(game, actorName(game, actor) + '因【雷击】回复 1 点体力（现为 ' + source.hp + '）。');
+            }
           } else {
             log(game, '【雷击】判定未中。');
           }
@@ -4645,9 +4700,11 @@
         SkillRuntime.registerSkill(skillRegistry, 'beige', {
         onDamageAfter: function (context) { return triggerBeigeDamageAfter(context); }
       });
-        // v15 V: 断肠 (蔡文姬) 注册在 行殇 之前 —— runHook 按注册序执行,
-        // 而官方判例是"杀死断肠者的角色**先**失去所有技能", 曹丕杀死蔡文姬
-        // 时【行殇】已被夺走, 拿不到牌。序错就是两个方向都错。
+        // v15 V 曾靠注册序 (断肠先于行殇) 定顺序, 并把它写成官方判例 ——
+        // W2 F5 复核后确认那是**没有出处且方向判反**的断言。真正的官方规则是
+        // 同一时机从当前回合角色起按逆时针依次 (glossary__flow.md:30),
+        // 现由 damage-dying.js 的 runDeathTimingHooks 逐席派发决定,
+        // **注册序不再承载任何语义**。
         SkillRuntime.registerSkill(skillRegistry, 'duanchang', {
         onDeath: function (context) { return triggerDuanchangDeath(context); }
       });
@@ -4667,8 +4724,10 @@
         SkillRuntime.registerSkill(skillRegistry, 'lieren', {
         onShaDamageDealt: function (context) { return triggerLierenShaDamageDealt(context); }
       });
+        // W2 (F7): 暴虐是**来源侧**"造成伤害后"时机 → 挂 onDamageDealt
+        // (不受"受害者存活"闸约束), 而不是受害侧的 onDamageAfter。
         SkillRuntime.registerSkill(skillRegistry, 'baonue', {
-        onDamageAfter: function (context) { return triggerBaonueDamageAfter(context); }
+        onDamageDealt: function (context) { return triggerBaonueDamageAfter(context); }
       });
         SkillRuntime.registerSkill(skillRegistry, 'haoshi', {
         onDrawPhase: function (context) { return triggerHaoshiDrawPhase(context); }

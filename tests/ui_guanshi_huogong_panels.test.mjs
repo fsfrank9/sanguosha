@@ -39,9 +39,13 @@ test('dom-adapter: initElements 注册全部新面板元素', () => {
   }
 });
 
-test('dom-adapter: renderPendingChoice 处理两个新 kind 且仅对 player 弹出', () => {
-  assert.match(adapter, /kind === 'guanshi-discard' && pending\.actor === 'player'/);
-  assert.match(adapter, /kind === 'huogong-show' && pending\.actor === 'player'/);
+// W1 (backlog:76): 提示面板改表驱动 —— "仅对 player 弹出"不再是每条各写一遍
+// 的 if 条件, 而是驱动器统一的 `pending.actor === (spec.actor || 'player')`。
+// 断言改为: ① 这两个 kind 在注册表里有条目; ② 驱动器确实带 actor 闸。
+test('dom-adapter: 提示面板注册表含两个新 kind, 且驱动器统一带 player 闸', () => {
+  assert.match(adapter, /\{ panelId: 'guanshiDiscardPanel', kind: 'guanshi-discard'/);
+  assert.match(adapter, /\{ panelId: 'huogongShowPanel', kind: 'huogong-show'/);
+  assert.match(adapter, /pending\.actor === \(spec\.actor \|\| 'player'\)/);
 });
 
 test('dom-adapter: 贯石斧多选恰好 2 张 — 选满禁入 + confirm 按钮 2 张门控', () => {

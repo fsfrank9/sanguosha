@@ -74,7 +74,9 @@ test('据守: 结束阶段发动 → 摸三张牌, 武将牌翻面, 回合交给
     const r = Engine.endTurn(game);
     assert.equal(r.ok, true, r.message);
   });
-  assert.equal(game.player.hand.length, handBefore + 3, '摸三张牌');
+  // W2: 曾被误改为摸一张, 经对抗验证还原 ——（风）曹仁是"据守(摸一张)+解围"
+  // 的双技重做版, 本仓这张单技曹仁对应的是摸三张的那四个版本。
+  assert.equal(game.player.hand.length, handBefore + 3, '摸三张牌 (单技曹仁: 旧风/1V1/3V3/国-标 一致)');
   assert.equal(game.player.turnedOver, true, '武将牌翻面');
   assert.equal(game.turn, 'enemy', '回合交给对手');
   assert.ok(game.log.some((l) => l.includes('【据守】')), '有据守日志');

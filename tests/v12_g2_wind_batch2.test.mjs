@@ -260,7 +260,7 @@ test('B7: 天香 — 目标超出小乔攻击范围 (对手 +1 马) 不转移', 
 
 // ═══════════════════ C. 雷击 (leiji, 张角) ═══════════════════════════════
 
-test('C1: 雷击 — 张角出闪响应杀, 判定黑桃 → 攻击者受 2 点雷电伤害', () => {
+test('C1: 雷击 — 张角出闪响应杀, 判定黑色 → 攻击者受 1 点雷电伤害', () => {
   const game = buildGame({ playerHero: 'zhangjiao', enemyHero: 'liubei' });
   game.turn = 'enemy';
   // v13 张角修缮: 雷击玩家侧默认改询问 (leiji-ask) — 本测试钉 auto 保旧直发口径
@@ -272,7 +272,8 @@ test('C1: 雷击 — 张角出闪响应杀, 判定黑桃 → 攻击者受 2 点�
   const playResult = assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'atk-sha'));
   assert.equal(playResult.ok, true, playResult.message);
   assert.equal(game.player.hp, game.player.maxHp, '张角出闪化解, 未受伤');
-  assert.equal(game.enemy.hp, enemyHpBefore - 2, '雷击判定黑桃, 攻击者受 2 点雷电伤害');
+  // W2 (F6): 雷击按风包现行版更正 (黑色 / 1 点雷电 / 张角回复 1 点体力)。
+  assert.equal(game.enemy.hp, enemyHpBefore - 1, '雷击判定黑色, 攻击者受 1 点雷电伤害');
   assert.ok(game.log.some((l) => l.includes('雷击')), '有雷击日志');
   assert.ok(game.log.some((l) => l.includes('雷电')), '日志含雷电伤害描述');
 });
@@ -326,7 +327,8 @@ test('C3: 雷击 + 八卦联动 — 八卦判定红视为出闪, 雷击照样触
   const playResult = assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'atk-sha'));
   assert.equal(playResult.ok, true, playResult.message);
   assert.equal(game.player.hp, game.player.maxHp, '八卦判定红, 视为出闪, 未受伤');
-  assert.equal(game.enemy.hp, enemyHpBefore - 2, '雷击随八卦"视为出闪"同样触发, 攻击者受 2 点雷电伤害');
+  // W2 (F6): 雷击按风包现行版更正 (黑色 / 1 点雷电 / 张角回复 1 点体力)。
+  assert.equal(game.enemy.hp, enemyHpBefore - 1, '雷击随八卦"视为出闪"同样触发, 攻击者受 1 点雷电伤害');
   assert.ok(game.log.some((l) => l.includes('八卦阵')));
   assert.ok(game.log.some((l) => l.includes('雷击')));
 });

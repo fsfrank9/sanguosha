@@ -270,6 +270,19 @@
       var targetState = game[damageContext.targetActor];
       var sourceCardClaimed = false;
       var targetAlive = targetState && targetState.hp > 0;
+      // W2 (第五轮审计 F7, 高): "造成伤害后" 是**来源侧**时机, 与"受到伤害后"
+      // 的**受害侧**时机是两码事 —— 前者不关心受害者死没死。
+      // 暴虐 (董卓主公技) 官方逐字: 「每当其他角色**造成伤害后**, 若其于受到此
+      // 伤害的角色因受到此伤害而扣减体力前为群势力角色, 来源可以判定…」
+      // (card__hero__neutral.md:185)。此前它挂在 onDamageAfter 上, 而整条
+      // onDamageAfter 派发被 targetAlive 一起闸住 → **伤害一旦致死, 暴虐静默
+      // 失效**, 而这恰恰是它最常发生的场合。
+      // 不能简单去掉 targetAlive: 同挂 onDamageAfter 的 奸雄/反馈/刚烈/遗计/
+      // 节命/放逐/耀武 全是受害方技能, 死后不该再触发 (flow__damage.md:97)。
+      // 故拆出独立的来源侧时机 onDamageDealt, **不受 targetAlive 约束**。
+      if (game.phase !== 'gameover') {
+        SkillRuntime.runHook(skillRegistry, 'onDamageDealt', damageContext);
+      }
       if (game.phase !== 'gameover' && targetAlive) {
         var damageResults = SkillRuntime.runHook(skillRegistry, 'onDamageAfter', damageContext);
         for (var damageIndex = 0; damageIndex < damageResults.length; damageIndex += 1) {
@@ -506,15 +519,45 @@
     // v12 H5: 身份场死亡结算 (仅对局继续时; 1v1 死亡即终局不进此路径) —
     // 官方: 武将阵亡弃置其所有区域内的牌; 奖惩: 任何角色击杀反贼 →
     // 摸三张牌; 主公击杀忠臣 → 弃置所有手牌与装备。闪电等无来源死亡无奖惩。
+    // W2 F5: "死亡时"时机的逐席派发 —— 从当前回合角色起按座次环 (行动顺序)
+    // 依次给每个座席一次发动机会, 死者本人排在最后 (其回合若正在进行, 官方
+    // 是"其回合结束"后才继续, 但断肠这类技能仍在死亡结算内, 故仍参与)。
+    // 各 handler 只在 context.resolvingSeat === 自己的持有者时动手。
+    function runDeathTimingHooks(game, deadActor, killerActor) {
+      var seats = StateRuntime.seatList(game);
+      var anchor = (game.turn && seats.indexOf(game.turn) >= 0) ? game.turn : seats[0];
+      var start = seats.indexOf(anchor);
+      var order = [];
+      for (var i = 0; i < seats.length; i += 1) order.push(seats[(start + i) % seats.length]);
+      order.forEach(function (seat) {
+        if (game.phase === 'gameover') return;
+        SkillRuntime.runHook(skillRegistry, 'onDeath', {
+          game: game, deadActor: deadActor, killerActor: killerActor, resolvingSeat: seat
+        });
+      });
+    }
+
     function settleDeath(game, deadActor, killerActor) {
       var deadState = game[deadActor];
       if (!deadState) return;
       var roles = game.roles || {};
       // v15 U: 死亡时机钩子 (曹丕【行殇】"每当其他角色死亡时，你可以获得其
       // 所有牌") —— 必须在 discardAllZones **之前**, 否则牌已进弃牌堆无从获得。
-      SkillRuntime.runHook(skillRegistry, 'onDeath', {
-        game: game, deadActor: deadActor, killerActor: killerActor
-      });
+      //
+      // W2 (第五轮审计 F5, 高): 【行殇】与【断肠】是**同一时机**
+      // (flow__death.md:31「(3) 死亡时：能发动的技能：【行殇】…【断肠】…」),
+      // 而官方对同一时机多名角色的技能有明确轮转序:
+      // glossary__flow.md:30「…是【化身②】和【连破】的发动时机, **从左慈开始
+      // 按逆时针方向**, 左慈和司马懿(神)依次决定是否发动」—— 即**从当前回合
+      // 角色起按行动顺序依次**。
+      //
+      // v15 V 曾按"断肠先于行殇"固定注册序落地, 并在注释里把它写成官方判例 ——
+      // **那是没有出处的断言, 且方向判反了**: 曹丕在**自己回合**杀死蔡文姬时,
+      // 当前回合角色是曹丕, 逆时针第一个就是他自己 → 行殇先结算 (他拿到牌),
+      // 之后才轮到蔡文姬的断肠夺走技能。反过来若曹丕是在**蔡文姬的回合**里
+      // (刚烈/反馈反伤) 杀死她, 则从蔡文姬起算, 断肠先手, 行殇被夺权。
+      // 固定注册序无论选哪个方向都会在另一种情形下出错 → 改为逐席派发。
+      runDeathTimingHooks(game, deadActor, killerActor);
       log(game, actorName(game, deadActor) + '阵亡（' + (roles[deadActor] || '未知身份') + '），弃置其所有牌。');
       discardAllZones(game, deadActor);
       deadState.chained = false;

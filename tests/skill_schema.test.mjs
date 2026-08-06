@@ -92,6 +92,9 @@ const VALID_TRIGGERS = new Set([
   // v15 V: 屯田触发时机 — "每当你于回合外失去牌后" (连营的 handLoss 只认
   // "失去最后一张手牌", 屯田是任意失牌 → 另立时机名)
   'cardLost',
+  // v15 W2: 暴虐触发时机 — "每当其他角色**造成伤害后**" (来源侧, 不受
+  // "受害者存活"约束; 与受害侧的 damageAfter 是两个时机)
+  'damageDealt',
 ]);
 const VALID_FREQUENCIES = new Set([
   'oncePerTurn',
@@ -210,6 +213,58 @@ test('cache and specs fixtures agree on every shared skill', () => {
     );
   }
 });
+// ───── W2 F3: metadata 声称的 hook 名必须与实际注册一致 ─────
+// 缘起: 第五轮审计发现 SKILL_METADATA 里有两条**谎报 hook 名**的条目 ——
+// 刚烈声称注册了 onJudgementAfterResolve (实际判定是在 onDamageAfter 内部
+// 直接 judge() 走完的), 洛神声称 onPreparePhase (实际走 processPreparePhase
+// 的直调口, 与妄尊/神速同款)。这类漂移没有任何东西能发现: schema 测试只校验
+// hooks 是"非空数组", 不校验里面写的名字是不是真的。
+//
+// 本测只管**注册表类**的 hook 名 (onXxx): 声称了就必须真注册, 真注册了就必须
+// 声称。非注册表机制 (processPreparePhase / hasPassiveEffect / handLimit …)
+// 是直调口, 名字由各自域自定, 不在此校验范围。
+const REGISTRY_HOOK_NAMES = new Set([
+  'onActiveSkill', 'onBeforeDiscardPhase', 'onCanRecast', 'onCardAs',
+  'onCardTarget', 'onCardUse', 'onDamageAfter', 'onDamageModify', 'onDeath',
+  'onDrawPhase', 'onDyingEnter', 'onJudgementAfterResolve',
+  'onJudgementBeforeResolve', 'onNeedResponse', 'onPreparePhase',
+  'onShaDamageDealt', 'onShaDodged', 'onShaTargeted', 'onShanUsed',
+  'onSkillPreview', 'onTurnEnd',
+  // v15 V 新增
+  'onCardLost', 'onDiscardPhaseEnd', 'onBeforePlayPhase', 'onTrickTargeted',
+  'onShaEffectiveness',
+  // v15 W2: 来源侧"造成伤害后"
+  'onDamageDealt',
+]);
+
+function actualRegistrations() {
+  const src = fs.readFileSync(path.join(root, 'src/engine/skills.js'), 'utf8');
+  const map = new Map();
+  for (const m of src.matchAll(/registerSkill\(skillRegistry, '([a-z0-9]+)', \{([\s\S]*?)\n      \}\);/g)) {
+    map.set(m[1], [...m[2].matchAll(/^\s*(on[A-Za-z]+):/gm)].map((h) => h[1]));
+  }
+  return map;
+}
+
+test('W2-F3: SKILL_METADATA 声称的注册表 hook 名与实际 registerSkill 逐条一致', () => {
+  const registered = actualRegistrations();
+  assert.ok(registered.size >= 70, `registerSkill 扫描口径可能失效 (只扫到 ${registered.size} 条)`);
+  const drift = [];
+  for (const skillId of IMPLEMENTED_SKILL_IDS) {
+    const meta = SKILL_METADATA[skillId];
+    if (!meta) continue;
+    const declared = (meta.hooks || []).filter((h) => REGISTRY_HOOK_NAMES.has(h));
+    const actual = registered.get(skillId) || [];
+    for (const h of declared) {
+      if (!actual.includes(h)) drift.push(`${skillId}: metadata 声称 ${h}, 但 registerSkill 里没有`);
+    }
+    for (const h of actual) {
+      if (!(meta.hooks || []).includes(h)) drift.push(`${skillId}: 实际注册了 ${h}, 但 metadata 没写`);
+    }
+  }
+  assert.deepEqual(drift, [], '技能元数据的 hook 名与实际注册漂移:\n  ' + drift.join('\n  '));
+});
+
 await runTests();
 
 console.log('\nSkill schema and fixture consistency tests passed.');

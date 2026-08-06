@@ -41,6 +41,25 @@ function trio(heroes, seed = 92050, roles = { player: '主公', enemy: '反贼',
   }));
 }
 
+function quad(heroes, roles, seed = 92095) {
+  return reset(Engine.newGame({
+    seed,
+    seats: ['player', 'enemy', 'ally', 'ally2'],
+    roles,
+    playerHero: heroes[0], enemyHero: heroes[1], allyHero: heroes[2], ally2Hero: heroes[3],
+  }));
+}
+
+function penta(heroes, seed = 92090) {
+  return reset(Engine.newGame({
+    seed,
+    seats: ['player', 'enemy', 'ally', 'ally2', 'ally3'],
+    roles: { player: '主公', enemy: '反贼', ally: '反贼', ally2: '忠臣', ally3: '内奸' },
+    playerHero: heroes[0], enemyHero: heroes[1], allyHero: heroes[2],
+    ally2Hero: heroes[3], ally3Hero: heroes[4],
+  }));
+}
+
 // 牌堆顶是数组**末尾** (takeCard/drawCards 从尾部取) → 想控判定花色就往
 // 尾部压, 且先传入的先被取走。
 function stackJudge(game, ...cards) {
@@ -171,16 +190,29 @@ test('屯田: 空牌堆时判定触发洗牌 — 牌张守恒不破 (失牌时�
   assert.equal(game.enemy.tian.length, 1, '洗牌后照常判定并置"田"');
 });
 
-test('屯田: 每张"田" 令邓艾与其他角色的距离 -1', () => {
-  const game = trio(['dengai', 'caocao', 'huatuo']);
-  const base = Engine.distanceBetween
-    ? Engine.distanceBetween(game, 'player', 'ally')
-    : null;
-  game.player.tian = [c('sha', { id: 't1' }), c('sha', { id: 't2' })];
-  if (base !== null) {
-    assert.equal(Engine.distanceBetween(game, 'player', 'ally'), Math.max(1, base - 2),
-      '两张"田" → 距离 -2 (下限 1)');
+// W2 (第五轮审计 F4): 这条测试原本挑了**基础距离恰为 1** 的席位对, 于是
+// max(1, 1-2) === 1 === 基础值 —— 无论距离有没有接进去它都绿, **空跑通过**,
+// 掩护了"屯田第二半句完全没实现"整整一批。改用 5 席环上基础距离 2 的席位对,
+// 并显式钉住"没接就必然红"。
+test('屯田: 每张"田" 令邓艾与其他角色的距离 -1 (5 席环上可观测)', () => {
+  const game = penta(['dengai', 'caocao', 'huatuo', 'zhangfei', 'guanyu']);
+  for (const seat of game.seats) {
+    game[seat].equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
   }
+  assert.equal(Engine.distanceBetween(game, 'player', 'ally'), 2, '前置: 基础距离必须 > 1, 否则本测空跑');
+  game.player.tian = [c('sha', { id: 't1' })];
+  assert.equal(Engine.distanceBetween(game, 'player', 'ally'), 1, '一张"田" → 距离 -1');
+  game.player.tian = [c('sha', { id: 't1' }), c('sha', { id: 't2' }), c('sha', { id: 't3' })];
+  assert.equal(Engine.distanceBetween(game, 'player', 'ally'), 1, '下限 1');
+});
+
+test('屯田: 距离只减**出向** (与马术同口径 — 别人到邓艾的距离不变)', () => {
+  const game = penta(['dengai', 'caocao', 'huatuo', 'zhangfei', 'guanyu']);
+  for (const seat of game.seats) {
+    game[seat].equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
+  }
+  game.player.tian = [c('sha', { id: 't1' })];
+  assert.equal(Engine.distanceBetween(game, 'ally', 'player'), 2, '反向距离不受"田"影响');
 });
 
 test('凿险: "田" ≥3 时准备阶段觉醒 — 减 1 上限并获得急袭, 且只觉醒一次', () => {
@@ -657,23 +689,46 @@ test('断肠: 蔡文姬死亡时杀死她的角色失去所有技能', () => {
   assert.equal(game.player.skills.length, 0, '杀死者失去所有技能');
 });
 
-test('断肠 × 行殇: 断肠先结算 → 曹丕失去行殇, 拿不到蔡文姬的牌', () => {
-  const game = trio(['caopi', 'huatuo', 'caiwenji'], 92082);
+// W2 (第五轮审计 F5): 这条原本断言"断肠先结算 → 曹丕拿不到牌", 并在 V 阶段
+// 被我写成"官方判例"。**那是没有出处的断言, 且方向判反了。**
+// 真正的官方规则: 行殇与断肠是**同一时机** (flow__death.md:31「(3) 死亡时:
+// 能发动的技能:【行殇】…【断肠】…」), 而同一时机多名角色的技能
+// **从当前回合角色起按逆时针依次** (glossary__flow.md:30)。
+// 于是顺序取决于"这是谁的回合", 固定注册序无论选哪边都会在另一种情形下出错。
+test('断肠 × 行殇 [官方轮转序]: 曹丕在**自己回合**杀死蔡文姬 → 行殇先手拿到牌, 随后才被断肠夺技', () => {
+  const game = quad(['caopi', 'caiwenji', 'zhangfei', 'huatuo'],
+    { player: '主公', enemy: '反贼', ally: '反贼', ally2: '忠臣' }, 92085);
   game.turn = 'player'; game.phase = 'play';
-  game.player.hand = [c('sha', { id: 'dc2-sha' })];
-  game.ally.hp = 1;
-  game.ally.hand = [c('tao', { id: 'dc2-loot-a' }), c('tao', { id: 'dc2-loot-b' })];
-  game.ally.skillPreferences.beige = 'decline';
-  game.ally.skillPreferences.taoSelfRescue = 'decline';
-  game.enemy.hand = [];
-  assertCardConservation(game, () => {
-    Engine.playCard(game, 'player', 'dc2-sha', { target: 'ally' });
-    while (game.pendingChoice) Engine.resolvePendingChoice(game, { decline: true });
-  });
-  if (game.ally.hp <= 0) {
-    assert.equal(game.player.skills.length, 0, '曹丕失去所有技能 (含行殇)');
-    assert.equal(game.player.hand.length, 0, '行殇已被夺走 → 拿不到遗产');
-  }
+  game.enemy.hp = 1;
+  // 战利品刻意用既不能闪避也不能自救的牌 (给【闪】她就躲了, 给【桃】她就自救了)。
+  game.enemy.hand = [c('wuzhong', { id: 'dc-loot-a' }), c('wuzhong', { id: 'dc-loot-b' })];
+  game.enemy.skillPreferences.beige = 'decline';
+  game.player.hand = [c('sha', { id: 'dc-kill' })];
+  const skillsBefore = game.player.skills.length;
+  assert.ok(skillsBefore > 0, '前置: 曹丕开局有技能');
+  Engine.playCard(game, 'player', 'dc-kill', { target: 'enemy' });
+  while (game.pendingChoice) Engine.resolvePendingChoice(game, { decline: true });
+  assert.ok(game.enemy.hp <= 0, '蔡文姬阵亡');
+  assert.equal(game.player.skills.length, 0, '断肠随后夺走曹丕全部技能');
+  // 行殇先手 → 两张战利品到手; 再加击杀反贼的 3 张奖励 = 5。
+  assert.equal(game.player.hand.length, 5, '行殇先结算, 曹丕拿到了那两张牌 (+3 击杀奖励)');
+});
+
+test('断肠 × 行殇 [官方轮转序]: 在**蔡文姬的回合**里被曹丕杀死 → 断肠先手, 行殇失效', () => {
+  const game = quad(['caopi', 'caiwenji', 'zhangfei', 'huatuo'],
+    { player: '主公', enemy: '反贼', ally: '反贼', ally2: '忠臣' }, 92086);
+  game.turn = 'enemy'; game.phase = 'play';
+  game.enemy.hp = 1;
+  // 她发起决斗又应不出杀 → 伤害来源是曹丕, 但当前回合角色是她自己。
+  game.enemy.hand = [c('juedou', { id: 'dc2-duel' }), c('shan', { id: 'dc2-loot' })];
+  game.enemy.skillPreferences.beige = 'decline';
+  game.player.hand = [c('sha', { id: 'dc2-answer' })];
+  Engine.playCard(game, 'enemy', 'dc2-duel', { target: 'player' });
+  while (game.pendingChoice) Engine.resolvePendingChoice(game, { decline: true });
+  assert.ok(game.enemy.hp <= 0, '蔡文姬阵亡');
+  assert.equal(game.player.skills.length, 0, '断肠先手夺技');
+  // 行殇已随技能一起没了 → 只剩击杀反贼的 3 张奖励, 拿不到那张【闪】。
+  assert.equal(game.player.hand.length, 3, '行殇失效: 只有击杀奖励, 没有战利品');
 });
 
 // ═════════════════ 收口: 守恒 / 快照 / 名单 ═════════════════

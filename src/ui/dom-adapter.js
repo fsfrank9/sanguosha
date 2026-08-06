@@ -191,7 +191,7 @@
           'yijiPromptPanel', 'yijiPromptHint', 'yijiCandidates', 'yijiKeepAllBtn', 'yijiConfirmBtn',
           'fanjianPromptPanel', 'fanjianPromptHint',
           'fanjianSpadeBtn', 'fanjianHeartBtn', 'fanjianClubBtn', 'fanjianDiamondBtn',
-          'fankuiPromptPanel', 'fankuiPromptHint', 'fankuiZones',
+          'fankuiPromptPanel', 'fankuiPromptHint', 'fankuiZones', 'fankuiDeclineBtn',
           'gangliePromptPanel', 'gangliePromptHint', 'ganglieFireBtn', 'ganglieDeclineBtn',
           'ganglieSourcePanel', 'ganglieSourceHint', 'ganglieSourceCandidates', 'ganglieSourceConfirmBtn', 'ganglieSourceTakeDamageBtn',
           'qilinPickPanel', 'qilinPickHint', 'qilinPickChoices', 'qilinDeclineBtn',
@@ -1410,7 +1410,7 @@
         // _handConfirm/Cancel 不再 fall-through 误触手牌; 必选面板 (无 cancel 语义) 用 null.
         { panelId: 'dyingRescuePanel',      confirmBtnId: null,                     cancelBtnId: 'dyingRescueDeclineBtn' },
         { panelId: 'fanjianPromptPanel',    confirmBtnId: null,                     cancelBtnId: null },
-        { panelId: 'fankuiPromptPanel',     confirmBtnId: null,                     cancelBtnId: null },
+        { panelId: 'fankuiPromptPanel',     confirmBtnId: null,                     cancelBtnId: 'fankuiDeclineBtn' },
         { panelId: 'wuguPickPanel',         confirmBtnId: null,                     cancelBtnId: null },
         { panelId: 'guohePickPanel',        confirmBtnId: null,                     cancelBtnId: null },
         { panelId: 'cixiongChoosePanel',    confirmBtnId: null,                     cancelBtnId: 'cixiongChooseDrawBtn' },

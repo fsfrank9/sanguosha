@@ -29,10 +29,14 @@ function buildGame(playerHero, enemyHero, seed) {
 // v11 A3 批次二: 洛神面板的渲染与接线正则断言已由
 // tests/ui_panels_a3_batch2.test.mjs 的 fake-DOM 全链路行为测试取代。
 
-test('v8 PR-C5: SKILL_METADATA 已注册 luoshen (preparePhase / onPreparePhase / judgement cost)', () => {
+// W2 (第五轮审计 F3): 原断言钉的是 hooks: ['onPreparePhase'] —— 但洛神从来
+// 没有注册过那个 hook, 它走的是 processPreparePhase 的直调口 (与妄尊/神速
+// 同款)。metadata 谎报 hook 名, 而这条测试恰好把谎话钉住了。
+// 现按实际机制更正, 并由 skill_schema 的 W2-F3 不变量兜底防止再漂。
+test('v8 PR-C5: SKILL_METADATA 已注册 luoshen (preparePhase / processPreparePhase 直调 / judgement cost)', () => {
   assert.match(heroesSrc, /luoshen:\s*\{.*trigger:\s*'preparePhase'/);
   assert.match(heroesSrc, /luoshen:\s*\{.*cost:\s*\{\s*type:\s*'judgement'/);
-  assert.match(heroesSrc, /luoshen:\s*\{.*hooks:\s*\[\s*'onPreparePhase'/);
+  assert.match(heroesSrc, /luoshen:\s*\{.*hooks:\s*\[\s*'processPreparePhase'/);
 });
 
 test('v8 PR-C5: 甄姬 auto + deck=[黑黑红] → 获得 2 张黑色, 红色入弃, 进入 judge 阶段', () => {

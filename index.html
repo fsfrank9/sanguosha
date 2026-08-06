@@ -603,6 +603,10 @@
         <div class="fankui-prompt-panel pending-prompt-panel" id="fankuiPromptPanel" hidden>
           <span class="badge pending-prompt-panel__hint" id="fankuiPromptHint">反馈：选择获得对方的一张牌</span>
           <div class="fankui-zone pending-prompt-panel__choices" id="fankuiZones" aria-live="polite"></div>
+          <!-- W2 (第五轮审计 F2): 反馈是"你可以", 窗口内必须留放弃出路。 -->
+          <div class="fankui-actions pending-prompt-panel__actions">
+            <button class="btn small" id="fankuiDeclineBtn">不发动</button>
+          </div>
         </div>
         <div class="ganglie-fire-panel pending-prompt-panel" id="gangliePromptPanel" hidden>
           <span class="badge pending-prompt-panel__hint" id="gangliePromptHint">刚烈：是否对来源发动？</span>

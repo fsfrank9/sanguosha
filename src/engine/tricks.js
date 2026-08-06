@@ -908,6 +908,17 @@
         // v15 S 评审收口: 于吉可背面朝上使用任意手牌当【杀】 → 手上没有
         // 杀也要走"决定"分支 (路线图 S1 明文含"借刀应杀"); 非蛊惑局面
         // 维持既有"无杀即交武器"。
+        // W2 (第五轮审计 F8, 高, **确证但本批未修** — 见
+        // docs/audit/2026-08-06-w-ledger.md):
+        // 这个闸口手写"手牌里有没有 sha/fire_sha/thunder_sha", 漏掉了全部
+        // 转化面 —— 关羽(武圣)/赵云(龙胆) 手握能当【杀】的红牌/闪时, 引擎
+        // 照样判"没有【杀】可用"并夺走武器。
+        // **但只改这一行是半成品**: 下游点火 jiedaoFireOpponentSha 用的是
+        // removeFirstCardOfType (同样只认字面牌型), 闸口放行后照样取不到牌,
+        // 结果是把解释性日志抹掉、行为一个字不变。正确修法要闸口与点火同时
+        // 收口到 listShaResponseOptions/findResponseCard 单点, 且必须处理
+        // 丈八蛇矛"两张手牌合成虚拟杀"的回滚 (照抄 putCard 回退会破坏牌张
+        // 守恒 —— 对抗验证已实证)。本批如实留缺口, 不做半拉子改动。
         var hasSha = opponentState.hand.some(function (c) {
           return c && (c.type === 'sha' || c.type === 'fire_sha' || c.type === 'thunder_sha');
         }) || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, opponentActor));
