@@ -24,12 +24,15 @@ const CACHE_PATHS = [
   'official-skill-cache/sanguosha-fire/official_fire_skill_cache.json',
   // v15 U: 林包接入
   'official-skill-cache/sanguosha-lin/official_lin_skill_cache.json',
+  // v15 V: 山包接入
+  'official-skill-cache/sanguosha-shan/official_shan_skill_cache.json',
 ];
 const SPECS_PATHS = [
   'tests/fixtures/official_standard_skill_specs.json',
   'tests/fixtures/official_wind_skill_specs.json',
   'tests/fixtures/official_fire_skill_specs.json',
   'tests/fixtures/official_lin_skill_specs.json',
+  'tests/fixtures/official_shan_skill_specs.json',
 ];
 
 function indexByLocalId(docs, specKey) {
@@ -86,6 +89,9 @@ const VALID_TRIGGERS = new Set([
   'shaDodged',
   // v15 U: 行殇触发时机 — "每当其他角色死亡时"
   'death',
+  // v15 V: 屯田触发时机 — "每当你于回合外失去牌后" (连营的 handLoss 只认
+  // "失去最后一张手牌", 屯田是任意失牌 → 另立时机名)
+  'cardLost',
 ]);
 const VALID_FREQUENCIES = new Set([
   'oncePerTurn',
@@ -106,6 +112,8 @@ const VALID_COST_TYPES = new Set([
   'turnOver',
   // v12 G2: 神速的成本是跳过阶段 (选项二另弃一张装备牌)
   'phaseSkip',
+  // v15 V: 凿险/志继/魂姿 三个觉醒技的成本是减 1 点体力上限
+  'reduceMaxHp',
   // v15 T: 驱虎/天义 的成本是与目标拼点 (双方各扣置一张手牌)
   'rankCompare',
 ]);
@@ -138,7 +146,19 @@ test('mandatory skills are not optional and vice versa for lock skills', () => {
     const meta = SKILL_METADATA[skillId];
     if (meta.mandatory) {
       assert.equal(meta.optional, false, `${skillId}: lock skill cannot also be optional`);
-      assert.equal(meta.frequency, 'passiveAlways', `${skillId}: lock skill must have passiveAlways frequency`);
+      // v15 V: 觉醒技 (凿险/志继/若愚/魂姿) 同样没有"不发动"这条出路 (条件
+      // 满足即必须觉醒), 但只发动一次且此后永久失效 —— 与"每次都生效"的
+      // 锁定技频率不同。用显式 awakening 标记区分, 而不是把它们错标成
+      // passiveAlways 或假装可选。
+      assert.equal(
+        meta.frequency,
+        meta.awakening ? 'oncePerGame' : 'passiveAlways',
+        `${skillId}: ${meta.awakening ? 'awakening skill must be oncePerGame' : 'lock skill must have passiveAlways frequency'}`,
+      );
+    }
+    if (meta.awakening) {
+      assert.equal(meta.mandatory, true, `${skillId}: awakening skill is mandatory (条件满足必须觉醒)`);
+      assert.equal(meta.trigger, 'preparePhase', `${skillId}: 本作已实现的觉醒技均在准备阶段开始时检定`);
     }
   }
 });

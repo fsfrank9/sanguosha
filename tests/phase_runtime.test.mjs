@@ -105,6 +105,11 @@ test('phase runtime resets actor turn state at the start of a turn', () => {
     huangtianUsed: false,   // v12 H 复核修复: 黄天 每回合复位 (H7 遗漏)
     lijianUsed: false,      // v12 H 复核修复: 离间 每回合复位 (H7 遗漏)
     guhuoUsedThisTurn: false, // v14 R1: 蛊惑 每名角色的回合内限一次
+    // v15 V (山包): 固政弃牌阶段记账 + 挑衅/制霸每回合限一次 + 放权跳过标记
+    discardPhaseCards: [],
+    tiaoxinUsed: false,
+    zhibaUsed: false,
+    fangquanSkipped: false,
   });
 });
 

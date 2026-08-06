@@ -62,12 +62,14 @@ test('图鉴: 状态标注 — 奸雄/蛊惑已实现 (v14 R1), 巨象未实现,
   };
   assert.ok(/奸雄[\s\S]{0,80}is-done/.test(cardOf('caocao')), '曹操奸雄标已实现');
   // v14 R1: 蛊惑经用户裁定按风包现行版立项 (todo → implemented, 主动技);
-  // 未实现样本一路让位: 祝融巨象随 v15 U 林包接入翻转 → 改用山包的
-  // 张郃巧变 (仍在名单外)。
+  // 未实现样本一路让位: 祝融巨象随 v15 U 林包接入翻转 → 张郃巧变随
+  // v15 V 山包接入再次翻转 → 改用左慈化身 (按成本评估门明确推迟, 是当前
+  // 名单外最稳定的样本)。
   assert.ok(/蛊惑[\s\S]{0,120}is-done/.test(cardOf('yuji')), '于吉蛊惑标已实现 (v14 R1)');
   assert.ok(/蛊惑[\s\S]{0,120}is-active-skill/.test(cardOf('yuji')), '蛊惑带主动标');
   assert.ok(/巨象[\s\S]{0,80}is-done/.test(cardOf('zhurong')), '祝融巨象已实现 (v15 U)');
-  assert.ok(/巧变[\s\S]{0,80}is-pending/.test(cardOf('zhanghe')), '张郃巧变标未实现 (todo 样本)');
+  assert.ok(/巧变[\s\S]{0,80}is-done/.test(cardOf('zhanghe')), '张郃巧变已实现 (v15 V)');
+  assert.ok(/化身[\s\S]{0,80}is-pending/.test(cardOf('zuoci')), '左慈化身标未实现 (todo 样本)');
   assert.ok(/苦肉[\s\S]{0,120}is-active-skill/.test(cardOf('huanggai')), '黄盖苦肉带主动标');
   assert.ok(cardOf('yuji').indexOf('可声明任意基本牌/锦囊') >= 0, '技能描述展示');
   $('heroBrowserBackBtn').click();
