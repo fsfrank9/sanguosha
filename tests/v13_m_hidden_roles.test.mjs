@@ -166,8 +166,9 @@ test('M2 守护: 感知路由已接管 AI 知识层 (perceived* 存在性锚点)
   const skills = srcText('skills.js');
   // v15 T: 火包新增三处敌先池消费方 (驱虎目标缺省 / 驱虎受害者挑选 /
   // 天义目标缺省) — 计数上调即"更多知识层走感知路由", 与本守护同向。
-  assert.equal(countOf(skills, 'StateRuntime.perceivedHostileFirstPool('), 6,
-    '天香/雷击/突袭 + 驱虎目标/驱虎受害者/天义目标 敌先池已路由');
+  // v15 U: 林包再增两处 (放逐翻面目标 / 英魂受益者) — 同向上调。
+  assert.equal(countOf(skills, 'StateRuntime.perceivedHostileFirstPool('), 8,
+    '天香/雷击/突袭 + 驱虎目标/驱虎受害者/天义目标 + 放逐目标/英魂目标 敌先池已路由');
   assert.ok(countOf(srcText('sha-flow.js'), 'StateRuntime.perceivedHostileSeats(') >= 1, '杀缺省目标已路由');
   assert.ok(countOf(srcText('damage-dying.js'), 'StateRuntime.perceivedHostile(') >= 1, '救援立场已路由');
 });

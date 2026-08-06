@@ -510,6 +510,11 @@
       var deadState = game[deadActor];
       if (!deadState) return;
       var roles = game.roles || {};
+      // v15 U: 死亡时机钩子 (曹丕【行殇】"每当其他角色死亡时，你可以获得其
+      // 所有牌") —— 必须在 discardAllZones **之前**, 否则牌已进弃牌堆无从获得。
+      SkillRuntime.runHook(skillRegistry, 'onDeath', {
+        game: game, deadActor: deadActor, killerActor: killerActor
+      });
       log(game, actorName(game, deadActor) + '阵亡（' + (roles[deadActor] || '未知身份') + '），弃置其所有牌。');
       discardAllZones(game, deadActor);
       deadState.chained = false;

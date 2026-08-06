@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "indexUrl": "https://www.sanguosha.com/hero",
+    "method": "gltjk 官方规则集镜像逐字提取 (镜像已入库 official-skill-cache/gltjk-sanguosha-rules/pages/), 每条 sourceTextRef/sourceTextSha256 为该镜像行的 sha256 — 与风包的\"人工转写\"不同, 本包可逐条复核。",
+    "gidPolicy": "provisional-local: gid 232-239 为本地临时编号 (顺接火包缓存 224-231), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。v15 U (2026-08-06): 与风/火包同款网络降级条款 — www.sanguosha.com 在本环境仍被网络策略拦截 (CONNECT 403), 按 v14 O4 裁定不主动重试, 网络环境变更时触发回填。"
+  },
+  "pack": "林",
+  "includeFullSkillText": false,
+  "heroes": [
+    {
+      "gid": 232,
+      "name": "徐晃",
+      "skills": [
+        "断粮"
+      ]
+    },
+    {
+      "gid": 233,
+      "name": "曹丕",
+      "skills": [
+        "行殇",
+        "放逐",
+        "颂威"
+      ]
+    },
+    {
+      "gid": 234,
+      "name": "孙坚",
+      "skills": [
+        "英魂"
+      ]
+    },
+    {
+      "gid": 235,
+      "name": "鲁肃",
+      "skills": [
+        "好施",
+        "缔盟"
+      ]
+    },
+    {
+      "gid": 236,
+      "name": "孟获",
+      "skills": [
+        "祸首",
+        "再起"
+      ]
+    },
+    {
+      "gid": 237,
+      "name": "祝融",
+      "skills": [
+        "巨象",
+        "烈刃"
+      ]
+    },
+    {
+      "gid": 238,
+      "name": "贾诩",
+      "skills": [
+        "完杀",
+        "乱武",
+        "帷幕"
+      ]
+    },
+    {
+      "gid": 239,
+      "name": "董卓",
+      "skills": [
+        "酒池",
+        "肉林",
+        "崩坏",
+        "暴虐"
+      ]
+    }
+  ]
+}

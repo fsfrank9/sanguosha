@@ -1437,6 +1437,240 @@
       //   "出牌阶段，你可以将一张黑色牌当【过河拆桥】使用。"
       // 仅 proactive (出牌阶段主动转化); 黑色手牌或装备牌皆可作来源
       // (spec condition: "发动者有黑色手牌或装备牌", 与武圣同口径)。
+      // ═════ v15 U (林包): 曹丕 行殇 / 放逐 / 颂威 ═════
+      // 行殇 (card__hero__wei.md:349): "每当其他角色死亡时，你可以获得其所有牌。"
+      // 时机在死亡结算**弃置其所有牌之前** (damage-dying.js settleDeath →
+      // discardAllZones), 由该处派发 onDeath 钩子。"所有牌" = 手牌 + 装备区 +
+      // 判定区 (判定区的牌不为角色所拥有, 但官方"其所有牌"在死亡结算语境下
+      // 指其区域里的牌 — 与 discardAllZones 的覆盖面一致, 取同一集合)。
+      function triggerXingshangDeath(context) {
+        var game = context.game;
+        var deadActor = context.deadActor;
+        var results = [];
+        StateRuntime.aliveSeats(game).forEach(function (seat) {
+          var state = game[seat];
+          if (seat === deadActor || !state || !hasSkill(state, 'xingshang')) return;
+          var pref = (state.skillPreferences && state.skillPreferences.xingshang)
+            || 'auto'; // "你可以" — 但获得牌恒为正收益, 缺省发动 (含玩家席)
+          if (pref === 'decline') {
+            log(game, actorName(game, seat) + '选择不发动【行殇】。');
+            return;
+          }
+          var dead = game[deadActor];
+          if (!dead) return;
+          var gained = 0;
+          (dead.hand || []).slice().forEach(function (card) {
+            var taken = takeCard(game, card, { zone: 'hand', actor: deadActor });
+            if (taken) { putCard(game, taken, { zone: 'hand', actor: seat }); gained += 1; }
+          });
+          ['weapon', 'armor', 'horseMinus', 'horsePlus'].forEach(function (slot) {
+            var equip = dead.equipment && dead.equipment[slot];
+            if (!equip) return;
+            var taken = takeCard(game, equip, { zone: 'equipment', actor: deadActor, slot: slot });
+            if (taken) { putCard(game, taken, { zone: 'hand', actor: seat }); gained += 1; }
+          });
+          (dead.judgeArea || []).slice().forEach(function (card) {
+            var taken = takeCard(game, card, { zone: 'judgeArea', actor: deadActor });
+            if (taken) { putCard(game, taken, { zone: 'hand', actor: seat }); gained += 1; }
+          });
+          if (gained > 0) {
+            log(game, actorName(game, seat) + '发动【行殇】，获得'
+              + actorName(game, deadActor) + '的所有牌（' + gained + ' 张）。');
+          }
+          results.push({ xingshangGained: gained });
+        });
+        return results.length ? { xingshangApplied: true } : null;
+      }
+
+      // 放逐 (card__hero__wei.md:351): "每当你受到伤害后，你可以令一名其他角色
+      // 摸X张牌（X为你已损失的体力值），然后其翻面。"
+      // X 可能为 0 (满血受伤后立刻被回满等边界) — 官方未排除 X=0, 此时"摸 0 张
+      // 然后翻面"仍成立, 故不以 X>0 作门槛。
+      function triggerFangzhuDamageAfter(context) {
+        var game = context.game;
+        var targetActor = context.targetActor;
+        var self = game[targetActor];
+        if (!self || !hasSkill(self, 'fangzhu') || game.phase === 'gameover') return null;
+        if (context.amount <= 0 || self.hp <= 0) return null;
+        var pref = (self.skillPreferences && self.skillPreferences.fangzhu)
+          || (targetActor === 'player' ? 'ask' : 'auto');
+        if (pref === 'decline') {
+          log(game, actorName(game, targetActor) + '选择不发动【放逐】。');
+          return null;
+        }
+        var candidates = StateRuntime.aliveSeats(game).filter(function (seat) {
+          return seat !== targetActor;
+        });
+        if (!candidates.length) return null;
+        var lost = Math.max(0, (self.maxHp || 0) - self.hp);
+        if (pref === 'ask') {
+          setPendingChoice(game, {
+            kind: 'fangzhu-pick',
+            actor: targetActor,
+            drawCount: lost,
+            candidates: candidates.map(function (seat) {
+              return { seat: seat, name: game[seat].name, hp: game[seat].hp,
+                turnedOver: !!game[seat].turnedOver };
+            })
+          });
+          log(game, '等待' + actorName(game, targetActor) + '决定是否发动【放逐】。');
+          return { suspendedForFangzhu: true };
+        }
+        // AI 启发: 只读公开信息 — 优先翻**未翻面的感知敌对**座席 (翻面 = 跳过
+        // 其下个回合, 对敌人是净损失); 全场无敌对候选时不发动 (摸牌白送)。
+        var pool = candidates.filter(function (seat) { return !game[seat].turnedOver; });
+        var hostile = StateRuntime.perceivedHostileFirstPool(game, targetActor, pool);
+        if (!pool.length || !hostile.length) return null;
+        return applyFangzhu(game, targetActor, hostile[0], lost);
+      }
+
+      function applyFangzhu(game, actor, targetSeat, drawCount) {
+        var target = game[targetSeat];
+        if (!target) return null;
+        if (drawCount > 0) drawCards(game, targetSeat, drawCount);
+        target.turnedOver = !target.turnedOver;
+        log(game, actorName(game, actor) + '发动【放逐】，令' + actorName(game, targetSeat)
+          + '摸 ' + drawCount + ' 张牌并将武将牌'
+          + (target.turnedOver ? '翻面。' : '翻回正面。'));
+        return { fangzhuApplied: true };
+      }
+
+      function resolveFangzhuPickChoice(game, pending, decision) {
+        var actor = pending.actor;
+        var d = decision || {};
+        if (d.decline || d.skip) {
+          log(game, actorName(game, actor) + '选择不发动【放逐】。');
+          return success('放逐结算完成。');
+        }
+        var legal = (pending.candidates || []).map(function (entry) { return entry.seat; });
+        var seat = StateRuntime.resolveSeatOption(game, d.target);
+        if (!seat || legal.indexOf(seat) < 0) {
+          setPendingChoice(game, pending);
+          return fail('请指定一名其他角色发动【放逐】，或 decline 放弃。');
+        }
+        applyFangzhu(game, actor, seat, pending.drawCount || 0);
+        return success('放逐结算完成。');
+      }
+
+      // 颂威 (card__hero__wei.md:353): "主公技，每当其他魏势力角色的黑色判定牌
+      // 生效后，其可以令你摸一张牌。"
+      // 注意三点: ① 主公技 → 仅当曹丕为主公时生效; ② 触发者是**其他魏势力
+      // 角色**的判定, 曹丕自己的判定不触发; ③ 决定权在**判定者**而非曹丕
+      // ("其可以令你摸") —— 判定者是玩家席时才需要询问, 但收益全归曹丕且对
+      // 判定者零成本, 故按"恒发动"处理并如实记录 (见 spec 简报 L 裁定)。
+      function triggerSongweiJudgementAfterResolve(context) {
+        var game = context.game;
+        var actor = context.actor;
+        var state = context.state || game[actor];
+        var card = physicalCardOf(context.card);
+        if (!state || !card) return null;
+        if (StateRuntime.effectiveCardColor(state, card) !== 'black') return null;
+        if (state.camp !== '魏') return null;
+        var roles = game.roles || {};
+        var lord = StateRuntime.aliveSeats(game).find(function (seat) {
+          return roles[seat] === '主公' && hasSkill(game[seat], 'songwei');
+        });
+        if (!lord || lord === actor) return null;
+        var lordPref = game[lord].skillPreferences && game[lord].skillPreferences.songwei;
+        if (lordPref === 'decline') return null;
+        drawCards(game, lord, 1);
+        log(game, actorName(game, actor) + '的黑色判定牌生效，发动【颂威】令'
+          + actorName(game, lord) + '摸一张牌。');
+        return { songweiApplied: true };
+      }
+
+      // ═════ v15 U (林包): 孙坚 英魂 ═════
+      // 官方逐字 (card__hero__wu.md:279): "准备阶段开始时，若你已受伤，你可以
+      // 选择一项：1.令一名其他角色摸X张牌，然后其弃置一张牌；2.令一名其他角色
+      // 摸一张牌，然后其弃置X张牌。（X为你已损失的体力值）"
+      function triggerYinghunPrepare(context) {
+        var game = context.game;
+        var actor = context.actor;
+        var self = game[actor];
+        if (!self || !hasSkill(self, 'yinghun') || game.phase === 'gameover') return null;
+        var lost = Math.max(0, (self.maxHp || 0) - self.hp);
+        if (lost <= 0) return null; // "若你已受伤"
+        var pref = (self.skillPreferences && self.skillPreferences.yinghun)
+          || (actor === 'player' ? 'ask' : 'auto');
+        if (pref === 'decline') {
+          log(game, actorName(game, actor) + '选择不发动【英魂】。');
+          return null;
+        }
+        var candidates = StateRuntime.aliveSeats(game).filter(function (seat) {
+          return seat !== actor;
+        });
+        if (!candidates.length) return null;
+        if (pref === 'ask') {
+          setPendingChoice(game, {
+            kind: 'yinghun-choice',
+            actor: actor,
+            x: lost,
+            candidates: candidates.map(function (seat) {
+              return { seat: seat, name: game[seat].name,
+                handCount: (game[seat].hand || []).length };
+            })
+          });
+          log(game, '等待' + actorName(game, actor) + '决定【英魂】的选项与目标。');
+          return { suspendedForYinghun: true };
+        }
+        // AI 启发 (只读公开信息): 对敌对座席选"摸一弃X" (X>1 时净损其 X-1 张),
+        // 对友方选"摸X弃一" (净得 X-1 张)。X=1 时两项等价, 取选项 1 喂友方。
+        var hostile = StateRuntime.perceivedHostileFirstPool(game, actor, candidates);
+        var foe = hostile[0];
+        var isHostile = foe && StateRuntime.perceivedHostile(game, actor, foe);
+        if (lost > 1 && isHostile) return applyYinghun(game, actor, foe, 2, lost);
+        var ally = candidates.find(function (seat) {
+          return !StateRuntime.perceivedHostile(game, actor, seat);
+        }) || foe;
+        return applyYinghun(game, actor, ally, 1, lost);
+      }
+
+      // option 1: 摸 X 弃 1 / option 2: 摸 1 弃 X。
+      function applyYinghun(game, actor, targetSeat, option, x) {
+        var target = game[targetSeat];
+        if (!target) return null;
+        var drawCount = option === 2 ? 1 : x;
+        var discardCount = option === 2 ? x : 1;
+        drawCards(game, targetSeat, drawCount);
+        // 弃置由目标自己选牌 — AI 席走弃牌估值, 玩家席同样走该出口 (与
+        // 五谷/铁索那类"令其弃置"同款: 本仓对被动弃牌统一用 AI 估值挑,
+        // 不为被动方开窗; 如实记录为已知局限)。
+        var actuallyDiscarded = 0;
+        for (var i = 0; i < discardCount; i += 1) {
+          var hand = target.hand || [];
+          if (!hand.length) break;
+          var pickId = deps.aiDiscardCandidates
+            ? (deps.aiDiscardCandidates(game, targetSeat) || [])[0]
+            : null;
+          var picked = pickId
+            ? hand.find(function (c) { return c.id === pickId; })
+            : hand[0];
+          var removed = removeCardFromHand(target, (picked || hand[0]).id);
+          if (removed) { discardCard(game, removed); actuallyDiscarded += 1; }
+        }
+        log(game, actorName(game, actor) + '发动【英魂】，令' + actorName(game, targetSeat)
+          + '摸 ' + drawCount + ' 张牌并弃置 ' + actuallyDiscarded + ' 张牌。');
+        return { yinghunApplied: true };
+      }
+
+      function resolveYinghunChoice(game, pending, decision) {
+        var actor = pending.actor;
+        var d = decision || {};
+        if (d.decline || d.skip) {
+          log(game, actorName(game, actor) + '选择不发动【英魂】。');
+          return success('英魂结算完成。');
+        }
+        var legal = (pending.candidates || []).map(function (entry) { return entry.seat; });
+        var seat = StateRuntime.resolveSeatOption(game, d.target);
+        var option = d.option === 2 ? 2 : 1;
+        if (!seat || legal.indexOf(seat) < 0) {
+          setPendingChoice(game, pending);
+          return fail('请指定一名其他角色发动【英魂】，或 decline 放弃。');
+        }
+        applyYinghun(game, actor, seat, option, pending.x || 1);
+        return success('英魂结算完成。');
+      }
+
       // ═════ v15 T (火包): 转化类技能 ═════
       // 火计 (卧龙诸葛亮, card__hero__shu.md:338): "你可以将一张红色手牌当
       // 【火攻】使用。" — 限手牌 (对照武圣的"红色牌"含装备区)。
@@ -1459,6 +1693,106 @@
         if (!context.card || !isHandCardOf(state, context.card)) return null;
         if (context.card.suit !== 'club') return null;
         return { card: context.card, asName: '铁索连环', skillName: '连环', priority: 10 };
+      }
+
+      // ═════ v15 U (林包): 转化类技能 ═════
+      // 酒池 (董卓, card__hero__neutral.md:175): "你可以将一张黑桃手牌当
+      // 【酒】使用。" — 限黑桃、限手牌。【酒】不是锦囊, 走基本牌转化面。
+      function triggerJiuchiCardAs(context) {
+        var state = context.state;
+        if (!state || !hasSkill(state, 'jiuchi')) return null;
+        if (context.asType !== 'jiu') return null;
+        if (!context.card || !isHandCardOf(state, context.card)) return null;
+        // 花色按"实际花色"读 (红颜等改花色技能经 effectiveCardSuit 单点)。
+        if (StateRuntime.effectiveCardSuit(state, context.card) !== 'spade') return null;
+        return { card: context.card, asName: '酒', skillName: '酒池', priority: 10 };
+      }
+
+      // 断粮 (徐晃, card__hero__wei.md:277): "你可以将一张不为锦囊牌的黑色牌
+      // 当【兵粮寸断】使用；你能对距离为2的角色使用【兵粮寸断】。"
+      //
+      // 逐字口径三点:
+      //  ① "不为**锦囊牌**的黑色牌" —— 排除全部锦囊 (普通锦囊 family==='trick'
+      //     与延时锦囊 family==='delayed' 都是锦囊牌, glossary__gamecard.md:41
+      //     明写"延时类锦囊牌"), 即只剩 基本牌 与 装备牌。
+      //  ② 措辞是"黑色**牌**"而非"黑色**手牌**" —— 对照火计的"红色手牌"
+      //     (限手牌) 与武圣的"红色牌" (含装备区), 断粮属后者, **含装备区**。
+      //  ③ "能对距离为 2 的角色使用"是把兵粮的距离上限从 1 **放宽到 2**,
+      //     不是"无视距离" (缜略那类) —— 见 duanliangTrickRange。
+      function triggerDuanliangCardAs(context) {
+        var state = context.state;
+        if (!state || !hasSkill(state, 'duanliang')) return null;
+        if (context.mode !== 'proactive' || context.asType !== 'bingliang') return null;
+        var card = context.card;
+        if (!card) return null;
+        // 含装备区 → 用"自己任一区域的牌"判据, 不用 isHandCardOf。
+        if (!firstMatchingOwnCard(state, function (item) { return item.id === card.id; })) return null;
+        if (card.family === 'trick' || card.family === 'delayed') return null;
+        if (StateRuntime.effectiveCardColor(state, card) !== 'black') return null;
+        return { card: card, asName: '兵粮寸断', skillName: '断粮', priority: 10 };
+      }
+
+      // ═════ v15 U (林包): 崩坏 (董卓) ═════
+      // 官方逐字 (card__hero__neutral.md:183): "锁定技，结束阶段开始时，
+      // 若你不是体力值最小的角色，你选择一项：1.失去1点体力；2.减1点体力上限。"
+      // 锁定技 = 满足条件必须发动 (无 decline), 但"选择一项"仍是发动者的决策 →
+      // 玩家席开窗, AI 席走启发。
+      function triggerBenghuaiTurnEnd(context) {
+        var game = context.game;
+        var actor = context.actor;
+        var state = game[actor];
+        if (!state || !hasSkill(state, 'benghuai') || game.phase === 'gameover') return null;
+        if (state.hp <= 0) return null;
+        // "若你不是体力值最小的角色" — 与全场存活角色比 (含自己)。并列最小时
+        // 自己**也是**最小之一 → 不发动。
+        var alive = StateRuntime.aliveSeats(game);
+        var minHp = alive.reduce(function (acc, seat) {
+          return Math.min(acc, game[seat].hp);
+        }, Infinity);
+        if (state.hp <= minHp) return null;
+        if (actor === 'player') {
+          setPendingChoice(game, {
+            kind: 'benghuai-choice',
+            actor: actor,
+            hp: state.hp,
+            maxHp: state.maxHp
+          });
+          log(game, '【崩坏】锁定：等待' + actorName(game, actor) + '选择失去 1 点体力或减 1 点体力上限。');
+          return { suspendedForBenghuai: true };
+        }
+        // AI 启发: 体力上限还够高 (> 4) 时优先减上限保住当前体力; 否则掉血 —
+        // 只读自己的公开量。
+        return applyBenghuai(game, actor, state.maxHp > 4 ? 'maxHp' : 'hp');
+      }
+
+      // 崩坏的效果体。choice: 'hp' 失去 1 点体力 / 'maxHp' 减 1 点体力上限。
+      function applyBenghuai(game, actor, choice) {
+        var state = game[actor];
+        if (!state) return null;
+        if (choice === 'maxHp') {
+          state.maxHp = Math.max(0, (state.maxHp || 0) - 1);
+          log(game, actorName(game, actor) + '发动【崩坏】，减 1 点体力上限（现为 ' + state.maxHp + '）。');
+          // 官方: 体力值不能大于体力上限 — 上限降到当前体力之下时体力随之下降。
+          if (state.hp > state.maxHp) {
+            state.hp = state.maxHp;
+            log(game, actorName(game, actor) + '的体力值随体力上限降至 ' + state.hp + '。');
+          }
+          // 体力上限归零 → 直接进入濒死 (无体力可失)。
+          if (state.hp <= 0) enterDying(game, actor);
+          return { benghuaiApplied: 'maxHp' };
+        }
+        state.hp -= 1;
+        log(game, actorName(game, actor) + '发动【崩坏】，失去 1 点体力。');
+        if (state.hp <= 0) enterDying(game, actor);
+        return { benghuaiApplied: 'hp' };
+      }
+
+      // 崩坏 resolver — decision: { choice: 'hp' | 'maxHp' }。锁定技无放弃出路,
+      // 缺省 (soak 决策表 {} 兜底) 按"失去 1 点体力"处理。
+      function resolveBenghuaiChoice(game, pending, decision) {
+        var choice = decision && decision.choice === 'maxHp' ? 'maxHp' : 'hp';
+        applyBenghuai(game, pending.actor, choice);
+        return success('崩坏结算完成。');
       }
 
       // 双雄 (颜良文丑, card__hero__neutral.md:161): 摸牌阶段放弃摸牌改判定
@@ -3088,6 +3422,28 @@
         }
       });
         // v15 T: 猛进 (庞德) — 杀被闪抵消时弃目标一张牌
+        // ═════ v15 U (林包) 注册 ═════
+        SkillRuntime.registerSkill(skillRegistry, 'xingshang', {
+        onDeath: function (context) { return triggerXingshangDeath(context); }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'fangzhu', {
+        onDamageAfter: function (context) { return triggerFangzhuDamageAfter(context); }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'songwei', {
+        onJudgementAfterResolve: function (context) { return triggerSongweiJudgementAfterResolve(context); }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'yinghun', {
+        onPreparePhase: function (context) { return triggerYinghunPrepare(context); }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'jiuchi', {
+        onCardAs: function (context) { return triggerJiuchiCardAs(context); }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'duanliang', {
+        onCardAs: function (context) { return triggerDuanliangCardAs(context); }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'benghuai', {
+        onTurnEnd: function (context) { return triggerBenghuaiTurnEnd(context); }
+      });
         SkillRuntime.registerSkill(skillRegistry, 'mengjin', {
         onShaDodged: function (context) {
           return triggerMengjinShaDodged(context);
@@ -3386,6 +3742,10 @@
           applyShuangxiongDrawPhase: applyShuangxiongDrawPhase,
           resolveQuhuVictimChoice: resolveQuhuVictimChoice,
           resolveJiemingPickChoice: resolveJiemingPickChoice,
+          // v15 U (林包)
+          resolveBenghuaiChoice: resolveBenghuaiChoice,
+          resolveFangzhuPickChoice: resolveFangzhuPickChoice,
+          resolveYinghunChoice: resolveYinghunChoice,
           resolveYaowuRewardChoice: resolveYaowuRewardChoice,
           resolveGanglieFireChoice: resolveGanglieFireChoice,
           resolveGanglieSourceChoice: resolveGanglieSourceChoice,

@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "cacheKind": "sanguosha-official-lin-skills-safe-cache",
+  "pack": "林",
+  "source": {
+    "indexUrl": "https://www.sanguosha.com/hero",
+    "retrieval": "gltjk 官方规则集镜像逐字提取 (镜像已入库 official-skill-cache/gltjk-sanguosha-rules/pages/), 每条 sourceTextRef/sourceTextSha256 为该镜像行的 sha256 — 与风包的\"人工转写\"不同, 本包可逐条复核。",
+    "parser": "gltjk-mirror-extraction",
+    "copyrightPolicy": "仅提交结构化实现规格与逐字文本摘要 (sha256), 不复制官网原文",
+    "gidPolicy": "provisional-local: gid 232-239 为本地临时编号 (顺接火包缓存 224-231), 官方索引页的真实 gid 待爬取核对后回填; 在核对前不生成 detailUrl 假链。v15 U (2026-08-06): 与风/火包同款网络降级条款 — www.sanguosha.com 在本环境仍被网络策略拦截 (CONNECT 403), 按 v14 O4 裁定不主动重试, 网络环境变更时触发回填。"
+  },
+  "includeFullSkillText": false,
+  "containsOfficialText": false,
+  "containsImplementationSpecs": true,
+  "copyrightPolicy": {
+    "verbatimOfficialSkillText": "omitted from repository cache",
+    "rawLocalCachePath": "official-skill-cache/gltjk-sanguosha-rules/pages/ (已入库镜像)"
+  },
+  "generatedFrom": "v15 U 林包接入批 (2026-08-06)",
+  "heroes": [
+    {
+      "gid": 232,
+      "name": "徐晃",
+      "localHeroId": "xuhuang",
+      "skills": [
+        {
+          "name": "断粮",
+          "localSkillId": "duanliang",
+          "sourceTextRef": "e7f224790fc4",
+          "sourceLine": "card__hero__wei.md:277"
+        }
+      ]
+    },
+    {
+      "gid": 233,
+      "name": "曹丕",
+      "localHeroId": "caopi",
+      "skills": [
+        {
+          "name": "行殇",
+          "localSkillId": "xingshang",
+          "sourceTextRef": "62bdec7f5b11",
+          "sourceLine": "card__hero__wei.md:349"
+        },
+        {
+          "name": "放逐",
+          "localSkillId": "fangzhu",
+          "sourceTextRef": "926506bdc0bb",
+          "sourceLine": "card__hero__wei.md:351"
+        },
+        {
+          "name": "颂威",
+          "localSkillId": "songwei",
+          "sourceTextRef": "3daa2e6e85ba",
+          "sourceLine": "card__hero__wei.md:353"
+        }
+      ]
+    },
+    {
+      "gid": 234,
+      "name": "孙坚",
+      "localHeroId": "sunjian",
+      "skills": [
+        {
+          "name": "英魂",
+          "localSkillId": "yinghun",
+          "sourceTextRef": "10c42e0761a7",
+          "sourceLine": "card__hero__wu.md:279"
+        }
+      ]
+    },
+    {
+      "gid": 235,
+      "name": "鲁肃",
+      "localHeroId": "lusu",
+      "skills": [
+        {
+          "name": "好施",
+          "localSkillId": "haoshi",
+          "sourceTextRef": "68bf7202be79",
+          "sourceLine": "card__hero__wu.md:455"
+        },
+        {
+          "name": "缔盟",
+          "localSkillId": "dimeng",
+          "sourceTextRef": "d98644e15bb2",
+          "sourceLine": "card__hero__wu.md:457"
+        }
+      ]
+    },
+    {
+      "gid": 236,
+      "name": "孟获",
+      "localHeroId": "menghuo",
+      "skills": [
+        {
+          "name": "祸首",
+          "localSkillId": "huoshou",
+          "sourceTextRef": "c2189470ef7c",
+          "sourceLine": "card__hero__shu.md:396"
+        },
+        {
+          "name": "再起",
+          "localSkillId": "zaiqi",
+          "sourceTextRef": "dc9138c4fc5c",
+          "sourceLine": "card__hero__shu.md:406"
+        }
+      ]
+    },
+    {
+      "gid": 237,
+      "name": "祝融",
+      "localHeroId": "zhurong",
+      "skills": [
+        {
+          "name": "巨象",
+          "localSkillId": "juxiang",
+          "sourceTextRef": "305d5fe3c182",
+          "sourceLine": "card__hero__shu.md:440"
+        },
+        {
+          "name": "烈刃",
+          "localSkillId": "lieren",
+          "sourceTextRef": "2bba62111976",
+          "sourceLine": "card__hero__shu.md:456"
+        }
+      ]
+    },
+    {
+      "gid": 238,
+      "name": "贾诩",
+      "localHeroId": "jiaxu",
+      "skills": [
+        {
+          "name": "完杀",
+          "localSkillId": "wansha",
+          "sourceTextRef": "4702fab9b0fe",
+          "sourceLine": "card__hero__neutral.md:197"
+        },
+        {
+          "name": "乱武",
+          "localSkillId": "luanwu",
+          "sourceTextRef": "9f69b6a5c2aa",
+          "sourceLine": "card__hero__neutral.md:199"
+        },
+        {
+          "name": "帷幕",
+          "localSkillId": "weimu",
+          "sourceTextRef": "fcfb71146b1e",
+          "sourceLine": "card__hero__neutral.md:201"
+        }
+      ]
+    },
+    {
+      "gid": 239,
+      "name": "董卓",
+      "localHeroId": "dongzhuo",
+      "skills": [
+        {
+          "name": "酒池",
+          "localSkillId": "jiuchi",
+          "sourceTextRef": "26352bae9bbc",
+          "sourceLine": "card__hero__neutral.md:175"
+        },
+        {
+          "name": "肉林",
+          "localSkillId": "roulin",
+          "sourceTextRef": "dbb2ca9b900f",
+          "sourceLine": "card__hero__neutral.md:177"
+        },
+        {
+          "name": "崩坏",
+          "localSkillId": "benghuai",
+          "sourceTextRef": "5c5f697c9508",
+          "sourceLine": "card__hero__neutral.md:183"
+        },
+        {
+          "name": "暴虐",
+          "localSkillId": "baonue",
+          "sourceTextRef": "c7387185bd5f",
+          "sourceLine": "card__hero__neutral.md:185"
+        }
+      ]
+    }
+  ]
+}

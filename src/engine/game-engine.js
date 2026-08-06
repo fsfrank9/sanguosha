@@ -1018,6 +1018,12 @@
         // v15 T 评审收口: 涅槃 ask 挂起后重入濒死循环 (DamageDyingRuntime
         // 早于本处装配, 直绑即可)。
         processDyingNext: DamageDyingRuntime.processDyingNext,
+        // v15 U: 英魂"令其弃置 N 张"的被动弃牌选牌 (AIRuntime 后置装配,
+        // 晚绑定包装 — 与 scoreCardForAI 同款先例)。
+        aiDiscardCandidates: function (game, seat) {
+          return AIRuntime.aiDiscardCandidates
+            ? AIRuntime.aiDiscardCandidates(game, seat) : null;
+        },
         // v15 T: 拼点 (驱虎/天义) — 发起入口与效果注册 (拼点域后置装配,
         // 包装注入)。
         startPindian: function (game, actor, targetActor, opts) {
@@ -1108,6 +1114,9 @@
       var resolveNiepanAskChoice = SkillDomain.resolveNiepanAskChoice;
       var resolveQuhuVictimChoice = SkillDomain.resolveQuhuVictimChoice;
       var resolveJiemingPickChoice = SkillDomain.resolveJiemingPickChoice;
+      var resolveBenghuaiChoice = SkillDomain.resolveBenghuaiChoice;
+      var resolveFangzhuPickChoice = SkillDomain.resolveFangzhuPickChoice;
+      var resolveYinghunChoice = SkillDomain.resolveYinghunChoice;
       var resolveYaowuRewardChoice = SkillDomain.resolveYaowuRewardChoice;
       var resolveGanglieFireChoice = SkillDomain.resolveGanglieFireChoice;
       var resolveGanglieSourceChoice = SkillDomain.resolveGanglieSourceChoice;
@@ -1140,6 +1149,11 @@
       // 选择发生在赢之后); 节命逐点询问受益者 (官方"你可以令一名角色…")。
       registerResponseKind('quhu-victim', resolveQuhuVictimChoice);
       registerResponseKind('jieming-pick', resolveJiemingPickChoice);
+      // v15 U: 崩坏 (董卓) 锁定技的二选一 (失体力 / 减体力上限)。
+      registerResponseKind('benghuai-choice', resolveBenghuaiChoice);
+      // v15 U: 放逐 (曹丕) 选目标 / 英魂 (孙坚) 选项 + 目标。
+      registerResponseKind('fangzhu-pick', resolveFangzhuPickChoice);
+      registerResponseKind('yinghun-choice', resolveYinghunChoice);
       registerResponseKind('ganglie-fire', resolveGanglieFireChoice);
       registerResponseKind('ganglie-source-choice', resolveGanglieSourceChoice);
       registerResponseKind('qilin-pick', resolveQilinPickChoice);
@@ -1657,6 +1671,27 @@
         return SkillRuntime.hasPassiveEffect(state, 'ignoreTrickDistance');
       }
 
+      // v15 U: 距离限制型锦囊 (顺手牵羊/兵粮寸断) 的**距离上限单点**。
+      // 此前四处调用点各自手写 `distanceBetween(...) > 1`, 徐晃【断粮】的
+      // "你能对距离为 2 的角色使用【兵粮寸断】"没法只改一处。
+      //
+      // 口径分层 (逐字, 三者语义不同, 不可互相替代):
+      //   - 奇才"使用锦囊牌无距离限制" → Infinity;
+      //   - 断粮"能对距离为 2 的角色使用【兵粮寸断】" → 上限**放宽到 2**
+      //     (不是无限制), 且只对兵粮寸断这一张牌名;
+      //   - 其余 → 官方上限 1。
+      // 返回 0 表示"本模式不限距离"(1v1 变体口径, 见 trickDistanceLimited)。
+      function trickDistanceLimitFor(game, actor, cardType) {
+        if (!trickDistanceLimited(game)) return Infinity;
+        if (ignoresTrickDistance(game[actor])) return Infinity;
+        if (cardType === 'bingliang' && hasSkill(game[actor], 'duanliang')) return 2;
+        return 1;
+      }
+
+      function withinTrickDistance(game, actor, seat, cardType) {
+        return distanceBetween(game, actor, seat) <= trickDistanceLimitFor(game, actor, cardType);
+      }
+
       // v12 H1: 借刀杀人 Bn (受害者) 候选 — 在武器持有者攻击范围内且不被
       // "不能成为目标"类技能保护的其他座席; 1v1 恒为 [使用者本人]。
       function jiedaoVictimCandidates(game, holderSeat) {
@@ -1704,7 +1739,7 @@
         if (card.type === 'shandian') return false; // 闪电只对自己使用
         if (card.type === 'lebusishu' || card.type === 'bingliang') {
           if ((seatState.judgeArea || []).some(function (judge) { return judge && judge.type === card.type; })) return false;
-          if (card.type === 'bingliang' && trickDistanceLimited(game) && !ignoresTrickDistance(game[actor]) && distanceBetween(game, actor, seat) > 1) return false;
+          if (card.type === 'bingliang' && !withinTrickDistance(game, actor, seat, 'bingliang')) return false;
           return !cardTargetProtection(game, actor, seat, card);
         }
         if (card.type === 'guohe') {
@@ -1720,7 +1755,7 @@
         }
         if (card.type === 'shunshou') {
           if (!hasAnyTargetableCard(seatState)) return false;
-          if (trickDistanceLimited(game) && !ignoresTrickDistance(game[actor]) && distanceBetween(game, actor, seat) > 1) return false;
+          if (!withinTrickDistance(game, actor, seat, 'shunshou')) return false;
           return !cardTargetProtection(game, actor, seat, card);
         }
         // audit4-M3: 火攻目标合法性 "一名有手牌的角色" (card__scroll.md:244) —
@@ -2242,6 +2277,20 @@
             state.handLimitDelta = (state.handLimitDelta || 0) - 1;
           }
         });
+        // v15 U: 准备阶段技能钩子 (孙坚英魂 等)。位序在妄尊之后、观星之前 —
+        // 观星/洛神会挂起 pendingChoice, 挂起后本函数即返回, 排在其后的钩子
+        // 本回合就跑不到了。挂起判据取钩子自身的返回信号, 不看
+        // game.pendingChoice (v15 T H1 教训: 该槽位可能已被无关窗口占用)。
+        var prepareHookResults = SkillRuntime.runHook(skillRegistry, 'onPreparePhase', {
+          game: game, actor: actor, state: state
+        });
+        if (prepareHookResults.some(function (entry) {
+          return entry && entry.result && entry.result.suspendedForYinghun;
+        })) {
+          if (!game.pauseState) game.pauseState = {};
+          game.pauseState.prepareResume = { actor: actor };
+          return { suspended: true };
+        }
         if (hasSkill(state, 'guanxing') && !state.flags.guanxingUsed && game.deck.length > 0) {
           var pref = (state.skillPreferences && state.skillPreferences.guanxing) || null;
           if (pref === 'decline') {
@@ -2671,7 +2720,16 @@
         // 单目标面 (1-2 名或重铸), 目标在结算期由 handler 处理。
         if (asType !== 'sha' && asType !== 'tiesuo' && CARD_AS_TRICK_SPECS[asType]) {
           var asVirtual = virtualTrickFromCard(asType, original);
-          asTargetActor = resolveTrickTargetActor(game, actor, asVirtual, options);
+          // v15 U: 【酒】的缺省目标是**自己** (使用方法Ⅰ"你于此回合内使用的
+          // 下一张【杀】伤害 +1")。resolveTrickTargetActor 的缺省是"感知敌对
+          // 座席"—— 对指向型锦囊正确, 对酒是反的 (酒池会把 buff 送给敌人)。
+          // 显式传 target 时仍走通用解析 (v13 K2 已按官方放开酒的他指)。
+          if (asType === 'jiu' && !(options && (options.target
+              || (options.targets && options.targets.length)))) {
+            asTargetActor = actor;
+          } else {
+            asTargetActor = resolveTrickTargetActor(game, actor, asVirtual, options);
+          }
           if (!asTargetActor) return fail('无效的【' + asVirtual.name + '】目标。');
         } else if (asType === 'sha') {
           // v13 K5 (review 修复): 杀转化同样前置解析 — playSha 的距离/保护
@@ -2768,6 +2826,12 @@
       // 杀走 makeTestCard 且名字带"（当杀）", 锦囊走字面对象。
       var CARD_AS_TRICK_SPECS = {
         lebusishu: { name: '乐不思蜀', family: 'delayed' },
+        // v15 U: 断粮 (徐晃) 把非锦囊的黑色牌当【兵粮寸断】—— 与乐不思蜀
+        // 同为延时锦囊, 走同一条 playDelayedCardHandler 路径。
+        bingliang: { name: '兵粮寸断', family: 'delayed' },
+        // v15 U: 酒池 (董卓) 把黑桃手牌当【酒】—— 基本牌, 走 registerPlayHandler
+        // 注册的 playJiuCardHandler (与锦囊分支同一个 handler 派发出口)。
+        jiu: { name: '酒', family: 'basic' },
         guohe: { name: '过河拆桥', family: 'trick' },
         huogong: { name: '火攻', family: 'trick' },
         tiesuo: { name: '铁索连环', family: 'trick' },
