@@ -81,11 +81,24 @@
         + (jc.rank ? ' ' + escapeHtml(String(jc.rank)) : '');
     }
 
-    function renderPromptPanels(kind, pending) {
-      var game = getGame();
-    if (els.guicaiPromptPanel) {
+    // ═════ W1 (2026-06-09 审计 backlog:76): 提示面板注册表 ═════
+    // 此前这里是 41 段逐字重复的
+    //   if (els.XPanel) { if (kind === 'k' && pending.actor === 'player') { …填充… }
+    //                     else { els.XPanel.hidden = true; } }
+    // —— 每段都得自己记得写 else 去隐藏面板, 漏一处就是"窗口早关了面板还挂着";
+    // 新增一个 pendingChoice kind 时也没有任何东西提醒你补面板。
+    // 改为表驱动: 驱动器统一"先隐藏全部已注册面板, 再只填充命中的那一个",
+    // 隐藏不再是每条各写一遍的义务。表的顺序 = 原 if 链顺序, 逐条 verbatim 搬运。
+    //
+    // 每条:
+    //   panelId — els 里的面板节点 id (缺节点则整条跳过, 与原 `if (els.X)` 等价)
+    //   kind    — 命中的 pendingChoice.kind
+    //   actor   — 该窗口归属座席, 缺省 'player' (41 条现全是玩家席)
+    //   fill    — 命中时的填充逻辑 (原 then 分支原样搬入)
+    //   onHide  — 未命中时除隐藏之外还要做的本地态复位 (原 else 分支的额外行)
+    var PROMPT_PANEL_SPECS = [
       // 鬼才 (司马懿) — 张角二修: 鬼道已拆出独立面板, 本面板只承载 guicai。
-      if (kind === 'guicai-replace' && pending.actor === 'player') {
+      { panelId: 'guicaiPromptPanel', kind: 'guicai-replace', fill: function (pending, game) {
         els.guicaiPromptPanel.hidden = false;
         if (els.guicaiPromptHint) {
           // v6.1: surface whose judgement is being replaced — when 司马懿
@@ -112,14 +125,10 @@
             });
           }).join('') || '<span class="mini-card">手牌为空，必须跳过</span>';
         }
-      } else {
-        els.guicaiPromptPanel.hidden = true;
-      }
-    }
-    // 张角二修: 鬼道独立面板 — 措辞"替换"、候选含装备黑牌 (带"装备"前缀)、
-    // 花色带色形状。
-    if (els.guidaoPromptPanel) {
-      if (kind === 'guidao-replace' && pending.actor === 'player') {
+      } },
+      // 张角二修: 鬼道独立面板 — 措辞"替换"、候选含装备黑牌 (带"装备"前缀)、
+      // 花色带色形状。
+      { panelId: 'guidaoPromptPanel', kind: 'guidao-replace', fill: function (pending, game) {
         els.guidaoPromptPanel.hidden = false;
         if (els.guidaoPromptHint) {
           var gdWhose = pending.judgementActor && pending.judgementActor !== pending.actor ? '对方' : '你';
@@ -141,14 +150,10 @@
             });
           }).join('') || '<span class="mini-card">没有黑色牌，必须跳过</span>';
         }
-      } else {
-        els.guidaoPromptPanel.hidden = true;
-      }
-    }
-    // v13 张角修缮: 雷击 ask — 闪结算完后挂起, 选一名其他角色判定或不发动。
-    // 点座席候选 stage (高亮), hand-confirm 提交; 不发动直提 decline。
-    if (els.leijiAskPanel) {
-      if (kind === 'leiji-ask' && pending.actor === 'player') {
+      } },
+      // v13 张角修缮: 雷击 ask — 闪结算完后挂起, 选一名其他角色判定或不发动。
+      // 点座席候选 stage (高亮), hand-confirm 提交; 不发动直提 decline。
+      { panelId: 'leijiAskPanel', kind: 'leiji-ask', fill: function (pending, game) {
         els.leijiAskPanel.hidden = false;
         if (els.leijiAskHint) {
           els.leijiAskHint.textContent =
@@ -161,12 +166,8 @@
               escapeHtml(entry.name) + '</button>';
           }).join('') || '<span class="mini-card">没有可指定的角色</span>';
         }
-      } else {
-        els.leijiAskPanel.hidden = true;
-      }
-    }
-    if (els.yijiPromptPanel) {
-      if (kind === 'yiji-distribute' && pending.actor === 'player') {
+      } },
+      { panelId: 'yijiPromptPanel', kind: 'yiji-distribute', fill: function (pending, game) {
         els.yijiPromptPanel.hidden = false;
         // Drop selections that no longer match this prompt's drawn IDs.
         Object.keys(yijiAssignments).forEach(function (id) {
@@ -190,26 +191,19 @@
               '</button>';
           }).join('') || '<span class="mini-card">未摸到任何牌</span>';
         }
-      } else {
-        els.yijiPromptPanel.hidden = true;
+      }, onHide: function () {
         yijiAssignments = {};
-      }
-    }
-    // (观星模式面板状态仍在主 adapter, 其渲染保留在 renderPendingChoice; 批次三迁移)
-    if (els.fanjianPromptPanel) {
-      if (kind === 'fanjian-guess' && pending.actor === 'player') {
+      } },
+      // (观星模式面板状态仍在主 adapter, 其渲染保留在 renderPendingChoice; 批次三迁移)
+      { panelId: 'fanjianPromptPanel', kind: 'fanjian-guess', fill: function (pending, game) {
         els.fanjianPromptPanel.hidden = false;
         if (els.fanjianPromptHint) {
           // Show only the card NAME — suit is what the player must guess.
           els.fanjianPromptHint.textContent =
             '反间：对方给你一张【' + pending.cardName + '】，请猜花色（猜错你受 1 点伤害）。';
         }
-      } else {
-        els.fanjianPromptPanel.hidden = true;
-      }
-    }
-    if (els.fankuiPromptPanel) {
-      if (kind === 'fankui-pick' && pending.actor === 'player') {
+      } },
+      { panelId: 'fankuiPromptPanel', kind: 'fankui-pick', fill: function (pending, game) {
         els.fankuiPromptPanel.hidden = false;
         if (els.fankuiPromptHint) {
           els.fankuiPromptHint.textContent =
@@ -233,24 +227,16 @@
             );
           }).join('') || '<span class="mini-card">对方没有可获得的牌</span>';
         }
-      } else {
-        els.fankuiPromptPanel.hidden = true;
-      }
-    }
-    // v6.1 ganglie: two distinct prompts.
-    if (els.gangliePromptPanel) {
-      if (kind === 'ganglie-fire' && pending.actor === 'player') {
+      } },
+      // v6.1 ganglie: two distinct prompts.
+      { panelId: 'gangliePromptPanel', kind: 'ganglie-fire', fill: function (pending, game) {
         els.gangliePromptPanel.hidden = false;
         if (els.gangliePromptHint) {
           els.gangliePromptHint.textContent =
             '刚烈：' + pending.sourceName + ' 对你造成了伤害，是否发动判定反制？';
         }
-      } else {
-        els.gangliePromptPanel.hidden = true;
-      }
-    }
-    if (els.ganglieSourcePanel) {
-      if (kind === 'ganglie-source-choice' && pending.actor === 'player') {
+      } },
+      { panelId: 'ganglieSourcePanel', kind: 'ganglie-source-choice', fill: function (pending, game) {
         els.ganglieSourcePanel.hidden = false;
         // Reset selection if the candidate set changed (new prompt).
         var validIds = pending.candidates.map(function (e) { return e.id; });
@@ -274,14 +260,11 @@
         if (els.ganglieSourceConfirmBtn) {
           els.ganglieSourceConfirmBtn.disabled = ganglieSelectedIds.length !== 2;
         }
-      } else {
-        els.ganglieSourcePanel.hidden = true;
+      }, onHide: function () {
         ganglieSelectedIds = [];
-      }
-    }
-    // v8 PR-A2: 麒麟弓 — source 在 2 马时挑一匹弃 (单匹自动走, 不会 pause)
-    if (els.qilinPickPanel) {
-      if (kind === 'qilin-pick' && pending.actor === 'player') {
+      } },
+      // v8 PR-A2: 麒麟弓 — source 在 2 马时挑一匹弃 (单匹自动走, 不会 pause)
+      { panelId: 'qilinPickPanel', kind: 'qilin-pick', fill: function (pending, game) {
         els.qilinPickPanel.hidden = false;
         if (els.qilinPickHint) {
           els.qilinPickHint.textContent =
@@ -300,14 +283,10 @@
             });
           }).join('') || '<span class="mini-card">没有可弃置的坐骑</span>';
         }
-      } else {
-        els.qilinPickPanel.hidden = true;
-      }
-    }
-    // 审计二轮 PR-8: 贯石斧 — 杀被闪后, 玩家自选两张牌 (手牌/装备) 弃置
-    // 令【杀】强制命中, 或不发动。
-    if (els.guanshiDiscardPanel) {
-      if (kind === 'guanshi-discard' && pending.actor === 'player') {
+      } },
+      // 审计二轮 PR-8: 贯石斧 — 杀被闪后, 玩家自选两张牌 (手牌/装备) 弃置
+      // 令【杀】强制命中, 或不发动。
+      { panelId: 'guanshiDiscardPanel', kind: 'guanshi-discard', fill: function (pending, game) {
         els.guanshiDiscardPanel.hidden = false;
         var gsAllowedIds = (pending.handIds || []).concat((pending.equipment || []).map(function (e) { return e.cardId; }));
         guanshiDiscardSelection = guanshiDiscardSelection.filter(function (id) {
@@ -341,15 +320,12 @@
             || '<span class="mini-card">没有可弃置的牌</span>';
         }
         if (els.guanshiConfirmBtn) els.guanshiConfirmBtn.disabled = guanshiDiscardSelection.length !== 2;
-      } else {
-        els.guanshiDiscardPanel.hidden = true;
+      }, onHide: function () {
         guanshiDiscardSelection = [];
-      }
-    }
-    // 审计二轮 PR-8: 火攻 — 玩家为目标时自选展示哪张手牌 (官方: 展示是
-    // 目标的选择)。必选面板: 点牌 stage 后经 hand-confirm 提交。
-    if (els.huogongShowPanel) {
-      if (kind === 'huogong-show' && pending.actor === 'player') {
+      } },
+      // 审计二轮 PR-8: 火攻 — 玩家为目标时自选展示哪张手牌 (官方: 展示是
+      // 目标的选择)。必选面板: 点牌 stage 后经 hand-confirm 提交。
+      { panelId: 'huogongShowPanel', kind: 'huogong-show', fill: function (pending, game) {
         els.huogongShowPanel.hidden = false;
         if (els.huogongShowHint) {
           els.huogongShowHint.textContent =
@@ -366,13 +342,9 @@
             });
           }).join('') || '<span class="mini-card">没有手牌可展示</span>';
         }
-      } else {
-        els.huogongShowPanel.hidden = true;
-      }
-    }
-    // v13 J3: 天香 ask — 受伤挂起: 选红桃成本 + 攻击范围内转移目标。
-    if (els.tianxiangAskPanel) {
-      if (kind === 'tianxiang-ask' && pending.actor === 'player') {
+      } },
+      // v13 J3: 天香 ask — 受伤挂起: 选红桃成本 + 攻击范围内转移目标。
+      { panelId: 'tianxiangAskPanel', kind: 'tianxiang-ask', fill: function (pending, game) {
         els.tianxiangAskPanel.hidden = false;
         if (tianxiangCostId && (pending.costIds || []).indexOf(tianxiangCostId) < 0) tianxiangCostId = null;
         if (tianxiangTargetSeat && !(pending.targets || []).some(function (t) { return t.seat === tianxiangTargetSeat; })) tianxiangTargetSeat = null;
@@ -399,16 +371,13 @@
           }).join('');
         }
         if (els.tianxiangConfirmBtn) els.tianxiangConfirmBtn.disabled = !(tianxiangCostId && tianxiangTargetSeat);
-      } else {
-        els.tianxiangAskPanel.hidden = true;
+      }, onHide: function () {
         tianxiangCostId = null;
         tianxiangTargetSeat = null;
-      }
-    }
-    // v14 Q3: 突袭摸牌 ask 面板 — 候选座席多选 (至多 2), 确认发动 (放弃
-    // 摸牌) 或不发动照常摸牌。
-    if (els.tuxiPickPanel) {
-      if (kind === 'tuxi-pick' && pending.actor === 'player') {
+      } },
+      // v14 Q3: 突袭摸牌 ask 面板 — 候选座席多选 (至多 2), 确认发动 (放弃
+      // 摸牌) 或不发动照常摸牌。
+      { panelId: 'tuxiPickPanel', kind: 'tuxi-pick', fill: function (pending, game) {
         els.tuxiPickPanel.hidden = false;
         var tuxiLegal = (pending.candidates || []).map(function (cd) { return cd.seat; });
         tuxiPickSelection = tuxiPickSelection.filter(function (seat) { return tuxiLegal.indexOf(seat) >= 0; });
@@ -425,15 +394,12 @@
           }).join('');
         }
         if (els.tuxiConfirmBtn) els.tuxiConfirmBtn.disabled = !(tuxiPickSelection.length >= 1 && tuxiPickSelection.length <= 2);
-      } else {
-        els.tuxiPickPanel.hidden = true;
+      }, onHide: function () {
         tuxiPickSelection = [];
-      }
-    }
-    // v15 T: 猛进 (庞德) 弃牌选择 — 手牌为暗牌 (只给"随机弃一张手牌"),
-    // 装备区逐张可指定; "不发动"走取消钮。
-    if (els.mengjinPanel) {
-      if (kind === 'mengjin-pick' && pending.actor === 'player') {
+      } },
+      // v15 T: 猛进 (庞德) 弃牌选择 — 手牌为暗牌 (只给"随机弃一张手牌"),
+      // 装备区逐张可指定; "不发动"走取消钮。
+      { panelId: 'mengjinPanel', kind: 'mengjin-pick', fill: function (pending, game) {
         els.mengjinPanel.hidden = false;
         var mjTargetState = getGame() && getGame()[pending.targetActor];
         if (els.mengjinHint) {
@@ -451,13 +417,9 @@
               + suitLabel(zone.suit) + (zone.rank || '') + '</button>';
           }).join('');
         }
-      } else {
-        els.mengjinPanel.hidden = true;
-      }
-    }
-    // v15 T: 拼点选牌 — 双方各扣置一张手牌比点数 (点数大者赢)。
-    if (els.pindianPanel) {
-      if (kind === 'pindian-card' && pending.actor === 'player') {
+      } },
+      // v15 T: 拼点选牌 — 双方各扣置一张手牌比点数 (点数大者赢)。
+      { panelId: 'pindianPanel', kind: 'pindian-card', fill: function (pending, game) {
         els.pindianPanel.hidden = false;
         if (els.pindianHint) {
           var pdFoeState = getGame() && getGame()[pending.opponentActor];
@@ -471,14 +433,10 @@
               + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
           }).join('');
         }
-      } else {
-        els.pindianPanel.hidden = true;
-      }
-    }
-    // ═════ v15 T 评审收口: 官方"你可以 / 你选择"的四个决策面 ═════
-    // 涅槃 (濒死限定技) — 二选一按钮, 无候选。
-    if (els.niepanPanel) {
-      if (kind === 'niepan-ask' && pending.actor === 'player') {
+      } },
+      // ═════ v15 T 评审收口: 官方"你可以 / 你选择"的四个决策面 ═════
+      // 涅槃 (濒死限定技) — 二选一按钮, 无候选。
+      { panelId: 'niepanPanel', kind: 'niepan-ask', fill: function (pending, game) {
         els.niepanPanel.hidden = false;
         if (els.niepanHint) {
           els.niepanHint.textContent = '涅槃（限定技，每局一次）：弃置你区域里的所有牌（手牌 '
@@ -486,25 +444,17 @@
             + ' 张 / 判定区 ' + (pending.judgeAreaCount || 0)
             + ' 张），武将牌复原，摸三张牌，体力回复至 3 点。';
         }
-      } else {
-        els.niepanPanel.hidden = true;
-      }
-    }
-    // 双雄 (摸牌阶段放不放弃摸牌) — 二选一按钮, 无候选。
-    if (els.shuangxiongPanel) {
-      if (kind === 'shuangxiong-ask' && pending.actor === 'player') {
+      } },
+      // 双雄 (摸牌阶段放不放弃摸牌) — 二选一按钮, 无候选。
+      { panelId: 'shuangxiongPanel', kind: 'shuangxiong-ask', fill: function (pending, game) {
         els.shuangxiongPanel.hidden = false;
         if (els.shuangxiongHint) {
           els.shuangxiongHint.textContent = '双雄：可放弃摸牌（' + (pending.drawCount || 0)
             + ' 张）改为判定并获得判定牌，本回合可将与之颜色不同的一张手牌当【决斗】使用。';
         }
-      } else {
-        els.shuangxiongPanel.hidden = true;
-      }
-    }
-    // 驱虎赢后的受伤角色 — 必选 (伤害已成事实, 只是选谁), 点候选即提交。
-    if (els.quhuVictimPanel) {
-      if (kind === 'quhu-victim' && pending.actor === 'player') {
+      } },
+      // 驱虎赢后的受伤角色 — 必选 (伤害已成事实, 只是选谁), 点候选即提交。
+      { panelId: 'quhuVictimPanel', kind: 'quhu-victim', fill: function (pending, game) {
         els.quhuVictimPanel.hidden = false;
         if (els.quhuVictimHint) {
           var qhTargetState = getGame() && getGame()[pending.targetActor];
@@ -518,13 +468,9 @@
               + escapeHtml(entry.name) + '（' + entry.hp + ' 血）</button>';
           }).join('');
         }
-      } else {
-        els.quhuVictimPanel.hidden = true;
-      }
-    }
-    // 节命 (逐点选受益者) — 点候选 stage, hand-confirm 提交; 可逐点放弃。
-    if (els.jiemingPanel) {
-      if (kind === 'jieming-pick' && pending.actor === 'player') {
+      } },
+      // 节命 (逐点选受益者) — 点候选 stage, hand-confirm 提交; 可逐点放弃。
+      { panelId: 'jiemingPanel', kind: 'jieming-pick', fill: function (pending, game) {
         els.jiemingPanel.hidden = false;
         if (els.jiemingHint) {
           els.jiemingHint.textContent = '节命（第 ' + (pending.pointIndex || 1) + ' / '
@@ -536,22 +482,16 @@
               + escapeHtml(entry.name) + '（补 ' + entry.gain + ' 张 → ' + entry.limit + '）</button>';
           }).join('');
         }
-      } else {
-        els.jiemingPanel.hidden = true;
-      }
-    }
-    // ═════ v15 U (林包) 六个决策窗 ═════
-    if (els.benghuaiPanel) {
-      if (kind === 'benghuai-choice' && pending.actor === 'player') {
+      } },
+      // ═════ v15 U (林包) 六个决策窗 ═════
+      { panelId: 'benghuaiPanel', kind: 'benghuai-choice', fill: function (pending, game) {
         els.benghuaiPanel.hidden = false;
         if (els.benghuaiHint) {
           els.benghuaiHint.textContent = '崩坏（锁定技）：你不是体力值最小的角色（体力 '
             + pending.hp + ' / 上限 ' + pending.maxHp + '），须选择一项。';
         }
-      } else { els.benghuaiPanel.hidden = true; }
-    }
-    if (els.fangzhuPanel) {
-      if (kind === 'fangzhu-pick' && pending.actor === 'player') {
+      } },
+      { panelId: 'fangzhuPanel', kind: 'fangzhu-pick', fill: function (pending, game) {
         els.fangzhuPanel.hidden = false;
         if (els.fangzhuHint) {
           els.fangzhuHint.textContent = '放逐：可令一名其他角色摸 ' + (pending.drawCount || 0)
@@ -564,10 +504,8 @@
               + (entry.turnedOver ? '，已翻面' : '') + '）</button>';
           }).join('');
         }
-      } else { els.fangzhuPanel.hidden = true; }
-    }
-    if (els.yinghunPanel) {
-      if (kind === 'yinghun-choice' && pending.actor === 'player') {
+      } },
+      { panelId: 'yinghunPanel', kind: 'yinghun-choice', fill: function (pending, game) {
         if (yinghunWindow !== pending) { yinghunWindow = pending; yinghunOption = null; yinghunSeat = null; }
         els.yinghunPanel.hidden = false;
         var yhX = pending.x || 1;
@@ -586,10 +524,8 @@
           }).join('');
         }
         refreshYinghunConfirm();
-      } else { els.yinghunPanel.hidden = true; }
-    }
-    if (els.haoshiPanel) {
-      if (kind === 'haoshi-give' && pending.actor === 'player') {
+      } },
+      { panelId: 'haoshiPanel', kind: 'haoshi-give', fill: function (pending, game) {
         els.haoshiPanel.hidden = false;
         if (els.haoshiHint) {
           els.haoshiHint.textContent = '好施：多名角色并列手牌最少，选择一名接受你的 '
@@ -601,20 +537,16 @@
               + escapeHtml(entry.name) + '（手牌 ' + entry.handCount + '）</button>';
           }).join('');
         }
-      } else { els.haoshiPanel.hidden = true; }
-    }
-    if (els.zaiqiPanel) {
-      if (kind === 'zaiqi-ask' && pending.actor === 'player') {
+      } },
+      { panelId: 'zaiqiPanel', kind: 'zaiqi-ask', fill: function (pending, game) {
         els.zaiqiPanel.hidden = false;
         if (els.zaiqiHint) {
           els.zaiqiHint.textContent = '再起：可放弃摸牌（' + (pending.drawCount || 0)
             + ' 张），改为亮出牌堆顶 ' + (pending.x || 0)
             + ' 张，按其中红桃张数回复体力并获得其余的牌。';
         }
-      } else { els.zaiqiPanel.hidden = true; }
-    }
-    if (els.luanwuPanel) {
-      if (kind === 'luanwu-sha' && pending.actor === 'player') {
+      } },
+      { panelId: 'luanwuPanel', kind: 'luanwu-sha', fill: function (pending, game) {
         if (luanwuWindow !== pending) { luanwuWindow = pending; luanwuCardId = null; luanwuSeat = null; }
         els.luanwuPanel.hidden = false;
         if (els.luanwuHint) {
@@ -634,11 +566,9 @@
           }).join('') || '<span class="mini-card">没有可用的【杀】</span>';
         }
         refreshLuanwuConfirm();
-      } else { els.luanwuPanel.hidden = true; }
-    }
-    // ═════ v15 V (山包) 四个决策窗 ═════
-    if (els.tiaoxinPanel) {
-      if (kind === 'tiaoxin-demand' && pending.actor === 'player') {
+      } },
+      // ═════ v15 V (山包) 四个决策窗 ═════
+      { panelId: 'tiaoxinPanel', kind: 'tiaoxin-demand', fill: function (pending, game) {
         els.tiaoxinPanel.hidden = false;
         if (els.tiaoxinHint) {
           var txSource = pending.sourceActor && game[pending.sourceActor];
@@ -653,20 +583,16 @@
               + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
           }).join('') || '<span class="mini-card">没有可用的【杀】</span>';
         }
-      } else { els.tiaoxinPanel.hidden = true; }
-    }
-    if (els.zhijiPanel) {
-      if (kind === 'zhiji-choice' && pending.actor === 'player') {
+      } },
+      { panelId: 'zhijiPanel', kind: 'zhiji-choice', fill: function (pending, game) {
         els.zhijiPanel.hidden = false;
         if (els.zhijiHint) {
           els.zhijiHint.textContent = '志继（觉醒技）：你没有手牌（体力 '
             + pending.hp + ' / 上限 ' + pending.maxHp
             + '），选择一项，然后减 1 点体力上限并获得【观星】。';
         }
-      } else { els.zhijiPanel.hidden = true; }
-    }
-    if (els.fangquanPanel) {
-      if (kind === 'fangquan-grant' && pending.actor === 'player') {
+      } },
+      { panelId: 'fangquanPanel', kind: 'fangquan-grant', fill: function (pending, game) {
         if (fangquanWindow !== pending) {
           fangquanWindow = pending; fangquanCardId = null; fangquanSeat = null;
         }
@@ -689,10 +615,8 @@
           }).join('');
         }
         refreshFangquanConfirm();
-      } else { els.fangquanPanel.hidden = true; }
-    }
-    if (els.xianglePanel) {
-      if (kind === 'xiangle-cost' && pending.actor === 'player') {
+      } },
+      { panelId: 'xianglePanel', kind: 'xiangle-cost', fill: function (pending, game) {
         els.xianglePanel.hidden = false;
         if (els.xiangleHint) {
           var xlTarget = pending.targetActor && game[pending.targetActor];
@@ -708,12 +632,10 @@
               + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
           }).join('') || '<span class="mini-card">没有基本牌可弃</span>';
         }
-      } else { els.xianglePanel.hidden = true; }
-    }
-    // v14 R1: 蛊惑质疑窗 — AI 于吉背面声明, 玩家决定是否质疑 (质疑真牌
-    // 获「缠怨」, 提示如实告知风险; 只显示声明牌名, 不泄露真牌)。
-    if (els.guhuoChallengePanel) {
-      if (kind === 'guhuo-challenge' && pending.actor === 'player') {
+      } },
+      // v14 R1: 蛊惑质疑窗 — AI 于吉背面声明, 玩家决定是否质疑 (质疑真牌
+      // 获「缠怨」, 提示如实告知风险; 只显示声明牌名, 不泄露真牌)。
+      { panelId: 'guhuoChallengePanel', kind: 'guhuo-challenge', fill: function (pending, game) {
         els.guhuoChallengePanel.hidden = false;
         if (els.guhuoChallengeHint) {
           var ghSourceState = pending.source && game[pending.source];
@@ -728,14 +650,10 @@
             + ' 背面朝上使用【' + (pending.declaredName || '?') + '】' + ghTargetText + '。'
             + '质疑为假可终止结算；质疑为真则你获得「缠怨」（不能再质疑，体力为1时其余技能无效）。';
         }
-      } else {
-        els.guhuoChallengePanel.hidden = true;
-      }
-    }
-    // v14 P3: 流离转移面板 — 成本 (手牌/装备任一) + 转移目标 两段选择,
-    // 结构随天香惯例; 装备成本候选带槽位标注。
-    if (els.liuliAskPanel) {
-      if (kind === 'liuli-transfer' && pending.actor === 'player') {
+      } },
+      // v14 P3: 流离转移面板 — 成本 (手牌/装备任一) + 转移目标 两段选择,
+      // 结构随天香惯例; 装备成本候选带槽位标注。
+      { panelId: 'liuliAskPanel', kind: 'liuli-transfer', fill: function (pending, game) {
         els.liuliAskPanel.hidden = false;
         if (liuliCostId && (pending.costIds || []).indexOf(liuliCostId) < 0) liuliCostId = null;
         if (liuliTargetSeat && !(pending.candidates || []).some(function (c) { return c.seat === liuliTargetSeat; })) liuliTargetSeat = null;
@@ -763,16 +681,13 @@
           }).join('');
         }
         if (els.liuliConfirmBtn) els.liuliConfirmBtn.disabled = !(liuliCostId && liuliTargetSeat);
-      } else {
-        els.liuliAskPanel.hidden = true;
+      }, onHide: function () {
         liuliCostId = null;
         liuliTargetSeat = null;
-      }
-    }
-    // v13 J2: 火攻成本挂起重选 — 显式成本在结算中途失效 (无懈拉锯 ×
-    // 展示缓存消耗 × 重展示花色变化) 时, 玩家重选同花色成本或不弃置。
-    if (els.huogongCostPanel) {
-      if (kind === 'huogong-cost' && pending.actor === 'player') {
+      } },
+      // v13 J2: 火攻成本挂起重选 — 显式成本在结算中途失效 (无懈拉锯 ×
+      // 展示缓存消耗 × 重展示花色变化) 时, 玩家重选同花色成本或不弃置。
+      { panelId: 'huogongCostPanel', kind: 'huogong-cost', fill: function (pending, game) {
         els.huogongCostPanel.hidden = false;
         if (els.huogongCostHint) {
           els.huogongCostHint.textContent =
@@ -790,25 +705,17 @@
             });
           }).join('') || '<span class="mini-card">没有同花色手牌</span>';
         }
-      } else {
-        els.huogongCostPanel.hidden = true;
-      }
-    }
-    // v8 PR-A3: 雌雄双股剑 fire — source 决定是否对异性发动
-    if (els.cixiongFirePanel) {
-      if (kind === 'cixiong-fire' && pending.actor === 'player') {
+      } },
+      // v8 PR-A3: 雌雄双股剑 fire — source 决定是否对异性发动
+      { panelId: 'cixiongFirePanel', kind: 'cixiong-fire', fill: function (pending, game) {
         els.cixiongFirePanel.hidden = false;
         if (els.cixiongFireHint) {
           els.cixiongFireHint.textContent =
             '雌雄双股剑：对' + actorDisplayName(pending.target) + '（异性）发动效果？目标二选一：弃 1 手牌 / 令你摸 1 张。';
         }
-      } else {
-        els.cixiongFirePanel.hidden = true;
-      }
-    }
-    // v8 PR-A3: 雌雄双股剑 choose — target 选 弃手 或 让 source 摸 1
-    if (els.cixiongChoosePanel) {
-      if (kind === 'cixiong-choose' && pending.actor === 'player') {
+      } },
+      // v8 PR-A3: 雌雄双股剑 choose — target 选 弃手 或 让 source 摸 1
+      { panelId: 'cixiongChoosePanel', kind: 'cixiong-choose', fill: function (pending, game) {
         els.cixiongChoosePanel.hidden = false;
         if (els.cixiongChooseHint) {
           els.cixiongChooseHint.textContent =
@@ -828,13 +735,9 @@
             });
           }).join('') || '<span class="mini-card">没有手牌可弃 → 必须让对方摸 1 张</span>';
         }
-      } else {
-        els.cixiongChoosePanel.hidden = true;
-      }
-    }
-    // v8 PR-A4: 借刀杀人决策 — 出杀 or 交武器
-    if (els.jiedaoDecisionPanel) {
-      if (kind === 'jiedao-decision' && pending.actor === 'player') {
+      } },
+      // v8 PR-A4: 借刀杀人决策 — 出杀 or 交武器
+      { panelId: 'jiedaoDecisionPanel', kind: 'jiedao-decision', fill: function (pending, game) {
         els.jiedaoDecisionPanel.hidden = false;
         if (els.jiedaoDecisionHint) {
           var jdShas = ((game.player && game.player.hand) || []).filter(function (c) {
@@ -844,13 +747,9 @@
             '借刀杀人：' + actorDisplayName(pending.sourceActor) +
             '令你对其出【杀】（手中可用 ' + jdShas.length + ' 张【杀】），否则把武器交给对方。';
         }
-      } else {
-        els.jiedaoDecisionPanel.hidden = true;
-      }
-    }
-    // v8 PR-A4: 过河拆桥 1V1 — source 二选一（弃装备 / 看手并弃）
-    if (els.guohePickPanel) {
-      if (kind === 'guohe-1v1-pick' && pending.actor === 'player') {
+      } },
+      // v8 PR-A4: 过河拆桥 1V1 — source 二选一（弃装备 / 看手并弃）
+      { panelId: 'guohePickPanel', kind: 'guohe-1v1-pick', fill: function (pending, game) {
         els.guohePickPanel.hidden = false;
         if (els.guohePickHint) {
           els.guohePickHint.textContent =
@@ -881,13 +780,9 @@
               }).join('')
             : '<span class="mini-card">手牌：空</span>';
         }
-      } else {
-        els.guohePickPanel.hidden = true;
-      }
-    }
-    // v8 PR-A5: 五谷丰登 reveal-then-pick — picker 从 pool 中选 1 张
-    if (els.wuguPickPanel) {
-      if (kind === 'wugu-pick' && pending.actor === 'player') {
+      } },
+      // v8 PR-A5: 五谷丰登 reveal-then-pick — picker 从 pool 中选 1 张
+      { panelId: 'wuguPickPanel', kind: 'wugu-pick', fill: function (pending, game) {
         els.wuguPickPanel.hidden = false;
         if (els.wuguPickHint) {
           var wuguTotal = (pending.cards || []).length;
@@ -906,28 +801,20 @@
             });
           }).join('') || '<span class="mini-card">池中没有可选牌</span>';
         }
-      } else {
-        els.wuguPickPanel.hidden = true;
-      }
-    }
-    // v8 hotfix-2: 洛神 (luoshen-continue) — 准备阶段每次判定前询问
-    if (els.luoshenPromptPanel) {
-      if (kind === 'luoshen-continue' && pending.actor === 'player') {
+      } },
+      // v8 hotfix-2: 洛神 (luoshen-continue) — 准备阶段每次判定前询问
+      { panelId: 'luoshenPromptPanel', kind: 'luoshen-continue', fill: function (pending, game) {
         els.luoshenPromptPanel.hidden = false;
         if (els.luoshenPromptHint) {
           els.luoshenPromptHint.textContent =
             '洛神：是否进行判定？黑色获得入手, 红色结束流程';
         }
-      } else {
-        els.luoshenPromptPanel.hidden = true;
-      }
-    }
-    // v12 G2: 神速 (夏侯渊) — 准备阶段开始前声明至多两项。四个按钮常驻:
-    // 不发动/仅一/仅二/一+二; 二与一+二 需 canOptionTwo (有装备可弃) 才可点,
-    // 点击后进入"选装备"子步骤 (本模块局部态), 选中候选后专属确认按钮才可
-    // 点亮 — 未选装备禁止提交, 与 guanshi 弃两张牌的"选够才能确认"惯例一致。
-    if (els.shensuOptionsPanel) {
-      if (kind === 'shensu-options' && pending.actor === 'player') {
+      } },
+      // v12 G2: 神速 (夏侯渊) — 准备阶段开始前声明至多两项。四个按钮常驻:
+      // 不发动/仅一/仅二/一+二; 二与一+二 需 canOptionTwo (有装备可弃) 才可点,
+      // 点击后进入"选装备"子步骤 (本模块局部态), 选中候选后专属确认按钮才可
+      // 点亮 — 未选装备禁止提交, 与 guanshi 弃两张牌的"选够才能确认"惯例一致。
+      { panelId: 'shensuOptionsPanel', kind: 'shensu-options', fill: function (pending, game) {
         els.shensuOptionsPanel.hidden = false;
         // 候选集变化 (新一轮 prompt) 或选项二不可用时, 复位子步骤本地态。
         if (!pending.canOptionTwo) shensuOptionMode = null;
@@ -959,30 +846,24 @@
           els.shensuConfirmEquipBtn.hidden = !shensuOptionMode;
           els.shensuConfirmEquipBtn.disabled = !shensuEquipCardId;
         }
-      } else {
-        els.shensuOptionsPanel.hidden = true;
+      }, onHide: function () {
         shensuOptionMode = null;
         shensuEquipCardId = null;
-      }
-    }
-    // v11 C7 (批次 31): 耀武 (yaowu-reward) — 玩家作为伤害来源二选一;
-    // 体力满时回复不可选 (resolver 同步校验)。
-    if (els.yaowuRewardPanel) {
-      if (kind === 'yaowu-reward' && pending.actor === 'player') {
+      } },
+      // v11 C7 (批次 31): 耀武 (yaowu-reward) — 玩家作为伤害来源二选一;
+      // 体力满时回复不可选 (resolver 同步校验)。
+      { panelId: 'yaowuRewardPanel', kind: 'yaowu-reward', fill: function (pending, game) {
         els.yaowuRewardPanel.hidden = false;
         if (els.yaowuRewardHint) {
           els.yaowuRewardHint.textContent =
             '耀武：你对' + (pending.targetName || '华雄') + '造成了红色【杀】伤害，选择一项奖励。';
         }
         if (els.yaowuRecoverBtn) els.yaowuRecoverBtn.disabled = !pending.canRecover;
-      } else {
-        els.yaowuRewardPanel.hidden = true;
+      }, onHide: function () {
         if (els.yaowuRecoverBtn) els.yaowuRecoverBtn.disabled = false;
-      }
-    }
-    // v8 PR-A2: 濒死救援 — responder 用 桃/酒 救援（酒仅自救）
-    if (els.dyingRescuePanel) {
-      if (kind === 'dying-rescue' && pending.actor === 'player') {
+      } },
+      // v8 PR-A2: 濒死救援 — responder 用 桃/酒 救援（酒仅自救）
+      { panelId: 'dyingRescuePanel', kind: 'dying-rescue', fill: function (pending, game) {
         els.dyingRescuePanel.hidden = false;
         var selfRescue = pending.actor === pending.dyingActor;
         if (els.dyingRescueHint) {
@@ -1023,10 +904,23 @@
             });
           }).join('') || '<span class="mini-card">手牌中没有可救援的牌</span>';
         }
-      } else {
-        els.dyingRescuePanel.hidden = true;
+      } },
+    ];
+
+    function renderPromptPanels(kind, pending) {
+      var game = getGame();
+      for (var i = 0; i < PROMPT_PANEL_SPECS.length; i += 1) {
+        var spec = PROMPT_PANEL_SPECS[i];
+        var panel = els[spec.panelId];
+        if (!panel) continue;
+        var hit = kind === spec.kind && pending && pending.actor === (spec.actor || 'player');
+        panel.hidden = !hit;
+        if (hit) {
+          spec.fill(pending, game);
+        } else if (spec.onHide) {
+          spec.onHide();
+        }
       }
-    }
     }
 
     function bindPromptPanels() {

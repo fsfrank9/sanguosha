@@ -111,13 +111,22 @@
       }
       // v10 V6: 决斗 响应 — 对方发起【决斗】, 玩家选用哪张牌当【杀】响应.
       // 候选含真【杀】 + 龙胆 / 武圣 转化. 不出 → 自己受 1 伤.
+      // W1 (第五轮审计 F1): 南蛮入侵/借刀的"打出【杀】"窗口 (aoe-sha-response)
+      // 复用本面板。此前它**没有任何面板** —— 引擎给了 options (含真【杀】),
+      // UI 一个都不渲染, 蛊惑面板的取消钮也只清自己的暂存不收窗口:
+      // 玩家 (于吉) 被南蛮指定后既打不出真杀也放弃不了, 整局卡死在
+      // pendingChoiceGuard 上。两个 kind 的 resolver 决策形状本就相同
+      // ({cardId} / {use:false}), 直接并入同一面板。
+      var SHA_RESPONSE_KINDS = ['sha-duel-response', 'aoe-sha-response'];
       if (els.duelResponsePanel) {
-        if (kind === 'sha-duel-response' && pending.actor === 'player') {
+        if (SHA_RESPONSE_KINDS.indexOf(kind) >= 0 && pending.actor === 'player') {
           els.duelResponsePanel.hidden = false;
           if (els.duelResponseHint) {
-            els.duelResponseHint.textContent =
-              '对方对你发起' + (pending.reason || '【决斗】')
-              + '，请选择一张牌当【杀】响应，或不出（受 1 点伤害）。';
+            els.duelResponseHint.textContent = kind === 'aoe-sha-response'
+              ? '对方使用【' + (pending.sourceName || '南蛮入侵')
+                + '】，请选择一张牌当【杀】响应，或不出（受 1 点伤害）。'
+              : '对方对你发起' + (pending.reason || '【决斗】')
+                + '，请选择一张牌当【杀】响应，或不出（受 1 点伤害）。';
           }
           if (els.duelResponseChoices) {
             var duelOpts = pending.options || [];
