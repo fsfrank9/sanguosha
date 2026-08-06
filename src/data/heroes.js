@@ -161,9 +161,14 @@
         liuli:     { trigger: 'shaTargetedAfter',  frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onShaTargeted'] },
         jijiu:     { trigger: 'cardConvert',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['attemptDyingRescue'] },
         qingnang:  { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onActiveSkill'] },
-        luoshen:   { trigger: 'preparePhase',      frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['onPreparePhase'] },
+        // W2 (第五轮审计 F3): 洛神走 processPreparePhase 的直调口 (与妄尊/神速
+        // 同款), **不**经 onPreparePhase 注册表 —— 此前 metadata 谎报 hook 名。
+        luoshen:   { trigger: 'preparePhase',      frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['processPreparePhase'] },
         jianxiong: { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
-        ganglie:   { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['onDamageAfter', 'onJudgementAfterResolve'] },
+        // W2 (第五轮审计 F3): 刚烈只注册 onDamageAfter, 判定是在其内部直接
+        // judge() + resolveJudgementCard() 走完的 (与暴虐同形), 并没有注册
+        // onJudgementAfterResolve —— 判定这件事由 cost.type 表达即可。
+        ganglie:   { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['onDamageAfter'] },
         fankui:    { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
         guicai:    { trigger: 'beforeJudgement',   frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onJudgementBeforeResolve'] },
         mashu:     { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['sumPassiveEffect'] },
