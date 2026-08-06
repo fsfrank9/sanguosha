@@ -9,6 +9,12 @@
 
   function setPhase(game, actor, phase) {
     game.phase = phase;
+    // v15 V: 固政 只认"于此阶段内因其弃置而失去过的手牌" → 每次进入弃牌
+    // 阶段重置本阶段记账 (跨回合残留会让固政拿到上一回合的牌)。
+    if (phase === 'discard' && game[actor]) {
+      game[actor].flags = game[actor].flags || {};
+      game[actor].flags.discardPhaseCards = [];
+    }
     recordPhase(game, actor, phase);
     return phase;
   }
@@ -34,6 +40,12 @@
     // v11 C8 (批次 32): 妄尊 等回合级手牌上限修正复位
     state.handLimitDelta = 0;
     var flags = ensureFlags(state);
+    // v15 V (山包): 固政的弃牌阶段记账 + 挑衅/制霸的"每回合限一次" +
+    // 放权的"跳过出牌阶段"标记 (回合结束时机消费, 跨回合不得残留)。
+    flags.discardPhaseCards = [];
+    flags.tiaoxinUsed = false;
+    flags.zhibaUsed = false;
+    flags.fangquanSkipped = false;
     flags.skipPlay = false;
     flags.skipDraw = false;
     // v12 G2: 神速 选项一 — 跳过判定阶段标记 (回合级)

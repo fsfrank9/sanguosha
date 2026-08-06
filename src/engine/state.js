@@ -298,6 +298,40 @@
     return !!(state.skills || []).some(function (skill) { return skill.id === skillId; });
   }
 
+  // ═════ v15 V: 觉醒技共用基建 — 动态获得技能 ═════
+  // 山包 17 技里有 **4 个觉醒技** (凿险/志继/若愚/魂姿), 形状完全相同:
+  //   "准备阶段开始时，若<条件>，<代价/收益>，然后获得<新技能>"。
+  // 本仓此前**没有任何动态技能层** —— state.skills 一律来自 HERO_CATALOG
+  // 静态展开 (`grep "state.skills ="` 零命中)。觉醒技需要的只是最简形态:
+  // 往 state.skills 追加一条, 之后 hasSkill / hasPassiveEffect 这两个单点
+  // 自动认得 (138 处调用面零改动)。
+  //
+  // 注意与左慈【化身】的区别 (V 批未接入, 见 spec 简报的成本评估门):
+  // 化身要的是**三态**(未获得 / 已获得且有效 / 已获得但无效) + 可切换 +
+  // 性别势力改写, 那是另一个量级的层, 不是本函数能覆盖的。
+  function grantSkill(state, skillId, skillName, meta) {
+    if (!state) return false;
+    if (!state.skills) state.skills = [];
+    if (state.skills.some(function (skill) { return skill.id === skillId; })) return false;
+    var entry = { id: skillId, name: skillName || skillId, granted: true };
+    if (meta) {
+      ['trigger', 'frequency', 'optional', 'mandatory', 'cost', 'hooks', 'desc'].forEach(function (key) {
+        if (meta[key] !== undefined) entry[key] = meta[key];
+      });
+    }
+    state.skills.push(entry);
+    return true;
+  }
+
+  // 断肠 (蔡文姬): "你令杀死你的角色失去其所有技能" —— 与 grantSkill 对称的
+  // 移除面。移除后 hasSkill 恒假, 锁定技/触发技一并失效。
+  function stripAllSkills(state) {
+    if (!state || !state.skills) return 0;
+    var removed = state.skills.length;
+    state.skills = [];
+    return removed;
+  }
+
   function canUseUnlimitedSha(state) {
     return SkillRuntime.hasPassiveEffect(state, 'unlimitedSha') || hasEquipmentEffect(state, 'unlimitedSha');
   }
@@ -485,6 +519,9 @@
     canReachWithSha: canReachWithSha,
     shaUseReachAllowed: shaUseReachAllowed,
     wanshaBlocksTaoUse: wanshaBlocksTaoUse,
+    // v15 V: 觉醒技的动态获得技能 / 断肠的技能移除
+    grantSkill: grantSkill,
+    stripAllSkills: stripAllSkills,
     firstActorFromRoles: firstActorFromRoles,
     handLimit: handLimit,
     effectiveCardSuit: effectiveCardSuit,

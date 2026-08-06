@@ -73,6 +73,8 @@ export function collectCardCensus(game) {
     for (const card of state.judgeArea || []) registerZoneCard(card, `${actor}.judgeArea`);
     // v12 G2: 不屈 — 武将牌上的"创"入普查
     for (const card of state.chuang || []) registerZoneCard(card, `${actor}.chuang`);
+    // v15 V: "田" (邓艾屯田) 是新的武将牌上置牌区, 必须进普查
+    for (const card of state.tian || []) registerZoneCard(card, `${actor}.tian`);
   }
 
   const inFlight = [];
