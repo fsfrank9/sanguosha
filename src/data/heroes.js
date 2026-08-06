@@ -244,7 +244,7 @@
         jiuchi:   { trigger: 'cardConvert',        frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs'] },
         roulin:   { trigger: 'passive',            frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['hasSkill'] },
         benghuai: { trigger: 'turnEnd',            frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'loseHp',     count: 1 },     hooks: ['onTurnEnd'] },
-        baonue:   { trigger: 'damageAfter',        frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['onDamageAfter'] },
+        baonue:   { trigger: 'damageDealt',        frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['onDamageDealt'] },
         qiangxi:  { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'loseHp',     count: 1 },     hooks: ['onActiveSkill'] },
         quhu:     { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'rankCompare' },              hooks: ['onActiveSkill', 'pindian:quhu'] },
         jieming:  { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDamageAfter'] },

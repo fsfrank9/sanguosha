@@ -92,6 +92,9 @@ const VALID_TRIGGERS = new Set([
   // v15 V: 屯田触发时机 — "每当你于回合外失去牌后" (连营的 handLoss 只认
   // "失去最后一张手牌", 屯田是任意失牌 → 另立时机名)
   'cardLost',
+  // v15 W2: 暴虐触发时机 — "每当其他角色**造成伤害后**" (来源侧, 不受
+  // "受害者存活"约束; 与受害侧的 damageAfter 是两个时机)
+  'damageDealt',
 ]);
 const VALID_FREQUENCIES = new Set([
   'oncePerTurn',
@@ -230,6 +233,8 @@ const REGISTRY_HOOK_NAMES = new Set([
   // v15 V 新增
   'onCardLost', 'onDiscardPhaseEnd', 'onBeforePlayPhase', 'onTrickTargeted',
   'onShaEffectiveness',
+  // v15 W2: 来源侧"造成伤害后"
+  'onDamageDealt',
 ]);
 
 function actualRegistrations() {

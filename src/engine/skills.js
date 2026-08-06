@@ -955,6 +955,13 @@
           log(game, actorName(game, actor) + '选择不发动【据守】。');
           return null;
         }
+        // W2 (第五轮审计 F6 的**反例**, 记录以免后人重踩):
+        // 本轮曾据 card__hero__wei.md:295 的（风）曹仁「摸**一张**牌」把这里
+        // 改成 1, 随后被对抗验证驳回 —— **（风）曹仁是另一张武将牌**: 它是
+        // 据守(摸一张) + **【解围】** 的双技重做版 (:297)。摸三张对应的是
+        // 单技曹仁 (旧风/1V1/3V3/国-标 四个版本一致, :301/:305/:309/:313),
+        // 而本仓的曹仁正是单技卡。只挑技能行不看整张牌的技能集去换版本,
+        // 得到的是一个**任何官方版本都不存在**的弱化曹仁。已还原为摸三张。
         drawCards(game, actor, 3);
         state.turnedOver = !state.turnedOver;
         log(game, actorName(game, actor) + '发动【据守】，摸三张牌并将武将牌' + (state.turnedOver ? '翻面。' : '翻回正面。'));
@@ -4112,11 +4119,23 @@
 
         function finishLeijiJudgement(game, actor, targetActor, leijiJudge) {
           var target = game[targetActor];
-          var hit = !!(leijiJudge && leijiJudge.suit === 'spade');
+          // W2 (F6 同源): 雷击原按**旧风/3V3/国-标**版落地 (黑桃 / 2 点雷电);
+          // 张角的**风**版是 card__hero__neutral.md:272
+          // 「…令一名其他角色判定，若结果为**黑色**，你对其造成 **1** 点雷电
+          //   伤害，若如此做，当你造成此伤害时，你**回复 1 点体力**。」
+          // 三处差异 (花色闸 / 伤害量 / 回血) 一并按风版更正。
+          // 花色读裸 color: judge() 已对判定归属者施加过红颜视图 (黑桃视红桃),
+          // 这里再走 effectiveCardColor 会二次施加。与旧代码读裸 .suit 同口径。
+          var hit = !!(leijiJudge && leijiJudge.color === 'black');
           resolveJudgementCard(game, targetActor, target, '【雷击】', leijiJudge);
           if (hit) {
-            log(game, '【雷击】判定为黑桃，' + actorName(game, targetActor) + '受到 2 点雷电伤害。');
-            damage(game, targetActor, 2, actor, '【雷击】', null, 'thunder');
+            log(game, '【雷击】判定为黑色，' + actorName(game, targetActor) + '受到 1 点雷电伤害。');
+            damage(game, targetActor, 1, actor, '【雷击】', null, 'thunder');
+            var source = game[actor];
+            if (source && source.hp > 0 && source.hp < source.maxHp) {
+              source.hp += 1;
+              log(game, actorName(game, actor) + '因【雷击】回复 1 点体力（现为 ' + source.hp + '）。');
+            }
           } else {
             log(game, '【雷击】判定未中。');
           }
@@ -4705,8 +4724,10 @@
         SkillRuntime.registerSkill(skillRegistry, 'lieren', {
         onShaDamageDealt: function (context) { return triggerLierenShaDamageDealt(context); }
       });
+        // W2 (F7): 暴虐是**来源侧**"造成伤害后"时机 → 挂 onDamageDealt
+        // (不受"受害者存活"闸约束), 而不是受害侧的 onDamageAfter。
         SkillRuntime.registerSkill(skillRegistry, 'baonue', {
-        onDamageAfter: function (context) { return triggerBaonueDamageAfter(context); }
+        onDamageDealt: function (context) { return triggerBaonueDamageAfter(context); }
       });
         SkillRuntime.registerSkill(skillRegistry, 'haoshi', {
         onDrawPhase: function (context) { return triggerHaoshiDrawPhase(context); }

@@ -270,6 +270,19 @@
       var targetState = game[damageContext.targetActor];
       var sourceCardClaimed = false;
       var targetAlive = targetState && targetState.hp > 0;
+      // W2 (第五轮审计 F7, 高): "造成伤害后" 是**来源侧**时机, 与"受到伤害后"
+      // 的**受害侧**时机是两码事 —— 前者不关心受害者死没死。
+      // 暴虐 (董卓主公技) 官方逐字: 「每当其他角色**造成伤害后**, 若其于受到此
+      // 伤害的角色因受到此伤害而扣减体力前为群势力角色, 来源可以判定…」
+      // (card__hero__neutral.md:185)。此前它挂在 onDamageAfter 上, 而整条
+      // onDamageAfter 派发被 targetAlive 一起闸住 → **伤害一旦致死, 暴虐静默
+      // 失效**, 而这恰恰是它最常发生的场合。
+      // 不能简单去掉 targetAlive: 同挂 onDamageAfter 的 奸雄/反馈/刚烈/遗计/
+      // 节命/放逐/耀武 全是受害方技能, 死后不该再触发 (flow__damage.md:97)。
+      // 故拆出独立的来源侧时机 onDamageDealt, **不受 targetAlive 约束**。
+      if (game.phase !== 'gameover') {
+        SkillRuntime.runHook(skillRegistry, 'onDamageDealt', damageContext);
+      }
       if (game.phase !== 'gameover' && targetAlive) {
         var damageResults = SkillRuntime.runHook(skillRegistry, 'onDamageAfter', damageContext);
         for (var damageIndex = 0; damageIndex < damageResults.length; damageIndex += 1) {
