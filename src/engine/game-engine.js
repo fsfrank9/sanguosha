@@ -111,7 +111,17 @@
           game.pauseState.shuangxiongAsk.drawCount = drawContext.drawCount;
           return { suspended: true };
         }
-        return drawCards(game, actor, drawContext.drawCount);
+        // v15 U: 再起 (孟获) 同款摸牌阶段 ask。
+        if (game.pauseState && game.pauseState.zaiqiAsk && game.pendingChoice) {
+          game.pauseState.zaiqiAsk.drawCount = drawContext.drawCount;
+          return { suspended: true };
+        }
+        var drawnResult = drawCards(game, actor, drawContext.drawCount);
+        // v15 U: 好施的"然后"段必须在**摸牌完成之后**结算 (手牌数要含刚摸的
+        // 牌)。并列手牌最少时会开窗 → 摸牌阶段在此挂起, 由 resolver 收尾。
+        var haoshiOutcome = SkillDomain.settleHaoshi(game, actor);
+        if (haoshiOutcome && haoshiOutcome.suspendedForHaoshi) return { suspended: true };
+        return drawnResult;
       }
 
       // Skill preference toggle. Lets the player explicitly choose how an
@@ -1020,6 +1030,7 @@
         processDyingNext: DamageDyingRuntime.processDyingNext,
         // v15 U: 英魂"令其弃置 N 张"的被动弃牌选牌 (AIRuntime 后置装配,
         // 晚绑定包装 — 与 scoreCardForAI 同款先例)。
+        reshuffleIfNeeded: reshuffleIfNeeded,
         aiDiscardCandidates: function (game, seat) {
           return AIRuntime.aiDiscardCandidates
             ? AIRuntime.aiDiscardCandidates(game, seat) : null;
@@ -1154,6 +1165,10 @@
       // v15 U: 放逐 (曹丕) 选目标 / 英魂 (孙坚) 选项 + 目标。
       registerResponseKind('fangzhu-pick', resolveFangzhuPickChoice);
       registerResponseKind('yinghun-choice', resolveYinghunChoice);
+      // v15 U: 好施并列手牌最少时由鲁肃选受赠者 (rule__element.md:91 判例)。
+      registerResponseKind('haoshi-give', resolveHaoshiGiveChoice);
+      // v15 U: 再起 (孟获) 摸牌阶段真 ask (放弃摸牌换亮牌回血)。
+      registerResponseKind('zaiqi-ask', resolveZaiqiAskChoice);
       registerResponseKind('ganglie-fire', resolveGanglieFireChoice);
       registerResponseKind('ganglie-source-choice', resolveGanglieSourceChoice);
       registerResponseKind('qilin-pick', resolveQilinPickChoice);
@@ -1681,6 +1696,17 @@
       //     (不是无限制), 且只对兵粮寸断这一张牌名;
       //   - 其余 → 官方上限 1。
       // 返回 0 表示"本模式不限距离"(1v1 变体口径, 见 trickDistanceLimited)。
+      // v15 U: 帷幕的判据 — 目标持有帷幕 且 该牌是黑色锦囊牌。
+      // 颜色按"实际颜色"读 (effectiveCardColor 单点, 红颜等改色技能一致);
+      // 虚拟转化牌的颜色继承来源实体, 故"把黑色牌当锦囊使用"同样被挡。
+      function weimuBlocksCard(game, seat, card) {
+        var seatState = game[seat];
+        if (!seatState || !hasSkill(seatState, 'weimu')) return false;
+        if (!card) return false;
+        if (card.family !== 'trick' && card.family !== 'delayed') return false;
+        return StateRuntime.effectiveCardColor(seatState, card) === 'black';
+      }
+
       function trickDistanceLimitFor(game, actor, cardType) {
         if (!trickDistanceLimited(game)) return Infinity;
         if (ignoresTrickDistance(game[actor])) return Infinity;
@@ -1709,10 +1735,26 @@
         if (!card || !game[seat]) return false;
         var seatState = game[seat];
         if (typeof seatState.hp !== 'number' || seatState.hp <= 0) return false;
+        // v15 U: 帷幕 (贾诩, card__hero__neutral.md:201) — "锁定技，你不是
+        // 黑色锦囊牌的合法目标。"
+        //
+        // 取林版而非国-标版 (:217 "每当你成为黑色锦囊牌的目标时，你取消自己")
+        // —— 两者语义不同: 林版在**指定目标**阶段就排除, 国-标版是成为目标后
+        // 再取消 (会先经过"成为目标时"的时机)。见 spec 简报的变体裁定。
+        // 接在 isLegalCardTarget 这个单点上, 玩家出牌 / AI 出牌 / 多目标逐席 /
+        // 转化锦囊 / 延时锦囊放置 全部自动覆盖。
+        // "锦囊牌"含**延时**锦囊 (glossary__gamecard.md:41 明写"延时类锦囊牌"),
+        // 故【闪电】也被挡 —— 贾诩不能把闪电放进自己判定区 (官方直接后果)。
+        if (weimuBlocksCard(game, seat, card)) return false;
         if (seat === actor) {
           // 自指: 桃 (已受伤) / 酒 (本实现仅自己, 见下方非自指分支注) /
           // 无中生有 / 闪电 (判定区无同名)
-          if (card.type === 'tao') return seatState.hp < seatState.maxHp;
+          if (card.type === 'tao') {
+            // v15 U: 完杀 (贾诩) — 贾诩回合内, 不处于濒死状态的其他角色不能
+            // 使用【桃】(含出牌阶段自己回血)。
+            if (StateRuntime.wanshaBlocksTaoUse(game, actor)) return false;
+            return seatState.hp < seatState.maxHp;
+          }
           if (card.type === 'jiu') return !(seatState.flags && seatState.flags.jiuUsedThisTurn);
           if (card.type === 'wuzhong') return true;
           if (card.type === 'shandian') {
@@ -2442,6 +2484,42 @@
         return finishDrawPhaseAndAdvance(game, actor);
       }
 
+      // v15 U: 好施受赠者 resolver — 并列手牌最少时由鲁肃选 (官方判例
+      // rule__element.md:91)。窗口开在摸牌阶段内, 收尾后推进到出牌阶段。
+      function resolveHaoshiGiveChoice(game, pending, decision) {
+        var legal = (pending.candidates || []).map(function (entry) { return entry.seat; });
+        var seat = resolveSeatOption(game, decision && decision.target);
+        if (!seat || legal.indexOf(seat) < 0) {
+          setPendingChoice(game, pending);
+          return fail('请从手牌最少的角色中选择一名接受【好施】。');
+        }
+        SkillDomain.applyHaoshiGive(game, pending.actor, seat, pending.giveCount || 0);
+        if (game.turn === pending.actor && game.phase === 'draw') {
+          return finishDrawPhaseAndAdvance(game, pending.actor);
+        }
+        return success('好施结算完成。');
+      }
+
+      // v15 U: 再起 ask resolver — { decline } / 空决策 = 放弃发动照常摸牌;
+      // 其余即发动 (放弃摸牌 → 亮 X 张 → 回血 → 获得非红桃)。
+      function resolveZaiqiAskChoice(game, pending, decision) {
+        var saved = game.pauseState && game.pauseState.zaiqiAsk;
+        if (!saved) return fail('找不到【再起】询问的暂停状态。');
+        var actor = pending.actor;
+        game.pauseState.zaiqiAsk = null;
+        if (decision && (decision.decline || decision.skip)) {
+          log(game, actorName(game, actor) + '选择不发动【再起】。');
+          drawCards(game, actor, saved.drawCount == null ? 2 : saved.drawCount);
+        } else {
+          SkillDomain.applyZaiqi(game, actor, saved.x || 1);
+        }
+        var haoshiAfter = SkillDomain.settleHaoshi(game, actor);
+        if (haoshiAfter && haoshiAfter.suspendedForHaoshi) {
+          return success('等待【好施】选择受赠角色。');
+        }
+        return finishDrawPhaseAndAdvance(game, actor);
+      }
+
       function finishPlayPhase(game) {
         var pendingGuard = pendingChoiceGuard(game);
         if (pendingGuard) return pendingGuard;
@@ -2896,7 +2974,10 @@
         // v15 T (火包): 火计 → 火攻 / 连环 → 铁索连环 / 双雄 → 决斗
         { asType: 'huogong', asName: '火攻' },
         { asType: 'tiesuo', asName: '铁索连环' },
-        { asType: 'juedou', asName: '决斗' }
+        { asType: 'juedou', asName: '决斗' },
+        // v15 U (林包): 断粮 → 兵粮寸断 / 酒池 → 酒
+        { asType: 'bingliang', asName: '兵粮寸断' },
+        { asType: 'jiu', asName: '酒' }
       ];
 
       function listCardConversions(game, actor, cardOrId) {

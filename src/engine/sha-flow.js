@@ -942,7 +942,14 @@
         // 天香 ask 挂起时回调随重入结算延迟触发, 时序与决策一致。
         damage(game, targetActor, amount, actor, '【' + card.name + '】', card, null, {
           afterDamageSettled: function (g, landed) {
-            if (landed) applyWeaponHitEffects(g, actor, targetActor);
+            if (!landed) return;
+            applyWeaponHitEffects(g, actor, targetActor);
+            // v15 U: "每当你使用【杀】对目标角色造成伤害后" (祝融【烈刃】)。
+            // 挂在 landed 回调里 —— 被天香转移/被防具防止时不触发, 与麒麟弓
+            // 那类"对目标角色造成伤害时"的命中特效同一判据。
+            SkillRuntime.runHook(skillRegistry, 'onShaDamageDealt', {
+              game: g, actor: actor, targetActor: targetActor, card: card, amount: amount
+            });
           }
         });
         return success(target.name + '受到攻击。');

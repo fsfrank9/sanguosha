@@ -583,7 +583,12 @@
       if (!responderState || !dyingState) return null;
       var pref = (responderState.skillPreferences && responderState.skillPreferences.dying)
         || (responder === 'player' ? 'ask' : 'auto');
-      var taoCards = (responderState.hand || []).filter(function (c) { return c && c.type === 'tao'; });
+      // v15 U: 完杀 (贾诩) — 贾诩回合内, 不处于濒死状态的其他角色不能使用
+      // 【桃】。濒死者本人不受限 (逐字"不处于濒死状态的其他角色");【酒】不是
+      // 【桃】, 不禁; 急救是"将红色牌当【桃】使用", 属使用【桃】→ 同样禁。
+      var wanshaBlocked = StateRuntime.wanshaBlocksTaoUse(game, responder, dyingActor);
+      var taoCards = wanshaBlocked ? []
+        : (responderState.hand || []).filter(function (c) { return c && c.type === 'tao'; });
       var jiuCards = (responder === dyingActor)
         ? (responderState.hand || []).filter(function (c) { return c && c.type === 'jiu'; })
         : [];
@@ -592,7 +597,7 @@
       //   触发条件: responder 装 jijiu + game.turn !== responder + 手牌有非桃非酒的红色牌
       //   救援目标: 任意 (含他人)
       var jijiuCards = [];
-      if (hasSkill(responderState, 'jijiu') && game.turn !== responder) {
+      if (!wanshaBlocked && hasSkill(responderState, 'jijiu') && game.turn !== responder) {
         var jijiuRed = function (c) {
           return c && c.color === 'red' && c.type !== 'tao' && c.type !== 'jiu';
         };
@@ -609,7 +614,8 @@
       var guhuoRescue = pref === 'ask' && deps.guhuoResponsePossible
         && deps.guhuoResponsePossible(game, responder);
       if (!taoCards.length && !jiuCards.length && !jijiuCards.length && !guhuoRescue) {
-        log(game, actorName(game, responder) + '没有可用的【桃】/【酒】，无法救援。');
+        log(game, actorName(game, responder)
+          + (wanshaBlocked ? '受【完杀】限制，不能使用【桃】救援。' : '没有可用的【桃】/【酒】，无法救援。'));
         return { skipped: true };
       }
       if (pref === 'decline') {
