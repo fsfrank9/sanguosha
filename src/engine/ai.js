@@ -1063,6 +1063,49 @@
         }
       }
 
+      // ═════ v15 V (山包) 主动技启发 ═════
+      // 挑衅 (姜维): 稳赚 —— 对方要么替你出一张【杀】(你随后可用闪/护甲应付,
+      // 且消耗了对方一张杀), 要么白丢一张牌。血线见底时不主动招杀。
+      if (hasSkill(self, 'tiaoxin') && !self.flags.tiaoxinUsed && self.hp > 1) {
+        var txPool = StateRuntime.aliveSeats(game).filter(function (seat) {
+          return seat !== actor && StateRuntime.canReachWithSha(game, seat, actor)
+            && ((game[seat].hand || []).length > 0
+              || Object.keys(game[seat].equipment || {}).some(function (slot) {
+                return !!game[seat].equipment[slot];
+              }));
+        });
+        var txPick = StateRuntime.perceivedHostileFirstPool(game, actor, txPool)[0];
+        if (txPick) {
+          return { skillId: 'tiaoxin', cardIds: [], options: { target: txPick } };
+        }
+      }
+
+      // 直谏 (张昭张纮): 把手里的装备牌塞给**感知友方**换一张牌 —— 送给敌人
+      // 等于资敌 (给他武器/防具), 所以没有友方就不发动。1v1 恒无友方 → no-op。
+      if (hasSkill(self, 'zhijian')) {
+        var zjEquip = (self.hand || []).find(function (card) { return card.family === 'equipment'; });
+        var zjFriend = StateRuntime.aliveSeats(game).find(function (seat) {
+          return seat !== actor && !StateRuntime.perceivedHostile(game, actor, seat);
+        });
+        if (zjEquip && zjFriend) {
+          return { skillId: 'zhijian', cardIds: [zjEquip.id], options: { target: zjFriend } };
+        }
+      }
+
+      // 制霸 (孙策主公技, 由其他吴势力角色发起): 没赢才有收益 —— 收益归主公,
+      // 发起者只是"送牌"。所以只有感知友方的主公才值得发起, 且用最小的牌去拼
+      // (故意输) 把两张牌塞给主公。手牌太少时不发起 (自身牌荒优先自用)。
+      if (!self.flags.zhibaUsed && (self.hand || []).length >= 2) {
+        var zbLord = StateRuntime.aliveSeats(game).find(function (seat) {
+          return seat !== actor && game.roles && game.roles[seat] === '主公'
+            && hasSkill(game[seat], 'zhiba');
+        });
+        if (zbLord && self.camp === '吴' && !StateRuntime.perceivedHostile(game, actor, zbLord)
+            && deps.pindianEligible && deps.pindianEligible(game, actor, zbLord)) {
+          return { skillId: 'zhiba', cardIds: [], options: {} };
+        }
+      }
+
       // 观星: free information; fire once per turn whenever deck has cards.
       if (hasSkill(self, 'guanxing') && !self.flags.guanxingUsed && game.deck.length > 0) {
         return { skillId: 'guanxing', cardIds: [], options: {} };
