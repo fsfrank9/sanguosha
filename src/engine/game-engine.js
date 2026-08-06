@@ -1032,6 +1032,7 @@
         // 晚绑定包装 — 与 scoreCardForAI 同款先例)。
         reshuffleIfNeeded: reshuffleIfNeeded,
         playSha: function (game, a, card, opts) { return playSha(game, a, card, opts); },
+        removeFirstCardOfType: removeFirstCardOfType,
         aiDiscardCandidates: function (game, seat) {
           return AIRuntime.aiDiscardCandidates
             ? AIRuntime.aiDiscardCandidates(game, seat) : null;

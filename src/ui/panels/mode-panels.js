@@ -717,6 +717,19 @@
     // 决定高亮哪些座席, 点选确认后直调 useSkill。返回 false 表示当前无
     // 合法座席 → 调用方回退直调 (引擎会给出具体拒绝理由, 不静默)。
     var SEAT_TARGET_SKILLS = {
+      // v15 U (林包): 缔盟 — 选**两名**其他角色, 弃置张数 X 由两人手牌差
+      // 决定 (引擎按公开的手牌数自算, UI 不自行推断); 乱武是全场型限定技,
+      // 无目标点选, 走直调。
+      dimeng: {
+        label: '缔盟',
+        min: 2,
+        max: 2,
+        hint: '缔盟：点击两名其他角色（弃置张数 = 两人手牌数之差）',
+        eligible: function (game, seat) {
+          return seat !== 'player' && game[seat] && game[seat].hp > 0;
+        },
+        optionsFor: function (seats) { return { targetA: seats[0], targetB: seats[1] }; }
+      },
       qiangxi: {
         label: '强袭',
         hint: '强袭：点击你攻击范围内的一名角色（成本为失去 1 点体力）',
@@ -749,14 +762,21 @@
         return seat !== 'player' && spec.eligible(game, seat);
       });
       if (!legalSeats.length) return false;
+      // v15 U: 需要点选**两名**角色的主动技 (缔盟) — needed/min/max 由 spec
+      // 给出, 组装 options 也交给 spec (缔盟传 targetA/targetB, 其余传 target)。
+      var needed = spec.min || 1;
+      if (legalSeats.length < needed) return false;
       startSeatPicker({
         legalSeats: legalSeats,
-        needed: 1,
+        needed: needed,
+        min: needed,
+        max: spec.max || needed,
         hintText: spec.hint,
         onComplete: function (seats) {
           var hpBefore = {};
           Engine.seatList(game).forEach(function (s) { hpBefore[s] = game[s].hp; });
-          var result = Engine.useSkill(game, 'player', skillId, [], { target: seats[0] });
+          var skillOptions = spec.optionsFor ? spec.optionsFor(seats) : { target: seats[0] };
+          var result = Engine.useSkill(game, 'player', skillId, [], skillOptions);
           if (!result.ok) game.log.push(result.message);
           Engine.seatList(game).forEach(function (s) {
             if (game[s].hp < hpBefore[s]) flashHero(s);

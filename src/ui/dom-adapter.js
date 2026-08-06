@@ -221,6 +221,15 @@
           'pindianPanel', 'pindianHint', 'pindianChoices',
           // v15 T 评审收口: 官方"你可以 / 你选择"的四个决策面。
           'niepanPanel', 'niepanHint', 'niepanConfirmBtn', 'niepanDeclineBtn',
+          // v15 U (林包) 六个决策窗
+          'benghuaiPanel', 'benghuaiHint', 'benghuaiHpBtn', 'benghuaiMaxHpBtn',
+          'fangzhuPanel', 'fangzhuHint', 'fangzhuChoices', 'fangzhuDeclineBtn',
+          'yinghunPanel', 'yinghunHint', 'yinghunOptions', 'yinghunChoices',
+          'yinghunConfirmBtn', 'yinghunDeclineBtn',
+          'haoshiPanel', 'haoshiHint', 'haoshiChoices',
+          'zaiqiPanel', 'zaiqiHint', 'zaiqiConfirmBtn', 'zaiqiDeclineBtn',
+          'luanwuPanel', 'luanwuHint', 'luanwuTargets', 'luanwuChoices',
+          'luanwuConfirmBtn', 'luanwuDeclineBtn',
           'shuangxiongPanel', 'shuangxiongHint', 'shuangxiongConfirmBtn', 'shuangxiongDeclineBtn',
           'quhuVictimPanel', 'quhuVictimHint', 'quhuVictimChoices',
           'jiemingPanel', 'jiemingHint', 'jiemingChoices', 'jiemingDeclineBtn',
@@ -1420,6 +1429,14 @@
         // v15 T 评审收口: 涅槃/双雄 是二选一按钮型; 驱虎受害者是必选
         // (赢已成事实, 伤害必落, 只是选谁 → 无 cancel); 节命可逐点放弃。
         { panelId: 'niepanPanel',           confirmBtnId: 'niepanConfirmBtn',       cancelBtnId: 'niepanDeclineBtn' },
+        // v15 U (林包): 崩坏是锁定技二选一 (无放弃出路, 两个按钮都在
+        // confirm/cancel 位); 好施受赠者必选 (点即提交); 其余可放弃。
+        { panelId: 'benghuaiPanel',         confirmBtnId: 'benghuaiHpBtn',          cancelBtnId: 'benghuaiMaxHpBtn' },
+        { panelId: 'fangzhuPanel',          confirmBtnId: null,                     cancelBtnId: 'fangzhuDeclineBtn' },
+        { panelId: 'yinghunPanel',          confirmBtnId: 'yinghunConfirmBtn',      cancelBtnId: 'yinghunDeclineBtn' },
+        { panelId: 'haoshiPanel',           confirmBtnId: null,                     cancelBtnId: null },
+        { panelId: 'zaiqiPanel',            confirmBtnId: 'zaiqiConfirmBtn',        cancelBtnId: 'zaiqiDeclineBtn' },
+        { panelId: 'luanwuPanel',           confirmBtnId: 'luanwuConfirmBtn',       cancelBtnId: 'luanwuDeclineBtn' },
         { panelId: 'shuangxiongPanel',      confirmBtnId: 'shuangxiongConfirmBtn',  cancelBtnId: 'shuangxiongDeclineBtn' },
         { panelId: 'quhuVictimPanel',       confirmBtnId: null,                     cancelBtnId: null },
         { panelId: 'jiemingPanel',          confirmBtnId: null,                     cancelBtnId: 'jiemingDeclineBtn' },

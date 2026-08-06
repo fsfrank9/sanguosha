@@ -51,6 +51,8 @@
         var isNormalTrickCard = deps.isNormalTrickCard;
         var randomSuit = deps.randomSuit;
         var removeOwnCardFromAnyZone = deps.removeOwnCardFromAnyZone;
+        // v15 U: 乱武逐席取杀
+        var removeFirstCardOfType = deps.removeFirstCardOfType;
         var removeTargetZoneCard = deps.removeTargetZoneCard;
         var restoreZhuqueIdentity = deps.restoreZhuqueIdentity;
         var selectActiveSkillResult = deps.selectActiveSkillResult;
