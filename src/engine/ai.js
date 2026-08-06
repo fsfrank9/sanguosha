@@ -559,7 +559,8 @@
       // 酒: 仅当持手中有可用杀且本回合未出过杀 → buff 杀; 否则浪费。
       // v12 I1: 酒+杀 可致死目标 (hp<=2) → 处决连招优先级抬高。
       if (card.type === 'jiu') {
-        var hasShaToBoost = !self.usedSha && self.hand.some(function (c) { return isShaType(c.type); });
+        var hasShaToBoost = StateRuntime.shaUseAllowed(self)
+          && self.hand.some(function (c) { return isShaType(c.type); });
         if (!hasShaToBoost) return -10;
         if (aiFeatureOn(game, actor, 'killPressure') && target && target.hp <= 2
             && aiFoeEstimate(game, actor, foeSeat, 'shan') < 1) {
@@ -573,7 +574,9 @@
       // 半开区间 — 对整数输入与旧 ===0/===1 判定逐值一致)。
       // v12 I1: 处决线 — 目标命悬 (含酒 buff 可致死) 且闪面稀薄 → 最高优先。
       if (isShaType(card.type)) {
-        if (self.usedSha && !canUseUnlimitedSha(self)) return -100;
+        // 评审收口 [中]: 与引擎闸门同口径 (shaUseAllowed) — 否则天义赢后
+        // 引擎放行第二张杀而 AI 评分恒 -100, 额外次数永远用不上。
+        if (!StateRuntime.shaUseAllowed(self)) return -100;
         var targetShans = aiFoeEstimate(game, actor, foeSeat, 'shan');
         if (aiFeatureOn(game, actor, 'killPressure')) {
           var killReach = 1 + (self.shaBonus || 0);

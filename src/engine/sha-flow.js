@@ -139,12 +139,23 @@
       // v14 P2: UI/AI 选目标时点的前置查询 — 牌尚在手牌中: 装备方天 + 该杀
       // 是仅剩的一张手牌 → 额外目标上限 2, 否则 0。(转化杀的 UI 侧暂不
       // 走多目标, 引擎侧由 fangtianShaEligible 在使用时点复核。)
+      // v15 T 评审收口 [中]: 天义的"额外目标数上限 +1"此前只落在
+      // normalizeMultiTargets 的结算层, 这条前置查询没接 → UI 多目标点选
+      // 与 AI 的额外目标启发都拿不到天义加成 (裸 API 才用得上)。方天与
+      // 天义可叠加 (两者都是"额外目标数上限 +N", 官方无互斥)。
       function shaExtraTargetLimit(game, actor, cardId) {
         var self = game[actor];
-        if (!self || !hasEquipmentEffect(self, 'fangtianLastHandBonus')) return 0;
+        if (!self) return 0;
         var hand = self.hand || [];
-        if (hand.length !== 1 || !hand[0] || hand[0].id !== cardId) return 0;
-        return isShaCard(hand[0]) ? 2 : 0;
+        if (hand.length !== 1 || !hand[0] || hand[0].id !== cardId || !isShaCard(hand[0])) {
+          // 方天资格要求"仅剩的一张手牌", 天义不要求 — 非独张时只给天义。
+          var loose = (hand || []).some(function (card) {
+            return card && card.id === cardId && isShaCard(card);
+          });
+          return loose ? tianyiExtraTargets(self) : 0;
+        }
+        return (hasEquipmentEffect(self, 'fangtianLastHandBonus') ? 2 : 0)
+          + tianyiExtraTargets(self);
       }
 
       // ── v14 P1: 多目标校验 — 逐席复用单目标合法性矩阵 (座席/自己/亡者/
@@ -166,10 +177,16 @@
           targets.push(resolved);
         }
         if (!targets.length) return { error: '没有合法的【杀】目标。' };
-        var extraLimit = (fangtianShaEligible(game, actor, card) ? 2 : 0)
-          + tianyiExtraTargets(game[actor]);
+        // 评审收口 [低 L5]: 拒绝文案此前把额外数一律记在方天名下 — 只有
+        // 天义加成时会写成"方天画戟额外 1"。改为逐来源列名。
+        var fangtianExtra = fangtianShaEligible(game, actor, card) ? 2 : 0;
+        var tianyiExtra = tianyiExtraTargets(game[actor]);
+        var extraLimit = fangtianExtra + tianyiExtra;
         if (targets.length > 1 + extraLimit) {
-          return { error: '【杀】目标数超过上限（额定 1' + (extraLimit ? ' + 方天画戟额外 ' + extraLimit : '') + '）。' };
+          var sources = [];
+          if (fangtianExtra) sources.push('方天画戟额外 ' + fangtianExtra);
+          if (tianyiExtra) sources.push('天义额外 ' + tianyiExtra);
+          return { error: '【杀】目标数超过上限（额定 1' + (sources.length ? ' + ' + sources.join(' + ') : '') + '）。' };
         }
         for (var vi = 0; vi < targets.length; vi += 1) {
           var protection = cardTargetProtection(game, actor, targets[vi], card, '杀');
@@ -798,12 +815,23 @@
           // 到此处的 dodged 恒为"闪抵消" — 仁王盾/藤甲免疫在开窗前已短路
           // 返回; 八卦"视为使用的闪"与护驾代打"视为你使用"均计 (官方
           // card__equipment.md:123 / card__hero__wei.md:13 逐字)。
-          SkillRuntime.runHook(skillRegistry, 'onShaDodged', {
+          var dodgeHookResults = SkillRuntime.runHook(skillRegistry, 'onShaDodged', {
             game: game, actor: actor, targetActor: targetActor, card: card, amount: amount
           });
           // 玩家席猛进经 pendingChoice 选牌 → 挂起, 由 resolver 续跑本段
           // 剩余流程 (青龙续杀 + 结算收尾)。
-          if (game.pendingChoice) {
+          //
+          // 评审收口 [高]: 判据必须是"本次钩子自己挂起了", 不能是
+          // `game.pendingChoice` — 闪响应本身就可能已挂起一个与猛进无关的
+          // 窗口 (consumeResponse 派发 onShanUsed → 张角雷击对玩家席开
+          // 'leiji-ask')。以 pendingChoice 为判据时, **局内没有庞德也会早退**,
+          // 而 shaDodgeResume 只有 resolveMengjinPickChoice 认 → 该【杀】永不
+          // settleShaCardAfterOutcome, 从所有区域消失 (守恒 census 因深扫
+          // pauseState 反而"通过"), 青龙续杀被静默吞掉。
+          var mengjinSuspended = dodgeHookResults.some(function (entry) {
+            return entry && entry.result && entry.result.suspendedForMengjin;
+          });
+          if (mengjinSuspended) {
             if (!game.pauseState) game.pauseState = {};
             game.pauseState.shaDodgeResume = {
               actor: actor, targetActor: targetActor, card: card, amount: amount
@@ -972,6 +1000,8 @@
       advanceShaChain: advanceShaChain,
       shaExtraTargetLimit: shaExtraTargetLimit,
       fangtianShaEligible: fangtianShaEligible,
+      // v15 T 评审收口: 转化杀多目标前置检查复用同一算式 (game-engine)
+      tianyiExtraTargets: tianyiExtraTargets,
       resolveLiuliTransferChoice: resolveLiuliTransferChoice
     };
   }

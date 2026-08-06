@@ -358,8 +358,11 @@
       // 既有 乐/拆/杀 三型路径逐字不变, 零回归)。
       if (CONVERSION_SEAT_TYPES[asType]) {
         var convLegal = (Engine.legalTargetsForCard && card)
+          // 评审收口 [低 L3]: 不再一律排除玩家自己 — 合法性交给引擎的
+          // isLegalCardTarget 单点 (铁索可指自己, 火攻/决斗的自指面由
+          // 谓词自己拒), UI 不再自带一层口径。
           ? Engine.aliveSeats(game).filter(function (seat) {
-            return seat !== 'player' && Engine.isLegalCardTarget
+            return Engine.isLegalCardTarget
               && Engine.isLegalCardTarget(game, 'player', virtualForConversion(asType, card), seat);
           })
           : [];

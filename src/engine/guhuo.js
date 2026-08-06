@@ -22,6 +22,7 @@
 // docs/audit/2026-08-05-guhuo-spec-gaps.md), 按正文全体其他存活角色可
 // 质疑, 缠怨持有者锁定除外。
 import { StateRuntime } from './state.js';
+import { CardRuntime } from './card-runtime.js';
 
 export function createGuhuoRuntime(deps) {
   var log = deps.log;
@@ -189,7 +190,7 @@ export function createGuhuoRuntime(deps) {
     var isTrue = physical.type === gh.declareType;
     var verb = gh.flow === 'use' ? '使用' : '打出';
     log(game, actorName(game, gh.actor) + '亮出盖置的牌：【' + physical.name + '】'
-      + (physical.suitLabel || physical.suit || '') + (physical.rank || '') + '。');
+      + CardRuntime.suitLabelOf(physical) + (physical.rank || '') + '。');
     noteGuhuoReveal(game, gh.actor, isTrue, !!challenger);
 
     if (challenger && !isTrue) {
@@ -392,7 +393,7 @@ export function createGuhuoRuntime(deps) {
     var actor = gh.actor;
     var isTrue = physical.type === gh.declareType;
     log(game, actorName(game, actor) + '亮出盖置的牌：【' + physical.name + '】'
-      + (physical.suitLabel || physical.suit || '') + (physical.rank || '') + '。');
+      + CardRuntime.suitLabelOf(physical) + (physical.rank || '') + '。');
     noteGuhuoReveal(game, actor, isTrue, !!challenger);
 
     if (challenger && !isTrue) {

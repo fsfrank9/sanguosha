@@ -181,6 +181,16 @@
     return card && typeof card === 'object' ? card.id : card;
   }
 
+  // v15 T 评审收口 [低 L1]: 日志里的花色名。牌上从来没有 `suitLabel` 字段
+  // (UI 侧另有 ♠♥♣♦ 徽章函数, 但引擎日志够不着), 于是 `card.suitLabel ||
+  // card.suit` 的写法一律落到英文 suit —— 乱击会打出"将两张 heart 手牌当
+  // 【万箭齐发】"。引擎日志统一走本函数。
+  var SUIT_LABELS = { spade: '黑桃', heart: '红桃', club: '梅花', diamond: '方片' };
+  function suitLabelOf(cardOrSuit) {
+    var suit = cardOrSuit && typeof cardOrSuit === 'object' ? cardOrSuit.suit : cardOrSuit;
+    return SUIT_LABELS[suit] || suit || '';
+  }
+
   // 定位一张牌当前所在的区域描述符; 在途 (不在任何区域) 返回 null。
   // v12 H 复核修复: 座席遍历泛化 (此前硬编码 player/enemy 两席, 对第三席的
   // 手牌/判定区/装备返回 null → moveCard(from=null) 用于第三席时静默失败;
@@ -215,6 +225,52 @@
       }
     }
     return null;
+  }
+
+  // v15 T 评审收口 [中]: findCardZone 按 **id** 比对, 而转化虚拟牌与其
+  // 来源实体同 id — 「拒绝路径把 handler 收到的虚拟牌退回手牌」时, 按 id
+  // 的落地判定会误判"来源已归位"而不回滚, 结果公开区里的牌面身份被永久
+  // 改写 (守恒 census 同样按 id, 察觉不到)。凡是要区分"是不是**这一个**
+  // 对象"的场合, 必须用本函数。
+  function findCardZoneByRef(game, cardObject) {
+    if (!cardObject || typeof cardObject !== 'object') return null;
+    var seats = (game && game.seats && game.seats.length) ? game.seats : ['player', 'enemy'];
+    var refs = [{ zone: 'deck' }, { zone: 'discard' }];
+    for (var a = 0; a < seats.length; a += 1) {
+      refs.push({ zone: 'hand', actor: seats[a] });
+      refs.push({ zone: 'judgeArea', actor: seats[a] });
+      refs.push({ zone: 'chuang', actor: seats[a] });
+    }
+    for (var i = 0; i < refs.length; i += 1) {
+      var list = zoneArrayOf(game, refs[i]);
+      if (!list) continue;
+      if (list.indexOf(cardObject) >= 0) return refs[i];
+    }
+    for (var b = 0; b < seats.length; b += 1) {
+      var equipment = game[seats[b]] && game[seats[b]].equipment;
+      if (!equipment) continue;
+      for (var s = 0; s < EQUIP_SLOTS.length; s += 1) {
+        if (equipment[EQUIP_SLOTS[s]] === cardObject) {
+          return { zone: 'equipment', actor: seats[b], slot: EQUIP_SLOTS[s] };
+        }
+      }
+    }
+    return null;
+  }
+
+  // 把某个具体对象从它所在的区域摘掉 (按对象身份, 非 id); 返回是否摘到。
+  function removeCardRefFromZones(game, cardObject) {
+    var ref = findCardZoneByRef(game, cardObject);
+    if (!ref) return false;
+    if (ref.zone === 'equipment') {
+      game[ref.actor].equipment[ref.slot] = null;
+      return true;
+    }
+    var list = zoneArrayOf(game, ref);
+    var idx = list ? list.indexOf(cardObject) : -1;
+    if (idx < 0) return false;
+    list.splice(idx, 1);
+    return true;
   }
 
   // 把牌从 from 区域移出并返回实体牌; 不在该区域返回 null。
@@ -292,7 +348,10 @@
     isNormalTrickCard: isNormalTrickCard,
     physicalCardOf: physicalCardOf,
     cardRankValue: cardRankValue,
+    suitLabelOf: suitLabelOf,
     findCardZone: findCardZone,
+    findCardZoneByRef: findCardZoneByRef,
+    removeCardRefFromZones: removeCardRefFromZones,
     takeCard: takeCard,
     putCard: putCard,
     moveCard: moveCard,

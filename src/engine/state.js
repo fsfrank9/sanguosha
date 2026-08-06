@@ -343,6 +343,18 @@
     return distanceBetween(game, actor, targetActor) <= weaponRange(game[actor]);
   }
 
+  // v15 T 评审收口 [中]: **使用【杀】** 的距离面 ≠ 攻击范围面。
+  // 天义拼点赢是"于此回合内使用【杀】无距离限制" (card__hero__wu.md:355) —
+  // 只放宽前者; 强袭/驱虎/借刀/濒死求助那类"攻击范围内的角色"仍读裸的
+  // canReachWithSha。此前该加成只落在 playSha 的结算层, 目标枚举面
+  // (isLegalCardTarget → UI 高亮 / AI aiShaTargetSeat) 没接 → 官方三项
+  // 收益里 UI/AI 实际只拿得到"额外次数 +1"。
+  function shaUseReachAllowed(game, actor, targetActor) {
+    var self = game[actor];
+    if (self && self.flags && self.flags.tianyiWon) return true;
+    return canReachWithSha(game, actor, targetActor);
+  }
+
   // v13 L1 (硬缺陷修复): 此前只查 player/enemy 两个字面键 — 身份轮转后
   // 主公可落任意座席 (ally/ally2/ally3), 先手会错判回 fallback。改为按
   // seats 座次序扫描 (兼容旧 2 参调用: seats 传数组之外的值时走缺省环)。
@@ -444,6 +456,7 @@
     weaponRange: weaponRange,
     distanceBetween: distanceBetween,
     canReachWithSha: canReachWithSha,
+    shaUseReachAllowed: shaUseReachAllowed,
     firstActorFromRoles: firstActorFromRoles,
     handLimit: handLimit,
     effectiveCardSuit: effectiveCardSuit,

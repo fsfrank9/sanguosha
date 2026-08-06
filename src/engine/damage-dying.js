@@ -434,11 +434,20 @@
         // (不屈掀"创"), 回复至 1 即脱离濒死; 失败才进入其桃/酒自救。
         if (responder === dyingActor && !saved.dyingEnterFired) {
           saved.dyingEnterFired = true;
-          SkillRuntime.runHook(skillRegistry, 'onDyingEnter', {
+          var dyingEnterResults = SkillRuntime.runHook(skillRegistry, 'onDyingEnter', {
             game: game,
             dyingActor: dyingActor,
             sourceActor: saved.source
           });
+          // v15 T 评审收口 [中]: "处于濒死状态时"的**可选**技能 (涅槃) 对
+          // 玩家席开窗询问 → 本轮挂起, 由该窗的 resolver 重入 processDyingNext
+          // (dyingEnterFired 已置位, 不会重复开窗)。判据取钩子自身的挂起
+          // 信号, 不看 game.pendingChoice (H1 同款教训)。
+          if (dyingEnterResults.some(function (entry) {
+            return entry && entry.result && entry.result.suspendedForNiepan;
+          })) {
+            return { paused: true };
+          }
           if (dyingState.hp >= 1) {
             log(game, actorName(game, dyingActor) + '脱离濒死状态。');
             game.pauseState.dying = null;
@@ -806,6 +815,9 @@
       damage: damage,
       enterDying: enterDying,
       resolveDyingRescueChoice: resolveDyingRescueChoice,
+      // v15 T 评审收口: 濒死循环的重入口 — "处于濒死状态时"的可选技能
+      // (涅槃) ask 挂起后, 由其 resolver 调本函数续跑。
+      processDyingNext: processDyingNext,
       // v13 J3: 天香 ask 询问 resolver (引擎中央注册表登记)。
       resolveTianxiangAskChoice: resolveTianxiangAskChoice,
       // v12 H 复核修复: 铁索传导队列被濒死救援挂起后的续跑入口。

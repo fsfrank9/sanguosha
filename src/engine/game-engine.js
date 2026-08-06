@@ -990,6 +990,9 @@
       // registerResponseKind 注册块 / processPreparePhase / 导出表零改动。
       var SkillDomain = installStandardSkillHandlers(skillRegistry, {
         hasSkill: hasSkill,
+        // v15 T 评审收口: 涅槃 ask 挂起后重入濒死循环 (DamageDyingRuntime
+        // 早于本处装配, 直绑即可)。
+        processDyingNext: DamageDyingRuntime.processDyingNext,
         // v15 T: 拼点 (驱虎/天义) — 发起入口与效果注册 (拼点域后置装配,
         // 包装注入)。
         startPindian: function (game, actor, targetActor, opts) {
@@ -1077,6 +1080,7 @@
       var getGuanxingPreview = SkillDomain.getGuanxingPreview;
       var resolveFankuiPickChoice = SkillDomain.resolveFankuiPickChoice;
       var resolveMengjinPickChoice = SkillDomain.resolveMengjinPickChoice;
+      var resolveNiepanAskChoice = SkillDomain.resolveNiepanAskChoice;
       var resolveYaowuRewardChoice = SkillDomain.resolveYaowuRewardChoice;
       var resolveGanglieFireChoice = SkillDomain.resolveGanglieFireChoice;
       var resolveGanglieSourceChoice = SkillDomain.resolveGanglieSourceChoice;
@@ -1102,6 +1106,9 @@
       registerResponseKind('fankui-pick', resolveFankuiPickChoice);
       // v15 T: 猛进 (庞德) 选牌窗 — resolver 收尾后续跑闪避分支剩余流程。
       registerResponseKind('mengjin-pick', resolveMengjinPickChoice);
+      // v15 T 评审收口: 涅槃 (庞统) 濒死询问窗 — 官方"你可以", 玩家席不再
+      // 无条件抢在【桃】窗口之前烧掉限定技。
+      registerResponseKind('niepan-ask', resolveNiepanAskChoice);
       registerResponseKind('ganglie-fire', resolveGanglieFireChoice);
       registerResponseKind('ganglie-source-choice', resolveGanglieSourceChoice);
       registerResponseKind('qilin-pick', resolveQilinPickChoice);
@@ -1643,9 +1650,16 @@
           if (card.type === 'shandian') {
             return !(seatState.judgeArea || []).some(function (judge) { return judge && judge.type === 'shandian'; });
           }
+          // 评审收口 [低 L3]: 【铁索连环】官方"使用目标：一至两名角色"
+          // (card__scroll.md:232) — 没有"其他"限定, 自己是合法目标 (横置
+          // 自己换连营/苦肉类收益是常规打法)。结算 handler 本就不排除自己,
+          // 只有这条枚举谓词漏了 → 连环转化铁索时玩家点不到自己。
+          if (card.type === 'tiesuo') return true;
           return false;
         }
-        if (isShaCard(card)) return canReachWithSha(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
+        // 评审收口 [中]: 使用【杀】的距离面走 shaUseReachAllowed (天义无
+        // 距离限制) — 这条正是 UI 高亮与 aiShaTargetSeat 读的谓词。
+        if (isShaCard(card)) return StateRuntime.shaUseReachAllowed(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
         if (card.type === 'tao') return false; // v13 J0-4: 出牌阶段【桃】目标恒为自己
         // v13 K2 (座席泛化桶销账): 【酒】使用方法Ⅰ按官方语义放开他指 —
         // gltjk card__basic.md:58 (军争/国-标) "使用目标: 包括你在内的一名
@@ -1759,6 +1773,11 @@
       }
 
       function recastHandCard(game, actor, cardId) {
+        // 评审收口 [中]: 与同族公开入口 (playCard / playCardAs / useSkill /
+        // endTurn / discardSelected) 同守卫 — UI 的重铸钮直调本函数, 缺守卫
+        // 时挂起中 (过河选牌/濒死…) 照样能弃一摸一。
+        var pendingGuard = pendingChoiceGuard(game);
+        if (pendingGuard) return pendingGuard;
         var self = game[actor];
         if (!self) return fail('未知角色。');
         if (game.turn !== actor || game.phase !== 'play') return fail('只能在自己的出牌阶段重铸。');
@@ -2492,7 +2511,14 @@
         cardIds = cardIds || [];
         if (!self) return fail('未知角色。');
         if (!hasEquipmentEffect(self, 'zhangbaTwoHandSha')) return fail('未装备【丈八蛇矛】。');
-        if (self.usedSha && !canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
+        // 评审收口 [中]: 丈八两手当杀是**使用**【杀】的又一入口, 次数/禁用闸
+        // 必须与 playCard / playCardAs / 诸葛连弩 同走 shaUseAllowed 单点 —
+        // 否则天义两个方向都错 (没赢的"本回合不能使用【杀】"被绕过, 赢的
+        // 额外次数用不上)。
+        if (!StateRuntime.shaUseAllowed(self)) {
+          return fail(self.flags && self.flags.tianyiLost
+            ? '【天义】拼点没赢，本回合不能使用【杀】。' : '本回合已经使用过【杀】。');
+        }
         if (cardIds.length !== 2) return fail('需要选择两张手牌。');
         var first = removeCardFromHand(self, cardIds[0]);
         var second = removeCardFromHand(self, cardIds[1]);
@@ -2607,12 +2633,15 @@
           // 逐席合法性全部在移牌前预判 (opus 实证: 此前 playShaMultiTarget
           // 移牌后拒绝无回滚, 来源实体凭空消失)。
           if (Array.isArray(options && options.targets) && options.targets.length > 1) {
-            if (hit.zone !== 'hand' || (self.hand || []).length !== 1
-                || !hasEquipmentEffect(self, 'fangtianLastHandBonus')) {
-              return fail('【杀】目标数超过上限（额定 1）。');
-            }
-            if (options.targets.length > 3) {
-              return fail('【杀】目标数超过上限（额定 1 + 方天画戟额外 2）。');
+            // 评审收口 [中]: 上限此前硬编码方天 → 天义赢后的转化杀 (武圣/
+            // 龙胆/火计…) 拿不到"额外目标数上限 +1"。改为与结算层
+            // (normalizeMultiTargets) 同一算式: 方天资格 2 + 天义 1。
+            var preFangtian = hit.zone === 'hand' && (self.hand || []).length === 1
+              && hasEquipmentEffect(self, 'fangtianLastHandBonus');
+            var preExtra = (preFangtian ? 2 : 0) + ShaFlowRuntime.tianyiExtraTargets(self);
+            if (preExtra <= 0) return fail('【杀】目标数超过上限（额定 1）。');
+            if (options.targets.length > 1 + preExtra) {
+              return fail('【杀】目标数超过上限（额定 1 + 额外 ' + preExtra + '）。');
             }
             var preVirtualSha = virtualShaFromCard(original);
             var preSeen = {};
@@ -2643,25 +2672,39 @@
           var trickResult = playCardWithRegisteredHandler(game, actor, virtualTrickCard, trickOptions, self);
           // 守恒兜底: handler 拒绝且实体不在任何区域 → 退回原区域
           // (playCardAs 的杀分支同款不变量)。
-          if (trickResult && !trickResult.ok && !findCardZone(game, original)) {
-            putCard(game, original, hit.zone === 'equipment'
-              ? { zone: 'equipment', actor: actor, slot: hit.slot }
-              : { zone: 'hand', actor: actor });
+          //
+          // 评审收口 [中]: 判据改按**对象身份**。handler 的拒绝路径退的是
+          // 它收到的虚拟牌 (与 original 同 id) — 按 id 的 findCardZone 会
+          // 误判"来源已归位"而不回滚, 手牌里那张【杀】就被永久换成了
+          // 【铁索连环】。铁索是唯一未在 playCardAs 前置解析目标的转化型,
+          // 故当前只有它可达; 判据修在共用出口上, 新增转化型天然免疫。
+          if (trickResult && !trickResult.ok) {
+            CardRuntime.removeCardRefFromZones(game, virtualTrickCard);
+            if (!CardRuntime.findCardZoneByRef(game, original)) {
+              putCard(game, original, hit.zone === 'equipment'
+                ? { zone: 'equipment', actor: actor, slot: hit.slot }
+                : { zone: 'hand', actor: actor });
+            }
           }
           return trickResult;
         }
         // v13 K2/K5: options 透传 + 前置解析出的合法目标显式传入 (缺省与
         // 显式路径均已过 isLegalCardTarget, playSha 内部校验恒通过,
         // 1v1 行为不变)。
-        var conversionShaResult = playSha(game, actor, virtualShaFromCard(original),
+        var conversionVirtualSha = virtualShaFromCard(original);
+        var conversionShaResult = playSha(game, actor, conversionVirtualSha,
           Object.assign({}, options, { target: asTargetActor }));
         // v14 P 评审收口兜底: 预检已覆盖全部已知拒绝面; 若未来新增校验令
         // playSha 在移牌后仍拒绝, 来源实体退回原区域 (在途还原), 不留
         // 守恒泄漏 (playShaCardHandler 同款)。
-        if (conversionShaResult && !conversionShaResult.ok && !findCardZone(game, original)) {
-          putCard(game, original, hit.zone === 'equipment'
-            ? { zone: 'equipment', actor: actor, slot: hit.slot }
-            : { zone: 'hand', actor: actor });
+        // v15 T 评审收口: 判据同上改按对象身份 (虚拟杀与来源同 id)。
+        if (conversionShaResult && !conversionShaResult.ok) {
+          CardRuntime.removeCardRefFromZones(game, conversionVirtualSha);
+          if (!CardRuntime.findCardZoneByRef(game, original)) {
+            putCard(game, original, hit.zone === 'equipment'
+              ? { zone: 'equipment', actor: actor, slot: hit.slot }
+              : { zone: 'hand', actor: actor });
+          }
         }
         return conversionShaResult;
       }
@@ -2914,6 +2957,10 @@
         makeTestCard: makeTestCard,
         newGame: newGame,
         distanceBetween: distanceBetween,
+        // v15 T 评审收口 [低 L2]: 攻击范围谓词的公开出口 — UI 的强袭座席
+        // 高亮读的就是 `Engine.canReachWithSha`, 而它此前没在公开面上 →
+        // 一路走 `: true` 兜底, 3+ 席场会把射程外座席也点亮 (点了才被拒)。
+        canReachWithSha: canReachWithSha,
         equipCard: equipCard,
         loseEquipment: loseEquipment,
         getTargetZoneCards: getTargetZoneCards,

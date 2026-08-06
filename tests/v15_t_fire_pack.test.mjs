@@ -273,7 +273,12 @@ test('涅槃: 限定技 — 濒死时弃区域所有牌, 武将牌复原, 摸三
   game.player.turnedOver = true;
   game.turn = 'enemy';
   game.enemy.hand = [c('sha', { id: 'e-kill' })];
-  assertCardConservation(game, () => Engine.playCard(game, 'enemy', 'e-kill', { target: 'player' }));
+  assertCardConservation(game, () => {
+    Engine.playCard(game, 'enemy', 'e-kill', { target: 'player' });
+    // 评审收口: 官方"你**可以**" → 玩家席开窗询问, 不再自动发动。
+    assert.equal(Engine.getPendingChoice(game).kind, 'niepan-ask', '玩家席开窗询问');
+    Engine.resolvePendingChoice(game, {});
+  });
   assert.equal(game.player.hp, 3, '体力回复至 3');
   assert.equal(game.player.hand.length, 3, '摸三张');
   assert.equal(game.player.equipment.weapon, null, '装备区清空');

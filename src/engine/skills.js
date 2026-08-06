@@ -432,7 +432,7 @@
           var removed = removeCardFromHand(self, card.id);
           if (removed) discardCard(game, removed);
         });
-        log(game, actorName(game, actor) + '发动【乱击】，将两张' + (picked[0].suitLabel || picked[0].suit)
+        log(game, actorName(game, actor) + '发动【乱击】，将两张' + CardRuntime.suitLabelOf(picked[0])
           + '手牌当【万箭齐发】使用。');
         return playCardWithRegisteredHandler(game, actor, virtualWanjian, context.options || {}, self);
       }
@@ -503,11 +503,38 @@
         if (!self || !hasSkill(self, 'niepan')) return null;
         self.flags = self.flags || {};
         if (self.flags.niepanUsed) return null;
-        var pref = (self.skillPreferences && self.skillPreferences.niepan) || 'auto';
+        // 评审收口 [中]: 官方"限定技，当你处于濒死状态时，你**可以**…"
+        // (card__hero__shu.md:324)。此前玩家席也是 auto → 濒死一进就把限定技
+        // 烧掉、连手上那张【桃】一起弃光, 玩家全程无提示。玩家席默认开窗询问
+        // (与突袭/遗计同款 ask 档), AI 席仍走 auto。
+        var pref = (self.skillPreferences && self.skillPreferences.niepan)
+          || (dyingActor === 'player' ? 'ask' : 'auto');
         if (pref === 'decline') {
           log(game, actorName(game, dyingActor) + '选择不发动【涅槃】。');
           return null;
         }
+        if (pref === 'ask') {
+          setPendingChoice(game, {
+            kind: 'niepan-ask',
+            actor: dyingActor,
+            handCount: (self.hand || []).length,
+            equipmentCount: ['weapon', 'armor', 'horseMinus', 'horsePlus']
+              .filter(function (slot) { return self.equipment && self.equipment[slot]; }).length,
+            judgeAreaCount: (self.judgeArea || []).length
+          });
+          log(game, '等待' + actorName(game, dyingActor) + '决定是否发动【涅槃】。');
+          return { suspendedForNiepan: true };
+        }
+        return applyNiepan(game, dyingActor);
+      }
+
+      // 涅槃的效果体 (限定技标记 → 弃区域所有牌 → 武将牌复原 → 摸三 →
+      // 体力回复至 3)。ask 档由 resolveNiepanAskChoice 调用。
+      function applyNiepan(game, dyingActor) {
+        var self = game[dyingActor];
+        if (!self) return null;
+        self.flags = self.flags || {};
+        if (self.flags.niepanUsed) return null;
         self.flags.niepanUsed = true;
         // ① 弃置区域里的所有牌
         (self.hand || []).slice().forEach(function (card) {
@@ -525,15 +552,48 @@
           var removed = takeCard(game, card, { zone: 'judgeArea', actor: dyingActor });
           if (removed) discardCard(game, removed);
         });
+        // 评审收口 [中]: 判定阶段里, 本角色尚未结算的延时锦囊已被
+        // processJudgeArea 整批 splice 成"在途" —— 但按官方它们仍在其判定区。
+        // 不认领就会出现"涅槃弃置了区域内所有牌, 然后那张【乐不思蜀】照常
+        // 生效"。认领后记进 claimed, 判定循环跳过它们。
+        var inFlight = game.pauseState && game.pauseState.judgeAreaInFlight;
+        if (inFlight && inFlight.actor === dyingActor) {
+          inFlight.pending.forEach(function (card) {
+            if (!card || inFlight.claimed.indexOf(card) >= 0) return;
+            if (CardRuntime.findCardZoneByRef(game, card)) return; // 已落回某区域, 上面已处理
+            inFlight.claimed.push(card);
+            discardCard(game, card);
+          });
+        }
         // ② 武将牌恢复至游戏开始时的状态 (翻回正面 + 解除横置)
         self.turnedOver = false;
         self.chained = false;
         // ③ 摸三张 ④ 体力回复至 3 点
         drawCards(game, dyingActor, 3);
-        self.hp = Math.min(self.maxHp, 3);
+        // 评审收口 [低 L6]: 官方逐字"将体力值**回复至3点**" — 体力值上限是
+        // 体力上限, 故取 min(maxHp, 3) 是对的; 但"回复"不应倒扣, 现有写法在
+        // hp 已 > 3 时会把体力打下来 (涅槃只在濒死即 hp<=0 时可发动, 当前
+        // 不可达; 变体 maxHp<3 时 min 同样正确)。改为只升不降。
+        self.hp = Math.max(self.hp, Math.min(self.maxHp, 3));
         log(game, actorName(game, dyingActor)
           + '发动【涅槃】：弃置区域内所有牌，武将牌复原，摸三张牌，体力回复至 ' + self.hp + ' 点。');
         return { niepanApplied: true };
+      }
+
+      // 涅槃 ask resolver — decision: { decline: true } / 其他即发动。
+      // 收尾后重入濒死循环 (dyingEnterFired 已置位, 不会重复开窗)。
+      function resolveNiepanAskChoice(game, pending, decision) {
+        var dyingActor = pending.actor;
+        if (decision && (decision.decline || decision.skip)) {
+          log(game, actorName(game, dyingActor) + '选择不发动【涅槃】。');
+        } else {
+          applyNiepan(game, dyingActor);
+        }
+        if (deps.processDyingNext) {
+          var outcome = deps.processDyingNext(game);
+          if (outcome && outcome.paused) return success('继续濒死结算。');
+        }
+        return success('涅槃结算完成。');
       }
 
       // ═════ v15 T (火包): 猛进 (庞德) ═════
@@ -3013,7 +3073,13 @@
           var self = context.state;
           if (!self || !hasSkill(self, 'jijiang')) return null;
           if (!game.roles || game.roles[actor] !== '主公') return fail('【激将】是主公技，须为主公才能发动。');
-          if (self.usedSha && !StateRuntime.canUseUnlimitedSha(self)) return fail('本回合已经使用过【杀】。');
+          // 评审收口 [中]: 与丈八同因 — 出杀入口一律走 shaUseAllowed 单点
+          // (激将与天义不同将, 当前不可达, 但闸门口径必须一致, 否则下一个
+          // 「本回合不能使用【杀】」类技能接进来时又会漏一处)。
+          if (!StateRuntime.shaUseAllowed(self)) {
+            return fail(self.flags && self.flags.tianyiLost
+              ? '【天义】拼点没赢，本回合不能使用【杀】。' : '本回合已经使用过【杀】。');
+          }
           var target = StateRuntime.resolveSeatOption(game, context.options && context.options.target);
           if (!target || target === actor) return fail('请为【激将】指定一名目标角色。');
           if (!game[target] || game[target].hp <= 0) return fail('目标已阵亡。');
@@ -3155,6 +3221,7 @@
           getGuanxingPreview: getGuanxingPreview,
           resolveFankuiPickChoice: resolveFankuiPickChoice,
           resolveMengjinPickChoice: resolveMengjinPickChoice,
+          resolveNiepanAskChoice: resolveNiepanAskChoice,
           resolveYaowuRewardChoice: resolveYaowuRewardChoice,
           resolveGanglieFireChoice: resolveGanglieFireChoice,
           resolveGanglieSourceChoice: resolveGanglieSourceChoice,
