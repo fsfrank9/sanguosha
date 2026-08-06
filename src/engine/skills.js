@@ -1489,6 +1489,8 @@
         var deadActor = context.deadActor;
         var results = [];
         StateRuntime.aliveSeats(game).forEach(function (seat) {
+          // W2 F5: 死亡时机改为按官方轮转序逐席派发 → 只处理轮到的那一席。
+          if (context.resolvingSeat && seat !== context.resolvingSeat) return;
           var state = game[seat];
           if (seat === deadActor || !state || !hasSkill(state, 'xingshang')) return;
           var pref = (state.skillPreferences && state.skillPreferences.xingshang)
@@ -2807,6 +2809,8 @@
         var game = context.game;
         var deadActor = context.deadActor;
         var killer = context.killerActor;
+        // W2 F5: 断肠的持有者就是死者本人 —— 只在轮到他那一席时结算。
+        if (context.resolvingSeat && context.resolvingSeat !== deadActor) return null;
         var dead = game[deadActor];
         if (!dead || !hasSkill(dead, 'duanchang')) return null;
         if (!killer || killer === deadActor || !game[killer]) return null;
@@ -4677,9 +4681,11 @@
         SkillRuntime.registerSkill(skillRegistry, 'beige', {
         onDamageAfter: function (context) { return triggerBeigeDamageAfter(context); }
       });
-        // v15 V: 断肠 (蔡文姬) 注册在 行殇 之前 —— runHook 按注册序执行,
-        // 而官方判例是"杀死断肠者的角色**先**失去所有技能", 曹丕杀死蔡文姬
-        // 时【行殇】已被夺走, 拿不到牌。序错就是两个方向都错。
+        // v15 V 曾靠注册序 (断肠先于行殇) 定顺序, 并把它写成官方判例 ——
+        // W2 F5 复核后确认那是**没有出处且方向判反**的断言。真正的官方规则是
+        // 同一时机从当前回合角色起按逆时针依次 (glossary__flow.md:30),
+        // 现由 damage-dying.js 的 runDeathTimingHooks 逐席派发决定,
+        // **注册序不再承载任何语义**。
         SkillRuntime.registerSkill(skillRegistry, 'duanchang', {
         onDeath: function (context) { return triggerDuanchangDeath(context); }
       });

@@ -203,4 +203,76 @@ test('W2 覆盖度: 39 个牌型逐个有使用出口 (自有 handler / 族共�
   assert.match(engineSrc, /只能用于响应，本版会自动打出/, 'playCard 对仅响应牌有显式拒绝');
 });
 
+// ───── W2: 放权/额外回合 逐字对照官方判例 ─────
+// glossary__flow.md 里有两条**逐字写死顺序**的判例, v15 V 实现时没找到它们
+// (当时只有技能行), 本轮审计翻到后补钉。两条都验中: 额外回合插在当前回合
+// 之后, 而**下一轮仍从原本的下家继续** —— 受赠者的额定回合照旧。
+//
+//   :21-26 「刘禅、A、B、C按行动顺序排列 … 刘禅发动【放权】令 A 获得一个
+//          额外的回合, 回合结束后开始进行 A 的额外回合, A 的额外回合结束后
+//          进行 A 的额定回合, A 的额定回合结束后按行动顺序 B、C 依次进行」
+//   :27   「令 B 获得一个额外的回合 … B 的额外回合结束后进行 A 的回合,
+//          A 的回合结束后按行动顺序 B、C 依次」
+
+function fourSeatRound(grantTo) {
+  // 刘禅(player) → A(enemy) → B(ally) → C(ally2), 按行动顺序。
+  const game = Engine.newGame({
+    seed: 95040, seats: ['player', 'enemy', 'ally', 'ally2'],
+    roles: { player: '主公', enemy: '忠臣', ally: '反贼', ally2: '反贼' },
+    playerHero: 'liushan', enemyHero: 'caocao', allyHero: 'huatuo', ally2Hero: 'zhangfei',
+  });
+  game.log = []; game.discard = [];
+  game.deck = Array.from({ length: 40 }, (_, i) => c('sha', { id: 'fq' + i }));
+  for (const seat of game.seats) {
+    game[seat].hand = []; game[seat].judgeArea = []; game[seat].flags = {};
+    game[seat].equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
+    game[seat].hp = game[seat].maxHp; game[seat].skillPreferences = {};
+  }
+  game.pendingChoice = null; game.pendingChoiceQueue = []; game.pauseState = {};
+  game.pendingExtraTurns = [grantTo]; game.extraTurnReturnSeat = null;
+  game.turn = 'player'; game.phase = 'finish';
+  return game;
+}
+
+test('W2 官方判例 glossary__flow.md:26 — 额外回合给下家 A, A 随后仍有额定回合', () => {
+  const game = fourSeatRound('enemy');
+  Engine.advancePhase(game); // finish → completeTurn → 派发额外回合
+  assert.equal(game.turn, 'enemy', 'A 的额外回合');
+  assert.equal(game.extraTurnReturnSeat, 'enemy', '额外回合后仍回原本的下家 = A');
+  Engine.runAITurn(game, 'enemy');
+  assert.equal(game.turn, 'enemy', 'A 的额外回合结束后进行 A 的额定回合');
+});
+
+test('W2 官方判例 glossary__flow.md:27 — 额外回合给 B, 结束后回到 A 而非 B', () => {
+  const game = fourSeatRound('ally');
+  Engine.advancePhase(game);
+  assert.equal(game.turn, 'ally', 'B 的额外回合');
+  assert.equal(game.extraTurnReturnSeat, 'enemy', '额外回合后回原本的下家 = A');
+  Engine.runAITurn(game, 'ally');
+  assert.equal(game.turn, 'enemy', 'B 的额外回合结束后进行 A 的回合 (不是 B 的额定回合)');
+});
+
+test('W2 官方判例 glossary__flow.md:15 — 五席下额外回合插队后轮次为 E-B-C-D-E-A', () => {
+  const game = Engine.newGame({
+    seed: 95041, seats: ['player', 'enemy', 'ally', 'ally2', 'ally3'],
+    roles: { player: '主公', enemy: '忠臣', ally: '反贼', ally2: '反贼', ally3: '内奸' },
+    playerHero: 'liushan', enemyHero: 'caocao', allyHero: 'huatuo',
+    ally2Hero: 'zhangfei', ally3Hero: 'guanyu',
+  });
+  game.log = []; game.discard = [];
+  game.deck = Array.from({ length: 60 }, (_, i) => c('sha', { id: 'fq5-' + i }));
+  for (const seat of game.seats) {
+    game[seat].hand = []; game[seat].judgeArea = []; game[seat].flags = {};
+    game[seat].equipment = { weapon: null, armor: null, horsePlus: null, horseMinus: null };
+    game[seat].hp = game[seat].maxHp; game[seat].skillPreferences = {};
+  }
+  game.pendingChoice = null; game.pendingChoiceQueue = []; game.pauseState = {};
+  // A = player 的回合里, E = ally3 获得额外回合。
+  game.pendingExtraTurns = ['ally3']; game.extraTurnReturnSeat = null;
+  game.turn = 'player'; game.phase = 'finish';
+  Engine.advancePhase(game);
+  assert.equal(game.turn, 'ally3', '插队: E 先行');
+  assert.equal(game.extraTurnReturnSeat, 'enemy', '之后回到 A 的下家 B — 即 E-B-C-D-E-A');
+});
+
 runTests(import.meta.url);

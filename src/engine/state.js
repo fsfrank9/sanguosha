@@ -370,6 +370,12 @@
     if (to.equipment && to.equipment.horsePlus) distance += 1;
     if (from.equipment && from.equipment.horseMinus) distance -= 1;
     distance += SkillRuntime.sumPassiveEffect(from, 'outgoingDistance');
+    // W2 (第五轮审计 F4, 高): 屯田 (邓艾) 官方逐字「你与其他角色的距离 -X
+    // (X 为"田"数)」(card__hero__wei.md:365) —— v15 V 只做了"置田"那一半,
+    // 距离这一半**完全没接**, 技能实际只剩个收牌器。
+    // 与马术同一口径 (二者措辞逐字相同): 只减**出向**距离 (你到别人),
+    // 等价于一匹随"田"数增长的 -1 马。
+    if (hasSkill(from, 'tuntian')) distance -= ((from.tian && from.tian.length) || 0);
     return Math.max(1, distance);
   }
 
