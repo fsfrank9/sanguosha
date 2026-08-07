@@ -290,13 +290,24 @@
         // 在响应窗口之前结算；若需要 source/target 的 pendingChoice，则把
         // sha 的剩余状态保存到 pauseState.playSha，由 resolveCixiong* 完成
         // 后调用 continueShaAfterCixiong 接着 渲染 仁王/闪/八卦/贯石/青龙/伤害.
+        //
+        // W2-F13: 铁骑/烈弓 锁定 (武将技) 前移到雌雄 (装备技) 之前 — 官方
+        // rule__principle.md "同一时机武将技先于装备技" (伏完判例); 此前单
+        // 目标路径为 雌雄→铁骑, 与多目标链的 locks(武将技)→cixiong(装备技)
+        // 相反。锁定结果随 pauseState.playSha 快照携带, 雌雄挂起恢复后经
+        // presetLock 传入, 不重跑 hook (铁骑不二次判定)。判定挂起风险与
+        // 原位置等同 (同一同步调用, 仅时点前移)。
+        var responseLocked = computeShaResponseLock(game, actor, card, targetActor);
         var cixiongResult = applyCixiongOnDesignate(game, actor, targetActor);
         if (cixiongResult && cixiongResult.paused) {
           if (!game.pauseState) game.pauseState = {};
-          game.pauseState.playSha = { actor: actor, targetActor: targetActor, card: card, amount: amount };
+          game.pauseState.playSha = {
+            actor: actor, targetActor: targetActor, card: card, amount: amount,
+            responseLocked: responseLocked
+          };
           return success('【雌雄双股剑】结算中…');
         }
-        return continueShaAfterCixiong(game, actor, card, amount, targetActor);
+        return continueShaAfterCixiong(game, actor, card, amount, targetActor, { responseLocked: responseLocked });
       }
 
       // ── v14 P3: 流离时机驱动 — 对当前目标跑 onShaTargeted hook; 技能侧
@@ -606,9 +617,9 @@
         // 目标后 早于 使用结算内的有效性检测 (享乐判例); v7 起单目标路径把
         // onNeedResponse 留在护甲短路之后, 对注定被仁王/藤甲挡下的目标漏跑
         // 铁骑判定 (P1 链路径已按官方序, 两路自此在护甲时序上对齐)。
-        // 评审收口口径: 铁骑×雌雄的相对序两路仍不同 — 单目标为 雌雄(装备
-        // 技)→铁骑(武将技), 链路径为 locks(武将技)→cixiong(装备技); 后者
-        // 合伏完判例, 但方天占武器槽使链内雌雄实战不可达, 无可观测冲突。
+        // W2-F13: 单目标路径的锁定进一步前移到 designateCixiongAndResolve
+        // (雌雄之前, 武将技先于装备技), 经 presetLock 传入 — 本处 else 分支
+        // 仅剩无 presetLock 的直调用者 (测试脚手架等) 兜底。
         var responseContext = { responseLocked: false };
         if (presetLock) {
           responseContext.responseLocked = !!presetLock.responseLocked;
@@ -851,9 +862,9 @@
         if (decision && decision.decline) {
           game.pauseState.guanshi = null;
           log(game, actorName(game, actor) + '选择不发动【贯石斧】。');
-          log(game, actorName(game, saved.targetActor) + '闪避成功，没有受到伤害。');
-          settleShaCardAfterOutcome(game, saved.card);
-          return success('目标闪避。');
+          // W2-F9: 收口到贯石之后的共用收尾 (青龙时机 + 弃置 + 闪避日志),
+          // 不在此回补 onShaDodged 钩子 — 猛进已在开窗前派发过, 回补会双跑。
+          return continueShaDodgeAfterGuanshi(game, actor, saved.card, saved.amount, saved.targetActor);
         }
         var ids = (decision && decision.cardIds) || [];
         var allowed = pending.handIds.concat(pending.equipment.map(function (e) { return e.cardId; }));
@@ -873,14 +884,15 @@
         targetActor = targetActor || opponent(actor);
         var target = game[targetActor];
         if (dodged) {
-          if (hasEquipmentEffect(self, 'guanshiForceHit')) {
-            var guanshiResult = applyGuanshiForcedHit(game, actor, targetActor, card, amount);
-            if (guanshiResult) return guanshiResult;
-          }
           // v15 T: 猛进 (庞德) — "每当你使用的【杀】被目标角色使用的【闪】
           // 抵消时, 你可以弃置其一张牌" (card__hero__neutral.md:225)。
-          // 位序: 贯石斧之后 (贯石强制命中 → 杀未被抵消, 猛进不触发),
-          // 青龙续杀之前 (抵消的瞬间先于"继续使用一张杀")。
+          // W2-F9: 位序更正 — 官方 flow__use.md:123 把猛进(武将技)与贯石斧
+          // (装备技)并列在同一时机"被抵消时", rule__principle.md 要求武将技
+          // 先于装备技 → 猛进先于贯石斧 (此前贯石强制命中在钩子之前短路
+          // return, 把猛进整个吞掉)。贯石闸门移入 continueShaDodgeAfterSkills
+          // — 猛进挂起恢复后仍会进贯石斧 (连续双挂起: 猛进窗口收掉后贯石
+          // ask 再开新窗, 单槽先后占用不冲突); 本处钩子是唯一派发点, 贯石
+          // resolver 不回补 (回补会双跑猛进)。
           // 到此处的 dodged 恒为"闪抵消" — 仁王盾/藤甲免疫在开窗前已短路
           // 返回; 八卦"视为使用的闪"与护驾代打"视为你使用"均计 (官方
           // card__equipment.md:123 / card__hero__wei.md:13 逐字)。
@@ -912,9 +924,24 @@
         return settleShaHit(game, actor, card, amount, targetActor);
       }
 
-      // v15 T: 闪避分支的剩余流程 (青龙续杀 + 收尾) — 猛进 ask 挂起后由
-      // resolver 重入本函数, 时序与同步路径一致。
+      // v15 T: 闪避分支的剩余流程 — 猛进 ask 挂起后由 resolver 重入本函数,
+      // 时序与同步路径一致。
+      // W2-F9: 贯石斧闸门自 resolveShaAfterResponse 移入本函数头部 (装备技
+      // 排在武将技猛进之后) — 同步路径与猛进恢复路径共用, 贯石 ask 在此
+      // 二次挂起即为"连续双挂起"链的第二环。
       function continueShaDodgeAfterSkills(game, actor, card, amount, targetActor) {
+        var self = game[actor];
+        if (hasEquipmentEffect(self, 'guanshiForceHit')) {
+          var guanshiResult = applyGuanshiForcedHit(game, actor, targetActor, card, amount);
+          if (guanshiResult) return guanshiResult;
+        }
+        return continueShaDodgeAfterGuanshi(game, actor, card, amount, targetActor);
+      }
+
+      // W2-F9: 贯石斧之后的收尾 (青龙续杀 + 杀弃置) — 贯石 ask-decline
+      // resolver 与上方闸门共用 (此前 decline 直接结算, 跳过了青龙时机;
+      // 实战贯石/青龙同占武器槽互斥, 该路径差异不可观测, 结构上仍收口)。
+      function continueShaDodgeAfterGuanshi(game, actor, card, amount, targetActor) {
         var self = game[actor];
         {
           // v13 审计三轮: 青龙偃月刀 — (a) "你可以"可选效果, 补 decline 偏好

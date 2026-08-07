@@ -695,3 +695,23 @@ scratch harness 终于常驻 (缺省 150 种子 ~23s, `SANGUOSHA_SOAK_SEEDS` 可
 
 全档 **205 文件绿**; 三基准不降; 三条红线零破 (守恒 1200 种子零失败 /
 AI 零全知守护计数同步 / 装备查询单点未被碰)。
+
+## X 执行记录 (2026-08-07, 留账清偿 F8-F14)
+
+**范围**: 用户点单"把留账的 F8-F14 一次性清掉"。W 批"确证未修"的八项
+(F8 含被主动还原的半拉子修复) 逐项按账落地, 对抗验证点名的坑全部按账处理;
+留账清零。明细: `docs/audit/2026-08-07-x-ledger-clear.md`; 行为钉:
+`tests/v15_x_ledger_clear.test.mjs` (17 例)。
+
+| # | 修复要点 |
+|---|----------|
+| F8 | 借刀闸口 (`hasShaResponseAvailable`+丈八+蛊惑) 与点火 (`findResponseCard`) 同点收口; 虚拟杀回滚走弃牌堆取回 (守恒钉) |
+| F9 | `onShaDodged` 前移到贯石斧之前 (武将技先于装备技); 贯石闸门入 `continueShaDodgeAfterSkills` 头部, 双挂起链成立; resolver 不回补钩子 |
+| F10 | 闪电移动候选过 `weimuBlocksCard` 窄谓词 (不用 `isLegalCardTarget` — 对 shandian 恒 false) |
+| F11 | 银月枪"使用"半面: 借刀/挑衅逼出的黑杀在二次合法性成立后于调用点派发 (不落 playSha 入口) |
+| F12 | 妄尊移到 `continueTurnAfterPreparePhase` 头部 — 观星等回合角色技能之后、且不被挂起吞掉 (唯一收束点, 不重不漏) |
+| F13 | `computeShaResponseLock` 前移到雌雄之前, 锁定随 `pauseState.playSha` 快照携带 (铁骑不二次判定) |
+| F14 | 无懈窗口 `wuxieWindowTargetSeat` 与 `recordWuxieStance` 同映射, 逐目标窗口展示目标补齐 |
+
+**门禁**: 全档 **206 文件绿** (205 + 新钉文件); `build:check` 过; 守恒 soak
+600 种子加档零失败; 三基准不降。

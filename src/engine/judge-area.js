@@ -14,6 +14,8 @@
         var opponent = deps.opponent;
         // v13 J0-2: 判定前无懈窗口 (tricks 域无懈链, 引擎装配注入)
         var checkWuxieAndContinue = deps.checkWuxieAndContinue;
+        // W2-F10: 帷幕对黑色锦囊的目标合法性 (窄谓词, 引擎装配注入)
+        var weimuBlocksCard = deps.weimuBlocksCard;
 
       function judge(game, actor, reason, opts) {
         reshuffleIfNeeded(game);
@@ -270,6 +272,10 @@
             return j && j.type === 'shandian';
           });
           if (candAlreadyShandian) continue;
+          // W2-F10: 帷幕 (贾诩) — "你不是黑色锦囊牌的合法目标"是目标合法性
+          // 类锁定技 (flow__condition.md:101), 闪电 (黑桃延时锦囊) 的移动
+          // 同样要过目标合法性; 此前只查同名去重, 闪电会移进贾诩的判定区。
+          if (weimuBlocksCard && weimuBlocksCard(game, candActor, trick)) continue;
           putCard(game, trick, { zone: 'judgeArea', actor: candActor });
           log(game, '【闪电】移至' + actorName(game, candActor) + '的判定区。');
           moved = true;

@@ -410,12 +410,30 @@
     // canReachWithSha (银月 range=3, 1v1 默认距离 1 ≤ 3 → 总成立)。
     // skillPreferences.yinyue = 'auto' (默认触发) / 'decline' (跳过)。
     function triggerYinyueQiang(game, holderActor) {
+      // W2-F11 评审收口 (opus 对抗复现驳倒后补): 单点守卫 —
+      //   ① 终局后不触发 (与 triggerMengjinShaDodged 等同类钩子一致);
+      //   ② 濒死结算进行中不同步插入 —— 借刀/挑衅把触发点扩到"使用"面后,
+      //      受害者可能正处于濒死 ask 挂起 (杀致 hp 0), 同步触发会在救援
+      //      收束前插入 1 点伤害把 hp 打到 -1, 那颗【桃】只能补回 0 →
+      //      "能救活"变"死" (对抗复现 head/base 对照实证)。挂入
+      //      deferredAfterDying, 由 flushDeferredDamageAfter 在濒死收束后
+      //      冲刷 (该出口自带 gameover 闸); 濒死黑酒路径 (damage-dying
+      //      audit4-L2) 同样受益 —— 银月伤害不再插进未收束的濒死结算;
+      //   ③ 持枪者/目标已倒下不触发 (多席场对局继续时的边界)。
+      if (!game || game.phase === 'gameover') return;
+      if (game.pauseState && game.pauseState.dying) {
+        if (!game.pauseState.deferredAfterDying) game.pauseState.deferredAfterDying = [];
+        game.pauseState.deferredAfterDying.push(function () {
+          triggerYinyueQiang(game, holderActor);
+        });
+        return;
+      }
       var holder = game[holderActor];
-      if (!holder) return;
+      if (!holder || holder.hp <= 0) return;
       var weapon = holder.equipment && holder.equipment.weapon;
       if (!weapon || weapon.type !== 'yinyue') return;
       var targetActor = opponent(holderActor);
-      if (!targetActor || !game[targetActor]) return;
+      if (!targetActor || !game[targetActor] || game[targetActor].hp <= 0) return;
       if (!canReachWithSha(game, holderActor, targetActor)) return;
       var pref = (holder.skillPreferences && holder.skillPreferences.yinyue) || 'auto';
       if (pref === 'decline') {

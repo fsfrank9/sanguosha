@@ -134,6 +134,19 @@
       return advanceWuxieChain(game);
     }
 
+    // W2-F14: 无懈窗口"当前结算目标"的展示席位 — 单目标锦囊 ctx 携带
+    // currentTarget/targetActor/victimActor 之一; 逐目标窗口 (南蛮/万箭/
+    // 五谷: order+idx; 桃园/铁索: targets+idx) 此前三个字段全空, 面板的
+    // "为他人解围"提示恒为 null。映射与 recordWuxieStance 的逐 trick 提取
+    // 一致 (delayed-judge 的受害者为判定区归属 ownerActor)。
+    function wuxieWindowTargetSeat(chain) {
+      var ctx = chain && chain.ctx;
+      if (!ctx) return null;
+      if (Array.isArray(ctx.order) && typeof ctx.idx === 'number') return ctx.order[ctx.idx] || null;
+      if (Array.isArray(ctx.targets) && typeof ctx.idx === 'number') return ctx.targets[ctx.idx] || null;
+      return ctx.currentTarget || ctx.targetActor || ctx.victimActor || ctx.ownerActor || null;
+    }
+
     // v12 H2: 当前净状态下的询问队列 — 自 initialResponder 起顺时针全部存活
     // 座席, 净通过态跳过锦囊来源, 净抵消态跳过刚打出无懈的座席。
     function wuxieResponderQueue(game, chain) {
@@ -182,11 +195,12 @@
               reason: chain.reason,
               chainWuxied: chain.wuxied,
               trickName: chain.trickName,
-              // v13 三批-6: 目标名直达 — 面板据此提示"可为他人解围"
-              // (逐目标窗口 ctx 携带 currentTarget/targetActor/victimActor 之一)。
-              targetActor: (chain.ctx && (chain.ctx.currentTarget || chain.ctx.targetActor || chain.ctx.victimActor)) || null,
+              // v13 三批-6: 目标名直达 — 面板据此提示"可为他人解围"。
+              // W2-F14: 逐目标窗口 (order/targets + idx) 经 wuxieWindowTargetSeat
+              // 取当前结算席位 (此前恒 null)。
+              targetActor: wuxieWindowTargetSeat(chain),
               targetName: (function () {
-                var t = chain.ctx && (chain.ctx.currentTarget || chain.ctx.targetActor || chain.ctx.victimActor);
+                var t = wuxieWindowTargetSeat(chain);
                 return t ? actorName(game, t) : null;
               })()
             },
@@ -908,20 +922,15 @@
         // v15 S 评审收口: 于吉可背面朝上使用任意手牌当【杀】 → 手上没有
         // 杀也要走"决定"分支 (路线图 S1 明文含"借刀应杀"); 非蛊惑局面
         // 维持既有"无杀即交武器"。
-        // W2 (第五轮审计 F8, 高, **确证但本批未修** — 见
-        // docs/audit/2026-08-06-w-ledger.md):
-        // 这个闸口手写"手牌里有没有 sha/fire_sha/thunder_sha", 漏掉了全部
-        // 转化面 —— 关羽(武圣)/赵云(龙胆) 手握能当【杀】的红牌/闪时, 引擎
-        // 照样判"没有【杀】可用"并夺走武器。
-        // **但只改这一行是半成品**: 下游点火 jiedaoFireOpponentSha 用的是
-        // removeFirstCardOfType (同样只认字面牌型), 闸口放行后照样取不到牌,
-        // 结果是把解释性日志抹掉、行为一个字不变。正确修法要闸口与点火同时
-        // 收口到 listShaResponseOptions/findResponseCard 单点, 且必须处理
-        // 丈八蛇矛"两张手牌合成虚拟杀"的回滚 (照抄 putCard 回退会破坏牌张
-        // 守恒 —— 对抗验证已实证)。本批如实留缺口, 不做半拉子改动。
-        var hasSha = opponentState.hand.some(function (c) {
-          return c && (c.type === 'sha' || c.type === 'fire_sha' || c.type === 'thunder_sha');
-        }) || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, opponentActor));
+        // W2-F8 (第五轮审计留账清偿): 闸口从手写字面牌型扫描收口到
+        // hasShaResponseAvailable (真杀 + 武圣红牌/龙胆闪, 含装备区) +
+        // 丈八蛇矛 (两张手牌合成) — 与下游点火 jiedaoFireOpponentSha 的
+        // findResponseCard 同一单点, 闸口放行的牌点火时必然取得到。
+        var hasSha = hasShaResponseAvailable(opponentState)
+          || (hasEquipmentEffect(opponentState, 'zhangbaTwoHandSha')
+            && (opponentState.hand || []).length >= 2
+            && !(opponentState.skillPreferences && opponentState.skillPreferences.zhangba === 'decline'))
+          || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, opponentActor));
         var canHit = game[jdVictim] && game[jdVictim].hp > 0
           && canReachWithSha(game, opponentActor, jdVictim)
           && !cardTargetProtection(game, opponentActor, jdVictim, { type: 'sha', color: 'black', name: '杀' }, '杀');
@@ -956,12 +965,37 @@
         var guhuoSha = deps.takeGuhuoResponseCard
           ? deps.takeGuhuoResponseCard(game, opponentActor, ['sha', 'fire_sha', 'thunder_sha'])
           : null;
-        var borrowedSha = guhuoSha ? guhuoSha.physical
-          : (removeFirstCardOfType(opponentState, 'sha')
-          || removeFirstCardOfType(opponentState, 'fire_sha')
-          || removeFirstCardOfType(opponentState, 'thunder_sha'));
-        if (!borrowedSha) {
+        // W2-F8: 点火与闸口同点收口 — findResponseCard 覆盖 真杀 + 武圣/
+        // 龙胆转化 (含装备区来源) + 丈八两张手牌合成, 取牌即离区。
+        var response = guhuoSha
+          ? { card: guhuoSha.physical, asName: guhuoSha.declaredName, skillName: '蛊惑' }
+          : findResponseCard(opponentState, 'sha', null, game);
+        if (!response || !response.card) {
           return transferWeaponJiedao(game, sourceActor, opponentActor);
+        }
+        var borrowedSha = response.card;
+        // 使用路径的物理组成牌: 转化/合成走青龙续杀 (audit4-L1) 同款 —
+        // 组成实体先入弃牌堆, 虚拟【杀】流经结算 (discardCard 对 virtual
+        // 直接跳过, 守恒基线不变); 回滚时从弃牌堆原路取回。
+        var usedPhysicals = null;
+        if (response.extraCards && response.extraCards.length) {
+          // 丈八蛇矛: 两张手牌 → 虚拟杀 (findResponseCard 已离手)。
+          usedPhysicals = response.extraCards.slice();
+          usedPhysicals.forEach(function (pc) { discardCard(game, pc); });
+          log(game, actorName(game, opponentActor) + '发动【' + response.skillName + '】，将【'
+            + usedPhysicals.map(function (c) { return c.name; }).join('】、【') + '】当【杀】使用。');
+        } else if (response.skillName && response.skillName !== '蛊惑') {
+          // 武圣/龙胆: 单张转化 (可能来自装备区) → 虚拟杀。
+          usedPhysicals = [borrowedSha];
+          discardCard(game, borrowedSha);
+          log(game, actorName(game, opponentActor) + '发动【' + response.skillName
+            + '】，将【' + borrowedSha.name + '】当【杀】使用。');
+          borrowedSha = CardRuntime.makeTestCard('sha', {
+            id: 'jiedao-as-' + usedPhysicals[0].id,
+            suit: usedPhysicals[0].suit, rank: usedPhysicals[0].rank,
+            color: usedPhysicals[0].color, name: '杀',
+            virtual: true, physicalCards: usedPhysicals
+          });
         }
         log(game, actorName(game, opponentActor) + '被【借刀杀人】驱使使用【' + borrowedSha.name + '】。');
         // v12 H1: 显式受害目标 (缺省 sourceActor — 1v1 中 playSha 的
@@ -969,10 +1003,29 @@
         var shaResult = playSha(game, opponentActor, borrowedSha, { target: victimActor || sourceActor });
         if (!shaResult || !shaResult.ok) {
           // Second legality check failed at playSha entry (target protection / distance
-          // changed since canPlayCard). Return sha to opponent's hand and transfer weapon.
-          putCard(game, borrowedSha, { zone: 'hand', actor: opponentActor });
+          // changed since canPlayCard). Return the cards and transfer weapon.
+          // W2-F8: 虚拟杀回滚 = 组成实体自弃牌堆退回手牌 (青龙续杀同款;
+          // 把虚拟牌 putCard 回手会凭空多牌破坏守恒), 物理杀原样退回。
+          if (usedPhysicals) {
+            usedPhysicals.forEach(function (pc) {
+              moveCard(game, pc, { zone: 'discard' }, { zone: 'hand', actor: opponentActor });
+            });
+          } else {
+            putCard(game, borrowedSha, { zone: 'hand', actor: opponentActor });
+          }
           log(game, '【杀】不再合法（second legality check）；交出武器。');
           return transferWeaponJiedao(game, sourceActor, opponentActor);
+        }
+        // W2-F11: 借刀驱使的是回合外"使用"黑色手牌 — 银月枪的另一半触发面
+        // (consumeResponse 只覆盖"打出")。时机取二次合法性成立之后 (入口前
+        // 触发无法回滚 playSha 拒绝); 由此开出的响应窗口经 pendingChoice
+        // 队列与杀自身的响应窗口先后排队。颜色按 effectiveCardColor (红颜
+        // 口径), 转化组成牌逐张判 (武圣/龙胆只收红牌, 实战恒不触发)。
+        if (game.turn !== opponentActor && deps.triggerYinyueQiang) {
+          var jdBlackUsed = (usedPhysicals || [borrowedSha]).some(function (pc) {
+            return pc && StateRuntime.effectiveCardColor(opponentState, pc) === 'black';
+          });
+          if (jdBlackUsed) deps.triggerYinyueQiang(game, opponentActor);
         }
         return shaResult;
       }

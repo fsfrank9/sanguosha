@@ -379,7 +379,10 @@
         if (game.pauseState && game.pauseState.playSha) {
           var saved = game.pauseState.playSha;
           game.pauseState.playSha = null;
-          return continueShaAfterCixiong(game, saved.actor, saved.card, saved.amount, saved.targetActor);
+          // W2-F13: 铁骑/烈弓锁定已在雌雄之前预结算 (快照携带), 经 presetLock
+          // 传入 — 恢复路径不重跑 onNeedResponse (铁骑不二次判定)。
+          return continueShaAfterCixiong(game, saved.actor, saved.card, saved.amount, saved.targetActor,
+            { responseLocked: !!saved.responseLocked });
         }
         // v14 P1: 多目标链的雌雄挂起 (锁定阶段, 游标已先行) → 续跑链驱动。
         if (game.pauseState && game.pauseState.shaChain) {
@@ -824,6 +827,9 @@
         guhuoResponsePossible: guhuoResponsePossible,
         // v15 S 收口: 借刀持刀者使用杀 — 声明牌注入取用口 (不走 consumeResponse)
         takeGuhuoResponseCard: takeGuhuoResponseCard,
+        // W2-F11: 借刀驱使 = 回合外"使用"黑色手牌 → 银月枪触发 (equipment
+        // 域后置装配, 晚绑定包装)。
+        triggerYinyueQiang: function (g, a) { return triggerYinyueQiang(g, a); },
         log: log,
         success: success,
         fail: fail,
@@ -1016,7 +1022,11 @@
         damage: function (g, a, n, s, r, c, nature, opts) { return damage(g, a, n, s, r, c, nature, opts); },
         opponent: opponent,
         // v13 J0-2: 判定前无懈窗口 (tricks 域已装配, 直接注入)
-        checkWuxieAndContinue: function (g, t, r, n, c) { return checkWuxieAndContinue(g, t, r, n, c); }
+        checkWuxieAndContinue: function (g, t, r, n, c) { return checkWuxieAndContinue(g, t, r, n, c); },
+        // W2-F10: 闪电移动的目标合法性 — 帷幕 (锁定技, "你不是黑色锦囊牌
+        // 的合法目标") 挡下移入。窄谓词注入: isLegalCardTarget 对 shandian
+        // 恒 false (延时锦囊不经它使用), 不可用作此处判据。
+        weimuBlocksCard: function (g, s, c) { return weimuBlocksCard(g, s, c); }
       });
       var judge = JudgeAreaRuntime.judge;
       var applyHongyanJudgementView = JudgeAreaRuntime.applyHongyanJudgementView;
@@ -1091,6 +1101,9 @@
         reshuffleIfNeeded: reshuffleIfNeeded,
         playSha: function (game, a, card, opts) { return playSha(game, a, card, opts); },
         removeFirstCardOfType: removeFirstCardOfType,
+        // W2-F11: 挑衅逼出的杀 = 回合外"使用"手牌 → 黑色时触发银月枪
+        // (equipment 域后置装配, 晚绑定包装)。
+        triggerYinyueQiang: function (g, a) { return triggerYinyueQiang(g, a); },
         aiDiscardCandidates: function (game, seat) {
           return AIRuntime.aiDiscardCandidates
             ? AIRuntime.aiDiscardCandidates(game, seat) : null;
@@ -2396,23 +2409,13 @@
         var state = game[actor];
         if (!state) return null;
         state.flags = state.flags || {};
-        // v11 C8 (批次 32): 妄尊 (标袁术) — gltjk spec: "主公的准备阶段开始
-        // 时, 你可以摸一张牌, 该主公本回合手牌上限 -1"。1v1 实现取对手为
-        // 主公的场景 (袁术自任主公时 +1 牌/-1 上限自净, 不建模); 默认自动,
-        // skillPreferences.wangzun='decline' 可关。放在观星/洛神之前, 避免
-        // 其 pendingChoice 挂起时被跳过。
-        // v12 H5: 妄尊持有者从 opponent() 二元假设泛化为座次环扫描
-        // (1v1 恒为对手, 行为不变; 多席时每名持有者各自触发)。
-        seatsFrom(game, actor, false).forEach(function (wangzunHolderActor) {
-          var wangzunHolder = game[wangzunHolderActor];
-          if (wangzunHolder && wangzunHolder.hp > 0 && hasSkill(wangzunHolder, 'wangzun')
-              && game.roles && game.roles[actor] === '主公'
-              && !(wangzunHolder.skillPreferences && wangzunHolder.skillPreferences.wangzun === 'decline')) {
-            log(game, actorName(game, wangzunHolderActor) + '发动【妄尊】，摸一张牌，' + actorName(game, actor) + '本回合手牌上限 -1。');
-            drawCards(game, wangzunHolderActor, 1);
-            state.handLimitDelta = (state.handLimitDelta || 0) - 1;
-          }
-        });
+        // W2-F12: 妄尊从这里 (观星之前) 移至 continueTurnAfterPreparePhase —
+        // 同一时机"准备阶段开始时"按官方从当前回合角色起座次依次结算
+        // (glossary__flow.md:30), 回合角色的观星/洛神/神速/英魂先于其他
+        // 座席的妄尊。"放在观星之前避免挂起时被跳过"的旧理由由收口点
+        // 解决: 所有准备阶段挂起 (观星/洛神/神速 resolver、prepareResume
+        // 排空) 都经 continueTurnAfterPreparePhase 收束, 妄尊设在那里
+        // 既不会被挂起吞掉、又排在回合角色技能之后。
         // v15 U: 准备阶段技能钩子 (孙坚英魂 等)。位序在妄尊之后、观星之前 —
         // 观星/洛神会挂起 pendingChoice, 挂起后本函数即返回, 排在其后的钩子
         // 本回合就跑不到了。挂起判据取钩子自身的返回信号, 不看
@@ -2471,6 +2474,23 @@
       function continueTurnAfterPreparePhase(game, actor) {
         // v12 H5: 回合角色已在准备阶段阵亡 (身份场对局继续) → 回合立即终止。
         if (game[actor] && game[actor].hp <= 0) return completeTurn(game, actor);
+        // v11 C8 (批次 32) / W2-F12 移位: 妄尊 (标袁术) — "主公的准备阶段
+        // 开始时, 你可以摸一张牌, 该主公本回合手牌上限 -1"。同一时机按
+        // 官方从当前回合角色起座次依次 (glossary__flow.md:30) → 回合角色的
+        // 观星/洛神/神速/英魂先结算, 其他座席的妄尊后结算。本函数是全部
+        // 准备阶段路径 (同步完成 + 各挂起 resolver + prepareResume 排空)
+        // 的唯一收束点, 每回合恰好进入一次 — 妄尊在此不重不漏。
+        // v12 H5: 持有者座次环扫描 (1v1 恒为对手; 多席各自触发)。
+        seatsFrom(game, actor, false).forEach(function (wangzunHolderActor) {
+          var wangzunHolder = game[wangzunHolderActor];
+          if (wangzunHolder && wangzunHolder.hp > 0 && hasSkill(wangzunHolder, 'wangzun')
+              && game.roles && game.roles[actor] === '主公'
+              && !(wangzunHolder.skillPreferences && wangzunHolder.skillPreferences.wangzun === 'decline')) {
+            log(game, actorName(game, wangzunHolderActor) + '发动【妄尊】，摸一张牌，' + actorName(game, actor) + '本回合手牌上限 -1。');
+            drawCards(game, wangzunHolderActor, 1);
+            game[actor].handLimitDelta = (game[actor].handLimitDelta || 0) - 1;
+          }
+        });
         setPhase(game, actor, 'judge');
         // v12 G2: 神速 选项一 — 跳过判定阶段 (判定区牌保留, 下回合照常结算)。
         if (game[actor].flags && game[actor].flags.skipJudge) {
