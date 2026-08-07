@@ -2314,7 +2314,12 @@
           || removeFirstCardOfType(targetState, 'thunder_sha');
         if (shaCard) {
           var result = deps.playSha(game, target, shaCard, { target: actor, skipShaCount: true });
-          if (result && result.ok) return result;
+          if (result && result.ok) {
+            // W2-F11: 挑衅逼出的杀是回合外"使用"手牌 — 黑色时触发银月枪
+            // (consumeResponse 只覆盖"打出"面; 时机取二次合法性成立之后)。
+            triggerTiaoxinYinyue(game, target, [shaCard]);
+            return result;
+          }
           putCard(game, shaCard, { zone: 'hand', actor: target });
         }
         return applyTiaoxinDiscard(game, actor, target);
@@ -2347,10 +2352,25 @@
           }
           var shaCard = removeCardFromHand(state, d.cardId);
           var result = deps.playSha(game, target, shaCard, { target: actor, skipShaCount: true });
-          if (result && result.ok) return result;
+          if (result && result.ok) {
+            // W2-F11: 同 AI 分支 — 回合外"使用"黑色手牌触发银月枪。
+            triggerTiaoxinYinyue(game, target, [shaCard]);
+            return result;
+          }
           putCard(game, shaCard, { zone: 'hand', actor: target });
         }
         return applyTiaoxinDiscard(game, actor, target);
+      }
+
+      // W2-F11: 挑衅路径的银月枪派发 — "每当你于回合外使用或打出黑色手牌
+      // 时" (SP 010) 的"使用"半面。颜色按 effectiveCardColor (红颜口径);
+      // 由此开出的响应窗口经 pendingChoice 队列与杀自身的响应窗口先后排队。
+      function triggerTiaoxinYinyue(game, userActor, physicals) {
+        if (game.turn === userActor || !deps.triggerYinyueQiang) return;
+        var anyBlack = (physicals || []).some(function (pc) {
+          return pc && StateRuntime.effectiveCardColor(game[userActor], pc) === 'black';
+        });
+        if (anyBlack) deps.triggerYinyueQiang(game, userActor);
       }
 
       // 志继 (shu.md:356): "觉醒技，准备阶段开始时，若你没有手牌，你选择一项：
