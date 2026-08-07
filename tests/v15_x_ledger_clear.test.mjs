@@ -230,6 +230,39 @@ test('F11: 挑衅逼出的黑杀 → 银月枪触发 (使用面, AI 席)', () =>
   assert.equal(game.player.hp, hpBefore - 2, '挑衅杀 1 点 + 银月枪 1 点');
 });
 
+test('F11 评审收口: 受害者濒死 ask 挂起时银月枪不插入 — 桃救援先收束', () => {
+  // 对抗复现驳倒项: 旧接线在濒死结算未收束时同步插入 1 点伤害, hp 被打到
+  // -1, 救援的桃只能补回 0 → "能救活"变"死"。守卫后: 救援先收束 (hp 0→1),
+  // 银月枪经 deferredAfterDying 在濒死结束后作为独立事件触发。
+  const game = duel('liubei', 'caocao', 96043);
+  game.player.hp = 1;
+  game.player.skillPreferences.dying = 'ask';
+  game.player.hand = [jiedao('jd-dying'), c('tao', { id: 'rescue-tao', suit: 'heart', color: 'red' })];
+  game.enemy.equipment.weapon = weapon('e-yy-dying', 'yinyue', '银月枪', 3);
+  game.enemy.hand = [c('sha', { id: 'yyd-sha', suit: 'spade', color: 'black' })];
+  Engine.playCard(game, 'player', 'jd-dying', { target: 'enemy' });
+  assert.equal(game.pendingChoice && game.pendingChoice.kind, 'dying-rescue', '杀致濒死开窗');
+  assert.equal(game.player.hp, 0, '濒死窗口时 hp=0 — 银月枪未插入 (旧接线此处已是 -1)');
+  Engine.resolvePendingChoice(game, { cardId: 'rescue-tao' });
+  const rescueAt = logIndex(game, '脱离濒死');
+  const yinyueAt = logIndex(game, '【银月枪】');
+  assert.ok(rescueAt >= 0, '桃救援成功收束');
+  assert.ok(yinyueAt > rescueAt, '银月枪在濒死收束之后才触发 (独立事件)');
+});
+
+test('F11 评审收口: 终局后银月枪不触发、不留悬空窗口', () => {
+  const game = duel('liubei', 'caocao', 96044);
+  game.player.hp = 1;
+  game.player.hand = [jiedao('jd-go')]; // 无桃无闪 → 杀致死, 1v1 直接终局
+  game.enemy.equipment.weapon = weapon('e-yy-go', 'yinyue', '银月枪', 3);
+  game.enemy.hand = [c('sha', { id: 'go-sha', suit: 'spade', color: 'black' })];
+  Engine.playCard(game, 'player', 'jd-go', { target: 'enemy' });
+  assert.equal(game.phase, 'gameover', '对局已终结');
+  assert.ok(!game.log.some((l) => l.includes('【银月枪】')), '终局后不触发');
+  assert.equal(game.pendingChoice, null, '无悬空响应窗口');
+  assert.ok(!(game.pauseState && game.pauseState.yinyueResponse), '无残留 pauseState');
+});
+
 // ───── F12: 妄尊排在回合角色准备阶段技能之后 ─────
 
 test('F12: 主公观星挂起期间妄尊不先跑; 观星收窗后妄尊补上 (座次环时序)', () => {
