@@ -484,10 +484,11 @@ test('崩坏: 已是体力值最小的角色 → 不触发', () => {
   assert.ok(!pending || pending.kind !== 'benghuai-choice', '最小体力 → 锁定技不触发');
 });
 
-test('暴虐: 主公技 — 群势力角色受伤后来源判定黑桃则董卓回血', () => {
-  const game = trio(['dongzhuo', 'caocao', 'huaxiong'], 91090,
+test('暴虐: 群势力来源造成伤害后判定黑桃则董卓回血，与受伤者势力无关', () => {
+  const game = trio(['dongzhuo', 'huaxiong', 'caocao'], 91090,
     { player: '主公', enemy: '反贼', ally: '反贼' });
-  assert.equal(game.ally.camp, '群', '华雄为群势力');
+  assert.equal(game.enemy.camp, '群', '伤害来源华雄为群势力');
+  assert.equal(game.ally.camp, '魏', '受伤者曹操不是群势力');
   game.player.hp = game.player.maxHp - 3;
   game.deck = [c('sha', { id: 'refill-a' }), c('sha', { id: 'bn-judge', suit: 'spade', color: 'black', rank: '5' })];
   game.discard = [c('sha', { id: 'refill-b' })];
@@ -499,10 +500,11 @@ test('暴虐: 主公技 — 群势力角色受伤后来源判定黑桃则董卓�
   assert.ok(game.log.some((line) => /暴虐/.test(line)));
 });
 
-test('暴虐: 受伤者非群势力 → 不触发', () => {
-  const game = trio(['dongzhuo', 'caocao', 'liubei'], 91091,
+test('暴虐: 来源非群势力 → 即使受伤者是群势力也不触发', () => {
+  const game = trio(['dongzhuo', 'caocao', 'huaxiong'], 91091,
     { player: '主公', enemy: '反贼', ally: '反贼' });
-  assert.equal(game.ally.camp, '蜀');
+  assert.equal(game.ally.camp, '群');
+  assert.equal(game.enemy.camp, '魏');
   game.player.hp = game.player.maxHp - 3;
   game.enemy.hand = [c('sha', { id: 'bn-sha2' })];
   game.turn = 'enemy';

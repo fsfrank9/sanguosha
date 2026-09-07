@@ -205,6 +205,11 @@
         if (game.pauseState && game.pauseState.shaChain && resumeShaChain) {
           resumeShaChain(game);
         }
+        // Z4/C28: 驱虎赢/没赢后的伤害可能经濒死选择导致终局。此时也须
+        // 收完处理区拼点牌; 终局提前返回不能把挂起留账永久悬在 pauseState。
+        if (game.pauseState && game.pauseState.pindianCards && deps.flushPindianCards) {
+          deps.flushPindianCards(game);
+        }
         return null;
       }
       // v12 G2: 神速 — AI 座席在准备阶段发动神速, 虚拟【杀】向玩家开出
@@ -259,8 +264,8 @@
         var luanwuResult = deps.advanceLuanwu(game);
         if (game.pendingChoice) return luanwuResult || success('回合暂停，等待玩家选择。');
       }
-      // v15 T 评审收口: 拼点"赢/没赢后"效果挂起 (驱虎选受伤角色 / 未来
-      // 烈刃认领拼点牌) → 选择排空后补弃处理区里未被认领的拼点牌。官方
+      // v15 T 评审收口: 拼点"赢/没赢后"效果挂起 (驱虎选受伤角色等)
+      // → 选择排空后补弃处理区里未被认领的拼点牌。官方
       // 顺序是「效果在前, 弃置在后」, 所以不能在效果挂起时就弃。这条只是
       // 收尾记账, 不推进任何流程, 放在推进型分支之间任意位置都安全。
       if (game.pauseState && game.pauseState.pindianCards && deps.flushPindianCards) {
@@ -284,6 +289,10 @@
       var savedTurnEnd = game.pauseState && game.pauseState.turnEndPending;
       if (savedTurnEnd && deps.resumeTurnEndAndAdvance) {
         return deps.resumeTurnEndAndAdvance(game);
+      }
+      // v16 Z2: 巧变的成本/装备失去触发排空后，再移动牌/进入弃牌阶段。
+      if (game.pauseState && game.pauseState.qiaobianPlay && deps.resumeQiaobianPlay) {
+        return deps.resumeQiaobianPlay(game);
       }
       var savedJudge = game.pauseState && game.pauseState.judgeArea;
       if (!savedJudge) return null;

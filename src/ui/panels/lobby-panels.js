@@ -9,6 +9,7 @@
       }
 
       var SKILL_TRIGGER_LABELS = {
+        phaseStart: '阶段开始',
         playPhase: '出牌阶段',
         drawPhase: '摸牌阶段',
         preparePhase: '准备阶段',
@@ -23,6 +24,7 @@
         passive: '被动'
       };
       var SKILL_FREQUENCY_LABELS = {
+        oncePerPhase: '每阶段一次',
         oncePerTurn: '每回合一次',
         unlimited: '无限制',
         passiveAlways: '锁定'
@@ -163,6 +165,7 @@
           // v14 R1 缠怨 (评审收口): hp=1 时除缠怨外技能引擎侧无效 — 按钮
           // 同步禁用, 不承诺引擎不兑现的操作。
           if (state.chanyuan && state.hp === 1 && skill.id !== 'chanyuan') active = false;
+          if (skill.id === 'jijiang' && !Engine.hasLordSkill(game, 'player', 'jijiang')) active = false;
           if (skill.id === 'zhiheng' && state.flags && state.flags.zhihengUsed) active = false;
           if (skill.id === 'fanjian' && state.flags && state.flags.fanjianUsed) active = false;
           if (skill.id === 'guanxing' && state.flags && state.flags.guanxingUsed) active = false;
@@ -220,14 +223,13 @@
         function huangtianAidButtonHtml(state, game, enemyThinking) {
           if (!game || game.mode !== 'identity3' || !game.roles || !game.roleSides) return '';
           if (!state || state.camp !== '群') return '';
-          if (game.roles.player === '主公') return '';
-          if (game.roleSides[game.roles.player] !== 'lordSide') return '';
-          if (state.flags && state.flags.huangtianUsed) return '';
+          var playerSide = game.roleSides[game.roles.player];
+          if (!playerSide || playerSide === 'renegade') return '';
           var lordSeat = (game.seats || []).find(function (seat) {
             var st = game[seat];
             return seat !== 'player' && st && st.hp > 0
-              && game.roles[seat] === '主公'
-              && (st.skills || []).some(function (s) { return s.id === 'huangtian'; });
+              && game.roleSides[game.roles[seat]] === playerSide
+              && Engine.lordSkillTargetAvailable(game, 'player', 'huangtian', seat);
           });
           if (!lordSeat) return '';
           var hasGivable = (state.hand || []).some(function (c) { return c.type === 'shan' || c.type === 'shandian'; });
@@ -241,11 +243,20 @@
         function renderPlayerSkillBar(ctx) {
           if (!els.playerSkillBar) return;
           var state = ctx.state;
-          var html = (state.skills || []).map(function (skill) {
-            return skillButtonHtml(skill, state, ctx.game, ctx.enemyThinking);
+          var skills = Engine.skillsForActor(ctx.game, 'player');
+          if (state.camp === '吴' && !skills.some(function (skill) { return skill.id === 'zhiba'; })
+              && Engine.aliveSeats(ctx.game).some(function (seat) {
+                return seat !== 'player' && Engine.hasLordSkill(ctx.game, seat, 'zhiba');
+              })) skills.push({ id: 'zhiba', name: '制霸', desc: '向拥有制霸的角色发起拼点。' });
+          var html = skills.map(function (skill) {
+            var view = Object.assign({}, skill);
+            if (Engine.IMPLEMENTED_SKILL_IDS.indexOf(view.id) >= 0) view.status = 'implemented';
+            return skillButtonHtml(view, state, ctx.game, ctx.enemyThinking);
           }).join('');
           // v13 L1: 黄天全场型按钮附加在英雄自身技能之后 (条件不满足时为空串)。
-          html += huangtianAidButtonHtml(state, ctx.game, ctx.enemyThinking);
+          if (!skills.some(function (skill) { return skill.id === 'huangtian'; })) {
+            html += huangtianAidButtonHtml(state, ctx.game, ctx.enemyThinking);
+          }
           els.playerSkillBar.innerHTML = html || '<span class="mini-card">无技能</span>';
         }
 

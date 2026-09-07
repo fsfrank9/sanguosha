@@ -108,9 +108,9 @@ test('M1: 终局全翻明 — 胜负判定同步亮出所有在场身份牌', ()
 // ───── M2: 直读零残留守护 (源码锚点) ────────────────────────────────
 // AI 知识层不得直读 isHostileSeat/hostileSeats/hostileFirstPool — 统一走
 // perceived* 感知路由。白名单 (计数锁定, 新增直读必须先过此测试评审):
-//   ai.js ×1        — 黄天献闪: 目标为确认主公 (身份恒公开, 直读合法)
-//   skills.js ×2    — 激将代打(发起者为主公)/黄天面板(目标主公) 同口径
-//   game-engine.js ×1 — lordAidAiderSeats: 规则层求助资格 (对象恒为主公)
+//   ai.js ×0        — Z1 黄天可赠给伪帝持有者，身份可能暗置，故也改为感知路由
+//   skills.js ×2    — 激将代打/黄天的既有规则层合作资格检查
+//   game-engine.js ×1 — lordAidAiderSeats: 既有规则层求助资格检查
 //   其余引擎文件 ×0
 
 const SRC = new URL('../src/engine/', import.meta.url);
@@ -123,7 +123,7 @@ function countOf(text, needle) {
 
 test('M2 守护: 引擎各文件直读计数锁定 (白名单外零残留)', () => {
   const budget = {
-    'ai.js': { isHostileSeat: 1, hostileSeats: 0, hostileFirstPool: 0 },
+    'ai.js': { isHostileSeat: 0, hostileSeats: 0, hostileFirstPool: 0 },
     'skills.js': { isHostileSeat: 2, hostileSeats: 0, hostileFirstPool: 0 },
     'sha-flow.js': { isHostileSeat: 0, hostileSeats: 0, hostileFirstPool: 0 },
     'tricks.js': { isHostileSeat: 0, hostileSeats: 0, hostileFirstPool: 0 },
@@ -150,12 +150,21 @@ test('M2 守护: 直读别名赋值零匹配 (防 var f = StateRuntime.isHostile
   }
 });
 
-test('M2 守护: ai.js 唯一直读位于黄天主公检查 (锚定上下文)', () => {
+test('M2 守护: 黄天统一校验主公技资格，AI 对伪帝接收者仍只读感知身份', () => {
   const ai = srcText('ai.js');
-  const idx = ai.indexOf('StateRuntime.isHostileSeat(');
-  const context = ai.slice(Math.max(0, idx - 300), idx + 100);
-  assert.ok(context.includes("roles[seat] === '主公'"),
-    'ai.js 直读必须紧邻主公身份确认 (主公身份恒公开)');
+  const idx = ai.indexOf('var htLordSeat = null;');
+  const context = ai.slice(idx, ai.indexOf('if (htLordSeat) {', idx));
+  assert.match(context, /StateRuntime\.lordSkillTargetAvailable\(game, actor, 'huangtian', seat\)/);
+  assert.match(context, /StateRuntime\.perceivedHostile\(game, actor, seat\)/);
+  assert.doesNotMatch(context, /StateRuntime\.isHostileSeat|\.roles\[/);
+  const state = srcText('state.js');
+  const targetGate = state.slice(state.indexOf('function lordSkillTargetAvailable('), state.indexOf('function skillsForActor('));
+  assert.match(targetGate, /hasLordSkill\(game, target, skillId\)/, '目标仍须通过有效主公技资格出口');
+  const ownerGate = state.slice(state.indexOf('function hasLordSkill('), state.indexOf('function lordSkillTargetAvailable('));
+  assert.match(ownerGate, /game\.roles\[actor\] === '主公'/, '真实主公分支仍须校验主公身份');
+  assert.match(ownerGate, /viewedLordSkills\(game, actor\)/, '非主公只能经伪帝视图获得资格');
+  const viewedGate = state.slice(state.indexOf('function viewedLordSkills('), state.indexOf('function hasLordSkill('));
+  assert.match(viewedGate, /hasSkill\(state, 'weidi'\)/, '视图仍要求自身有效伪帝');
 });
 
 test('M2 守护: 感知路由已接管 AI 知识层 (perceived* 存在性锚点)', () => {

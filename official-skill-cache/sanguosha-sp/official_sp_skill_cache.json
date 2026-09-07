@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "pack": "SP",
+  "includeFullSkillText": false,
+  "interactions": [
+    {
+      "kind": "lord-awakens-first",
+      "sourceLine": "card__hero__neutral.md:634",
+      "sourceTextSha256": "0723ef6393c5dfd3396f6e0d998aba21221e137ca6d840bde525145d6dfb79a4"
+    },
+    {
+      "kind": "yuanshu-awakens-first",
+      "sourceLine": "card__hero__neutral.md:635",
+      "sourceTextSha256": "3cafb4cde25e4a4ba1a1f20a0374b71d1e2516fb798e6cd10c385d2a9fbcc847"
+    },
+    {
+      "kind": "no-lord-skill-recursion",
+      "sourceLine": "card__hero__neutral.md:637",
+      "sourceTextSha256": "c694d556ef24c290dea2a4da0a0befc7c37e7dea0a6325571eb0e4b0a1219d5b"
+    }
+  ],
+  "heroes": [
+    {
+      "localHeroId": "sp_guanyu",
+      "name": "SP 关羽",
+      "skills": [
+        {
+          "localSkillId": "danji",
+          "name": "单骑",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__wei.md:595",
+          "sourceTextSha256": "d9bf705afca2006e6c6eed651bab83dbc4d53dc35016e77f6adb8967e092eaea",
+          "sourceTextRef": "d9bf705afca2",
+          "implementationSpec": {
+            "summary": "准备阶段手牌数大于体力且主公为曹操，减1体力上限并获得马术。",
+            "timing": "准备阶段开始时",
+            "condition": "手牌数大于体力且主公为曹操",
+            "cost": "减1点体力上限",
+            "effect": "获得马术",
+            "frequency": "每局一次",
+            "engineHooks": [
+              "onPreparePhase"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "localHeroId": "sp_yuanshu",
+      "name": "SP 袁术",
+      "skills": [
+        {
+          "localSkillId": "yongsi",
+          "name": "庸肆",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__neutral.md:621",
+          "sourceTextSha256": "690ffa2faf8c1fa6a203ea804e5ae8325bd5d6b4a3cbb00e1becc0f94190cb17",
+          "sourceTextRef": "690ffa2faf8c",
+          "implementationSpec": {
+            "summary": "摸牌阶段额外摸当前存活势力数X张；弃牌阶段开始时弃X张手牌或装备牌，再执行正常手牌上限弃牌。",
+            "timing": "摸牌阶段和弃牌阶段开始时",
+            "condition": "存在该阶段且技能有效",
+            "cost": "弃牌阶段开始时弃当前势力数X张牌",
+            "effect": "摸牌多摸X；弃牌先弃X手牌或装备，再检查手牌上限",
+            "frequency": "锁定技",
+            "engineHooks": [
+              "onDrawPhase",
+              "triggerYongsiDiscardStart"
+            ]
+          }
+        },
+        {
+          "localSkillId": "weidi",
+          "name": "伪帝",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__neutral.md:622",
+          "sourceTextSha256": "e357a38417cfdf15be33be167ba808eaede144d3dab34d8633119b9cddf8842a",
+          "sourceTextRef": "e357a38417cf",
+          "implementationSpec": {
+            "summary": "实时视为拥有主公现有主公技；主公失去技能则视为拥有消失。自身获得的激将保留，但只有主公当前拥有激将时才可发动。",
+            "timing": "每次读取主公技时",
+            "condition": "自身伪帝有效且主公当前拥有该主公技",
+            "cost": "无",
+            "effect": "实时视为拥有主公技；自身获得的激将与视为拥有资格分开",
+            "frequency": "锁定技",
+            "engineHooks": [
+              "hasLordSkill"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "containsImplementationSpecs": true,
+  "source": {
+    "rawCachePath": "official-skill-cache/gltjk-sanguosha-rules/pages/",
+    "method": "local-mirror-extraction",
+    "gidPolicy": "Only existing local hero IDs; no fabricated official gid or URL."
+  },
+  "cacheKind": "sanguosha-official-sp-skills-safe-cache",
+  "containsOfficialText": false
+}

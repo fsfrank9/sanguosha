@@ -164,6 +164,16 @@
     handLossHandler(game, origin);
   }
 
+  // 拼点的实体牌已扣入调用方的处理区快照, 尚不能进入弃牌堆。双方扣置
+  // 完成后通过同一失牌入口提交事件; actor 让 JSON 克隆后的快照也能找到
+  // 正确来源 (不可枚举的 _handOrigin 不会被序列化)。调用方记账防重复。
+  function commitHandLossToProcessing(game, card, actor) {
+    if (!card) return;
+    var origin = game[actor] || card._handOrigin;
+    clearHandOrigin(card);
+    settleHandLoss(game, origin, { zone: 'processing' });
+  }
+
   function zoneArrayOf(game, ref) {
     if (!ref) return null;
     if (ref.zone === 'deck') return game.deck;
@@ -360,5 +370,6 @@
     putCard: putCard,
     moveCard: moveCard,
     markHandOrigin: markHandOrigin,
+    commitHandLossToProcessing: commitHandLossToProcessing,
     setHandLossHandler: setHandLossHandler
   };

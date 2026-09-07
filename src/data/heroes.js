@@ -113,12 +113,12 @@
         { id: 'sp_zhaoyun', name: 'SP 赵云', camp: '群', gender: 'male', title: '白马先锋', maxHp: 3, quote: '龙胆在身，进退无惧。', skills: [{ id: 'longdan', name: '龙胆', desc: '杀/闪互转。' }, { id: 'chongzhen', name: '冲阵', desc: '发动龙胆时可获得对方牌。' }] },
         { id: 'sp_diaochan', name: 'SP 貂蝉', camp: '群', gender: 'female', title: '暗黑的傀儡师', maxHp: 3, quote: '这场戏才刚刚开始。', skills: [{ id: 'lihun', name: '离魂', desc: '可获得男性角色手牌后交还。' }, { id: 'biyue', name: '闭月', desc: '结束阶段摸一张。' }] },
         { id: 'sp_machao', name: 'SP 马超', camp: '群', gender: 'male', title: '西凉的猛狮', maxHp: 4, quote: '西凉铁骑，踏破山河！', skills: [{ id: 'zhuiji', name: '追击', desc: '距离相关锁定技。' }, { id: 'shichou', name: '誓仇', desc: '主公技/限定技展示。' }] },
-        { id: 'sp_guanyu', name: 'SP 关羽', camp: '魏', gender: 'male', title: '汉寿亭侯', maxHp: 4, quote: '单刀赴会，义薄云天。', skills: [{ id: 'wusheng', name: '武圣', desc: '红牌当杀。' }, { id: 'danji', name: '单骑', desc: '觉醒技：条件达成后获得马术。' }] },
+        { id: 'sp_guanyu', name: 'SP 关羽', camp: '魏', gender: 'male', title: '汉寿亭侯', maxHp: 4, quote: '单刀赴会，义薄云天。', skills: [{ id: 'wusheng', name: '武圣', desc: '红牌当杀。' }, { id: 'danji', name: '单骑', desc: '觉醒技：准备阶段手牌数大于体力且主公为曹操，减1点体力上限并获得马术。' }] },
         { id: 'sp_jiaxu', name: 'SP 贾诩', camp: '魏', gender: 'male', title: '算无遗策', maxHp: 3, quote: '一切尽在算计。', skills: [{ id: 'zhenlue', name: '缜略', desc: '锦囊不受距离/无懈影响。' }, { id: 'jianshu', name: '间书', desc: '限定技：交给牌并令二人拼点。' }, { id: 'yongdi', name: '拥嫡', desc: '限定技：令男性角色加上限。' }] },
         { id: 'sp_caoren', name: 'SP 曹仁', camp: '魏', gender: 'male', title: '险不辞难', maxHp: 4, quote: '据守城池，以待援军。', skills: [{ id: 'weikui', name: '伪溃', desc: '可失体力观看并弃牌。' }, { id: 'lizhan', name: '励战', desc: '结束阶段令角色摸牌。' }] },
         { id: 'sp_ganning', name: 'SP 甘宁', camp: '吴', gender: 'male', title: '铃铛游侠', maxHp: 4, quote: '锦帆夜袭，片甲不留。', skills: [{ id: 'yinling', name: '银铃', desc: '可将黑色牌置为锦。' }, { id: 'junwei', name: '军威', desc: '结束阶段可弃锦令目标选择。' }] },
         { id: 'sp_pangde', name: 'SP 庞德', camp: '魏', gender: 'male', title: '决死抬榇', maxHp: 4, quote: '今日不是你死，就是我亡。', skills: [{ id: 'mashu', name: '马术', desc: '距离 -1。' }, { id: 'jianchu', name: '鞬出', desc: '杀指定后可弃目标牌。' }] },
-        { id: 'sp_yuanshu', name: 'SP 袁术', camp: '群', gender: 'male', title: '仲家帝', maxHp: 4, quote: '玉玺在手，天下我有。', skills: [{ id: 'yongsi', name: '庸肆', desc: '摸牌/弃牌数与势力数相关。' }, { id: 'weidi', name: '伪帝', desc: '拥有当前主公技。' }] },
+        { id: 'sp_yuanshu', name: 'SP 袁术', camp: '群', gender: 'male', title: '仲家帝', maxHp: 4, quote: '玉玺在手，天下我有。', skills: [{ id: 'yongsi', name: '庸肆', desc: '摸牌阶段多摸X张，弃牌阶段开始时弃X张手牌或装备牌，X为全场势力数。' }, { id: 'weidi', name: '伪帝', desc: '视为拥有主公当前拥有的主公技，随主公失去而失去该视为拥有。' }] },
         { id: 'sp_daqiao', name: 'SP 大乔', camp: '吴', gender: 'female', title: '韶光易逝', maxHp: 3, quote: '伯符，我去了。', skills: [{ id: 'yanxiao', name: '言笑', desc: '可将方片牌置入判定区抵消判定牌。' }, { id: 'anxian', name: '安娴', desc: '出牌/被杀时摸弃。' }] },
         { id: 'sp_xiahoudun', name: 'SP 夏侯惇', camp: '魏', gender: 'male', title: '啖睛的苍狼', maxHp: 4, quote: '以彼之道，还施彼身。', skills: [{ id: 'fenyong', name: '愤勇', desc: '受到伤害后防止下一次伤害。' }, { id: 'xuehen', name: '雪恨', desc: '准备阶段可弃置来源牌。' }] },
         { id: 'sp_sunshangxiang', name: 'SP 孙尚香', camp: '蜀', gender: 'female', title: '梦醉良缘', maxHp: 3, quote: '夫君，身体要紧。', skills: [{ id: 'liangzhu', name: '良助', desc: '角色回复后可摸牌或令其摸牌。' }, { id: 'fanxiang', name: '返乡', desc: '觉醒技：获得枭姬。' }] }
@@ -261,7 +261,7 @@
         // ═════ v15 V (山包 7 将 15 技 + 凿险授予的"急袭") ═════
         // 觉醒技 (凿险/志继/若愚/魂姿) 是**锁定**的一次性技能: 条件满足就
         // 必须觉醒 → optional:false / mandatory:true / frequency:'oncePerGame'。
-        qiaobian: { trigger: 'drawPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onDrawPhase'] },
+        qiaobian: { trigger: 'phaseStart',        frequency: 'oncePerPhase',    optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onDrawPhase', 'onBeforePlayPhase'] },
         tuntian:  { trigger: 'cardLost',          frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['onCardLost', 'onJudgementAfterResolve'] },
         zaoxian:  { trigger: 'preparePhase',      frequency: 'oncePerGame',     optional: false, mandatory: true,  cost: { type: 'reduceMaxHp', count: 1 },    hooks: ['onPreparePhase'], awakening: true },
         // 急袭 没有武将牌归属 —— 它只能由【凿险】觉醒授予, HERO_CATALOG 里
@@ -274,6 +274,9 @@
         xiangle:  { trigger: 'shaTargetedAfter',  frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onShaEffectiveness', 'xiangle-cost'] },
         fangquan: { trigger: 'turnEnd',           frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'phaseSkip' },                hooks: ['onBeforePlayPhase', 'onTurnEnd', 'fangquan-grant'] },
         ruoyu:    { trigger: 'preparePhase',      frequency: 'oncePerGame',     optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onPreparePhase'], lord: true, awakening: true },
+        danji:    { trigger: 'preparePhase', frequency: 'oncePerGame', optional: false, mandatory: true, cost: { type: 'reduceMaxHp', count: 1 }, hooks: ['onPreparePhase'], awakening: true },
+        yongsi:   { trigger: 'drawPhase', frequency: 'passiveAlways', optional: false, mandatory: true, cost: { type: 'none' }, hooks: ['onDrawPhase', 'triggerYongsiDiscardStart'] },
+        weidi:    { trigger: 'passive', frequency: 'passiveAlways', optional: false, mandatory: true, cost: { type: 'none' }, hooks: ['hasLordSkill'] },
         jiang:    { trigger: 'shaTargetedAfter',  frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onShaTargeted', 'onTrickTargeted'] },
         hunzi:    { trigger: 'preparePhase',      frequency: 'oncePerGame',     optional: false, mandatory: true,  cost: { type: 'reduceMaxHp', count: 1 },    hooks: ['onPreparePhase'], awakening: true },
         zhiba:    { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'rankCompare' },              hooks: ['onActiveSkill', 'pindian:zhiba'], lord: true },

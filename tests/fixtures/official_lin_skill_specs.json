@@ -401,16 +401,16 @@
           "sourceTextRef": "c7387185bd5f",
           "sourceLine": "card__hero__neutral.md:185",
           "spec": {
-            "summary": "主公技，每当其他角色造成伤害后，若受到此伤害的角色为群势力，来源可以判定，若结果为黑桃，你回复1点体力。",
+            "summary": "主公技，其他角色造成伤害后，若来源在受伤者扣减体力前为群势力，来源可以判定，若结果为黑桃，你回复1点体力。",
             "timing": "其他角色造成伤害后。",
-            "condition": "你为主公；受伤者为群势力；来源不是你。",
+            "condition": "你拥有有效主公技；来源不是你，且来源在受伤者扣减体力前为群势力。",
             "cost": "来源进行一次判定。",
             "effect": "判定为黑桃则你回复 1 点体力。",
             "frequency": "无次数限制。",
             "engineHooks": [
-              "onDamageAfter",
+              "onDamageDealt",
               "judge",
-              "roles.主公"
+              "hasLordSkill"
             ]
           }
         }

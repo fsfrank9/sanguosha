@@ -27,6 +27,56 @@
     var fangquanCardId = null;
     var fangquanSeat = null;
     var fangquanWindow = null;
+    // v16 Z2: 四段选择属于具体窗口，不能只凭 kind 沿用上一次暂存。
+    var qiaobianWindow = null;
+    var qiaobianSelection = {};
+
+    function qiaobianButton(attribute, value, label, selected) {
+      return '<button class="mini-card' + (selected ? ' selected' : '') + '" '
+        + attribute + '="' + escapeHtml(value) + '" aria-pressed="' + !!selected + '">'
+        + escapeHtml(label) + '</button>';
+    }
+
+    function fillQiaobian(pending, game) {
+      if (qiaobianWindow !== pending) { qiaobianWindow = pending; qiaobianSelection = {}; }
+      var selected = qiaobianSelection;
+      var moves = pending.moves || [];
+      var costs = pending.cards || [];
+      if (!costs.some(function (card) { return card.cardId === selected.costCardId; })) selected.costCardId = null;
+      if (!moves.some(function (move) { return move.sourceActor === selected.sourceActor; })) {
+        selected.sourceActor = null; selected.sourceZone = null; selected.cardId = null; selected.targetActor = null;
+      }
+      var sourceMoves = moves.filter(function (move) { return move.sourceActor === selected.sourceActor; });
+      var zoneMoves = sourceMoves.filter(function (move) { return move.sourceZone === selected.sourceZone; });
+      var cardMoves = zoneMoves.filter(function (move) { return move.cardId === selected.cardId; });
+      if (!cardMoves.some(function (move) { return move.targetActor === selected.targetActor; })) selected.targetActor = null;
+      function distinct(items, key) {
+        return items.filter(function (item, i) { return items.findIndex(function (other) { return other[key] === item[key]; }) === i; });
+      }
+      var zoneLabels = { equipment: '装备区', judgeArea: '判定区' };
+      if (els.qiaobianHint) els.qiaobianHint.textContent = pending.allowMove
+        ? '巧变：选一张手牌作为成本；可依次选择来源角色、区域、牌及去向。'
+        : '巧变：出牌阶段已被跳过，仍可弃手牌发动，但不能移动牌。';
+      if (els.qiaobianCostCards) els.qiaobianCostCards.innerHTML = '成本手牌：' + costs.map(function (card) {
+        return qiaobianButton('data-qiaobian-cost', card.cardId, card.name + ' ' + suitLabel(card.suit) + (card.rank || ''), selected.costCardId === card.cardId);
+      }).join('');
+      if (els.qiaobianSources) els.qiaobianSources.innerHTML = '① 来源角色：' + distinct(moves, 'sourceActor').map(function (move) {
+        return qiaobianButton('data-qiaobian-source', move.sourceActor, game[move.sourceActor].name, selected.sourceActor === move.sourceActor);
+      }).join('');
+      if (els.qiaobianZones) els.qiaobianZones.innerHTML = '② 来源区域：' + distinct(sourceMoves, 'sourceZone').map(function (move) {
+        return qiaobianButton('data-qiaobian-zone', move.sourceZone, zoneLabels[move.sourceZone], selected.sourceZone === move.sourceZone);
+      }).join('');
+      if (els.qiaobianCards) els.qiaobianCards.innerHTML = '③ 移动一张牌：' + distinct(zoneMoves, 'cardId').map(function (move) {
+        return qiaobianButton('data-qiaobian-card', move.cardId, move.name + ' ' + suitLabel(move.suit) + (move.rank || ''), selected.cardId === move.cardId);
+      }).join('');
+      if (els.qiaobianTargets) els.qiaobianTargets.innerHTML = '④ 目标角色及区域：' + cardMoves.map(function (move) {
+        return qiaobianButton('data-qiaobian-target', move.targetActor, game[move.targetActor].name + ' · ' + zoneLabels[move.targetZone], selected.targetActor === move.targetActor);
+      }).join('');
+      if (els.qiaobianConfirmBtn) els.qiaobianConfirmBtn.disabled = !(selected.costCardId && selected.targetActor);
+      if (els.qiaobianSkipOnlyBtn) els.qiaobianSkipOnlyBtn.disabled = !selected.costCardId;
+    }
+    var yongsiWindow = null;
+    var yongsiIds = [];
 
     function refreshYinghunConfirm() {
       if (els.yinghunConfirmBtn) {
@@ -568,6 +618,8 @@
         refreshLuanwuConfirm();
       } },
       // ═════ v15 V (山包) 四个决策窗 ═════
+      { panelId: 'qiaobianPanel', kind: 'qiaobian-play', fill: fillQiaobian,
+        onHide: function () { qiaobianWindow = null; qiaobianSelection = {}; } },
       { panelId: 'tiaoxinPanel', kind: 'tiaoxin-demand', fill: function (pending, game) {
         els.tiaoxinPanel.hidden = false;
         if (els.tiaoxinHint) {
@@ -583,6 +635,18 @@
               + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
           }).join('') || '<span class="mini-card">没有可用的【杀】</span>';
         }
+      } },
+      { panelId: 'yongsiPanel', kind: 'yongsi-discard', fill: function (pending, game) {
+        if (yongsiWindow !== pending) { yongsiWindow = pending; yongsiIds = []; }
+        els.yongsiPanel.hidden = false;
+        els.yongsiHint.textContent = '庸肆：先弃置 ' + pending.count + ' 张手牌或装备牌，再检查手牌上限。';
+        els.yongsiChoices.innerHTML = pending.options.map(function (opt) {
+          return '<button class="mini-card' + (yongsiIds.indexOf(opt.cardId) >= 0 ? ' selected' : '')
+            + '" data-yongsi-card-id="' + escapeHtml(opt.cardId) + '">'
+            + escapeHtml(opt.name) + '（' + (opt.zone === 'hand' ? '手牌' : '装备') + '）'
+            + suitLabel(opt.suit) + escapeHtml(opt.rank || '') + '</button>';
+        }).join('');
+        els.yongsiConfirmBtn.disabled = yongsiIds.length !== pending.count;
       } },
       { panelId: 'zhijiPanel', kind: 'zhiji-choice', fill: function (pending, game) {
         els.zhijiPanel.hidden = false;
@@ -924,6 +988,39 @@
     }
 
     function bindPromptPanels() {
+    [ ['qiaobianCostCards', 'data-qiaobian-cost', 'costCardId'],
+      ['qiaobianSources', 'data-qiaobian-source', 'sourceActor'],
+      ['qiaobianZones', 'data-qiaobian-zone', 'sourceZone'],
+      ['qiaobianCards', 'data-qiaobian-card', 'cardId'],
+      ['qiaobianTargets', 'data-qiaobian-target', 'targetActor'] ].forEach(function (binding) {
+      if (!els[binding[0]]) return;
+      els[binding[0]].addEventListener('click', function (event) {
+        var pending = getGame().pendingChoice;
+        if (!pending || pending !== qiaobianWindow || pending.kind !== 'qiaobian-play') return;
+        var button = event.target.closest('[' + binding[1] + ']');
+        if (!button) return;
+        var key = binding[2];
+        qiaobianSelection[key] = button.getAttribute(binding[1]);
+        if (key === 'sourceActor') { qiaobianSelection.sourceZone = null; qiaobianSelection.cardId = null; }
+        if (key === 'sourceZone') qiaobianSelection.cardId = null;
+        if (key === 'sourceActor' || key === 'sourceZone' || key === 'cardId') qiaobianSelection.targetActor = null;
+        render();
+      });
+    });
+    function submitQiaobian(mode) {
+      var game = getGame(), pending = game.pendingChoice;
+      if (!pending || pending !== qiaobianWindow || pending.kind !== 'qiaobian-play') return;
+      var choice = mode === 'decline' ? {} : Object.assign({}, qiaobianSelection, {
+        skipOnly: mode === 'skip', targetZone: qiaobianSelection.sourceZone
+      });
+      choice.choiceId = pending.choiceId;
+      var result = Engine.resolvePendingChoice(game, choice);
+      if (!result.ok) renderLog();
+      render();
+    }
+    if (els.qiaobianConfirmBtn) els.qiaobianConfirmBtn.addEventListener('click', function () { submitQiaobian('move'); });
+    if (els.qiaobianSkipOnlyBtn) els.qiaobianSkipOnlyBtn.addEventListener('click', function () { submitQiaobian('skip'); });
+    if (els.qiaobianDeclineBtn) els.qiaobianDeclineBtn.addEventListener('click', function () { submitQiaobian('decline'); });
     // v9 PR-E24: 响应/技能面板候选两步化 — 点候选只 stage (高亮),
     // #handConfirmBtn 才 resolvePendingChoice. selector 供 render 重建后重套高亮.
     if (els.guicaiCandidates) els.guicaiCandidates.addEventListener('click', function (event) {
@@ -1246,6 +1343,19 @@
     if (els.tiaoxinDeclineBtn) els.tiaoxinDeclineBtn.addEventListener('click', function () {
       var r = Engine.resolvePendingChoice(getGame(), { decline: true });
       if (!r.ok) renderLog();
+      render();
+    });
+    if (els.yongsiChoices) els.yongsiChoices.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-yongsi-card-id]');
+      if (!btn) return;
+      var id = btn.getAttribute('data-yongsi-card-id');
+      var index = yongsiIds.indexOf(id);
+      if (index >= 0) yongsiIds.splice(index, 1); else yongsiIds.push(id);
+      render();
+    });
+    if (els.yongsiConfirmBtn) els.yongsiConfirmBtn.addEventListener('click', function () {
+      var result = Engine.resolvePendingChoice(getGame(), { cardIds: yongsiIds.slice() });
+      if (!result.ok) renderLog();
       render();
     });
     if (els.zhijiHealBtn) els.zhijiHealBtn.addEventListener('click', function () {

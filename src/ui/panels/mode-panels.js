@@ -717,6 +717,13 @@
     // 决定高亮哪些座席, 点选确认后直调 useSkill。返回 false 表示当前无
     // 合法座席 → 调用方回退直调 (引擎会给出具体拒绝理由, 不静默)。
     var SEAT_TARGET_SKILLS = {
+      zhiba: {
+        label: '制霸', hint: '制霸：选择一名拥有有效【制霸】的角色拼点',
+        eligible: function (game, seat) {
+          return game.player.camp === '吴' && Engine.lordSkillTargetAvailable(game, 'player', 'zhiba', seat)
+            && Engine.pindianEligible(game, 'player', seat);
+        }
+      },
       // v15 U (林包): 缔盟 — 选**两名**其他角色, 弃置张数 X 由两人手牌差
       // 决定 (引擎按公开的手牌数自算, UI 不自行推断); 乱武是全场型限定技,
       // 无目标点选, 走直调。
@@ -791,6 +798,23 @@
     // 走既有 cardSkillConfig 流程先收好) 后, 依次选两名男性角色 (不含自己)。
     // 返回 false 表示无合法双人组合 (调用方回退旧的直调 useSkill, 会因目标
     // 不足报错, 与改动前行为一致)。
+    function startHuangtianTargetPicker(cardIds) {
+      var game = getGame();
+      var legalSeats = Engine.aliveSeats(game).filter(function (seat) {
+        return Engine.lordSkillTargetAvailable(game, 'player', 'huangtian', seat);
+      });
+      if (legalSeats.length <= 1) return false;
+      startSeatPicker({ legalSeats: legalSeats, needed: 1,
+        hintText: '黄天：选择接收这张牌的角色',
+        onComplete: function (seats) {
+          var result = Engine.useSkill(game, 'player', 'huangtian', cardIds, { target: seats[0] });
+          if (!result.ok) game.log.push(result.message);
+          render();
+        }
+      });
+      return true;
+    }
+
     function startLijianTargetPicker(costCardIds) {
       var game = getGame();
       if (!game) return false;
@@ -1139,6 +1163,7 @@
       // v15 T: 强袭/驱虎/天义 座席点选入口
       tryEnterSeatTargetSkillMode: tryEnterSeatTargetSkillMode,
       startLijianTargetPicker: startLijianTargetPicker,
+      startHuangtianTargetPicker: startHuangtianTargetPicker,
       startTiesuoSeatPicker: startTiesuoSeatPicker,
       activeSeatPickerLegalSeats: activeSeatPickerLegalSeats,
       // v13 J0-1: 已暂存座席查询 (board-panels .is-target-staged 高亮用)。

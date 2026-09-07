@@ -41,7 +41,7 @@
           var lordName = actorDisplayName(pending.lordActor);
           var reasonText = lordAidReasonText(pending);
           els.lordAidHint.textContent =
-            '主公' + lordName + '发动【' + spec.skillName + '】求助' + (reasonText ? '（' + reasonText + '）' : '')
+            lordName + '发动【' + spec.skillName + '】求助' + (reasonText ? '（' + reasonText + '）' : '')
             + '，是否代打【' + spec.cardLabel + '】？';
         }
         if (els.lordAidChoices) {
