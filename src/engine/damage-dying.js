@@ -179,6 +179,8 @@
       // C1: 体力值可降至负数 (gltjk flow__neardeath.md — 1 体力的法正受
       // 【闪电】3 点伤害后为 -2, 需 3 张【桃】方能回到 +1)。不再 clamp 到
       // 0, 否则深度致命伤被一张【桃】抹平, 严重削弱【闪电】/【酒】+【杀】等。
+      // 暴虐读取伤害来源在受伤者扣血前的势力，保留此时快照跨濒死挂起。
+      var sourceCampBeforeDamage = sourceActor && game[sourceActor] ? game[sourceActor].camp : null;
       target.hp = target.hp - amount;
       log(game, actorName(game, targetActor) + '因' + reason + '受到 ' + amount + ' 点伤害。');
       // v12 I3: 敌意记账 (AI 目标评估用, 纯遥测不影响规则) — 记录"谁伤了谁",
@@ -203,6 +205,7 @@
         game: game,
         targetActor: targetActor,
         sourceActor: sourceActor,
+        sourceCampBeforeDamage: sourceCampBeforeDamage,
         reason: reason,
         sourceCard: sourceCard,
         amount: amount,
@@ -221,7 +224,12 @@
         enterDying(game, targetActor, sourceActor);
         if (game.pauseState && game.pauseState.dying) {
           if (!game.pauseState.deferredDamageAfter) game.pauseState.deferredDamageAfter = [];
-          game.pauseState.deferredDamageAfter.push(damageContext);
+          // Z4/C28: 暂停快照只存结算数据。把 game 本身挂入其 pauseState
+          // 会造成循环引用, 拼点后濒死时的 AI 克隆/模拟因此直接抛异常。
+          // 消费时再绑定实际续跑的 game, 避免克隆局钩子操作原局。
+          var deferredContext = Object.assign({}, damageContext);
+          delete deferredContext.game;
+          game.pauseState.deferredDamageAfter.push(deferredContext);
           if (notifyDamageSettled) notifyDamageSettled(true, null);
           return true;
         }
@@ -268,6 +276,9 @@
     // 且游戏未结束时), 再把未被技能获得的来源牌移入弃牌堆。同步路径由
     // damage() 直接调用; 濒死暂停路径由 flushDeferredDamageAfter 延迟调用。
     function finishDamageAfter(game, damageContext) {
+      if (damageContext.game !== game) {
+        damageContext = Object.assign({}, damageContext, { game: game });
+      }
       var targetState = game[damageContext.targetActor];
       var sourceCardClaimed = false;
       var targetAlive = targetState && targetState.hp > 0;

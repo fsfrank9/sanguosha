@@ -542,8 +542,8 @@
       var target = game[foeSeat];
 
       // 桃: hp 缺口梯度。critical (hp=1) > 多伤 > 轻伤; 满血给负分阻止 AI 用。
-      // v12 I: 轻伤 (缺口 1 且血线安全) 不吃桃 — 桃是濒死窗口硬通货,
-      // 平时慢回不如留作救命/抬处决期血线。
+      // v12 I: 轻伤时降低出牌优先级。Z4 的候选门另行保留最后一张救命桃,
+      // 不把持有分改成负数, 避免制衡/弃牌把应保留的桃误当作废牌。
       if (card.type === 'tao') {
         if (self.hp >= self.maxHp) return -100;
         if (self.hp === 1) return 200;
@@ -634,6 +634,32 @@
       }
       if (card.family === 'delayed') return 48;
       return 0;
+    }
+
+    // Z4/C23: 正分低优先级仍会在其他行动结束后被打出, 单靠 25 分不能
+    // 实现轻伤留桃。仅阻止普通回血候选: 安全血线、缺 1 血、无弃牌压力
+    // 且只剩 1 桃时留作救援。额外桃/将要溢出的手牌仍可换体力; 低血与
+    // 多伤沿用原梯度。只读自身及公开状态, 冻结的 v11 及响应/转化均不受影响。
+    function aiReserveLastTao(game, actor, card) {
+      if (card.type !== 'tao' || !aiFeatureOn(game, actor, 'killPressure')) return false;
+      var self = game[actor];
+      if (hasSkill(self, 'yongsi')) {
+        // 庸肆会额外弃 X 张手牌/装备; 全部牌都不得不弃时保留桃没有收益。
+        // 仅在公开可知的必弃面放行, 仍有其他牌可满足成本时继续留桃。
+        var available = self.hand.length + ['weapon', 'armor', 'horsePlus', 'horseMinus']
+          .filter(function (slot) { return self.equipment && self.equipment[slot]; }).length;
+        var camps = new Set(StateRuntime.aliveSeats(game).map(function (seat) {
+          return game[seat].camp;
+        })).size;
+        if (camps >= available) return false;
+      }
+      var reserve = self.hp >= 3 && self.maxHp - self.hp === 1
+        && self.hand.length <= handLimit(game, actor)
+        && self.hand.filter(function (held) { return held.type === 'tao'; }).length === 1;
+      // 3 血不是无条件安全: 复用现有威胁估计, 可达敌席的预期来杀超过
+      // 自身真闪/龙胆/倾国响应余量时放行回血。防具效果仍由原 lookahead
+      // 评估, 不把概率闪避当作保证安全, 也不读取对手暗牌来选例外。
+      return reserve && aiEvaluateStateWithThreat(game, actor) >= aiEvaluateState(game, actor);
     }
 
     // Phase 6F-bis: returns the best card+mode for AI to play, where mode
@@ -875,8 +901,10 @@
       var self = game[actor];
       var candidates = [];
       self.hand.forEach(function (card) {
+        var candidateStart = candidates.length;
+        var reserveTao = aiReserveLastTao(game, actor, card);
         // Original-card use.
-        if (canPlayCard(game, actor, card).ok) {
+        if (!reserveTao && canPlayCard(game, actor, card).ok) {
           // v12 H5: 杀类另行确认存在可达敌对目标 (∃-目标语义含友方座席)
           if (!isShaType(card.type) || aiShaTargetSeat(game, actor, card)) {
             // v8 PR-D3: 用 lookahead 综合分; sim 失败回退到 scoreCardForAI
@@ -903,6 +931,13 @@
               candidates.push({ card: card, mode: 'convert', asType: conv.asType, score: convScore });
             }
           });
+        }
+        // 若转化候选也要消耗这张桃, 单独过滤回血会强迫低收益的武圣等
+        // 转化, 并未保留资源。恢复普通回血与转化的原比较, 不替换旧决策。
+        if (reserveTao && candidates.length > candidateStart && canPlayCard(game, actor, card).ok) {
+          var healScore = aiScoreCardWithLookahead(game, actor, card, 'normal');
+          if (healScore > 0) candidates.splice(candidateStart, 0,
+            { card: card, mode: 'normal', score: healScore });
         }
       });
       candidates.sort(function (a, b) { return b.score - a.score; });
@@ -1095,14 +1130,13 @@
       // 制霸 (孙策主公技, 由其他吴势力角色发起): 没赢才有收益 —— 收益归主公,
       // 发起者只是"送牌"。所以只有感知友方的主公才值得发起, 且用最小的牌去拼
       // (故意输) 把两张牌塞给主公。手牌太少时不发起 (自身牌荒优先自用)。
-      if (!self.flags.zhibaUsed && (self.hand || []).length >= 2) {
+      if ((self.hand || []).length >= 2) {
         var zbLord = StateRuntime.aliveSeats(game).find(function (seat) {
-          return seat !== actor && game.roles && game.roles[seat] === '主公'
-            && hasSkill(game[seat], 'zhiba');
+          return StateRuntime.lordSkillTargetAvailable(game, actor, 'zhiba', seat);
         });
         if (zbLord && self.camp === '吴' && !StateRuntime.perceivedHostile(game, actor, zbLord)
             && deps.pindianEligible && deps.pindianEligible(game, actor, zbLord)) {
-          return { skillId: 'zhiba', cardIds: [], options: {} };
+          return { skillId: 'zhiba', cardIds: [], options: { target: zbLord } };
         }
       }
 
@@ -1193,14 +1227,13 @@
       }
 
       // v12 H7: 黄天 — 群势力 AI 在自己出牌阶段把多余【闪】交给同阵营主公张角。
-      if (game.mode === 'identity3' && self.camp === '群' && !self.flags.huangtianUsed) {
+      if (game.mode === 'identity3' && self.camp === '群') {
         var htLordSeat = null;
         StateRuntime.seatList(game).forEach(function (seat) {
           if (htLordSeat || seat === actor) return;
           var st = game[seat];
-          if (st && st.hp > 0 && hasSkill(st, 'huangtian')
-              && game.roles && game.roles[seat] === '主公'
-              && !StateRuntime.isHostileSeat(game, actor, seat)) {
+          if (st && StateRuntime.lordSkillTargetAvailable(game, actor, 'huangtian', seat)
+              && !StateRuntime.perceivedHostile(game, actor, seat)) {
             htLordSeat = seat;
           }
         });
@@ -1208,10 +1241,10 @@
           var spareShans = self.hand.filter(function (c) { return c.type === 'shan'; });
           var spareShandian = self.hand.find(function (c) { return c.type === 'shandian'; });
           if (spareShans.length >= 2) {
-            return { skillId: 'huangtian', cardIds: [spareShans[0].id] };
+            return { skillId: 'huangtian', cardIds: [spareShans[0].id], options: { target: htLordSeat } };
           }
           if (spareShandian) {
-            return { skillId: 'huangtian', cardIds: [spareShandian.id] };
+            return { skillId: 'huangtian', cardIds: [spareShandian.id], options: { target: htLordSeat } };
           }
         }
       }
@@ -1355,13 +1388,17 @@
       return 0;
     }
 
+    function scoreCardForDiscard(game, actor, card) {
+      return scoreCardForAI(game, actor, card) + aiDiscardHoldValue(game, actor, card);
+    }
+
     function aiDiscardCandidates(game, actor) {
       var state = game[actor];
       var count = getDiscardCount(game, actor);
       if (!state || count <= 0) return [];
       return state.hand
         .map(function (card) {
-          return { card: card, score: scoreCardForAI(game, actor, card) + aiDiscardHoldValue(game, actor, card) };
+          return { card: card, score: scoreCardForDiscard(game, actor, card) };
         })
         .sort(function (a, b) { return a.score - b.score; })
         .slice(0, count)
@@ -1630,6 +1667,7 @@
 
     return {
       scoreCardForAI: scoreCardForAI,
+      scoreCardForDiscard: scoreCardForDiscard,
       aiEstimateShaCount: aiEstimateShaCount,
       aiEstimateShanCount: aiEstimateShanCount,
       // v12 I2: 可见信息计数建模 (诚实估计) + profile 路由

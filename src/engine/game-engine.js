@@ -54,7 +54,11 @@
       var handLimit = StateRuntime.handLimit;
       var getActorStatus = StateRuntime.getActorStatus;
       var hasEquipmentEffect = StateRuntime.hasEquipmentEffect;
-      var setPhase = PhaseRuntime.setPhase;
+      function setPhase(game, actor, phase) {
+        var result = PhaseRuntime.setPhase(game, actor, phase);
+        if (phase === 'discard' && SkillDomain) SkillDomain.triggerYongsiDiscardStart(game, actor);
+        return result;
+      }
       var nextPlayablePhase = PhaseRuntime.nextPlayablePhase;
       var resetActorTurnState = PhaseRuntime.resetActorTurnState;
       // v15 S1: 蛊惑限次全场按回合复位 (响应窗口声明发生在他人回合内)
@@ -415,6 +419,7 @@
         processJudgeArea: function (game, actor) { return processJudgeArea(game, actor); },
         continueTurnAfterJudgeArea: function (game, actor) { return continueTurnAfterJudgeArea(game, actor); },
         continueTurnAfterPreparePhase: function (game, actor) { return continueTurnAfterPreparePhase(game, actor); },
+        resumeQiaobianPlay: function (game) { return SkillDomain.resumeQiaobianPlay(game); },
         // v12 H2: AOE 逐座席队列被濒死救援挂起后的续跑 (锦囊域后置装配, 包装注入)
         resumeAOETargets: function (game) { return TricksRuntime.advanceAOETargets(game); },
         // v15 T 评审收口: 强袭成本致濒死时的伤害段续跑 (SkillDomain 后置
@@ -447,6 +452,8 @@
       var pendingChoiceGuard = ResponseRuntime.pendingChoiceGuard;
       // v15 T: 拼点域 (驱虎/天义 前置; 后续烈刃/制霸/间书 同框架)。
       var PindianRuntime = createPindianRuntime({
+        responseFlows: ResponseRuntime.responseFlows,
+        notifyCardLoss: notifyCardLoss,
         log: log,
         fail: fail,
         success: success,
@@ -1121,6 +1128,9 @@
           return AIRuntime.aiDiscardCandidates
             ? AIRuntime.aiDiscardCandidates(game, seat) : null;
         },
+        scoreCardForDiscard: function (game, seat, card) {
+          return AIRuntime.scoreCardForDiscard(game, seat, card);
+        },
         // v15 T: 拼点 (驱虎/天义) — 发起入口与效果注册 (拼点域后置装配,
         // 包装注入)。
         startPindian: function (game, actor, targetActor, opts) {
@@ -1175,6 +1185,8 @@
         processJudgeArea: processJudgeArea,
         continueTurnAfterJudgeArea: continueTurnAfterJudgeArea,
         continueTurnAfterPreparePhase: continueTurnAfterPreparePhase,
+        continueTurnAfterBeforePlayPhase: continueTurnAfterBeforePlayPhase,
+        notifyCardLoss: notifyCardLoss,
         enterDying: enterDying,
         isNormalTrickCard: isNormalTrickCard,
         randomSuit: randomSuit,
@@ -1198,6 +1210,7 @@
         applyHongyanJudgementView: applyHongyanJudgementView,
         restoreHongyanJudgementView: restoreHongyanJudgementView,
         handLimit: handLimit,
+        recordDiscardPhaseLoss: recordDiscardPhaseLoss,
         CARD_INFO: CARD_INFO,
         scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); }
       });
@@ -1289,6 +1302,8 @@
       registerResponseKind('zhiji-choice', resolveZhijiChoice);
       // 放权: 回合结束时"弃一张手牌令一名其他角色获得额外回合"。
       registerResponseKind('fangquan-grant', resolveFangquanGrantChoice);
+      registerResponseKind('qiaobian-play', SkillDomain.resolveQiaobianPlayChoice);
+      registerResponseKind('yongsi-discard', SkillDomain.resolveYongsiDiscardChoice);
       // 享乐: 杀的**来源**决定是否弃一张基本牌 (resolver 在杀结算链域)。
       registerResponseKind('xiangle-cost', ShaFlowRuntime.resolveXiangleCostChoice);
 
@@ -1306,8 +1321,7 @@
       function lordAidEnabled(game, lordActor, skillId) {
         var spec = LORD_AID_SPECS[skillId];
         var lordState = game[lordActor];
-        return !!(spec && lordState && lordState.hp > 0 && hasSkill(lordState, skillId)
-          && game.roles && game.roles[lordActor] === '主公'
+        return !!(spec && lordState && lordState.hp > 0 && StateRuntime.hasLordSkill(game, lordActor, skillId)
           && !(lordState.skillPreferences && lordState.skillPreferences[skillId] === 'decline'));
       }
 
@@ -1962,8 +1976,7 @@
         if (userActor === targetActor) return 0;
         var target = game[targetActor];
         var user = game[userActor];
-        if (!target || !user || !hasSkill(target, 'jiuyuan')) return 0;
-        if (!game.roles || game.roles[targetActor] !== '主公') return 0;
+        if (!target || !user || !StateRuntime.hasLordSkill(game, targetActor, 'jiuyuan')) return 0;
         if (user.camp !== '吴') return 0;
         log(game, actorName(game, targetActor) + '的【救援】生效，回复量 +1。');
         return 1;
@@ -2562,14 +2575,21 @@
         SkillRuntime.runHook(skillRegistry, 'onDiscardPhaseEnd', {
           game: game,
           actor: actor,
-          discardedCards: (flags.discardPhaseCards || []).slice()
+          discardedCards: (flags.discardPhaseCards || []).slice(),
+          allDiscardedCards: (flags.discardPhaseAllCards || flags.discardPhaseCards || []).slice()
         });
         flags.discardPhaseCards = [];
+        delete flags.discardPhaseAllCards;
       }
 
       function finishDrawPhaseAndAdvance(game, actor) {
-        var state = game[actor];
         runBeforePlayPhaseHooks(game, actor);
+        if (game.pendingChoice) return success('等待出牌阶段前的技能选择。');
+        return continueTurnAfterBeforePlayPhase(game, actor);
+      }
+
+      function continueTurnAfterBeforePlayPhase(game, actor) {
+        var state = game[actor];
         setPhase(game, actor, nextPlayablePhase(state));
         log(game, actorName(game, actor) + '进入' + (game.phase === 'play' ? '出牌' : '弃牌') + '阶段。');
         return success('回合开始。');
@@ -2722,11 +2742,13 @@
       // v15 V: 固政 (张昭张纮) 要"其于此阶段内因其弃置而失去过的手牌", 所以
       // 弃牌阶段的弃牌要按回合记账。存在 state.flags 上, 随 setPhase 进入
       // 弃牌阶段时清空 (见 setPhase), 由 onDiscardPhaseEnd 消费。
-      function recordDiscardPhaseLoss(game, actor, cards) {
+      function recordDiscardPhaseLoss(game, actor, cards, allCards) {
         var state = game[actor];
-        if (!state || game.phase !== 'discard' || !cards || !cards.length) return;
+        allCards = allCards || cards;
+        if (!state || game.phase !== 'discard' || !allCards || !allCards.length) return;
         state.flags = state.flags || {};
         state.flags.discardPhaseCards = (state.flags.discardPhaseCards || []).concat(cards);
+        state.flags.discardPhaseAllCards = (state.flags.discardPhaseAllCards || []).concat(allCards);
         notifyCardLoss(game, actor); // v15 V: 屯田 (回合外过滤在技能侧)
       }
 
@@ -2795,10 +2817,7 @@
           return success('进入摸牌阶段。');
         }
         if (game.phase === 'draw') {
-          runBeforePlayPhaseHooks(game, actor);
-          setPhase(game, actor, nextPlayablePhase(game[actor]));
-          log(game, actorName(game, actor) + '进入' + (game.phase === 'play' ? '出牌' : '弃牌') + '阶段。');
-          return success('进入' + (game.phase === 'play' ? '出牌' : '弃牌') + '阶段。');
+          return finishDrawPhaseAndAdvance(game, actor);
         }
         if (game.phase === 'play') return finishPlayPhase(game);
         if (game.phase === 'discard') {
@@ -3234,8 +3253,7 @@
         if (!LORD_WIDE_SKILLS[skillId]) return false;
         return seatList(game).some(function (seat) {
           var seatState = game[seat];
-          return seatState && seatState.hp > 0 && hasSkill(seatState, skillId)
-            && game.roles && game.roles[seat] === '主公';
+          return seatState && seatState.hp > 0 && StateRuntime.hasLordSkill(game, seat, skillId);
         });
       }
 
@@ -3246,7 +3264,7 @@
         cardIds = cardIds || [];
         options = options || {};
         if (!self) return fail('未知角色。');
-        if (!hasSkill(self, skillId) && !lordWideSkillAvailable(game, skillId)) return fail('没有这个技能。');
+        if (!hasSkill(self, skillId, game) && !lordWideSkillAvailable(game, skillId)) return fail('没有这个技能。');
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         if (game.turn !== actor) return fail('还没有轮到你行动。');
         if (PLAY_PHASE_ACTIVE_SKILLS[skillId] && game.phase !== 'play') return fail('主动技能只能在出牌阶段发动。');
@@ -3444,6 +3462,9 @@
         needsDiscard: needsDiscard,
         discardSelected: discardSelected,
         handLimit: handLimit,
+        skillsForActor: StateRuntime.skillsForActor,
+        hasLordSkill: StateRuntime.hasLordSkill,
+        lordSkillTargetAvailable: StateRuntime.lordSkillTargetAvailable,
         getActorStatus: getActorStatus,
         seatList: seatList,
         aliveSeats: aliveSeats,

@@ -20,6 +20,8 @@ const SPEC_FIXTURE_PATHS = [
   'tests/fixtures/official_lin_skill_specs.json',
   // v15 V: 山包接入
   'tests/fixtures/official_shan_skill_specs.json',
+  // v16 Z1: SP 3 技的结构化规格与所有已实现技能接受同一完整性审计。
+  'tests/fixtures/official_sp_skill_specs.json',
 ].map((rel) => path.join(root, rel));
 const REQUIRED_SPEC_FIELDS = [
   'summary',

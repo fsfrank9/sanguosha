@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "pack": "SP",
+  "source": {
+    "rawCachePath": "official-skill-cache/gltjk-sanguosha-rules/pages/",
+    "method": "local-mirror-extraction",
+    "gidPolicy": "Only existing local hero IDs; no fabricated official gid or URL."
+  },
+  "includeFullSkillText": false,
+  "heroes": [
+    {
+      "localHeroId": "sp_guanyu",
+      "name": "SP 关羽",
+      "skills": [
+        "单骑"
+      ]
+    },
+    {
+      "localHeroId": "sp_yuanshu",
+      "name": "SP 袁术",
+      "skills": [
+        "庸肆",
+        "伪帝"
+      ]
+    }
+  ]
+}

@@ -233,8 +233,12 @@
           // v15 V (山包) 四个决策窗
           'tiaoxinPanel', 'tiaoxinHint', 'tiaoxinChoices', 'tiaoxinDeclineBtn',
           'zhijiPanel', 'zhijiHint', 'zhijiHealBtn', 'zhijiDrawBtn',
+          'yongsiPanel', 'yongsiHint', 'yongsiChoices', 'yongsiConfirmBtn',
           'fangquanPanel', 'fangquanHint', 'fangquanCards', 'fangquanChoices',
           'fangquanConfirmBtn', 'fangquanDeclineBtn',
+          'qiaobianPanel', 'qiaobianHint', 'qiaobianCostCards', 'qiaobianSources',
+          'qiaobianZones', 'qiaobianCards', 'qiaobianTargets', 'qiaobianConfirmBtn',
+          'qiaobianSkipOnlyBtn', 'qiaobianDeclineBtn',
           'xianglePanel', 'xiangleHint', 'xiangleChoices', 'xiangleDeclineBtn',
           'shuangxiongPanel', 'shuangxiongHint', 'shuangxiongConfirmBtn', 'shuangxiongDeclineBtn',
           'quhuVictimPanel', 'quhuVictimHint', 'quhuVictimChoices',
@@ -626,6 +630,14 @@
           return;
         }
         var cardIds = config.max === 1 ? selectedSkillCardIds.slice(0, 1) : selectedSkillCardIds;
+        if (skillSelectMode === 'huangtian') {
+          exitSkillSelectMode();
+          if (modePanels.startHuangtianTargetPicker(cardIds)) { render(); return; }
+          var htResult = Engine.useSkill(game, 'player', 'huangtian', cardIds, {});
+          if (!htResult.ok) game.log.push(htResult.message);
+          render();
+          return;
+        }
         // v12 H6/H7: 离间 (lijian) 需先弃 1 张成本牌, 再依次选两名男性角色
         // 目标 — 成本牌确认后不立即 useSkill, 转入座席点选 (与卡牌目标点选
         // 共用骨架)。identity3 下若凑不出两名合法男性目标 (1v1 恒如此),
@@ -1448,7 +1460,9 @@
         // 放权是两段选择 + 确认。
         { panelId: 'tiaoxinPanel',          confirmBtnId: null,                     cancelBtnId: 'tiaoxinDeclineBtn' },
         { panelId: 'zhijiPanel',            confirmBtnId: 'zhijiHealBtn',           cancelBtnId: 'zhijiDrawBtn' },
+        { panelId: 'yongsiPanel',           confirmBtnId: 'yongsiConfirmBtn' },
         { panelId: 'fangquanPanel',         confirmBtnId: 'fangquanConfirmBtn',     cancelBtnId: 'fangquanDeclineBtn' },
+        { panelId: 'qiaobianPanel',         confirmBtnId: 'qiaobianConfirmBtn',     cancelBtnId: 'qiaobianDeclineBtn' },
         { panelId: 'xianglePanel',          confirmBtnId: null,                     cancelBtnId: 'xiangleDeclineBtn' },
         { panelId: 'shuangxiongPanel',      confirmBtnId: 'shuangxiongConfirmBtn',  cancelBtnId: 'shuangxiongDeclineBtn' },
         { panelId: 'quhuVictimPanel',       confirmBtnId: null,                     cancelBtnId: null },

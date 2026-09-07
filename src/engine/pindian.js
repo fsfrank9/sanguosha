@@ -11,7 +11,7 @@
   //   ◆ 若拼点的两名角色中有一名在亮出前死亡, 之后仍亮出其拼点的牌确定
   //     结果 (本实现: 出牌已在选牌期离手并锚在 pauseState, 死亡不影响)。
   //
-  // 关键顺序: 弃置发生在"赢/没赢后"效果**之后** — 烈刃类"获得其拼点牌"
+  // 关键顺序: 弃置发生在"赢/没赢后"效果**之后** — 制霸"获得两张拼点的牌"
   // 必须能在效果窗口内把牌拿走。本实现的 flushPindianCards 只弃置"结算
   // 后仍不在任何区域"的拼点牌, 天然兼容认领。
   //
@@ -19,12 +19,14 @@
   // 'pindian-card' (单槽 + FIFO 队列), AI 席同步选; 双方都是 AI 时整个
   // 拼点同步跑完。选牌期实体牌锚在 pauseState.pindian (守恒 census 在途面)。
   import { StateRuntime } from './state.js';
+  import { CardRuntime } from './card-runtime.js';
 
   export function createPindianRuntime(deps) {
     var log = deps.log;
     var fail = deps.fail;
     var success = deps.success;
     var actorName = deps.actorName;
+    var flows = deps.responseFlows;
 
     // 效果注册表: 各技能按 key 注册"赢/没赢后"的延续 (无懈链 continuation
     // 同款), 拼点框架本身不认识任何技能。
@@ -65,7 +67,7 @@
       };
       log(game, actorName(game, actor) + '与' + actorName(game, targetActor)
         + '进行' + (opts.reason || '拼点') + '。');
-      return collectPindianCards(game);
+      return flows.run(game, 'pindian', game.pauseState.pindian);
     }
 
     // 逐方收集拼点牌 (官方"同时"扣置 — 实现为发起者先、目标后; 两张牌在
@@ -106,6 +108,31 @@
         }
         takePindianCard(game, seat, picked.id);
       }
+      return settlePindianHandLosses(game, pd);
+    }
+
+    // 双方都扣置完成后, 先处理「失去手牌后」再亮牌。不能在最终弃牌时
+    // 才提交失牌: 连营所得的桃可用于驱虎伤害后的救援, 屯田也属此时机。
+    // 进度先记再派发, 嵌套选择排空后由统一帧恢复, 不重复摸牌/判定。
+    function settlePindianHandLosses(game, pd) {
+      if (!pd.lossOrder) {
+        pd.lossOrder = StateRuntime.seatsFrom(game, game.turn || pd.actor, true)
+          .filter(function (seat) { return seat === pd.actor || seat === pd.target; });
+        pd.lossIdx = 0;
+        pd.lossStage = 'hand';
+      }
+      while (pd.lossIdx < pd.lossOrder.length) {
+        var actor = pd.lossOrder[pd.lossIdx];
+        if (pd.lossStage === 'hand') {
+          pd.lossStage = 'card';
+          CardRuntime.commitHandLossToProcessing(game, pd.cards[actor], actor);
+          if (flows.blocked(game)) return success('拼点等待失牌效果。');
+        }
+        pd.lossIdx += 1;
+        pd.lossStage = 'hand';
+        deps.notifyCardLoss(game, actor);
+        if (flows.blocked(game)) return success('拼点等待失牌效果。');
+      }
       return revealPindian(game);
     }
 
@@ -123,7 +150,7 @@
     function abortPindian(game, reason) {
       var pd = game.pauseState && game.pauseState.pindian;
       if (!pd) return;
-      game.pauseState.pindian = null;
+      flows.finish(game, 'pindian', pd);
       Object.keys(pd.cards).forEach(function (seat) {
         deps.discardCard(game, pd.cards[seat]);
       });
@@ -132,7 +159,7 @@
 
     function revealPindian(game) {
       var pd = game.pauseState.pindian;
-      game.pauseState.pindian = null;
+      flows.finish(game, 'pindian', pd);
       var initiatorCard = pd.cards[pd.actor];
       var targetCard = pd.cards[pd.target];
       var initiatorRank = deps.cardRankValue(initiatorCard);
@@ -156,7 +183,7 @@
       var continuation = pd.key && PINDIAN_CONTINUATIONS[pd.key];
       var result = continuation ? continuation(game, outcome) : success('拼点结算完成。');
       // 官方顺序是「"赢/没赢后"效果 → 处理区拼点牌入弃牌堆」。效果挂起时
-      // (驱虎赢后由荀彧选受伤角色 / 未来烈刃的"获得其拼点牌") 还不能弃 —
+      // (驱虎赢后由荀彧选受伤角色及后续伤害/濒死选择) 还不能弃 —
       // 否则认领面在窗口打开时就已经没牌可认。挂起时留账, 由
       // resumeSuspendedTurnFlowIfReady 在选择排空后 flush。
       if (game.pendingChoice) return result;
@@ -165,7 +192,7 @@
     }
 
     // 官方: "然后将处理区里所有拼点的牌置入弃牌堆" — 只弃置结算后仍不在
-    // 任何区域的牌 (烈刃类"获得其拼点牌"已把牌移走的天然跳过)。
+    // 任何区域的牌 (制霸"获得两张拼点的牌"已把牌移走的天然跳过)。
     function flushPindianCards(game) {
       var pending = game.pauseState && game.pauseState.pindianCards;
       if (!pending) return;
@@ -194,9 +221,19 @@
         return fail('请选择一张手牌作为拼点牌。');
       }
       takePindianCard(game, 'player', cardId);
-      return collectPindianCards(game);
+      return flows.run(game, 'pindian', pd);
     }
     deps.registerResponseKind('pindian-card', resolvePindianCardChoice);
+    flows.register('pindian', {
+      key: 'pindian',
+      advance: collectPindianCards,
+      cancel: function (game, pd) {
+        Object.keys(pd.cards).forEach(function (actor) {
+          var card = pd.cards[actor];
+          if (card && !deps.findCardZone(game, card)) deps.discardCard(game, card);
+        });
+      }
+    });
 
     return {
       startPindian: startPindian,

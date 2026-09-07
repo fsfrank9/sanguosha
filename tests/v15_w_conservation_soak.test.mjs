@@ -4,7 +4,7 @@
 // 回退 / harness zone 名笔误), 但那是一次性的 scratch harness, 没有入库 ——
 // 于是这条唯一能发现"某条罕见路径把牌弄丢/弄多了"的手段, 每次都要重写。
 // 本文件把它固化: 每一步之后做全区域普查 (含 v15 V 新增的武将牌上置牌区
-// "田"), 牌张总数一旦偏离开局基线立刻失败并打印区域分布。
+// "田"), 牌 ID 集合变化或同一牌重复占区立即失败。
 //
 // 分档: 入全档不入快档 (v14 O2 约定 — soak/基准一律入全档)。
 // 种子规模按 SANGUOSHA_SOAK_SEEDS 环境变量可调, 缺省 150 (~23s);
@@ -18,8 +18,9 @@ import { test, runTests } from './helpers/harness.mjs';
 const SEEDS = Number(process.env.SANGUOSHA_SOAK_SEEDS || 150);
 const MAX_TURNS = 60;
 
-// 覆盖面优先取**近三批新接入**的武将 (火/林/山包), 再补标准包高交互面。
+// 覆盖 SP 与火/林/山包, 再补标准包高交互面。
 const HEROES = [
+  'sp_guanyu', 'sp_yuanshu',
   'zhanghe', 'dengai', 'liushan', 'jiangwei', 'sunce', 'erzhang', 'caiwenji',
   'caopi', 'sunjian', 'lusu', 'menghuo', 'zhurong', 'jiaxu', 'dongzhuo',
   'xuhuang', 'pangde', 'pangtong', 'dianwei', 'xunyu', 'taishici', 'yuanshao',
@@ -51,8 +52,10 @@ function buildGame(seed) {
 // 列在这里。这不是给引擎开后门: 这些窗口本就没有"放弃"这条出路
 //   雌雄双股剑 — "令其选择一项: 弃置一张手牌 / 令你摸一张牌" (二选一, 必选)
 //   反间       — "令其猜测该牌花色" (必猜, 无弃权)
+//   庸肆       — 必须选择 count 张手牌/装备，不能放弃或只传单个 cardId
 // 而通用兜底只会传 { cardId / target / option:'heal' / choice:'hp' }。
 const MANDATORY_DECISIONS = {
+  'yongsi-discard': (p) => ({ cardIds: p.options.slice(0, p.count).map(option => option.cardId) }),
   'fanjian-guess': () => ({ suit: 'spade' }),
   'cixiong-choose': (p, game) => {
     const hand = (game[p.actor] && game[p.actor].hand) || [];
@@ -83,7 +86,12 @@ test(`W2 soak: ${SEEDS} 种子 × 3/4/5 席全 AI 对局, 每步全区域牌张�
   let steps = 0;
   for (let seed = 1; seed <= SEEDS; seed += 1) {
     const game = buildGame(seed);
-    const total = collectCardCensus(game).total;
+    // Z review: census returns ids/zoneEntries, not total/byZone. The former
+    // undefined === undefined comparison never checked conservation. Compare
+    // identity as well as duplicates: equal counts alone can hide replacement.
+    const initial = collectCardCensus(game);
+    assert.ok(initial.ids.size > 0, '开局牌普查不能为空');
+    assert.deepEqual(initial.zoneDuplicates, [], '开局不能有重复占区');
     for (let turn = 0; turn < MAX_TURNS; turn += 1) {
       if (game.phase === 'gameover') break;
       try {
@@ -105,9 +113,13 @@ test(`W2 soak: ${SEEDS} 种子 × 3/4/5 席全 AI 对局, 每步全区域牌张�
       }
       steps += 1;
       const census = collectCardCensus(game);
-      if (census.total !== total) {
+      const vanished = [...initial.ids].filter(id => !census.ids.has(id));
+      const conjured = [...census.ids].filter(id => !initial.ids.has(id));
+      if (vanished.length || conjured.length || census.zoneDuplicates.length) {
         failures.push({
-          seed, turn, why: `牌张 ${total} → ${census.total}`, zones: census.byZone,
+          seed, turn, why: `牌张 ${initial.ids.size} → ${census.ids.size}`,
+          vanished, conjured, duplicates: census.zoneDuplicates,
+          zones: Object.fromEntries(census.zoneEntries),
         });
         break;
       }
@@ -116,6 +128,7 @@ test(`W2 soak: ${SEEDS} 种子 × 3/4/5 席全 AI 对局, 每步全区域牌张�
   assert.deepEqual(failures.slice(0, 5), [],
     `守恒/推进失败 ${failures.length} 例 (共 ${steps} 步); 前 5 例见上`);
   assert.ok(steps > SEEDS * 10, `推进步数异常偏少 (${steps}) — soak 可能空转了`);
+  console.log(`  (log) ${SEEDS} 种子 / ${steps} 步，实体牌 ID 集合与重复占区检查通过`);
 });
 
 runTests(import.meta.url);

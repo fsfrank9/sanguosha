@@ -1617,16 +1617,17 @@
         if (StateRuntime.effectiveCardColor(state, card) !== 'black') return null;
         if (state.camp !== '魏') return null;
         var roles = game.roles || {};
-        var lord = StateRuntime.aliveSeats(game).find(function (seat) {
-          return roles[seat] === '主公' && hasSkill(game[seat], 'songwei');
+        var lords = StateRuntime.seatsFrom(game, game.turn, true).filter(function (seat) {
+          return game[seat].hp > 0 && seat !== actor && StateRuntime.hasLordSkill(game, seat, 'songwei');
         });
-        if (!lord || lord === actor) return null;
+        lords.forEach(function (lord) {
         var lordPref = game[lord].skillPreferences && game[lord].skillPreferences.songwei;
-        if (lordPref === 'decline') return null;
+        if (lordPref === 'decline') return;
         drawCards(game, lord, 1);
         log(game, actorName(game, actor) + '的黑色判定牌生效，发动【颂威】令'
           + actorName(game, lord) + '摸一张牌。');
-        return { songweiApplied: true };
+        });
+        return lords.length ? { songweiApplied: true } : null;
       }
 
       // ═════ v15 U (林包): 孙坚 英魂 ═════
@@ -1985,8 +1986,8 @@
       // 若其于受到此伤害的角色因受到此伤害而扣减体力前为群势力角色，来源可以
       // 判定，若结果为黑桃，你回复1点体力。"
       //
-      // 三个角色别弄混: **来源**造成伤害并进行判定, 条件看**受伤者**在扣血前
-      // 的势力 (须为群), 回复体力的是**董卓**(主公)。"其他角色"= 来源不是董卓。
+      // 三个角色别弄混: **来源**造成伤害并进行判定，条件读来源在受伤者扣血前
+      // 的势力（须为群），回血的是本次主公技持有者（董卓或伪帝袁术）。
       function triggerBaonueDamageAfter(context) {
         var game = context.game;
         var sourceActor = context.sourceActor;
@@ -1994,20 +1995,17 @@
         if (!sourceActor || !game[sourceActor] || game.phase === 'gameover') return null;
         if (context.amount <= 0) return null;
         var roles = game.roles || {};
-        var lord = StateRuntime.aliveSeats(game).find(function (seat) {
-          return roles[seat] === '主公' && hasSkill(game[seat], 'baonue');
+        var lords = StateRuntime.seatsFrom(game, game.turn, true).filter(function (seat) {
+          return game[seat].hp > 0 && seat !== sourceActor && StateRuntime.hasLordSkill(game, seat, 'baonue');
         });
-        if (!lord) return null;
-        if (sourceActor === lord) return null; // "每当**其他**角色造成伤害后"
-        // 条件读的是**受伤者**的势力。伤害已结算完毕, 但势力是静态属性
-        // (本仓无变更势力的技能), 扣血前后同值 —— 逐字条款在此等价, 记档。
-        var victim = game[targetActor];
-        if (!victim || victim.camp !== '群') return null;
+        if (!lords.length) return null;
+        if (context.sourceCampBeforeDamage !== '群') return null;
         var source = game[sourceActor];
         var pref = source.skillPreferences && source.skillPreferences.baonue;
         if (pref === 'decline') return null; // "来源**可以**判定"
+        lords.forEach(function (lord) {
         var result = judge(game, sourceActor, '【暴虐】');
-        if (!result) return null;
+        if (!result) return;
         resolveJudgementCard(game, sourceActor, source, '【暴虐】', result);
         if (result.suit === 'spade') {
           var lordState = game[lord];
@@ -2018,6 +2016,7 @@
             log(game, '【暴虐】判定为黑桃，但' + actorName(game, lord) + '体力已满。');
           }
         }
+        });
         return { baonueApplied: true };
       }
 
@@ -2171,7 +2170,7 @@
       // 且是**锁定**的 —— 条件满足就必须觉醒, 没有"不发动"这条出路。
       function runAwakening(game, actor, spec) {
         var state = game[actor];
-        if (!state || !hasSkill(state, spec.skillId)) return null;
+        if (!state || !hasSkill(state, spec.skillId, game)) return null;
         state.flags = state.flags || {};
         var flag = spec.skillId + 'Awakened';
         if (state.flags[flag]) return null;
@@ -2196,6 +2195,85 @@
         if (state.hp > state.maxHp) state.hp = state.maxHp;
         log(game, actorName(game, actor) + '减 ' + amount + ' 点体力上限（现为 ' + state.maxHp + '）。');
         if (state.hp <= 0) enterDying(game, actor);
+      }
+
+      // v16 Z1: SP 单骑 / 庸肆。单骑沿用目录 ID danji。
+      function triggerDanjiPrepare(context) {
+        return runAwakening(context.game, context.actor, {
+          skillId: 'danji', label: '单骑',
+          condition: function (game, actor, state) {
+            return state.hand.length > state.hp && StateRuntime.seatList(game).some(function (seat) {
+              return game.roles && game.roles[seat] === '主公' && game[seat].heroId === 'caocao';
+            });
+          },
+          apply: function (game, actor) { reduceMaxHp(game, actor, 1); },
+          grants: [{ id: 'mashu', name: '马术' }]
+        });
+      }
+
+      function yongsiCampCount(game) {
+        return new Set(StateRuntime.aliveSeats(game).map(function (seat) { return game[seat].camp; })).size;
+      }
+
+      function triggerYongsiDraw(context) {
+        if (!hasSkill(context.game[context.actor], 'yongsi')) return null;
+        var count = yongsiCampCount(context.game);
+        context.drawCount += count;
+        log(context.game, actorName(context.game, context.actor) + '因【庸肆】多摸 ' + count + ' 张牌。');
+        return { yongsiDraw: count };
+      }
+
+      function yongsiDiscardOptions(game, actor) {
+        var state = game[actor];
+        return (state.hand || []).map(function (card) { return { card: card, zone: 'hand' }; })
+          .concat(['weapon', 'armor', 'horsePlus', 'horseMinus'].filter(function (slot) {
+            return state.equipment && state.equipment[slot];
+          }).map(function (slot) { return { card: state.equipment[slot], zone: 'equipment' }; }));
+      }
+
+      function triggerYongsiDiscardStart(game, actor) {
+        if (!game[actor] || !hasSkill(game[actor], 'yongsi')) return;
+        var options = yongsiDiscardOptions(game, actor);
+        var needed = Math.min(yongsiCampCount(game), options.length);
+        if (!needed) return;
+        var pending = { kind: 'yongsi-discard', actor: actor, count: needed,
+          options: options.map(function (entry) {
+            return { cardId: entry.card.id, name: entry.card.name, suit: entry.card.suit,
+              rank: entry.card.rank, zone: entry.zone };
+          }) };
+        if (actor === 'player' && needed < options.length) {
+          setPendingChoice(game, pending);
+          return;
+        }
+        options.sort(function (a, b) {
+          return deps.scoreCardForDiscard(game, actor, a.card) - deps.scoreCardForDiscard(game, actor, b.card);
+        });
+        resolveYongsiDiscardChoice(game, pending, {
+          cardIds: options.slice(0, needed).map(function (entry) { return entry.card.id; })
+        });
+      }
+
+      function resolveYongsiDiscardChoice(game, pending, decision) {
+        var options = yongsiDiscardOptions(game, pending.actor);
+        var needed = Math.min(pending.count, options.length);
+        var ids = (decision && decision.cardIds) || [];
+        var selected = options.filter(function (entry) { return ids.indexOf(entry.card.id) >= 0; });
+        if (ids.length !== needed || new Set(ids).size !== needed || selected.length !== needed) {
+          setPendingChoice(game, pending);
+          return fail('【庸肆】须选择 ' + needed + ' 张手牌或装备牌。');
+        }
+        var handCards = [];
+        var allCards = [];
+        selected.forEach(function (entry) {
+          var removed = removeTargetZoneCard(game, pending.actor, entry.zone, entry.card.id);
+          if (!removed || !removed.card) return;
+          discardCard(game, removed.card);
+          allCards.push(removed.card);
+          if (entry.zone === 'hand') handCards.push(removed.card);
+        });
+        if (deps.recordDiscardPhaseLoss) deps.recordDiscardPhaseLoss(game, pending.actor, handCards, allCards);
+        log(game, actorName(game, pending.actor) + '因【庸肆】弃置 ' + selected.length + ' 张牌。');
+        return success('庸肆弃牌完成。');
       }
 
       // ── 邓艾 屯田 / 凿险 ──
@@ -2563,7 +2641,7 @@
       function triggerRuoyuPrepare(context) {
         var game = context.game;
         var actor = context.actor;
-        if (!game.roles || game.roles[actor] !== '主公') return null; // 主公技
+        if (!StateRuntime.hasLordSkill(game, actor, 'ruoyu')) return null;
         return runAwakening(game, actor, {
           skillId: 'ruoyu',
           label: '若愚',
@@ -2649,19 +2727,29 @@
         var actor = context.actor;   // 发起者 = 其他吴势力角色
         var self = context.state;
         var roles = game.roles || {};
+        var zhibaTarget = context.options && context.options.target;
         var lord = StateRuntime.aliveSeats(game).find(function (seat) {
-          return roles[seat] === '主公' && hasSkill(game[seat], 'zhiba');
+          return seat !== actor && (!zhibaTarget || seat === zhibaTarget)
+            && StateRuntime.hasLordSkill(game, seat, 'zhiba')
+            && (zhibaTarget || StateRuntime.lordSkillTargetAvailable(game, actor, 'zhiba', seat));
         });
-        if (!lord) return fail('场上没有拥有【制霸】的主公。');
+        if (!lord) {
+          var spent = !zhibaTarget && StateRuntime.aliveSeats(game).some(function (seat) {
+            return seat !== actor && StateRuntime.hasLordSkill(game, seat, 'zhiba');
+          });
+          return fail(spent ? '对同一角色的【制霸】每回合限一次。' : '场上没有拥有【制霸】的主公。');
+        }
         if (lord === actor) return fail('【制霸】由其他吴势力角色发起。');
         if (self.camp !== '吴') return fail('【制霸】只有吴势力角色可以发起。');
-        if (self.flags.zhibaUsed) return fail('【制霸】每回合限一次。');
+        if (!StateRuntime.lordSkillTargetAvailable(game, actor, 'zhiba', lord)) return fail('对同一角色的【制霸】每回合限一次。');
         if (!pindianEligible || !pindianEligible(game, actor, lord)) {
           return fail('拼点需要双方各有至少一张手牌。');
         }
         // 官方判例 (card__hero__wu.md:305): "吴势力角色发动【制霸】与你拼点
         // **被拒绝**计入其出牌阶段限制的发动次数。" → 次数在拒绝分支之前记。
         self.flags.zhibaUsed = true;
+        self.flags.zhibaUsedAgainst = self.flags.zhibaUsedAgainst || {};
+        self.flags.zhibaUsedAgainst[lord] = true;
         // "若你发动过'魂姿'，你可以拒绝此拼点"
         var lordState = game[lord];
         if (lordState.flags && lordState.flags.hunziAwakened) {
@@ -2757,7 +2845,8 @@
         var giveBack = stillInDiscard[0];
         moveCard(game, giveBack, { zone: 'discard' }, { zone: 'hand', actor: discarder });
         var gained = 0;
-        stillInDiscard.slice(1).forEach(function (card) {
+        (context.allDiscardedCards || stillInDiscard).forEach(function (card) {
+          if (card === giveBack) return;
           if (game.discard.indexOf(card) < 0) return;
           moveCard(game, card, { zone: 'discard' }, { zone: 'hand', actor: holder });
           gained += 1;
@@ -2879,6 +2968,139 @@
           takeHandCard(game, seat, actor, '发动【巧变】，获得');
         });
         return { qiaobianApplied: true };
+      }
+
+      // v16 Z2: 置入不是使用：不检查距离/使用者限制、不走无懈，但目的区域
+      // 仍须合法 (glossary__gamecard.md:35-47)。判定区的转化身份原样保留。
+      function qiaobianMoves(game) {
+        var moves = [];
+        var seats = StateRuntime.aliveSeats(game);
+        seats.forEach(function (source) {
+          var entries = equipmentList(game[source]).map(function (entry) {
+            return { card: entry.card, zone: 'equipment', slot: entry.slot };
+          });
+          (game[source].judgeArea || []).forEach(function (card) {
+            entries.push({ card: card, zone: 'judgeArea', slot: null });
+          });
+          entries.forEach(function (entry) {
+            seats.forEach(function (target) {
+              if (target === source) return;
+              var card = entry.card;
+              if (entry.zone === 'equipment') {
+                if (!entry.slot || game[target].equipment[entry.slot]) return;
+              } else {
+                if ((game[target].judgeArea || []).some(function (held) { return held.type === card.type; })) return;
+                if (card.type === 'lebusishu' && hasSkill(game[target], 'qianxun')) return;
+                if (hasSkill(game[target], 'weimu') && (card.suit === 'spade' || card.suit === 'club'
+                    || (!card.suit && card.color === 'black'))) return;
+              }
+              moves.push({ sourceActor: source, sourceZone: entry.zone, cardId: card.id,
+                name: card.name, suit: card.suit, rank: card.rank, slot: entry.slot,
+                targetActor: target, targetZone: entry.zone });
+            });
+          });
+        });
+        return moves;
+      }
+
+      function qiaobianSameMove(left, right) {
+        return left && right && left.sourceActor === right.sourceActor
+          && left.sourceZone === right.sourceZone && left.cardId === right.cardId
+          && left.targetActor === right.targetActor && left.targetZone === right.targetZone;
+      }
+
+      function triggerQiaobianBeforePlay(context) {
+        var game = context.game, actor = context.actor, state = game[actor];
+        if (!state || !hasSkill(state, 'qiaobian') || !(state.hand || []).length) return null;
+        var pref = state.skillPreferences && state.skillPreferences.qiaobianPlay;
+        if (pref === 'decline') return null;
+        // rule__classification.md:71: 已被乐不思蜀跳过，仍可付费发动，不能移牌。
+        game.qiaobianChoiceSerial = (game.qiaobianChoiceSerial || 0) + 1;
+        var pending = { kind: 'qiaobian-play', actor: actor, choiceId: game.qiaobianChoiceSerial,
+          allowMove: !state.flags.skipPlay,
+          cards: state.hand.map(function (card) { return { cardId: card.id, name: card.name,
+            suit: card.suit, rank: card.rank }; }),
+          moves: state.flags.skipPlay ? [] : qiaobianMoves(game) };
+        if (actor === 'player' && pref !== 'auto') {
+          setPendingChoice(game, pending);
+          return { suspended: true };
+        }
+        // 只读自己的成本牌和公开区域；友方判定区减负/敌方装备转给友方才值得
+        // 放弃整个出牌阶段。无获益时不为“已接入技能”盲目花牌。
+        var ranked = pending.moves.map(function (move) {
+          var sourceHostile = StateRuntime.perceivedHostile(game, actor, move.sourceActor);
+          var targetHostile = StateRuntime.perceivedHostile(game, actor, move.targetActor);
+          var value = move.sourceZone === 'judgeArea'
+            ? (!sourceHostile && targetHostile ? 8 : -8)
+            : (sourceHostile && !targetHostile ? 6 : -6);
+          return { move: move, value: value };
+        }).sort(function (a, b) { return b.value - a.value; });
+        if (!ranked.length || ranked[0].value <= 0) return null;
+        var costIds = deps.aiDiscardCandidates ? deps.aiDiscardCandidates(game, actor) : [];
+        pending.fromHook = true;
+        resolveQiaobianPlayChoice(game, pending, Object.assign({ costCardId: costIds[0] || state.hand[0].id }, ranked[0].move));
+        if (game.pauseState && game.pauseState.qiaobianPlay) game.pauseState.qiaobianPlay.fromHook = false;
+        return { qiaobianApplied: true, suspended: !!game.pendingChoice };
+      }
+
+      function resumeQiaobianPlay(game) {
+        var saved = game.pauseState && game.pauseState.qiaobianPlay;
+        if (!saved || game.pendingChoice) return null;
+        if (game.phase === 'gameover') { game.pauseState.qiaobianPlay = null; return success('游戏结束。'); }
+        if (saved.stage === 'move') {
+          saved.stage = 'advance'; // 装备失去可能再挂起；已落位的牌绝不重复移动。
+          var move = saved.move && qiaobianMoves(game).find(function (item) { return qiaobianSameMove(item, saved.move); });
+          if (move) {
+            var moved = moveCard(game, move.cardId,
+              { actor: move.sourceActor, zone: move.sourceZone, slot: move.slot },
+              { actor: move.targetActor, zone: move.targetZone, slot: move.slot });
+            if (moved) {
+              log(game, actorName(game, saved.actor) + '发动【巧变】，将' + actorName(game, move.sourceActor)
+                + '的【' + moved.name + '】置入' + actorName(game, move.targetActor)
+                + (move.targetZone === 'equipment' ? '的装备区。' : '的判定区。'));
+              // flow__move.md:58-64：先落位，再结算失去装备；判定区牌不归角色拥有。
+              if (move.sourceZone === 'equipment') {
+                triggerEquipmentLoss(game, move.sourceActor, moved);
+                deps.notifyCardLoss(game, move.sourceActor);
+              }
+            }
+          } else if (saved.move) log(game, '【巧变】的原移动目的地已失效，本次不移动牌。');
+        }
+        if (game.pendingChoice) return success('等待【巧变】引发的结算。');
+        game.pauseState.qiaobianPlay = null;
+        if (saved.fromHook) return success('【巧变】已结算。');
+        return deps.continueTurnAfterBeforePlayPhase(game, saved.actor);
+      }
+
+      function resolveQiaobianPlayChoice(game, pending, decision) {
+        if (decision.choiceId !== undefined && decision.choiceId !== pending.choiceId) {
+          setPendingChoice(game, pending);
+          return fail('【巧变】选择窗口已更新，请重新选择。');
+        }
+        var state = game[pending.actor];
+        if (!decision.costCardId && !decision.sourceActor) {
+          return deps.continueTurnAfterBeforePlayPhase(game, pending.actor);
+        }
+        var validCost = state && (state.hand || []).some(function (card) { return card.id === decision.costCardId; });
+        var legalMoves = pending.allowMove && state && !state.flags.skipPlay ? qiaobianMoves(game) : [];
+        var move = legalMoves.find(function (item) { return qiaobianSameMove(item, decision); });
+        if (!validCost || (!decision.skipOnly && !move)) {
+          pending.moves = legalMoves;
+          pending.allowMove = pending.allowMove && !!state && !state.flags.skipPlay;
+          pending.cards = (state && state.hand || []).map(function (card) {
+            return { cardId: card.id, name: card.name, suit: card.suit, rank: card.rank };
+          });
+          setPendingChoice(game, pending);
+          return fail('请选择仍在手牌中的成本牌，以及合法的移动；也可以仅跳过出牌阶段。');
+        }
+        state.flags.skipPlay = true;
+        game.pauseState = game.pauseState || {};
+        game.pauseState.qiaobianPlay = { actor: pending.actor, move: decision.skipOnly ? null : move,
+          stage: 'move', fromHook: !!pending.fromHook };
+        var cost = removeCardFromHand(state, decision.costCardId);
+        discardCard(game, cost);
+        log(game, actorName(game, pending.actor) + '发动【巧变】，弃置一张手牌跳过出牌阶段。');
+        return resumeQiaobianPlay(game) || success('等待【巧变】成本结算。');
       }
 
       // ═════ v15 T (火包): 转化类技能 ═════
@@ -4667,7 +4889,8 @@
         // ═════ v15 V (山包) 注册 ═════
         // 张郃 巧变
         SkillRuntime.registerSkill(skillRegistry, 'qiaobian', {
-        onDrawPhase: function (context) { return triggerQiaobianDrawPhase(context); }
+        onDrawPhase: function (context) { return triggerQiaobianDrawPhase(context); },
+        onBeforePlayPhase: function (context) { return triggerQiaobianBeforePlay(context); }
       });
         // 邓艾 屯田 / 凿险 / (凿险授予) 急袭
         SkillRuntime.registerSkill(skillRegistry, 'tuntian', {
@@ -4697,6 +4920,12 @@
       });
         SkillRuntime.registerSkill(skillRegistry, 'ruoyu', {
         onPreparePhase: function (context) { return triggerRuoyuPrepare(context); }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'danji', {
+        onPreparePhase: function (context) { return triggerDanjiPrepare(context); }
+      });
+        SkillRuntime.registerSkill(skillRegistry, 'yongsi', {
+        onDrawPhase: function (context) { return triggerYongsiDraw(context); }
       });
         // 孙策 激昂 / 魂姿 / 制霸
         SkillRuntime.registerSkill(skillRegistry, 'jiang', {
@@ -4913,8 +5142,8 @@
           var game = context.game;
           var actor = context.actor;
           var self = context.state;
-          if (!self || !hasSkill(self, 'jijiang')) return null;
-          if (!game.roles || game.roles[actor] !== '主公') return fail('【激将】是主公技，须为主公才能发动。');
+          if (!self || !hasSkill(self, 'jijiang', game)) return null;
+          if (!StateRuntime.hasLordSkill(game, actor, 'jijiang')) return fail('当前没有可发动的【激将】主公技。');
           // 评审收口 [中]: 与丈八同因 — 出杀入口一律走 shaUseAllowed 单点
           // (激将与天义不同将, 当前不可达, 但闸门口径必须一致, 否则下一个
           // 「本回合不能使用【杀】」类技能接进来时又会漏一处)。
@@ -4962,15 +5191,17 @@
           StateRuntime.seatList(game).forEach(function (seat) {
             if (htLord) return;
             var st = game[seat];
-            if (st && st.hp > 0 && seat !== actor && hasSkill(st, 'huangtian')
-                && game.roles && game.roles[seat] === '主公') {
+            var requested = context.options && context.options.target;
+            if (st && st.hp > 0 && seat !== actor && (!requested || requested === seat)
+                && StateRuntime.hasLordSkill(game, seat, 'huangtian')
+                && (requested || StateRuntime.lordSkillTargetAvailable(game, actor, 'huangtian', seat))) {
               htLord = seat;
             }
           });
           if (!htLord) return fail('场上没有可响应【黄天】的主公张角。');
           if (self.camp !== '群') return fail('只有群势力角色可以发动【黄天】。');
           if (StateRuntime.isHostileSeat(game, actor, htLord)) return fail('敌对阵营不会响应【黄天】。');
-          if (self.flags.huangtianUsed) return fail('【黄天】每回合限一次。');
+          if (!StateRuntime.lordSkillTargetAvailable(game, actor, 'huangtian', htLord)) return fail('对同一角色的【黄天】每回合限一次。');
           if (cardIds.length !== 1) return fail('请选择一张【闪】或【闪电】交给主公。');
           var giveCard = (self.hand || []).find(function (c) { return c.id === cardIds[0]; });
           if (!giveCard) return fail('选择的手牌不存在。');
@@ -4980,6 +5211,8 @@
           removeCardFromHand(self, cardIds[0]);
           putCard(game, giveCard, { zone: 'hand', actor: htLord });
           self.flags.huangtianUsed = true;
+          self.flags.huangtianUsedAgainst = self.flags.huangtianUsedAgainst || {};
+          self.flags.huangtianUsedAgainst[htLord] = true;
           log(game, actorName(game, actor) + '发动【黄天】，将【' + giveCard.name + '】交给' + actorName(game, htLord) + '。');
           return success('黄天完成。');
         }
@@ -5054,6 +5287,8 @@
 
         // v12 F1: 引擎流程仍需直调的技能域函数面 (回绑为引擎内同名 var)
         return {
+          triggerYongsiDiscardStart: triggerYongsiDiscardStart,
+          resolveYongsiDiscardChoice: resolveYongsiDiscardChoice,
           triggerShensuPrepare: triggerShensuPrepare,
           resolveShensuOptionsChoice: resolveShensuOptionsChoice,
           resolveGuidaoReplaceChoice: resolveGuidaoReplaceChoice,
@@ -5089,6 +5324,8 @@
           resolveTiaoxinDemandChoice: resolveTiaoxinDemandChoice,
           resolveZhijiChoice: resolveZhijiChoice,
           resolveFangquanGrantChoice: resolveFangquanGrantChoice,
+          resolveQiaobianPlayChoice: resolveQiaobianPlayChoice,
+          resumeQiaobianPlay: resumeQiaobianPlay,
           applyZhijiOption: applyZhijiOption,
           applyFangquan: applyFangquan,
           settleZhibaPindian: settleZhibaPindian
@@ -5117,4 +5354,3 @@
         huangtian: true,
         lijian: true
       };
-

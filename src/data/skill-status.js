@@ -85,12 +85,12 @@
         //   酒池 jiuchi    董卓 黑桃手牌当酒
         //   肉林 roulin    董卓 与女性角色互相出杀时需两张闪抵消
         //   崩坏 benghuai  董卓 结束阶段非最小体力则失血或减上限
-        //   暴虐 baonue    董卓 主公技: 群势力受伤后来源判定黑桃你回血
+        //   暴虐 baonue    董卓 主公技: 群势力来源造成伤害后判定黑桃你回血
         'duanliang', 'xingshang', 'fangzhu', 'songwei', 'yinghun',
         'haoshi', 'dimeng', 'huoshou', 'zaiqi', 'juxiang', 'lieren',
         'wansha', 'luanwu', 'weimu', 'jiuchi', 'roulin', 'benghuai', 'baonue',
         // v15 V (山包 8 将 17 技 → 本批接入 7 将 15 技):
-        //   巧变 qiaobian  张郃      弃一张手牌跳过摸牌阶段并拿两人各一张手牌
+        //   巧变 qiaobian  张郃      弃手牌跳过摸牌/出牌阶段，取手牌/跨角色移牌
         //   屯田 tuntian   邓艾      回合外失去牌后判定, 非红桃置为"田"并缩距离
         //   凿险 zaoxian   邓艾      觉醒技: "田" ≥3 减 1 上限, 获得"急袭"
         //   急袭 jixi      (凿险授予) 一张"田"当【顺手牵羊】
@@ -111,7 +111,9 @@
         // docs/audit/2026-08-06-shan-pack-spec.md。
         'qiaobian', 'tuntian', 'zaoxian', 'jixi', 'tiaoxin', 'zhiji',
         'xiangle', 'fangquan', 'ruoyu', 'jiang', 'hunzi', 'zhiba',
-        'zhijian', 'guzheng', 'beige', 'duanchang'
+        'zhijian', 'guzheng', 'beige', 'duanchang',
+        // v16 Z1: 本地逐字源可核对的 SP 3 技。
+        'danji', 'yongsi', 'weidi'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,

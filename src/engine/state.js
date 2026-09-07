@@ -289,13 +289,57 @@
     return hostiles.length ? hostiles : (candidates || []);
   }
 
-  function hasSkill(state, skillId) {
+  // v16 Z1: 伪帝局部视图；只读取当下主公技能集，不复制进自身技能数组。
+  // 获得的激将仍可保留在 skills 中，其发动资格另由 hasLordSkill 判定。
+  // AA 三态层收编时替换此局部出口。
+  var LORD_SKILL_IDS = { hujia: true, jijiang: true, jiuyuan: true, huangtian: true,
+    xueyi: true, songwei: true, baonue: true, ruoyu: true, zhiba: true };
+
+  function viewedLordSkills(game, actor) {
+    var state = game && game[actor];
+    if (!state || !hasSkill(state, 'weidi') || !game.roles || game.roles[actor] === '主公') return [];
+    var lord = seatList(game).find(function (seat) { return game.roles[seat] === '主公'; });
+    return lord && game[lord] ? (game[lord].skills || []).filter(function (skill) {
+      return skill.lord || LORD_SKILL_IDS[skill.id];
+    }) : [];
+  }
+
+  function hasLordSkill(game, actor, skillId) {
+    var state = game && game[actor];
+    if (!state || (state.chanyuan && state.hp === 1)) return false;
+    if (game.roles && game.roles[actor] === '主公') return hasSkill(state, skillId);
+    return viewedLordSkills(game, actor).some(function (skill) { return skill.id === skillId; });
+  }
+
+  function lordSkillTargetAvailable(game, actor, skillId, target) {
+    if (actor === target || !game[actor] || !game[target] || game[target].hp <= 0
+        || !hasLordSkill(game, target, skillId)) return false;
+    var flags = game[actor].flags || {};
+    var used = flags[skillId + 'UsedAgainst'];
+    return used ? !used[target] : !flags[skillId + 'Used'];
+  }
+
+  function skillsForActor(game, actor) {
+    var owned = ((game && game[actor] && game[actor].skills) || []).slice();
+    viewedLordSkills(game, actor).forEach(function (skill) {
+      if (!owned.some(function (item) { return item.id === skill.id; })) {
+        owned.push(Object.assign({}, skill, { viewedByWeidi: true }));
+      }
+    });
+    return owned;
+  }
+
+  function hasSkill(state, skillId, game) {
     // v14 R1 缠怨 (蛊惑质疑真牌惩罚): 锁定技 — 体力值为 1 时除「缠怨」外
     // 技能无效。武将技能归属统一经本闸判定, 此处单点压制即全局生效
     // (装备技走 hasEquipmentEffect, 不在压制面 — 口径见 R1 执行记录;
     // 被动效果面 skill-runtime.hasPassiveEffect 同步双闸)。
     if (state && state.chanyuan && state.hp === 1 && skillId !== 'chanyuan') return false;
-    return !!(state.skills || []).some(function (skill) { return skill.id === skillId; });
+    if (!state) return false;
+    if ((state.skills || []).some(function (skill) { return skill.id === skillId; })) return true;
+    if (!game || !LORD_SKILL_IDS[skillId]) return false;
+    var actor = seatList(game).find(function (seat) { return game[seat] === state; });
+    return viewedLordSkills(game, actor).some(function (skill) { return skill.id === skillId; });
   }
 
   // ═════ v15 V: 觉醒技共用基建 — 动态获得技能 ═════
@@ -454,8 +498,7 @@
   // (缠怨 hp1 压制照常)。
   function xueyiHandLimitBonus(game, actor) {
     var state = game && game[actor];
-    if (!state || !hasSkill(state, 'xueyi')) return 0;
-    if (!game.roles || game.roles[actor] !== '主公') return 0;
+    if (!state || !hasLordSkill(game, actor, 'xueyi')) return 0;
     var others = aliveSeats(game).filter(function (seat) {
       return seat !== actor && game[seat] && game[seat].camp === '群';
     });
@@ -516,6 +559,10 @@
     seatsInShaRangeOf: seatsInShaRangeOf,
     opponent: opponent,
     hasSkill: hasSkill,
+    hasLordSkill: hasLordSkill,
+    lordSkillTargetAvailable: lordSkillTargetAvailable,
+    viewedLordSkills: viewedLordSkills,
+    skillsForActor: skillsForActor,
     canUseUnlimitedSha: canUseUnlimitedSha,
     shaUseAllowed: shaUseAllowed,
     hasEquipmentEffect: hasEquipmentEffect,

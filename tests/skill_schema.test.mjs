@@ -26,6 +26,7 @@ const CACHE_PATHS = [
   'official-skill-cache/sanguosha-lin/official_lin_skill_cache.json',
   // v15 V: 山包接入
   'official-skill-cache/sanguosha-shan/official_shan_skill_cache.json',
+  'official-skill-cache/sanguosha-sp/official_sp_skill_cache.json',
 ];
 const SPECS_PATHS = [
   'tests/fixtures/official_standard_skill_specs.json',
@@ -33,6 +34,7 @@ const SPECS_PATHS = [
   'tests/fixtures/official_fire_skill_specs.json',
   'tests/fixtures/official_lin_skill_specs.json',
   'tests/fixtures/official_shan_skill_specs.json',
+  'tests/fixtures/official_sp_skill_specs.json',
 ];
 
 function indexByLocalId(docs, specKey) {
@@ -61,6 +63,8 @@ const cacheById = indexByLocalId(CACHE_PATHS.map(readJson), 'implementationSpec'
 const specsById = indexByLocalId(SPECS_PATHS.map(readJson), 'spec');
 
 const VALID_TRIGGERS = new Set([
+  // v16 Z2: 巧变在摸牌/出牌开始前分别决策；不是单独的摸牌阶段技能。
+  'phaseStart',
   'playPhase',
   'drawPhase',
   'preparePhase',
@@ -98,6 +102,8 @@ const VALID_TRIGGERS = new Set([
 ]);
 const VALID_FREQUENCIES = new Set([
   'oncePerTurn',
+  // v16 Z2: 巧变同回合可分别跳过摸牌与出牌阶段，次数按阶段计算。
+  'oncePerPhase',
   'unlimited',
   'passiveAlways',
   // v15 T: 涅槃是限定技 (每局一次) — flags.niepanUsed 永不复位
