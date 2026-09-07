@@ -16,6 +16,7 @@
   var hasSkill = StateRuntime.hasSkill;
 
   export function createDamageDyingRuntime(deps) {
+    var flows = deps.responseFlows;
     var skillRegistry = deps.skillRegistry;
     var log = deps.log;
     var success = deps.success;
@@ -333,6 +334,13 @@
     }
 
     function advanceChainTransmit(game) {
+      // Y review: a transmission can sit BETWEEN an outer Shan/AOE frame and
+      // its inner rescue frame. Register its actual nesting position instead
+      // of resuming it after all response frames via a fixed legacy priority.
+      return flows.run(game, 'chain-transmit', game.pauseState && game.pauseState.chainTransmit);
+    }
+
+    function advanceChainTransmission(game) {
       var ct = game.pauseState && game.pauseState.chainTransmit;
       if (!ct) return;
       var natureName = ct.nature === 'fire' ? '火焰' : '雷电';
@@ -348,7 +356,7 @@
         // 某传导受害者濒死 ask 暂停 → 保留队列, 待救援结算后续跑剩余座席。
         if (game.pendingChoice) return;
       }
-      game.pauseState.chainTransmit = null;
+      flows.finish(game, 'chain-transmit', ct);
     }
 
     function flushDeferredDamageAfter(game) {
@@ -421,6 +429,10 @@
     }
 
     function processDyingNext(game) {
+      return flows.run(game, 'dying', game.pauseState && game.pauseState.dying);
+    }
+
+    function advanceDyingResponses(game) {
       var saved = game.pauseState && game.pauseState.dying;
       if (!saved) return null;
       var dyingActor = saved.actor;
@@ -429,7 +441,7 @@
       // 存活检测：hp >= 1 → 结束濒死
       if (dyingState.hp >= 1) {
         log(game, actorName(game, dyingActor) + '脱离濒死状态。');
-        game.pauseState.dying = null;
+        flows.finish(game, 'dying', saved);
         flushDeferredDamageAfter(game);
         return { saved: true };
       }
@@ -439,7 +451,7 @@
       // 该响应者放弃 / 已无可用救援牌时才前进到下一名 (idx += 1)。
       while (saved.idx < saved.responders.length) {
         var responder = saved.responders[saved.idx];
-        if (!game[responder]) {
+        if (!game[responder] || (responder !== dyingActor && game[responder].hp <= 0)) {
           saved.idx += 1;
           continue;
         }
@@ -463,20 +475,21 @@
           }
           if (dyingState.hp >= 1) {
             log(game, actorName(game, dyingActor) + '脱离濒死状态。');
-            game.pauseState.dying = null;
+            flows.finish(game, 'dying', saved);
             flushDeferredDamageAfter(game);
             return { saved: true };
           }
         }
         var attemptResult = attemptDyingRescue(game, responder, dyingActor);
-        if (attemptResult && attemptResult.paused) {
+        if (attemptResult && attemptResult.handled) return attemptResult;
+        if (flows.blocked(game) || (attemptResult && attemptResult.paused)) {
           return { paused: true };
         }
         if (attemptResult && attemptResult.healed) {
           // 回复后再次检查存活；未满 1 点则继续询问同一响应者 (不前进 idx)。
           if (dyingState.hp >= 1) {
             log(game, actorName(game, dyingActor) + '脱离濒死状态。');
-            game.pauseState.dying = null;
+            flows.finish(game, 'dying', saved);
             flushDeferredDamageAfter(game);
             return { saved: true };
           }
@@ -505,7 +518,7 @@
         }
         log(game, (winner === 'lordSide' ? '主忠方' : winner === 'rebelSide' ? '反贼方' : winner === 'renegade' ? '内奸' : actorName(game, winner)) + '获胜！');
       }
-      game.pauseState.dying = null;
+      flows.finish(game, 'dying', saved);
       // v12 H5: 对局继续 (身份场非终局死亡) → 阵亡结算 (弃置所有牌 + 奖惩)。
       if (!winner && game.phase !== 'gameover') {
         settleDeath(game, dyingActor, killerActor);
@@ -654,7 +667,7 @@
       }
       // v15 S1: 于吉可背面朝上使用任意手牌当【桃】(自己濒死时亦可当【酒】)
       // → 手上没有桃/酒也要开窗 (仅玩家席 ask 路径)。
-      var guhuoRescue = pref === 'ask' && deps.guhuoResponsePossible
+      var guhuoRescue = (pref === 'ask' || responder !== 'player') && deps.guhuoResponsePossible
         && deps.guhuoResponsePossible(game, responder);
       if (!taoCards.length && !jiuCards.length && !jijiuCards.length && !guhuoRescue) {
         log(game, actorName(game, responder)
@@ -701,6 +714,10 @@
         if ((sameSide || renegadeSaveLord) && taoCards.length) {
           return executeDyingRescue(game, responder, dyingActor, 'tao', taoCards[0].id);
         }
+        if (sameSide || renegadeSaveLord) {
+          var ghOther = tryGuhuoRescue(game, responder, dyingActor, taoCards, jiuCards, jijiuCards);
+          if (ghOther) return ghOther;
+        }
         log(game, actorName(game, responder) + '选择不救援。');
         return { skipped: true };
       }
@@ -710,8 +727,20 @@
       if (jiuCards.length) {
         return executeDyingRescue(game, responder, dyingActor, 'jiu', jiuCards[0].id);
       }
+      var ghSelf = tryGuhuoRescue(game, responder, dyingActor, taoCards, jiuCards, jijiuCards);
+      if (ghSelf) return ghSelf;
+      if (!jijiuCards.length) return { skipped: true };
       // 自救 — 急救 红色牌兜底
       return executeDyingRescue(game, responder, dyingActor, 'jijiu', jijiuCards[0].id);
+    }
+
+    function tryGuhuoRescue(game, responder, dyingActor, taoCards, jiuCards, jijiuCards) {
+      if (taoCards.length || jiuCards.length || jijiuCards.length) return null;
+      var result = deps.tryAIResponseGuhuo(game, {
+        kind: 'dying-rescue', actor: responder, pauseKey: 'dying', source: game.pauseState.dying,
+        options: [], meta: { dyingActor: dyingActor, taoIds: [], jiuIds: [], jijiuIds: [] }
+      });
+      return result ? { handled: true, paused: !!game.pendingChoice } : null;
     }
 
     // v15 S1: guhuoCard — 蛊惑声明并亮出的实体牌 (声明期已离手, 锚在处理
@@ -761,6 +790,9 @@
         dyingState.hp = Math.min(dyingState.maxHp, dyingState.hp + taoHeal);
         log(game, actorName(game, responder) + '对' + actorName(game, dyingActor) + '使用【桃】（濒死救援），回复 ' + taoHeal + ' 点体力。');
         StateRuntime.recordStance(game, { type: 'rescue', source: responder, beneficiary: dyingActor }); // v13 M3 立场遥测 (自救不记)
+        // 蛊惑声明桃可来自黑色手牌，使用时机同黑酒；濒死期由装备域延后。
+        if (game.turn !== responder && StateRuntime.effectiveCardColor(responderState, card) === 'black'
+            && triggerYinyueQiang) triggerYinyueQiang(game, responder);
         return { healed: true };
       }
       if (kind === 'jiu') {
@@ -832,6 +864,7 @@
         if (ghNext && ghNext.paused) return success('继续等待救援。');
         return success('濒死结算完成。');
       }
+      if (decision && decision.automaticFallback) decision = { decline: true };
       if (decision && (decision.decline || decision.skip)) {
         log(game, actorName(game, responder) + '选择不救援。');
         saved.idx += 1; // C2: 放弃 → 进入下一名响应者
@@ -864,6 +897,9 @@
       if (outcome && outcome.paused) return success('继续等待救援。');
       return success('濒死结算完成。');
     }
+
+    flows.register('dying', { key: 'dying', advance: advanceDyingResponses });
+    flows.register('chain-transmit', { key: 'chainTransmit', advance: advanceChainTransmission });
 
     return {
       damage: damage,

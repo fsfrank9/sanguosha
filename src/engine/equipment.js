@@ -465,6 +465,12 @@
           return;
         }
       }
+      var gh = deps.tryAIResponseGuhuo(game, {
+        kind: 'yinyue-response', actor: targetActor, pauseKey: 'yinyueResponse',
+        source: { holderActor: holderActor }, options: listShanResponseOptions(game[targetActor]),
+        meta: { sourceActor: holderActor, sourceName: '银月枪' }
+      });
+      if (gh) return gh;
       if (!consumeResponse(game, targetActor, 'shan', '【银月枪】')) {
         damage(game, targetActor, 1, holderActor, '【银月枪】');
       }
@@ -478,16 +484,16 @@
       var holderActor = saved.holderActor;
       var dodged = false;
       if (decision.cardId) {
-        dodged = consumeResponse(game, 'player', 'shan', '【银月枪】', decision.cardId);
-        if (!dodged) log(game, actorName(game, 'player') + '指定的牌无法当【闪】。');
+        dodged = consumeResponse(game, pending.actor, 'shan', '【银月枪】', decision.cardId);
+        if (!dodged) log(game, actorName(game, pending.actor) + '指定的牌无法当【闪】。');
       } else if (decision.use) {
-        dodged = consumeResponse(game, 'player', 'shan', '【银月枪】');
-        if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
+        dodged = consumeResponse(game, pending.actor, 'shan', '【银月枪】');
+        if (!dodged) log(game, actorName(game, pending.actor) + '没有可打出的【闪】。');
       } else {
-        log(game, actorName(game, 'player') + '选择不打出【闪】响应【银月枪】。');
+        log(game, actorName(game, pending.actor) + '选择不打出【闪】响应【银月枪】。');
       }
       if (!dodged) {
-        damage(game, 'player', 1, holderActor, '【银月枪】');
+        damage(game, pending.actor, 1, holderActor, '【银月枪】');
       }
       return success('银月枪响应完成。');
     }

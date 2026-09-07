@@ -105,20 +105,46 @@ export function createGuhuoRuntime(deps) {
     if (spec.selfTypes && pending.actor === pending.dyingActor) {
       types = types.concat(spec.selfTypes);
     }
-    return types;
+    return types.filter(function (type) {
+      return type !== 'tao' || !StateRuntime.wanshaBlocksTaoUse(game, pending.actor, pending.dyingActor);
+    });
   }
 
   // 响应窗口开窗门槛 (各窗口 gate 调用): 于吉 + 本回合次数未用 + 有手牌
   // → 即便手上没有窗口所需牌型也必须开窗 (蛊惑可背面朝上打出任意手牌;
   // 此前"无闪不开窗"会把蛊惑的响应面直接锁死)。
-  // v1 口径: 仅玩家席 — AI 席在响应中声明会把玩家质疑窗挂进 consumeResponse
-  // 的同步调用栈 (需要全响应链改造), 记录为已知局限。
+  // v16 Y: 全座席；AI 质疑窗口由响应帧保留已付张数和当前消费位置。
   function guhuoResponsePossible(game, actor) {
-    if (actor !== 'player') return false;
     var state = game && game[actor];
     if (!state || !StateRuntime.hasSkill(state, 'guhuo')) return false;
     if (state.flags && state.flags.guhuoUsedThisTurn) return false;
     return (state.hand || []).length > 0;
+  }
+
+  // AI chooses from its OWN hand only. Native responses keep priority; a
+  // missing response can use the cheapest card as a bluff. Wuxie EV and rescue
+  // allegiance are checked by the caller before this optional declaration.
+  function tryAIResponseGuhuo(game, spec) {
+    var actor = spec.actor;
+    if (actor === 'player' || game.pendingChoice || !guhuoResponsePossible(game, actor)) return null;
+    var state = game[actor];
+    if (state.skillPreferences && state.skillPreferences.guhuo === 'decline') return null;
+    if (spec.options && spec.options.length) return null;
+    var candidate = Object.assign({ kind: spec.kind, actor: actor }, spec.meta || {});
+    var types = guhuoResponseTypes(game, candidate);
+    if (!types.length) return null;
+    var cards = state.hand.slice().sort(function (a, b) {
+      return deps.scoreCardForAI(game, actor, a) - deps.scoreCardForAI(game, actor, b);
+    });
+    var type = types[0];
+    var truth = cards.find(function (card) { return types.indexOf(card.type) >= 0; });
+    var physical = truth || cards[0];
+    if (truth) type = truth.type;
+    if (type === 'tao' && StateRuntime.wanshaBlocksTaoUse(game, actor, candidate.dyingActor)) return null;
+    deps.requestPlayerResponse(game, spec);
+    var pending = game.pendingChoice;
+    pending.automaticResponse = true;
+    return declareGuhuoResponse(game, pending, { cardId: physical.id, declareType: type });
   }
 
   // 当前挂起的响应窗口是否可发动蛊惑 (UI 面板入口门禁)。
@@ -148,12 +174,13 @@ export function createGuhuoRuntime(deps) {
     if (!state) return fail('未知角色。');
     if (!StateRuntime.hasSkill(state, 'guhuo')) return fail('该角色没有【蛊惑】。');
     if (state.flags && state.flags.guhuoUsedThisTurn) return fail('【蛊惑】每名角色的回合内限一次。');
-    // 评审收口: 与各窗口 gate / UI 门禁复用同一谓词 — 此前公开 dispatcher
-    // 可绕过"仅玩家席"边界 (AI 席经 skillPreferences.dying='ask' 拿到窗口
-    // 后直调即可发动), 落进本批明文声明不支持的区域。
+    // v16 Y3: 各窗口 gate / 两个公开 dispatcher / UI 门禁复用全座席谓词。
     if (!guhuoResponsePossible(game, actor)) return fail('该角色当前不能在响应中发动【蛊惑】。');
     var allowed = guhuoResponseTypes(game, pending);
     if (allowed.indexOf(opts.declareType) < 0) return fail('此响应窗口不能声明该牌名。');
+    if (opts.declareType === 'tao' && StateRuntime.wanshaBlocksTaoUse(game, actor, pending.dyingActor)) {
+      return fail('受【完杀】限制，不能声明【桃】救援。');
+    }
     var physical = (state.hand || []).find(function (item) { return item.id === opts.cardId; });
     if (!physical) return fail('找不到要盖置的手牌。');
 
@@ -199,6 +226,12 @@ export function createGuhuoRuntime(deps) {
         + '流程终止，视为' + actorName(game, gh.actor) + '没有决定如何进行响应。');
       // "你可以打出为你声明的牌名的牌进行响应" — 窗口原样重开 (本回合
       // 蛊惑次数已消耗, 重开窗内只能打出真牌或放弃)。
+      deps.restoreResponseContext(game, gh.responsePending);
+      deps.refreshResponseOptions(game, gh.responsePending);
+      if (gh.responsePending.automaticResponse) {
+        var fallback = deps.responseResolverFor(gh.responsePending.kind);
+        return fallback(game, gh.responsePending, { use: true, automaticFallback: true });
+      }
       deps.setPendingChoice(game, gh.responsePending);
       var reopened = success('【蛊惑】被质破，请重新决定如何响应。');
       reopened.paused = true;
@@ -212,6 +245,7 @@ export function createGuhuoRuntime(deps) {
       declaredName: gh.declaredName,
       physical: physical
     };
+    deps.restoreResponseContext(game, gh.responsePending);
     var resolver = deps.responseResolverFor(gh.responsePending.kind);
     var result = resolver
       ? resolver(game, gh.responsePending, { use: true, guhuoResolved: true })
@@ -481,6 +515,7 @@ export function createGuhuoRuntime(deps) {
     guhuoLegalTargets: guhuoLegalTargets,
     playGuhuoDeclare: playGuhuoDeclare,
     // v15 S1: 响应窗口面 (声明入口 / UI 门禁 / 各窗口 gate 谓词)
+    tryAIResponseGuhuo: tryAIResponseGuhuo,
     guhuoResponseAvailable: guhuoResponseAvailable,
     guhuoResponseTypes: guhuoResponseTypes,
     guhuoResponseMenu: guhuoResponseMenu,

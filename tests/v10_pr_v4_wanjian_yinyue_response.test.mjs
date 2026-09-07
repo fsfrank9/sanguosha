@@ -1,3 +1,4 @@
+// v16 Y: AOE 驱动经统一帧；resolver 用窗口座席兼容 AI 声明。
 // v10 V4 守护测试: 万箭齐发 + 银月枪 玩家闪响应 (V3 框架二度复用 + UI 复用面板).
 // 端到端运行测试在 tests/wanjian_player_response.test.mjs + yinyue_player_response.test.mjs.
 import assert from 'node:assert/strict';
@@ -33,7 +34,7 @@ test('v10 V4: playAOE shan 路径走 requestPlayerResponse(kind:wanjian-response
   // (AOE shan 路径走 requestPlayerResponse 三件套) 不变, 断言跟随定位。
   const driver = engineSrc.match(/function advanceAOETargets\(game\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(driver);
-  assert.match(driver[0], /advanceTargetQueue\(game,\s*aoe,\s*AOE_QUEUE_HOOKS\)/);
+  assert.match(driver[0], /flows\.run\(game, 'aoe', aoe\)/);
   const fn = engineSrc.match(/function aoeEffectForCurrent\(game, aoe, targetActor\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /requestPlayerResponse\(game,\s*\{/);
@@ -66,7 +67,7 @@ test('v10 V4: resolver 支持 decision.cardId / decision.use / 默认不出闪',
   [wanjian[0], yinyue[0]].forEach(function (fnSrc, idx) {
     assert.match(fnSrc, /decision\.cardId/, ['wanjian','yinyue'][idx] + ': 缺 cardId 分支');
     assert.match(fnSrc, /decision\.use/, ['wanjian','yinyue'][idx] + ': 缺 use 分支');
-    assert.match(fnSrc, /consumeResponse\(game,\s*'player',\s*'shan'/, ['wanjian','yinyue'][idx] + ': 缺 consumeResponse');
+    assert.match(fnSrc, /consumeResponse\(game,\s*pending\.actor,\s*'shan'/, ['wanjian','yinyue'][idx] + ': 缺 consumeResponse');
   });
 });
 
