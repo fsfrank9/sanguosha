@@ -22,6 +22,105 @@
     // v14 P1: 多目标杀链续跑 (杀链域后置装配, 包装注入)
     var resumeShaChain = deps.resumeShaChain;
 
+    // v16 Y-G1(b): response chains own resumable frames, not handwritten
+    // shaResponse windows. A frame records paid responses BEFORE yielding.
+    // Nested effects resume inside-out; no callbacks are stored in game state,
+    // so AI simulation can still clone it. Window snapshots remain independent
+    // even when two nested windows use the same legacy pauseKey.
+    var FLOW_KINDS = {};
+    var RESPONSE_OPTIONS = {};
+    function registerResponseOptions(kind, refresh) {
+      RESPONSE_OPTIONS[kind] = refresh;
+    }
+    function refreshResponseOptions(game, pending) {
+      var refresh = pending && RESPONSE_OPTIONS[pending.kind];
+      if (refresh) refresh(game, pending);
+      return pending;
+    }
+    function restoreResponseContext(game, pending) {
+      // JSON copies lose shared object identity. Rebind both legacy aliases and
+      // nested frame references before a resolver changes paid counts/indices.
+      var frames = game.pauseState && game.pauseState.responseFlows || [];
+      var byId = {};
+      frames.forEach(function (frame) { byId[frame.id] = frame.source; });
+      frames.forEach(function (frame) {
+        Object.keys(frame.source).forEach(function (key) {
+          var value = frame.source[key];
+          if (value && byId[value.responseFlowId]) frame.source[key] = byId[value.responseFlowId];
+        });
+        game.pauseState[FLOW_KINDS[frame.kind].key] = frame.source;
+      });
+      var context = pending && pending.responseContext;
+      if (context) {
+        if (!game.pauseState) game.pauseState = {};
+        if (context.source && byId[context.source.responseFlowId]) {
+          context.source = byId[context.source.responseFlowId];
+        }
+        game.pauseState[context.key] = context.source;
+      }
+    }
+    function responseFlowBlocked(game) {
+      return !!game.pendingChoice;
+    }
+    function registerResponseFlow(kind, spec) {
+      FLOW_KINDS[kind] = spec;
+    }
+    function finishResponseFlow(game, kind, source) {
+      var spec = FLOW_KINDS[kind];
+      var frames = game.pauseState.responseFlows || [];
+      var id = source && source.responseFlowId;
+      game.pauseState.responseFlows = frames.filter(function (frame) { return frame.id !== id; });
+      var previous = game.pauseState.responseFlows.filter(function (frame) { return frame.kind === kind; }).pop();
+      game.pauseState[spec.key] = previous ? previous.source : null;
+    }
+    function runResponseFlow(game, kind, source) {
+      if (!source) return null;
+      var spec = FLOW_KINDS[kind];
+      if (!spec) throw new Error('Unregistered response flow: ' + kind);
+      if (!game.pauseState) game.pauseState = {};
+      var frames = game.pauseState.responseFlows || (game.pauseState.responseFlows = []);
+      var frame = frames.find(function (entry) { return entry.id === source.responseFlowId; });
+      if (!frame) {
+        game.responseFlowSerial = (game.responseFlowSerial || 0) + 1;
+        source.responseFlowId = game.responseFlowSerial;
+        frame = { id: source.responseFlowId, kind: kind, source: source };
+        frames.push(frame);
+      }
+      // Canonical frame source also repairs aliases after a JSON simulation clone.
+      source = frame.source;
+      game.pauseState[spec.key] = source;
+      if (game.phase === 'gameover') {
+        finishResponseFlow(game, kind, source);
+        if (spec.cancel) spec.cancel(game, source);
+        return success('游戏结束。');
+      }
+      if (responseFlowBlocked(game)) {
+        return Object.assign(success('响应链暂停，等待插入结算。'), { paused: true, suspended: true });
+      }
+      return spec.advance(game, source);
+    }
+    function resumeResponseFlows(game) {
+      var result = null;
+      while (!responseFlowBlocked(game)) {
+        var frames = game.pauseState && game.pauseState.responseFlows;
+        if (!frames || !frames.length) break;
+        var frame = frames[frames.length - 1];
+        result = runResponseFlow(game, frame.kind, frame.source);
+        if (responseFlowBlocked(game)) break;
+        var remaining = game.pauseState.responseFlows;
+        if (remaining.length && remaining[remaining.length - 1].id === frame.id) {
+          // Every advance must finish, open a window, or make the inner frame
+          // own continuation. Fail visibly instead of spinning forever.
+          throw new Error('Response flow did not yield or finish: ' + frame.kind);
+        }
+      }
+      return result;
+    }
+    var responseFlows = {
+      register: registerResponseFlow, run: runResponseFlow,
+      finish: finishResponseFlow, blocked: responseFlowBlocked
+    };
+
     // v10 V3: 玩家响应窗口框架 — 统一暂停/恢复 API.
     //
     // 调用 (engine 侧): 触发暂停时, 不再手写 game.pauseState[xxx] +
@@ -45,6 +144,7 @@
       if (!game.pauseState) game.pauseState = {};
       game.pauseState[spec.pauseKey] = spec.source;
       var pending = { kind: spec.kind, actor: spec.actor };
+      pending.responseContext = { key: spec.pauseKey, source: spec.source };
       if (spec.options !== undefined) pending.options = spec.options;
       if (spec.meta) {
         Object.keys(spec.meta).forEach(function (k) { pending[k] = spec.meta[k]; });
@@ -80,7 +180,10 @@
     function shiftPendingChoiceQueue(game) {
       if (!game || game.pendingChoice) return;
       var queue = game.pendingChoiceQueue;
-      if (queue && queue.length) game.pendingChoice = queue.shift();
+      if (queue && queue.length) {
+        game.pendingChoice = refreshResponseOptions(game, queue.shift());
+        restoreResponseContext(game, game.pendingChoice);
+      }
     }
 
     // H2 (审计二轮): 判定阶段的延时锦囊结算 (如【闪电】命中) 把角色打入濒死
@@ -90,6 +193,10 @@
     // 排空后调用本函数续跑判定区剩余结算 + 摸牌/出牌阶段。
     function resumeSuspendedTurnFlowIfReady(game) {
       if (!game || game.pendingChoice) return null;
+      // Response frames are deeper than turn/target queues. Drain them before
+      // prepareResume, duel/sha/AOE legacy continuations or the next phase.
+      var flowResult = resumeResponseFlows(game);
+      if (responseFlowBlocked(game)) return flowResult;
       if (game.phase === 'gameover') {
         // v14 P 评审收口: 终局时清理悬空的多目标杀链 — advanceShaChain 的
         // gameover 分支直接 finishShaChain (幂等弃置 + 清态); 否则"链在
@@ -195,7 +302,10 @@
     // dispatcher 公共收尾: resolver 返回后弹出队列中的下一个选择; 若全部
     // 排空且存在被 H2 挂起的回合流程, 续跑之。
     function finishPendingChoiceResolution(game, result) {
-      shiftPendingChoiceQueue(game);
+      if (game.phase === 'gameover') {
+        game.pendingChoice = null;
+        game.pendingChoiceQueue = [];
+      } else shiftPendingChoiceQueue(game);
       resumeSuspendedTurnFlowIfReady(game);
       return result;
     }
@@ -224,11 +334,16 @@
       }
       var resolver = RESPONSE_KIND_RESOLVERS[pending.kind];
       if (!resolver) return fail('未注册的响应类型：' + pending.kind);
+      restoreResponseContext(game, pending);
       game.pendingChoice = null;
       return finishPendingChoiceResolution(game, resolver(game, pending, decision || {}));
     }
 
     return {
+      responseFlows: responseFlows,
+      registerResponseOptions: registerResponseOptions,
+      refreshResponseOptions: refreshResponseOptions,
+      restoreResponseContext: restoreResponseContext,
       requestPlayerResponse: requestPlayerResponse,
       RESPONSE_KIND_RESOLVERS: RESPONSE_KIND_RESOLVERS,
       registerResponseKind: registerResponseKind,

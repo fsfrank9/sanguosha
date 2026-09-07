@@ -323,16 +323,19 @@ test('S1 声明门: 窗口不支持的牌名 / 不在手牌的盖置牌 → 拒�
   assert.ok(stillOpen && stillOpen.kind === 'shan-response', '窗口仍在');
 });
 
-test('S1 已知局限钉: AI 席在响应窗口不声明蛊惑 (仅玩家席接入)', () => {
+test('Y3 翻转 S1 局限: AI 响应蛊惑挂起质疑，放弃质疑后抵消杀', () => {
   const game = buildDuel('caocao', 'yuji');
   game.turn = 'player';
   game.player.hand = [c('sha', { id: 'ai-target-sha' })];
   game.enemy.hand = [c('wuzhong', { id: 'ai-nonshan' })]; // AI 于吉无闪
   const before = game.enemy.hp;
   Engine.playCard(game, 'player', 'ai-target-sha', { target: 'enemy' });
-  assert.equal(Engine.getPendingChoice(game), null, 'AI 席不开响应窗口');
-  assert.equal(game.enemy.hp, before - 1, 'AI 于吉照常受伤 (不声明蛊惑)');
-  assert.ok(game.enemy.hand.some((card) => card.id === 'ai-nonshan'), '手牌未被当闪打出');
+  assert.equal(Engine.getPendingChoice(game).kind, 'guhuo-challenge');
+  assert.equal(game.enemy.hp, before, '质疑未决不结算伤害');
+  Engine.resolvePendingChoice(game, { challenge: false });
+  assert.equal(game.enemy.hp, before, '声明闪抵消杀');
+  assert.equal(game.pendingChoice, null);
+  assert.ok(game.discard.some((card) => card.id === 'ai-nonshan'));
 });
 
 // ───── 评审收口回归钉 (opus 对抗端到端复现) ─────
@@ -392,27 +395,26 @@ test('S1 收口: 无双第二张【杀】的窗口同样提供蛊惑 (与闪路�
   assert.equal(Engine.guhuoResponseAvailable(game), true, '第二张窗口可发动蛊惑');
 });
 
-test('S1 收口: AI 席不得经公开 dispatcher 越界发动响应蛊惑 (声明入口复用同一谓词)', () => {
+test('Y3 翻转 S1 门禁: AI 救援窗口可经公开 dispatcher 声明，菜单一致', () => {
   const game = buildDuel('caocao', 'yuji');
-  game.enemy.skillPreferences.dying = 'ask'; // 引擎支持的旋钮 → AI 席也能拿到窗口
+  game.enemy.skillPreferences.dying = 'ask';
   game.enemy.hp = 1;
-  // 有【桃】→ AI 席也能拿到 ask 救援窗 (评审复现的入口); 另备一张非桃牌
-  // 作为越界声明的盖置牌。
-  game.enemy.hand = [c('tao', { id: 'ai-tao', suit: 'heart', color: 'red' }),
-    c('wuzhong', { id: 'ai-cover' })];
+  game.enemy.skillPreferences.guhuo = 'decline';
+  game.enemy.hand = [c('tao', { id: 'ai-tao', suit: 'heart', color: 'red' })];
   game.turn = 'player';
-  game.player.hand = [c('sha', { id: 'p-kill-ai' })];
-  Engine.playCard(game, 'player', 'p-kill-ai', { target: 'enemy' });
-  const dying = Engine.getPendingChoice(game);
-  assert.ok(dying && dying.kind === 'dying-rescue' && dying.actor === 'enemy');
-  assert.equal(Engine.guhuoResponseAvailable(game), false, 'UI 门禁: AI 席无声明面');
-  assert.deepEqual(Engine.guhuoResponseTypes(game), [], '菜单谓词与门禁同口径');
-  const rejected = Engine.resolvePendingChoice(game, {
-    guhuo: { cardId: 'ai-cover', declareType: 'tao' }
-  });
-  assert.equal(rejected.ok, false, '直调 dispatcher 同样被拒');
-  assert.ok(!game.enemy.flags.guhuoUsedThisTurn, '额度未消耗');
-  assert.ok(game.enemy.hand.some((card) => card.id === 'ai-cover'), '手牌零副作用');
+  game.player.hand = [c('sha', { id: 'ai-rescue-trigger' })];
+  Engine.playCard(game, 'player', 'ai-rescue-trigger', { target: 'enemy' });
+  assert.equal(game.pendingChoice.kind, 'dying-rescue');
+  assert.equal(Engine.guhuoResponseAvailable(game), true);
+  assert.deepEqual(Engine.guhuoResponseTypes(game), ['tao', 'jiu']);
+  assert.equal(Engine.resolvePendingChoice(game, {
+    guhuo: { cardId: 'ai-tao', declareType: 'tao' }
+  }).ok, true);
+  assert.equal(game.pendingChoice.kind, 'guhuo-challenge');
+  Engine.resolvePendingChoice(game, { challenge: true });
+  assert.equal(game.enemy.hp, 1);
+  assert.equal(game.player.chanyuan, true);
+  assert.equal(game.pendingChoice, null);
 });
 
 await runTests();

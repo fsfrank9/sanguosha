@@ -1,3 +1,4 @@
+// v16 Y: 递归消费改逐张游标；玩家/AI 共用 resolver，伤害仍由注册驱动唯一结算。
 // v10 V6 守护: 决斗 玩家手动【杀】响应 框架 + UI panel.
 // 端到端在 duel_player_response.test.mjs.
 import assert from 'node:assert/strict';
@@ -52,25 +53,25 @@ test('v10 V6: playDuel 重构走 advanceDuelChain (不再含同步 while 循环)
 });
 
 test('v10 V6: advanceDuelChain — 玩家 ask 走 requestPlayerResponse(kind:sha-duel-response)', () => {
-  const fn = engineSrc.match(/function advanceDuelChain\(game\)\s*\{[\s\S]*?\n {6}\}/);
+  const fn = engineSrc.match(/function advanceDuelResponses\(game, chain\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /shaDuelResponse\s*===\s*'ask'/);
-  assert.match(fn[0], /requestPlayerResponse\(game,\s*\{/);
+  assert.match(fn[0], /requestPlayerResponse\(game,\s*spec\)/);
   assert.match(fn[0], /kind:\s*'sha-duel-response'/);
   assert.match(fn[0], /pauseKey:\s*'duelChain'/);
   assert.match(fn[0], /listShaResponseOptions/);
 });
 
 test('v10 V6: advanceDuelChain — AI / 默认 走 consumeResponse 自动 + 切换 currentResponder + 尾递归', () => {
-  const fn = engineSrc.match(/function advanceDuelChain\(game\)\s*\{[\s\S]*?\n {6}\}/);
+  const fn = engineSrc.match(/function advanceDuelResponses\(game, chain\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /consumeResponse\(game,\s*responder,\s*'sha'/);
   // v12 H2: 决斗限定 starter/target 两方 — 切换/伤害来源经 duelOtherParty
   // (双座席时即 opponent, 语义不变)。
-  assert.match(fn[0], /chain\.currentResponder\s*=\s*duelOtherParty\(chain,\s*responder\)/);
-  assert.match(fn[0], /return advanceDuelChain\(game\)/, '尾递归');
+  assert.match(fn[0], /chain\.currentResponder\s*=\s*foe/);
+  assert.match(fn[0], /flows\.blocked\(game\)/, '逐张支付后检查挂起');
   // 无杀 → damage + clear chain
-  assert.match(fn[0], /damage\(game,\s*loser,\s*1,\s*duelOtherParty\(chain,\s*loser\)/);
+  assert.match(fn[0], /damage\(game,\s*responder,\s*1,\s*foe/);
 });
 
 test('v10 V6: resolveDuelResponseChoice 注册到 RESPONSE_KIND_RESOLVERS', () => {
@@ -82,8 +83,9 @@ test('v10 V6: resolveDuelResponseChoice — cardId / use / decline 三分支 + d
   assert.ok(fn);
   assert.match(fn[0], /decision\.cardId/);
   assert.match(fn[0], /decision\.use/);
-  assert.match(fn[0], /consumeResponse\(game,\s*'player',\s*'sha',\s*chain\.reason,\s*decision\.cardId/);
-  assert.match(fn[0], /damage\(game,\s*'player',\s*1/);
+  assert.match(fn[0], /consumeResponse\(game,\s*responder,\s*'sha',\s*chain\.reason,\s*decision\.cardId/);
+  assert.match(fn[0], /chain\.aidOnly\s*=\s*true/);
+  assert.match(fn[0], /return advanceDuelChain\(game\)/);
 });
 
 // ───── UI ────────────────────────────────────────────────────────────

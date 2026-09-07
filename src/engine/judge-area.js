@@ -263,6 +263,7 @@
       // 的 moveToNext) 与被无懈 (processJudgeArea) 共用。
       function moveShandianOnward(game, actor, trick) {
         var moved = false;
+        var blockedReasons = [];
         var ring = StateRuntime.seatsFrom(game, actor, false);
         for (var ringIdx = 0; ringIdx < ring.length; ringIdx += 1) {
           var candActor = ring[ringIdx];
@@ -271,11 +272,14 @@
           var candAlreadyShandian = (candState.judgeArea || []).some(function (j) {
             return j && j.type === 'shandian';
           });
-          if (candAlreadyShandian) continue;
+          if (candAlreadyShandian) { blockedReasons.push('判定区已有同名牌'); continue; }
           // W2-F10: 帷幕 (贾诩) — "你不是黑色锦囊牌的合法目标"是目标合法性
           // 类锁定技 (flow__condition.md:101), 闪电 (黑桃延时锦囊) 的移动
           // 同样要过目标合法性; 此前只查同名去重, 闪电会移进贾诩的判定区。
-          if (weimuBlocksCard && weimuBlocksCard(game, candActor, trick)) continue;
+          if (weimuBlocksCard && weimuBlocksCard(game, candActor, trick)) {
+            blockedReasons.push('帷幕限制');
+            continue;
+          }
           putCard(game, trick, { zone: 'judgeArea', actor: candActor });
           log(game, '【闪电】移至' + actorName(game, candActor) + '的判定区。');
           moved = true;
@@ -284,7 +288,9 @@
         if (!moved) {
           // 后续座席均非合法目标 → 回到自己
           putCard(game, trick, { zone: 'judgeArea', actor: actor });
-          log(game, '【闪电】移动失败（对手判定区已有同名牌），留在' + actorName(game, actor) + '的判定区。');
+          var reasons = blockedReasons.filter(function (reason, idx) { return blockedReasons.indexOf(reason) === idx; });
+          log(game, '【闪电】移动失败（' + (reasons.join('、') || '没有其他存活角色')
+            + '），留在' + actorName(game, actor) + '的判定区。');
         }
       }
 

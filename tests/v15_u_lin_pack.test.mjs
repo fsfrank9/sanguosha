@@ -531,8 +531,8 @@ test('收口 A1: 乱武链已接进 resumeSuspendedTurnFlowIfReady (源码锚点
 
 test('收口 A3: 祸首的伤害来源在挂起快照里也已替换 (源码锚点)', () => {
   const text = fs.readFileSync(new URL('../src/engine/tricks.js', import.meta.url), 'utf8');
-  assert.equal((text.split('sourceActor: aoe.sourceActor').length - 1), 2,
-    '仅 meta 里的两处显示用途保留裸 sourceActor; source 快照必须走 aoeDamageSourceFor');
+  assert.equal((text.split('sourceActor: aoe.sourceActor').length - 1), 3,
+    'v16 Y 新增 AI 响应 meta，三处均为显示用途保留裸 sourceActor; source 快照必须走 aoeDamageSourceFor');
 });
 
 test('收口 B1: 帷幕挡黑色 AOE (flow__condition.md:101 目标合法性类技能)', () => {

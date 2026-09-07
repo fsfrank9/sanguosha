@@ -12,6 +12,7 @@
   var seatsFrom = StateRuntime.seatsFrom;
 
   export function createTricksRuntime(deps) {
+    var flows = deps.responseFlows;
     var log = deps.log;
     var success = deps.success;
     var fail = deps.fail;
@@ -160,6 +161,10 @@
     // 链推进: 沿询问队列逐座席决定 暂停 (玩家 ask + 有无懈) / AI 期望值
     // auto-use / 跳过 (无无懈); 队列耗尽 → 结算.
     function advanceWuxieChain(game) {
+      return flows.run(game, 'wuxie', game.pauseState && game.pauseState.wuxieChain);
+    }
+
+    function advanceWuxieResponses(game) {
       var chain = game.pauseState && game.pauseState.wuxieChain;
       if (!chain) return fail('无懈链状态丢失。');
       if (!chain.queue) {
@@ -170,13 +175,15 @@
         var responder = chain.queue[chain.idx];
         chain.currentResponder = responder;
         var state = game[responder];
+        if (state && state.skillPreferences && state.skillPreferences.wuxieResponse === 'decline') {
+          chain.idx += 1;
+          continue;
+        }
         // v15 S1: 玩家席于吉可背面朝上使用任意手牌当【无懈可击】 → 手上
-        // 没有无懈也要开窗 (AI 席维持原门禁 — 响应中声明为已知局限)。
+        // 没有无懈也要开窗；v16 Y 中 AI 声明也经同一响应帧挂起。
         var hasWuxie = state && state.hp > 0
           && (hasWuxieResponseAvailable(state)
-            || (responder === 'player' && state.skillPreferences
-              && state.skillPreferences.wuxieResponse === 'ask'
-              && deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, responder)));
+            || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, responder)));
         if (!hasWuxie) {
           chain.idx += 1;
           continue;
@@ -220,7 +227,17 @@
           chain.idx += 1;
           continue;
         }
-        consumeWuxie(game, responder, chain.reason);
+        var ghResult = deps.tryAIResponseGuhuo(game, {
+          kind: 'wuxie-response', actor: responder, pauseKey: 'wuxieChain', source: chain,
+          options: listWuxieOptions(state),
+          meta: { reason: chain.reason, trickName: chain.trickName, chainWuxied: chain.wuxied,
+            targetActor: wuxieWindowTargetSeat(chain) }
+        });
+        if (ghResult) return ghResult;
+        if (!consumeWuxie(game, responder, chain.reason)) {
+          chain.idx += 1;
+          continue;
+        }
         recordWuxieStance(game, responder, chain); // v13 M3 (翻转前记录)
         chain.wuxied = !chain.wuxied;
         chain.lastWuxieBy = responder;
@@ -284,7 +301,7 @@
     function settleWuxieChain(game) {
       var chain = game.pauseState && game.pauseState.wuxieChain;
       if (!chain) return fail('无懈链状态丢失。');
-      game.pauseState.wuxieChain = null;
+      flows.finish(game, 'wuxie', chain);
       var cont = WUXIE_CONTINUATIONS[chain.trickName];
       if (!cont) return fail('未注册的无懈延续: ' + chain.trickName);
       return cont(game, chain.ctx, chain.wuxied);
@@ -298,25 +315,26 @@
       if (!chain) return fail('找不到无懈响应的暂停状态。');
 
       if (decision.cardId || decision.use) {
-        var used = consumeWuxie(game, 'player', chain.reason, decision.cardId || null);
+        var used = consumeWuxie(game, pending.actor, chain.reason, decision.cardId || null);
         if (!used) {
-          log(game, actorName(game, 'player') + '没有可打出的【无懈可击】。');
+          log(game, actorName(game, pending.actor) + '没有可打出的【无懈可击】。');
           chain.idx += 1;
           return advanceWuxieChain(game);
         }
-        recordWuxieStance(game, 'player', chain); // v13 M3 (翻转前记录)
+        recordWuxieStance(game, pending.actor, chain); // v13 M3 (翻转前记录)
         chain.wuxied = !chain.wuxied;
-        chain.lastWuxieBy = 'player';
+        chain.lastWuxieBy = pending.actor;
         chain.queue = null;
         return advanceWuxieChain(game);
       }
       // 玩家放弃响应 → 队列下一位 (耗尽则由 advanceWuxieChain 调 settleWuxieChain(game) 结算)
-      log(game, actorName(game, 'player') + '选择不打出【无懈可击】响应' + chain.reason + '。');
+      log(game, actorName(game, pending.actor) + '选择不打出【无懈可击】响应' + chain.reason + '。');
       chain.idx += 1;
       return advanceWuxieChain(game);
     }
 
     registerResponseKind('wuxie-response', resolveWuxieResponseChoice);
+    flows.register('wuxie', { key: 'wuxieChain', advance: advanceWuxieResponses });
 
     // v10 V5: 无懈链 settle 时调用. ctx = { actor, card, options, targetActor? }.
     // wuxied: true → 锦囊被抵消; false → 锦囊照常结算.
@@ -954,6 +972,13 @@
           });
           return success('【借刀杀人】等待目标决定…');
         }
+        var gh = deps.tryAIResponseGuhuo(game, {
+          kind: 'jiedao-decision', actor: opponentActor, pauseKey: 'jiedaoResponse',
+          source: { sourceActor: sourceActor, victimActor: jdVictim },
+          options: hasShaResponseAvailable(opponentState) ? listShaResponseOptions(opponentState) : [],
+          meta: { sourceActor: sourceActor, victimActor: jdVictim }
+        });
+        if (gh) return gh;
         // 'auto' → fire sha.
         return jiedaoFireOpponentSha(game, sourceActor, opponentActor, jdVictim);
       }
@@ -973,7 +998,10 @@
         if (!response || !response.card) {
           return transferWeaponJiedao(game, sourceActor, opponentActor);
         }
-        var borrowedSha = response.card;
+        var borrowedSha = guhuoSha ? CardRuntime.makeTestCard(guhuoSha.declareType, {
+          id: guhuoSha.physical.id, physicalCard: guhuoSha.physical,
+          suit: guhuoSha.physical.suit, color: guhuoSha.physical.color, rank: guhuoSha.physical.rank
+        }) : response.card;
         // 使用路径的物理组成牌: 转化/合成走青龙续杀 (audit4-L1) 同款 —
         // 组成实体先入弃牌堆, 虚拟【杀】流经结算 (discardCard 对 virtual
         // 直接跳过, 守恒基线不变); 回滚时从弃牌堆原路取回。
@@ -1008,10 +1036,10 @@
           // 把虚拟牌 putCard 回手会凭空多牌破坏守恒), 物理杀原样退回。
           if (usedPhysicals) {
             usedPhysicals.forEach(function (pc) {
-              moveCard(game, pc, { zone: 'discard' }, { zone: 'hand', actor: opponentActor });
+              moveCard(game, pc, { zone: 'discard' }, response.sourceZone || { zone: 'hand', actor: opponentActor });
             });
           } else {
-            putCard(game, borrowedSha, { zone: 'hand', actor: opponentActor });
+            putCard(game, guhuoSha ? guhuoSha.physical : borrowedSha, { zone: 'hand', actor: opponentActor });
           }
           log(game, '【杀】不再合法（second legality check）；交出武器。');
           return transferWeaponJiedao(game, sourceActor, opponentActor);
@@ -1031,6 +1059,7 @@
       }
 
       function resolveJiedaoDecisionChoice(game, pending, decision) {
+        if (game.pauseState) game.pauseState.jiedaoResponse = null;
         var sourceActor = pending.sourceActor;
         var opponentActor = pending.actor;
         if (!game[sourceActor] || !game[opponentActor]) return fail('未知角色。');
@@ -1076,171 +1105,108 @@
       }
 
       function advanceDuelChain(game) {
-        var chain = game.pauseState && game.pauseState.duelChain;
-        if (!chain) return fail('决斗链状态丢失。');
-        if (game.phase === 'gameover') {
-          game.pauseState.duelChain = null;
-          return success('决斗结算完成。');
-        }
-        // audit4-L5: 插入结算挂起 (银月枪/雷击等经 onShanUsed/onCardUse 挂
-        // pendingChoice) 时决斗链停机 — 链保留, 选择排空后由
-        // resumeSuspendedTurnFlowIfReady 的 duelChain 分支续跑 (此前越过挂起
-        // 继续对拼, auto/ask 同局面结果分歧, 对手白掉血)。
-        if (game.pendingChoice) return success('【决斗】暂停，等待插入结算。');
-        // audit4-L5: 插入结算致一方阵亡 → 决斗中止 (官方: 角色死亡其为
-        // 目标的结算终止), 不再对亡者结算伤害。
-        var responder = chain.currentResponder;
-        var otherParty = duelOtherParty(chain, responder);
-        if (!game[responder] || game[responder].hp <= 0 || !game[otherParty] || game[otherParty].hp <= 0) {
-          game.pauseState.duelChain = null;
-          return success('【决斗】中止（一方已阵亡）。');
-        }
-        var state = game[responder];
-        // v15 S1: 于吉可背面朝上打出任意手牌当【杀】 → 手上没有杀也要开窗。
-        var hasSha = hasShaResponseAvailable(state)
-          || (responder === 'player' && deps.guhuoResponsePossible
-            && deps.guhuoResponsePossible(game, responder));
-
-        // 玩家 ask + 有杀响应 → 暂停
-        if (responder === 'player'
-            && state.skillPreferences && state.skillPreferences.shaDuelResponse === 'ask'
-            && hasSha) {
-          return requestPlayerResponse(game, {
-            kind: 'sha-duel-response',
-            actor: 'player',
-            pauseKey: 'duelChain',
-            source: chain,
-            options: listShaResponseOptions(state),
-            meta: {
-              reason: chain.reason,
-              starterActor: chain.starterActor
-            },
-            logMessage: '等待' + actorName(game, 'player') + '决定是否打出【杀】响应' + chain.reason + '。',
-            statusMessage: '等待玩家响应【决斗】。'
-          });
-        }
-
-        // 非玩家 ask 路径: AI / 默认 — 走原 consumeResponse 自动消耗
-        // v11 C1: 无双 — 对方为吕布时每轮需依次打出两张【杀】。
-        var duelNeeded = duelShaRequired(game, responder, duelOtherParty(chain, responder));
-        // audit4-L5: 挂起停机时已付张数落快照, 续跑不重复支付。
-        var duelPaid = chain.resumePaid || 0;
-        chain.resumePaid = 0;
-        while (duelPaid < duelNeeded && consumeResponse(game, responder, 'sha', chain.reason)) {
-          duelPaid += 1;
-          if (game.pendingChoice) {
-            chain.resumePaid = duelPaid;
-            return success('【决斗】暂停，等待插入结算。');
-          }
-        }
-        if (duelPaid === duelNeeded) {
-          chain.currentResponder = duelOtherParty(chain, responder);
-          return advanceDuelChain(game);
-        }
-        // v12 H7: 激将 — AI 主公打不齐【杀】时求助蜀势力座席: 玩家可代打 →
-        // 挂起询问 (链保留, resolver 收尾); AI 座席 → 同步接力。
-        if (lordAidPlayerCanAid && lordAidPlayerCanAid(game, responder, 'jijiang')) {
-          chain.aidPaid = duelPaid;
-          chain.aidNeeded = duelNeeded;
-          return requestPlayerResponse(game, {
-            kind: 'jijiang-aid',
-            actor: 'player',
-            pauseKey: 'duelChain',
-            source: chain,
-            options: listShaResponseOptions(game.player),
-            meta: { lordActor: responder, reason: chain.reason, aidSkill: 'jijiang' },
-            logMessage: '等待' + actorName(game, 'player') + '决定是否响应【激将】代打【杀】。',
-            statusMessage: '等待玩家护主响应。'
-          });
-        }
-        while (duelPaid < duelNeeded && tryLordAidSync && tryLordAidSync(game, responder, 'jijiang', chain.reason)) {
-          duelPaid += 1;
-          // audit4-L5: 代打座席的打出同样可挂插入结算 (银月枪等)。
-          if (game.pendingChoice) {
-            chain.resumePaid = duelPaid;
-            return success('【决斗】暂停，等待插入结算。');
-          }
-        }
-        if (duelPaid === duelNeeded) {
-          chain.currentResponder = duelOtherParty(chain, responder);
-          return advanceDuelChain(game);
-        }
-        if (duelNeeded > 1) {
-          log(game, '【无双】锁定：' + actorName(game, responder) + '未能打出两张【杀】。');
-        }
-        // 无杀 → 受 1 伤 (来源=决斗另一方), 链结束
-        var loser = responder;
-        game.pauseState.duelChain = null;
-        damage(game, loser, 1, duelOtherParty(chain, loser), chain.reason, chain.card);
-        return success('决斗结算完成。');
+        return flows.run(game, 'duel', game.pauseState && game.pauseState.duelChain);
       }
 
-      // resolver — 玩家 sha-duel-response pendingChoice 决定.
-      // v12 H2: 对方/伤害来源 = duelOtherParty(chain, 'player') (跨座席决斗)。
+      function advanceDuelResponses(game, chain) {
+        while (true) {
+          var responder = chain.currentResponder;
+          var foe = duelOtherParty(chain, responder);
+          var state = game[responder];
+          if (!state || state.hp <= 0 || !game[foe] || game[foe].hp <= 0) {
+            flows.finish(game, 'duel', chain);
+            return success('【决斗】中止（一方已阵亡）。');
+          }
+          var needed = chain.roundNeeded || duelShaRequired(game, responder, foe);
+          if (!chain.roundNeeded && needed > 1) {
+            log(game, '【无双】锁定：' + actorName(game, responder) + '需依次打出两张【杀】。');
+          }
+          chain.roundNeeded = needed;
+          chain.resumePaid = chain.resumePaid || 0;
+          if (chain.resumePaid >= needed) {
+            chain.currentResponder = foe;
+            chain.resumePaid = 0;
+            chain.roundNeeded = null;
+            chain.shaRemaining = null;
+            chain.aidOnly = false;
+            chain.skipPlayerAid = false;
+            continue;
+          }
+          chain.shaRemaining = needed - chain.resumePaid;
+          if (!chain.aidOnly) {
+            var spec = {
+              kind: 'sha-duel-response', actor: responder, pauseKey: 'duelChain', source: chain,
+              options: listShaResponseOptions(state),
+              meta: { reason: chain.reason, starterActor: chain.starterActor },
+              statusMessage: '等待响应【决斗】。'
+            };
+            if (responder === 'player' && state.skillPreferences
+                && state.skillPreferences.shaDuelResponse === 'ask'
+                && (hasShaResponseAvailable(state) || deps.guhuoResponsePossible(game, responder))) {
+              return requestPlayerResponse(game, spec);
+            }
+            // 丈八 is a valid native response even though it has no single-card option.
+            var hasZhangba = hasEquipmentEffect(state, 'zhangbaTwoHandSha') && state.hand.length >= 2
+              && !(state.skillPreferences && state.skillPreferences.zhangba === 'decline');
+            var gh = !hasZhangba && deps.tryAIResponseGuhuo(game, spec);
+            if (gh) return gh;
+            if (consumeResponse(game, responder, 'sha', chain.reason)) {
+              chain.resumePaid += 1;
+              if (flows.blocked(game)) return success('【决斗】等待插入结算。');
+              continue;
+            }
+            chain.aidOnly = true;
+          }
+          if (!chain.skipPlayerAid && lordAidPlayerCanAid
+              && lordAidPlayerCanAid(game, responder, 'jijiang')) {
+            chain.aidPaid = chain.resumePaid;
+            chain.aidNeeded = needed;
+            return requestPlayerResponse(game, {
+              kind: 'jijiang-aid', actor: 'player', pauseKey: 'duelChain', source: chain,
+              options: listShaResponseOptions(game.player),
+              meta: { lordActor: responder, reason: chain.reason, aidSkill: 'jijiang' },
+              statusMessage: '等待玩家护主响应。'
+            });
+          }
+          if (tryLordAidSync && tryLordAidSync(game, responder, 'jijiang', chain.reason)) {
+            chain.resumePaid += 1;
+            if (flows.blocked(game)) return success('【决斗】等待护主插入结算。');
+            continue;
+          }
+          flows.finish(game, 'duel', chain);
+          if (needed > 1) log(game, '【无双】锁定：' + actorName(game, responder) + '未能打出两张【杀】。');
+          damage(game, responder, 1, foe, chain.reason, chain.card);
+          return success('决斗结算完成。');
+        }
+      }
+
       function resolveDuelResponseChoice(game, pending, decision) {
         var chain = game.pauseState && game.pauseState.duelChain;
         if (!chain) return fail('找不到决斗响应的暂停状态。');
-        var duelFoe = duelOtherParty(chain, 'player');
-
-        if (decision.cardId || decision.use) {
-          var consumed = consumeResponse(game, 'player', 'sha', chain.reason, decision.cardId || null);
-          if (!consumed) {
-            // 罕见: 指定的 cardId 无效或库中此牌已不可用 → 视为放弃
-            log(game, actorName(game, 'player') + '没有可打出的【杀】。');
-            game.pauseState.duelChain = null;
-            damage(game, 'player', 1, duelFoe, chain.reason, chain.card);
-            return success('决斗结算完成。');
-          }
-          // v11 C1: 无双 — 玩家每轮需依次两张【杀】; 首张后剩余 >0 则再询问。
-          if (chain.shaRemaining === undefined || chain.shaRemaining === null) {
-            chain.shaRemaining = duelShaRequired(game, 'player', duelFoe);
-          }
-          chain.shaRemaining -= 1;
-          if (chain.shaRemaining > 0) {
-            // 评审收口: 与 sha-flow 的无双第二张【闪】窗口对称 — 蛊惑可当
-            // 【杀】打出, 手上没有杀也要开第二个窗口 (此前直接判"无法打出
-            // 第二张", 蛊惑额度未消耗却被跳过)。
-            if (hasShaResponseAvailable(game.player)
-                || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, 'player'))) {
-              log(game, '【无双】：' + actorName(game, 'player') + '需再打出一张【杀】。');
-              return advanceDuelChain(game);
-            }
-            log(game, '【无双】锁定：' + actorName(game, 'player') + '无法打出第二张【杀】。');
-            game.pauseState.duelChain = null;
-            damage(game, 'player', 1, duelFoe, chain.reason, chain.card);
-            return success('决斗结算完成。');
-          }
-          chain.shaRemaining = null;
-          chain.currentResponder = duelFoe;
-          return advanceDuelChain(game);
+        var responder = pending.actor;
+        if ((decision.cardId || decision.use)
+            && consumeResponse(game, responder, 'sha', chain.reason, decision.cardId || null)) {
+          chain.resumePaid = (chain.resumePaid || 0) + 1;
+          chain.shaRemaining = (chain.roundNeeded || duelShaRequired(game, responder, duelOtherParty(chain, responder)))
+            - chain.resumePaid;
+        } else {
+          chain.aidOnly = true;
+          log(game, actorName(game, responder) + '未打出【杀】响应' + chain.reason + '。');
         }
-        // 玩家放弃出杀 → v12 H7: 玩家为主公时先求助蜀势力 AI 座席 (激将);
-        // 无人代打或非主公 → 受 1 伤
-        log(game, actorName(game, 'player') + '选择不打出【杀】响应' + chain.reason + '。');
-        if (tryLordAidSync) {
-          var aidNeeded = duelShaRequired(game, 'player', duelFoe);
-          // 评审收口: 同 advanceDuelChain — 代打打出可挂插入结算 (银月枪),
-          // 已付张数落 resumePaid 快照, 续跑不重复支付 (同槽语义: 本轮
-          // 已向 duelNeeded 支付的总张数)。
-          var aidPaid = chain.resumePaid || 0;
-          chain.resumePaid = 0;
-          while (aidPaid < aidNeeded && tryLordAidSync(game, 'player', 'jijiang', chain.reason)) {
-            aidPaid += 1;
-            if (game.pendingChoice) {
-              chain.resumePaid = aidPaid;
-              return success('【决斗】暂停，等待插入结算。');
-            }
-          }
-          if (aidPaid === aidNeeded) {
-            chain.shaRemaining = null;
-            chain.currentResponder = duelFoe;
-            return advanceDuelChain(game);
-          }
-        }
-        game.pauseState.duelChain = null;
-        damage(game, 'player', 1, duelFoe, chain.reason, chain.card);
-        return success('决斗结算完成。');
+        return advanceDuelChain(game);
       }
+
+      function resolveDuelAidChoice(game, chain, pending, decision) {
+        var paid = !!((decision.cardId || decision.use)
+          && consumeResponse(game, 'player', 'sha', chain.reason + '（激将）', decision.cardId || null));
+        if (paid) {
+          log(game, actorName(game, 'player') + '响应【激将】，代' + actorName(game, pending.lordActor) + '打出【杀】。');
+          chain.resumePaid = (chain.resumePaid || 0) + 1;
+          StateRuntime.recordStance(game, { type: 'aid', source: 'player', beneficiary: pending.lordActor });
+        } else chain.skipPlayerAid = true;
+        return advanceDuelChain(game);
+      }
+      flows.register('duel', { key: 'duelChain', advance: advanceDuelResponses });
 
       // v12 H2: AOE 逐座席结算队列 — 目标 = 来源下家起顺时针全部存活座席
       // (官方 "所有其他角色")。playAOE 建队列, advanceAOETargets 推进; 玩家
@@ -1310,7 +1276,12 @@
         // v13 J0-3: 八卦阵先行 — 需打出【闪】的座席 (万箭) 先给判定机会
         // (全座席统一; 此前玩家座席在窗口后/真闪后才试), 红判定即化解。
         // 【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦。
-        if (responseType === 'shan' && tryBaguaDodge(game, targetActor, false)) {
+        var baguaPaid = false;
+        if (responseType === 'shan' && aoe.baguaCheckedIdx !== aoe.idx) {
+          aoe.baguaCheckedIdx = aoe.idx;
+          baguaPaid = tryBaguaDodge(game, targetActor, false);
+        }
+        if (baguaPaid) {
           log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');
           aoe.idx += 1;
           // v13 张角修缮评审收口: 八卦"视为闪"同样走 onShanUsed → 雷击可挂
@@ -1320,6 +1291,27 @@
             return success('【' + title + '】等待响应结算…');
           }
           return 'continue';
+        }
+        if (flows.blocked(game)) return success('AOE 等待判定插入结算。');
+        if (targetActor !== 'player' && deps.guhuoResponsePossible(game, targetActor)) {
+          var ghOptions = responseType === 'shan'
+            ? listShanResponseOptions(game[targetActor]) : listShaResponseOptions(game[targetActor]);
+          var ghNativeZhangba = responseType === 'sha'
+            && hasEquipmentEffect(game[targetActor], 'zhangbaTwoHandSha')
+            && game[targetActor].hand.length >= 2
+            && !(game[targetActor].skillPreferences && game[targetActor].skillPreferences.zhangba === 'decline');
+          if (!ghOptions.length && !ghNativeZhangba) {
+            aoe.idx += 1; // original resolver owns this seat, just like a player ask
+            var gh = deps.tryAIResponseGuhuo(game, {
+              kind: responseType === 'shan' ? 'wanjian-response' : 'aoe-sha-response',
+              actor: targetActor, pauseKey: responseType === 'shan' ? 'wanjianResponse' : 'aoeShaResponse',
+              source: { sourceActor: aoeDamageSourceFor(game, aoe), title: title, card: aoe.card },
+              options: ghOptions,
+              meta: { sourceActor: aoe.sourceActor, sourceName: title }
+            });
+            if (gh) return gh;
+            aoe.idx -= 1;
+          }
         }
         // v10 V4: 万箭齐发 (responseType='shan') + 玩家为目标 + shanResponse=ask +
         // 有闪可响应 → 暂停, 让玩家自选闪 / 不出. 引擎默认仍走自动响应.
@@ -1450,7 +1442,7 @@
         effect: aoeEffectForCurrent,
         onDrain: function (game, aoe) {
           settleJuxiangClaim(game, aoe);
-          game.pauseState.aoe = null;
+          flows.finish(game, 'aoe', aoe);
           return success(aoe.title + '结算完成。');
         }
       };
@@ -1487,8 +1479,13 @@
       function advanceAOETargets(game) {
         var aoe = game.pauseState && game.pauseState.aoe;
         if (!aoe) return fail('AOE 结算状态丢失。');
-        return advanceTargetQueue(game, aoe, AOE_QUEUE_HOOKS);
+        return flows.run(game, 'aoe', aoe);
       }
+
+      flows.register('aoe', {
+        key: 'aoe',
+        advance: function (game, aoe) { return advanceTargetQueue(game, aoe, AOE_QUEUE_HOOKS); }
+      });
 
       // v10 V4: 万箭齐发 闪响应 — 玩家 decision 决定 化解 / damage(1).
       // saved.sourceActor 是万箭来源, saved.title 是显示文案.
@@ -1501,24 +1498,24 @@
         var title = saved.title || '万箭齐发';
         var dodged = false;
         if (decision.cardId) {
-          dodged = consumeResponse(game, 'player', 'shan', '【' + title + '】', decision.cardId);
-          if (!dodged) log(game, actorName(game, 'player') + '指定的牌无法当【闪】。');
+          dodged = consumeResponse(game, pending.actor, 'shan', '【' + title + '】', decision.cardId);
+          if (!dodged) log(game, actorName(game, pending.actor) + '指定的牌无法当【闪】。');
         } else if (decision.use) {
-          dodged = consumeResponse(game, 'player', 'shan', '【' + title + '】');
-          if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
+          dodged = consumeResponse(game, pending.actor, 'shan', '【' + title + '】');
+          if (!dodged) log(game, actorName(game, pending.actor) + '没有可打出的【闪】。');
         } else {
-          log(game, actorName(game, 'player') + '选择不打出【闪】响应【' + title + '】。');
+          log(game, actorName(game, pending.actor) + '选择不打出【闪】响应【' + title + '】。');
         }
         // v13 J0-3: 八卦机会已在开窗前给过 (advanceAOETargets 内判定失败才
         // 开的窗), 此处不再补试。
         // v12 H7: 玩家为主公时求助魏势力 AI 座席代打【闪】(护驾)。
-        if (!dodged && tryLordAidSync && tryLordAidSync(game, 'player', 'hujia', '【' + title + '】')) {
+        if (!dodged && tryLordAidSync && tryLordAidSync(game, pending.actor, 'hujia', '【' + title + '】')) {
           dodged = true;
         }
         if (dodged) {
-          log(game, actorName(game, 'player') + '成功化解【' + title + '】。');
+          log(game, actorName(game, pending.actor) + '成功化解【' + title + '】。');
         } else {
-          damage(game, 'player', 1, sourceActor, '【' + title + '】', saved.card);
+          damage(game, pending.actor, 1, sourceActor, '【' + title + '】', saved.card);
         }
         // v12 H2: 队列尚有剩余座席且未被濒死等选择挂起 → 继续推进;
         // 挂起时交给 resumeSuspendedTurnFlowIfReady 的 aoe 分支续跑。
@@ -1542,22 +1539,22 @@
         var title = saved.title || '南蛮入侵';
         var responded = false;
         if (decision.cardId) {
-          responded = consumeResponse(game, 'player', 'sha', '【' + title + '】', decision.cardId);
-          if (!responded) log(game, actorName(game, 'player') + '指定的牌无法当【杀】。');
+          responded = consumeResponse(game, pending.actor, 'sha', '【' + title + '】', decision.cardId);
+          if (!responded) log(game, actorName(game, pending.actor) + '指定的牌无法当【杀】。');
         } else if (decision.use) {
           // 蛊惑注入亦走这条 (consumeResponse 先取处理区的声明牌)。
-          responded = consumeResponse(game, 'player', 'sha', '【' + title + '】');
-          if (!responded) log(game, actorName(game, 'player') + '没有可打出的【杀】。');
+          responded = consumeResponse(game, pending.actor, 'sha', '【' + title + '】');
+          if (!responded) log(game, actorName(game, pending.actor) + '没有可打出的【杀】。');
         } else {
-          log(game, actorName(game, 'player') + '选择不打出【杀】响应【' + title + '】。');
+          log(game, actorName(game, pending.actor) + '选择不打出【杀】响应【' + title + '】。');
         }
-        if (!responded && tryLordAidSync && tryLordAidSync(game, 'player', 'jijiang', '【' + title + '】')) {
+        if (!responded && tryLordAidSync && tryLordAidSync(game, pending.actor, 'jijiang', '【' + title + '】')) {
           responded = true;
         }
         if (responded) {
-          log(game, actorName(game, 'player') + '成功化解【' + title + '】。');
+          log(game, actorName(game, pending.actor) + '成功化解【' + title + '】。');
         } else {
-          damage(game, 'player', 1, sourceActor, '【' + title + '】', saved.card);
+          damage(game, pending.actor, 1, sourceActor, '【' + title + '】', saved.card);
         }
         if (game.pauseState.aoe && !game.pendingChoice && game.phase !== 'gameover') {
           return advanceAOETargets(game);
@@ -1638,6 +1635,7 @@
       playDuel: playDuel,
       advanceDuelChain: advanceDuelChain,
       resolveDuelResponseChoice: resolveDuelResponseChoice,
+      resolveDuelAidChoice: resolveDuelAidChoice,
       playAOE: playAOE,
       advanceAOETargets: advanceAOETargets,
       resolveWanjianResponseChoice: resolveWanjianResponseChoice,

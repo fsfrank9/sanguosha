@@ -496,6 +496,8 @@
       // v11 B1: 伤害/濒死域拆分 — damage/enterDying/濒死救援/铁索传导 迁往
       // ./damage-dying.js, 引擎闭包能力经 createDamageDyingRuntime 依赖注入。
       var DamageDyingRuntime = createDamageDyingRuntime({
+        responseFlows: ResponseRuntime.responseFlows,
+        tryAIResponseGuhuo: tryAIResponseGuhuo,
         // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
         guhuoResponsePossible: guhuoResponsePossible,
         // v15 S1: 蛊惑声明救援牌的注入取用口 (濒死不走 consumeResponse)
@@ -646,7 +648,11 @@
           var responseContext = { mode: 'response', state: state, asType: 'sha' };
           var conversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', responseContext));
           // Same: support equipment-zone sources for 武圣 's response path.
-          if (conversion) return { card: removeOwnCardFromAnyZone(state, conversion.card.id, game), asName: conversion.asName, skillName: conversion.skillName };
+          if (conversion) {
+            var origin = CardRuntime.findCardZoneByRef(game, conversion.card);
+            return { card: removeOwnCardFromAnyZone(state, conversion.card.id, game),
+              asName: conversion.asName, skillName: conversion.skillName, sourceZone: origin };
+          }
           // v7 PR-14: 丈八蛇矛 — "你可以将两张手牌当【杀】使用或打出"
           //   响应路径：装备 丈八 且手牌 >= 2 时，consume 2 张手牌当 杀 响应。
           //   spec 是 optional，但响应窗口缺省"自动出杀"——保留旧行为。
@@ -817,6 +823,8 @@
       // consumeWuxie/requestPlayerResponse 为函数声明/已装配别名, 提升与
       // 装配顺序保证前向引用安全。
       var TricksRuntime = createTricksRuntime({
+        responseFlows: ResponseRuntime.responseFlows,
+        tryAIResponseGuhuo: tryAIResponseGuhuo,
         // v15 U 评审收口: AOE 建队列时的目标合法性过滤 (帷幕等"目标合法性"
         // 类技能, flow__condition.md:101)。晚绑定包装 — isLegalCardTarget
         // 声明在本处之后。
@@ -911,6 +919,8 @@
       // v11 B1: 装备域装配 — 依赖注入引擎闭包能力 (函数声明经包装注入,
       // 提升保证前向引用); yinyue-response 在工厂内自注册。
       var EquipmentRuntime = createEquipmentRuntime({
+        responseFlows: ResponseRuntime.responseFlows,
+        tryAIResponseGuhuo: tryAIResponseGuhuo,
         // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
         guhuoResponsePossible: guhuoResponsePossible,
         log: log,
@@ -952,6 +962,8 @@
       // (AIRuntime 后置), 其余 deps 此时均已就绪。直调面回绑同名 var,
       // registerResponseKind 注册行与 PLAY_HANDLERS/导出表零文本改动。
       var ShaFlowRuntime = createShaFlowRuntime({
+        responseFlows: ResponseRuntime.responseFlows,
+        tryAIResponseGuhuo: tryAIResponseGuhuo,
         // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
         guhuoResponsePossible: guhuoResponsePossible,
         log: log,
@@ -1075,6 +1087,7 @@
         // wanjian/yinyue 走注册表, 其余 15 个 kind 是手写 if 链)。
         var resolver = RESPONSE_KIND_RESOLVERS[pending.kind];
         if (!resolver) return fail('未知的选择类型：' + pending.kind);
+        ResponseRuntime.restoreResponseContext(game, pending);
         game.pendingChoice = null;
         return finishPendingChoiceResolution(game, resolver(game, pending, decision || {}));
       }
@@ -1368,6 +1381,7 @@
         }
         var chain = game.pauseState && game.pauseState.duelChain;
         if (!chain) return fail('找不到【激将】的挂起来源。');
+        if (chain.responseFlowId) return TricksRuntime.resolveDuelAidChoice(game, chain, pending, decision);
         var duelFoeOfLord = lordActor === chain.starterActor ? chain.targetActor : chain.starterActor;
         var paid = false;
         if (wantsAid) {
@@ -1449,6 +1463,7 @@
         }
         var saved = game.pauseState && game.pauseState.shaResponse;
         if (!saved) return fail('找不到【护驾】的挂起来源。');
+        if (saved.responseFlowId) return ShaFlowRuntime.resolveShaAidChoice(game, saved, pending, decision);
         game.pauseState.shaResponse = null;
         var remaining = saved.shanRemaining || 1;
         var hujiaPaidThis = false;
@@ -1793,14 +1808,15 @@
       //   - 其余 → 官方上限 1。
       // 返回 0 表示"本模式不限距离"(1v1 变体口径, 见 trickDistanceLimited)。
       // v15 U: 帷幕的判据 — 目标持有帷幕 且 该牌是黑色锦囊牌。
-      // 颜色按"实际颜色"读 (effectiveCardColor 单点, 红颜等改色技能一致);
+      // v16 Y4: 按牌的实际花色读，不把候选目标的红颜覆写应用到外来锦囊;
       // 虚拟转化牌的颜色继承来源实体, 故"把黑色牌当锦囊使用"同样被挡。
       function weimuBlocksCard(game, seat, card) {
         var seatState = game[seat];
         if (!seatState || !hasSkill(seatState, 'weimu')) return false;
         if (!card) return false;
         if (card.family !== 'trick' && card.family !== 'delayed') return false;
-        return StateRuntime.effectiveCardColor(seatState, card) === 'black';
+        return card.suit === 'spade' || card.suit === 'club'
+          || (!card.suit && card.color === 'black');
       }
 
       function trickDistanceLimitFor(game, actor, cardType) {
@@ -3278,6 +3294,10 @@
       // v14 R1: 蛊惑域 (虚拟声明牌层 + 质疑链)。AI 质疑立场经晚绑定包装
       // 回环 (AIRuntime 在其后创建, 调用发生在运行期)。
       var GuhuoRuntime = createGuhuoRuntime({
+        requestPlayerResponse: requestPlayerResponse,
+        restoreResponseContext: ResponseRuntime.restoreResponseContext,
+        refreshResponseOptions: ResponseRuntime.refreshResponseOptions,
+        scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); },
         log: log,
         fail: fail,
         success: success,
@@ -3302,9 +3322,27 @@
         responseResolverFor: function (kind) { return RESPONSE_KIND_RESOLVERS[kind]; }
       });
       var playGuhuoDeclare = GuhuoRuntime.playGuhuoDeclare;
+      ['shan-response', 'wanjian-response', 'yinyue-response', 'hujia-aid'].forEach(function (kind) {
+        ResponseRuntime.registerResponseOptions(kind, function (game, pending) {
+          pending.options = listShanResponseOptions(game[pending.actor]);
+        });
+      });
+      ['sha-duel-response', 'aoe-sha-response', 'jijiang-aid'].forEach(function (kind) {
+        ResponseRuntime.registerResponseOptions(kind, function (game, pending) {
+          pending.options = listShaResponseOptions(game[pending.actor]);
+        });
+      });
+      ResponseRuntime.registerResponseOptions('wuxie-response', function (game, pending) {
+        pending.options = TricksRuntime.listWuxieOptions(game[pending.actor]);
+      });
+
       // v15 S1: 各响应窗口 gate 的开窗谓词 (于吉可背面朝上打出任意手牌 →
       // 手上没有所需牌型也要开窗)。晚绑定包装: 调用点在 sha-flow/tricks/
       // damage-dying 域, 装配早于本处。
+      function tryAIResponseGuhuo(game, spec) {
+        return GuhuoRuntime.tryAIResponseGuhuo(game, spec);
+      }
+
       function guhuoResponsePossible(game, actor) {
         return GuhuoRuntime.guhuoResponsePossible(game, actor);
       }

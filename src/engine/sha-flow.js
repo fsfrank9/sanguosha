@@ -23,6 +23,7 @@
   var putCard = CardRuntime.putCard;
 
   export function createShaFlowRuntime(deps) {
+    var flows = deps.responseFlows;
     var log = deps.log;
     var fail = deps.fail;
     var success = deps.success;
@@ -679,80 +680,89 @@
           }
         }
 
-        // v9 PR-E25: 玩家是【杀】目标 + skillPreferences.shanResponse==='ask' +
-        //   有【闪】可响应 → 暂停, 把"出不出闪"的决策交给玩家. 引擎默认 (无该
-        //   pref) 仍走自动响应, 保证旧测试同步行为不变.
-        // v10 V3: 走 requestPlayerResponse 框架 — pauseState.shaResponse + pendingChoice
-        // 的设置统一. resolve 在 RESPONSE_KIND_RESOLVERS['shan-response'] 注册.
-        // v15 S1: 于吉可背面朝上打出任意手牌当【闪】 → 手上没有闪也要开窗。
-        if (targetActor === 'player' && !responseContext.responseLocked
-            && target.skillPreferences && target.skillPreferences.shanResponse === 'ask'
-            && (hasShanResponseAvailable(target)
-              || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, targetActor)))) {
-          // v13 J0-3 (PR #165 缺陷 3): 八卦阵先行 — "需要使用/打出【闪】时"
-          // 先给判定机会 (红=视为打出闪, 免出手牌; 可用 skillPreferences.bagua
-          // ='decline' 关闭), 判定失败/无八卦才回到手牌响应窗口; 窗口内放弃
-          // 后不再补试八卦 (机会已在窗前给过)。无双两张需求逐张先试八卦。
-          var askShanNeeded = shanRequiredAgainstSha(game, actor, targetActor);
-          var askBaguaPaid = 0;
-          while (askBaguaPaid < askShanNeeded && tryBaguaDodge(game, targetActor, ignoreArmor)) {
-            askBaguaPaid += 1;
-          }
-          if (askBaguaPaid >= askShanNeeded) {
-            return resolveShaAfterResponse(game, actor, card, amount, true, targetActor);
-          }
-          return requestPlayerResponse(game, {
-            kind: 'shan-response',
-            actor: 'player',
-            pauseKey: 'shaResponse',
-            // v11 C1: 无双 → shanRemaining=2, 首张闪后再开第二个响应窗口。
-            // v13 J0-3: 八卦已顶掉的需求从 shanRemaining 中扣除。
-            source: { actor: actor, targetActor: targetActor, card: card, amount: amount, shanRemaining: askShanNeeded - askBaguaPaid, baguaTried: true },
-            // v9 PR-E26: 列出所有可作【闪】的牌 (真闪 + 龙胆/倾国 转化), 玩家自选.
-            options: listShanResponseOptions(target),
-            meta: { sourceActor: actor, shaName: card.name },
-            logMessage: '等待' + actorName(game, 'player') + '决定是否打出【闪】。',
-            statusMessage: '等待玩家响应【杀】。'
-          });
+        var needed = shanRequiredAgainstSha(game, actor, targetActor);
+        if (needed > 1 && !responseContext.responseLocked) {
+          log(game, '【' + doubleShanReasonLabel(game, actor, targetActor) + '】锁定：'
+            + actorName(game, targetActor) + '需依次使用两张【闪】。');
         }
+        return flows.run(game, 'sha', {
+          actor: actor, targetActor: targetActor, card: card, amount: amount,
+          shanRemaining: needed, stage: 'bagua', failed: responseContext.responseLocked
+        });
+      }
 
-        var dodged = false;
-        if (!responseContext.responseLocked) {
-          // v11 C1: 无双 — 需依次两张【闪】(每一张都可由八卦判定替代)。
-          var shanNeeded = shanRequiredAgainstSha(game, actor, targetActor);
-          if (shanNeeded > 1) {
-            log(game, '【' + doubleShanReasonLabel(game, actor, targetActor) + '】锁定：'
-              + actorName(game, targetActor) + '需依次使用两张【闪】。');
+      // v16 Y: each response is one committed step. A 雷击/银月/屯田 window
+      // yields before the next card, next judgement, dodge hooks, or damage.
+      function advanceShaResponses(game, saved) {
+        var actor = saved.actor;
+        var targetActor = saved.targetActor || opponent(actor);
+        var target = game[targetActor];
+        if (!target || target.hp <= 0) {
+          flows.finish(game, 'sha', saved);
+          settleShaCardAfterOutcome(game, saved.card);
+          return success('【杀】目标已阵亡。');
+        }
+        while (!saved.failed && saved.shanRemaining > 0) {
+          if (saved.stage === 'bagua') {
+            saved.stage = 'response';
+            if (tryBaguaDodge(game, targetActor, isArmorIgnoredBySha(game, actor, saved.card))) {
+              saved.shanRemaining -= 1;
+              saved.stage = 'bagua';
+            }
+            if (flows.blocked(game)) return success('【杀】等待插入结算。');
+            if (saved.stage === 'bagua') continue;
           }
-          dodged = true;
-          for (var shanIndex = 0; shanIndex < shanNeeded; shanIndex += 1) {
-            // v13 J0-3: 全座席八卦先行 (此前玩家 auto 座席真闪优先) —
-            // "需要使用/打出【闪】时"防具先给发动机会, 判定失败再出真闪。
-            if (tryBaguaDodge(game, targetActor, ignoreArmor)) continue;
-            if (consumeResponse(game, targetActor, 'shan', '【杀】')) continue;
-            // v12 H7: 护驾 — 主公自身打不出【闪】时求助魏势力座席:
-            // AI 主公 + 玩家可代打 → 挂起询问 (resolver 收尾杀结算);
-            // 其余 → AI 座席同步接力。
-            if (targetActor !== 'player' && lordAidPlayerCanAid
+          if (saved.stage === 'response') {
+            var spec = {
+              kind: 'shan-response', actor: targetActor, pauseKey: 'shaResponse', source: saved,
+              options: listShanResponseOptions(target),
+              meta: { sourceActor: actor, shaName: saved.card.name },
+              logMessage: '等待' + actorName(game, targetActor) + '决定是否打出【闪】。',
+              statusMessage: '等待响应【杀】。'
+            };
+            if (targetActor === 'player' && target.skillPreferences
+                && target.skillPreferences.shanResponse === 'ask'
+                && (spec.options.length || deps.guhuoResponsePossible(game, targetActor))) {
+              return requestPlayerResponse(game, spec);
+            }
+            var ghResult = deps.tryAIResponseGuhuo(game, spec);
+            if (ghResult) return ghResult;
+            if (consumeResponse(game, targetActor, 'shan', '【杀】')) {
+              saved.shanRemaining -= 1;
+              saved.stage = 'bagua';
+            } else {
+              saved.stage = 'aid';
+            }
+            if (flows.blocked(game)) return success('【杀】等待插入结算。');
+            if (saved.stage === 'bagua') continue;
+          }
+          if (saved.stage === 'aid' || saved.stage === 'aid-auto') {
+            if (saved.stage !== 'aid-auto' && targetActor !== 'player' && lordAidPlayerCanAid
                 && lordAidPlayerCanAid(game, targetActor, 'hujia')) {
               return requestPlayerResponse(game, {
-                kind: 'hujia-aid',
-                actor: 'player',
-                pauseKey: 'shaResponse',
-                source: { actor: actor, targetActor: targetActor, card: card, amount: amount, shanRemaining: shanNeeded - shanIndex, lordAid: true },
+                kind: 'hujia-aid', actor: 'player', pauseKey: 'shaResponse', source: saved,
                 options: listShanResponseOptions(game.player),
-                meta: { lordActor: targetActor, sourceActor: actor, shaName: card.name },
-                logMessage: '等待' + actorName(game, 'player') + '决定是否响应【护驾】代打【闪】。',
+                meta: { lordActor: targetActor, sourceActor: actor, shaName: saved.card.name },
                 statusMessage: '等待玩家护主响应。'
               });
             }
-            if (tryLordAidSync && tryLordAidSync(game, targetActor, 'hujia', '【杀】')) continue;
-            dodged = false;
-            break;
+            if (tryLordAidSync && tryLordAidSync(game, targetActor, 'hujia', '【杀】')) {
+              saved.shanRemaining -= 1;
+            } else saved.failed = true;
+            if (flows.blocked(game)) return success('【杀】等待护驾插入结算。');
           }
         }
-        return resolveShaAfterResponse(game, actor, card, amount, dodged, targetActor);
+        flows.finish(game, 'sha', saved);
+        return resolveShaAfterResponse(game, actor, saved.card, saved.amount,
+          !saved.failed && saved.shanRemaining === 0, targetActor);
       }
+      flows.register('sha', {
+        key: 'shaResponseFlow', advance: advanceShaResponses,
+        cancel: function (game, saved) {
+          game.pauseState.shaResponse = null;
+          settleShaCardAfterOutcome(game, saved.card);
+        }
+      });
 
       // H2: 八卦阵 — 需要打出【闪】时 (响应【杀】或【万箭齐发】) 若目标装备
       // 八卦且未被无视, 进行判定; 红色视为打出【闪】。返回是否因此闪避; 无
@@ -965,6 +975,7 @@
               // 可来自装备区 (firstMatchingOwnCard), 只扫手牌会静默漏掉,
               // 装备来源顺带走统一失去时机。
               var chaseBest = selectCardAsConversion(chaseAsResults);
+              var chaseOrigin = chaseBest && CardRuntime.findCardZoneByRef(game, chaseBest.card);
               var chasePhysical = chaseBest && removeOwnCardFromAnyZone(self, chaseBest.card.id, game);
               if (chasePhysical) {
                 discardCard(game, chasePhysical);
@@ -987,7 +998,7 @@
               // 回滚: 转化杀退回组成实体 (已入弃牌堆), 物理杀原样退回。
               if (followPhysicals) {
                 followPhysicals.forEach(function (pc) {
-                  moveCard(game, pc, { zone: 'discard' }, { zone: 'hand', actor: actor });
+                  moveCard(game, pc, { zone: 'discard' }, chaseOrigin || { zone: 'hand', actor: actor });
                 });
               } else {
                 putCard(game, follow, { zone: 'hand', actor: actor });
@@ -1032,55 +1043,35 @@
         var saved = game.pauseState && game.pauseState.shaResponse;
         if (!saved) return fail('找不到【杀】响应的暂停状态。');
         game.pauseState.shaResponse = null;
-        var actor = saved.actor;
-        var card = saved.card;
-        var amount = saved.amount;
-        var target = game.player;
+        var targetActor = saved.targetActor || pending.actor || 'player';
+        saved.targetActor = targetActor;
+        saved.shanRemaining = saved.shanRemaining || 1;
         var d = decision || {};
-        var shanRemaining = saved.shanRemaining || 1;
-        var dodged = false;
-        if (d.cardId) {
-          dodged = consumeResponse(game, 'player', 'shan', '【杀】', d.cardId);
-          if (!dodged) log(game, actorName(game, 'player') + '指定的牌无法当【闪】。');
-        } else if (d.use) {
-          dodged = consumeResponse(game, 'player', 'shan', '【杀】');
-          if (!dodged) log(game, actorName(game, 'player') + '没有可打出的【闪】。');
+        var dodged = !!((d.cardId || d.use)
+          && consumeResponse(game, targetActor, 'shan', '【杀】', d.cardId || null));
+        if (dodged) {
+          saved.shanRemaining -= 1;
+          saved.stage = 'bagua';
         } else {
-          log(game, actorName(game, 'player') + '选择不打出【闪】。');
-          // v13 J0-3: 八卦机会已在开窗前给过 (判定失败才开的窗), 放弃出闪
-          // 不再补试八卦 → 未抵消。
-          dodged = false;
-          shanRemaining = 1;
+          log(game, actorName(game, targetActor) + '未打出【闪】。');
+          saved.stage = 'aid';
         }
-        // v11 C1: 无双 — 首张闪成功且仍有剩余需求 → 下一张需求产生:
-        // v13 J0-3: 先给八卦机会 (新需求新判定), 失败再开第二个响应窗口。
-        if (dodged && shanRemaining > 1) {
-          if (tryBaguaDodge(game, 'player', isArmorIgnoredBySha(game, actor, card))) {
-            shanRemaining -= 1;
-          }
+        return flows.run(game, 'sha', saved);
+      }
+
+      function resolveShaAidChoice(game, saved, pending, decision) {
+        game.pauseState.shaResponse = null;
+        var paid = !!((decision.cardId || decision.use)
+          && consumeResponse(game, 'player', 'shan', '【杀】（护驾）', decision.cardId || null));
+        if (paid) {
+          log(game, actorName(game, 'player') + '响应【护驾】，代' + actorName(game, saved.targetActor) + '打出【闪】。');
+          saved.shanRemaining -= 1;
+          StateRuntime.recordStance(game, { type: 'aid', source: 'player', beneficiary: saved.targetActor });
+        } else {
+          // Declining this request must not immediately ask the same player again.
+          saved.stage = 'aid-auto';
         }
-        if (dodged && shanRemaining > 1) {
-          if (hasShanResponseAvailable(game.player)
-              || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, 'player'))) {
-            return requestPlayerResponse(game, {
-              kind: 'shan-response',
-              actor: 'player',
-              pauseKey: 'shaResponse',
-              source: { actor: actor, targetActor: saved.targetActor, card: card, amount: amount, shanRemaining: shanRemaining - 1 },
-              options: listShanResponseOptions(game.player),
-              meta: { sourceActor: actor, shaName: card.name },
-              logMessage: '【无双】：' + actorName(game, 'player') + '需再使用一张【闪】。',
-              statusMessage: '等待玩家响应【杀】(无双第二张)。'
-            });
-          }
-          // 八卦已试过且无第二张可出 → 未抵消。
-          dodged = false;
-        }
-        // v12 H7: 玩家为主公且未抵消 → 求助魏势力 AI 座席代打【闪】(护驾)。
-        if (!dodged && tryLordAidSync && tryLordAidSync(game, 'player', 'hujia', '【杀】')) {
-          dodged = true;
-        }
-        return resolveShaAfterResponse(game, actor, card, amount, dodged, saved.targetActor);
+        return flows.run(game, 'sha', saved);
       }
 
       // v15 V: 享乐 — 来源为玩家时的"是否弃一张基本牌"询问收尾。
@@ -1128,6 +1119,7 @@
       shanRequiredAgainstSha: shanRequiredAgainstSha,
       isArmorIgnoredBySha: isArmorIgnoredBySha,
       resolveShanResponseChoice: resolveShanResponseChoice,
+      resolveShaAidChoice: resolveShaAidChoice,
       // v15 T: 猛进 ask 挂起后的闪避分支续跑入口 (skills 域经包装回调)
       continueShaDodgeAfterSkills: continueShaDodgeAfterSkills,
       resolveGuanshiDiscardChoice: resolveGuanshiDiscardChoice,

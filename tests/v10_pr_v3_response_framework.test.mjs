@@ -64,10 +64,11 @@ test('v10 V3: shan-response 通过 registerResponseKind 注册到 resolveShanRes
   assert.match(engineSrc, /registerResponseKind\(\s*'shan-response'\s*,\s*resolveShanResponseChoice\s*\)/);
 });
 
-test('v10 V3: continueShaAfterCixiong 调 requestPlayerResponse 替代手写 pauseState/pendingChoice', () => {
-  const fn = engineSrc.match(/function continueShaAfterCixiong[\s\S]*?\n {6}\}/);
+// v16 Y-G1(b): 窗口由注册步骤创建，仍禁止手写 shaResponse；见 Y 协议裁定。
+test('v10 V3: advanceShaResponses 调 requestPlayerResponse 替代手写 pauseState/pendingChoice', () => {
+  const fn = engineSrc.match(/function advanceShaResponses[\s\S]*?\n {6}\}/);
   assert.ok(fn);
-  assert.match(fn[0], /requestPlayerResponse\(game,\s*\{/);
+  assert.match(fn[0], /requestPlayerResponse\(game,\s*spec\)/);
   assert.match(fn[0], /pauseKey:\s*'shaResponse'/);
   // 旧的手写 game.pauseState.shaResponse = ... 已删 (在 continueShaAfterCixiong 内)
   assert.doesNotMatch(fn[0], /game\.pauseState\.shaResponse\s*=\s*\{\s*actor:/);
