@@ -28,6 +28,7 @@
       judgeArea: [],
       // v12 G2: 不屈 (周泰) — 武将牌上的"创"区域 (独立计数牌区, 入守恒记账)
       chuang: [],
+      stars: [],
       flags: {},
       skillPreferences: {},
       usedSha: false,

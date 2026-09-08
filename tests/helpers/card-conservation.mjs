@@ -75,6 +75,7 @@ export function collectCardCensus(game) {
     for (const card of state.chuang || []) registerZoneCard(card, `${actor}.chuang`);
     // v15 V: "田" (邓艾屯田) 是新的武将牌上置牌区, 必须进普查
     for (const card of state.tian || []) registerZoneCard(card, `${actor}.tian`);
+    for (const card of state.stars || []) registerZoneCard(card, `${actor}.stars`);
   }
 
   const inFlight = [];

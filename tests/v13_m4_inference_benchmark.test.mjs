@@ -1,3 +1,5 @@
+// AB: keep these explicitly enumerated historical rosters, seeds and thresholds.
+// Formal selection includes god heroes; their separate soak does not alter this baseline.
 // v13 M4: 暗身份自对弈 soak + 推断准确率量化门禁 (入 verify 门禁)。
 //   (a) 暗置模式全 AI 自对弈红线 — 每步不抛异常/牌守恒/终局可达/终局全
 //       翻明 (范式沿用 v13_k4_soak45, 驱动循环与兜底决定表同源);

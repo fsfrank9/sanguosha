@@ -48,7 +48,7 @@ test('AA3 nonterminal death returns public/hidden generals and the body before p
   assert.deepEqual(game.generalCards.deathReturnedSeats, ['enemy']);
   assert.equal(game.generalCards.randomState, generalRandom);
   assert.equal(calls, 0, 'death return does not shuffle either card resource');
-  assert.equal(G.assertConservation(game).total, 71);
+  assert.equal(G.assertConservation(game).total, Object.keys(Engine.HERO_CATALOG).length);
   assert.equal(game.player.hand.length, 3, 'the existing rebel-kill reward still follows cleanup');
 });
 

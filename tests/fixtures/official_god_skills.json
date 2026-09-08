@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "pack": "神",
+  "includeFullSkillText": false,
+  "source": {
+    "rawCachePath": "official-skill-cache/gltjk-sanguosha-rules/pages/",
+    "method": "local-mirror-extraction",
+    "gidPolicy": "独立 god_* 本地 ID；采用镜像 LE001–LE008 整卡版本，不编造官网 gid。",
+    "versionPolicy": "三国杀官方规则集3.0本地镜像风火林山神将；神赵云为山版体力X换牌。"
+  },
+  "heroes": [
+    {
+      "localHeroId": "god_guanyu",
+      "name": "神关羽",
+      "version": "风 LE001",
+      "skills": [
+        "武神",
+        "武魂"
+      ]
+    },
+    {
+      "localHeroId": "god_lvmeng",
+      "name": "神吕蒙",
+      "version": "风 LE002",
+      "skills": [
+        "涉猎",
+        "攻心"
+      ]
+    },
+    {
+      "localHeroId": "god_zhouyu",
+      "name": "神周瑜",
+      "version": "火 LE003",
+      "skills": [
+        "琴音",
+        "业炎"
+      ]
+    },
+    {
+      "localHeroId": "god_zhugeliang",
+      "name": "神诸葛亮",
+      "version": "火 LE004",
+      "skills": [
+        "七星",
+        "狂风",
+        "大雾"
+      ]
+    },
+    {
+      "localHeroId": "god_caocao",
+      "name": "神曹操",
+      "version": "林 LE005（PR.LE005同正文）",
+      "skills": [
+        "归心",
+        "飞影"
+      ]
+    },
+    {
+      "localHeroId": "god_lvbu",
+      "name": "神吕布",
+      "version": "林 LE006（SP022同正文）",
+      "skills": [
+        "狂暴",
+        "无谋",
+        "神愤",
+        "无前"
+      ]
+    },
+    {
+      "localHeroId": "god_zhaoyun",
+      "name": "神赵云",
+      "version": "山 LE007：体力X换牌版",
+      "skills": [
+        "绝境",
+        "龙魂"
+      ]
+    },
+    {
+      "localHeroId": "god_simayi",
+      "name": "神司马懿",
+      "version": "山 LE008",
+      "skills": [
+        "忍戒",
+        "拜印",
+        "连破"
+      ]
+    }
+  ]
+}

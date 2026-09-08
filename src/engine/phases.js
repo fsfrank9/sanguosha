@@ -9,6 +9,12 @@
 
   function setPhase(game, actor, phase) {
     game.phase = phase;
+    if (phase === 'play' && game[actor]) {
+      var playFlags = game[actor].flags || (game[actor].flags = {});
+      playFlags.gongxinUsed = false;
+      playFlags.shenfenUsed = false;
+      playFlags.jilueZhihengUsed = false;
+    }
     // v15 V: 固政 只认"于此阶段内因其弃置而失去过的手牌" → 每次进入弃牌
     // 阶段重置本阶段记账 (跨回合残留会让固政拿到上一回合的牌)。
     if (phase === 'discard' && game[actor]) {
@@ -54,6 +60,7 @@
     // v12 G2: 神速 选项一 — 跳过判定阶段标记 (回合级)
     flags.skipJudge = false;
     flags.zhihengUsed = false;
+    flags.gongxinUsed = false;
     flags.fanjianUsed = false;
     flags.guanxingUsed = false;
     flags.rendeGiven = 0;

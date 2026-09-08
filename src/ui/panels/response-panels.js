@@ -94,7 +94,7 @@
                 : '对方使用' + wxReason + '，是否打出【无懈可击】抵消？');
           }
           if (els.wuxieResponseChoices) {
-            var wuxieOpts = pending.options || [];
+            var wuxieOpts = (pending.options || []).filter(function (option) { return option.via !== '龙魂'; });
             els.wuxieResponseChoices.innerHTML = wuxieOpts.length
               ? wuxieOpts.map(function (opt) {
                   var suit = suitLabel(opt.suit);
@@ -129,7 +129,7 @@
                 + '，请选择一张牌当【杀】响应，或不出（受 1 点伤害）。';
           }
           if (els.duelResponseChoices) {
-            var duelOpts = pending.options || [];
+            var duelOpts = (pending.options || []).filter(function (option) { return option.via !== '龙魂'; });
             els.duelResponseChoices.innerHTML = duelOpts.length
               ? duelOpts.map(function (opt) {
                   var suit = suitLabel(opt.suit);
@@ -159,7 +159,7 @@
               '对方' + verb + '【' + srcLabel + '】，点选一张牌当【闪】后按下方【确认】，或点【不出【闪】】。';
           }
           if (els.shanResponseChoices) {
-            var shanOpts = pending.options || [];
+            var shanOpts = (pending.options || []).filter(function (option) { return option.via !== '龙魂'; });
             els.shanResponseChoices.innerHTML = shanOpts.length
               ? shanOpts.map(function (opt) {
                   var suit = suitLabel(opt.suit);

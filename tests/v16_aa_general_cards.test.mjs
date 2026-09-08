@@ -4,6 +4,9 @@ import { Engine, Runtime, HERO_CATALOG } from './helpers/load-engine.mjs';
 import { collectCardCensus, assertCardConservation } from './helpers/card-conservation.mjs';
 import { test, runTests } from './helpers/harness.mjs';
 
+// AB extends the real catalog; this resource test follows its exact ID set.
+const CATALOG_SIZE = Object.keys(HERO_CATALOG).length;
+
 function gameOf(seed = 16301, heroes = ['zuoci', 'caocao'], catalog = HERO_CATALOG) {
   const seats = ['player', 'enemy', 'ally', 'fourth', 'fifth'].slice(0, heroes.length);
   const game = { seats, random: Runtime.makeRng(seed) };
@@ -15,18 +18,18 @@ function gameOf(seed = 16301, heroes = ['zuoci', 'caocao'], catalog = HERO_CATAL
 function change(game, action) { return G.assertConservation(game, action); }
 function snapshot(game) { return JSON.stringify(game); }
 
-test('AA3: 完整 71 将目录按上场 ID 排除, SP 版本独立且未实现技能不筛掉', () => {
+test('AA3: 完整当前目录按上场 ID 排除, SP 版本独立且未实现技能不筛掉', () => {
   const game = gameOf(16301, ['zuoci', 'guanyu', 'sp_guanyu']);
   const state = game.generalCards;
-  assert.equal(state.catalogIds.length, 71);
+  assert.equal(state.catalogIds.length, CATALOG_SIZE);
   assert.deepEqual(state.catalogIds, Object.keys(HERO_CATALOG).sort());
   assert.deepEqual(state.excludedIds, ['guanyu', 'sp_guanyu', 'zuoci']);
-  assert.equal(state.outsideIds.length, 68);
+  assert.equal(state.outsideIds.length, CATALOG_SIZE - 3);
   for (const id of ['sp_machao', 'sp_jiaxu', 'sp_caoren', 'sp_ganning',
     'sp_daqiao', 'sp_xiahoudun', 'sp_sunshangxiang']) {
     assert.ok(state.outsideIds.includes(id), `${id} 仍是合法目录资源`);
   }
-  assert.equal(G.assertConservation(game).total, 71);
+  assert.equal(G.assertConservation(game).total, CATALOG_SIZE);
 });
 
 test('AA3: 多席同一武将只排除一次, 濒死体力或外部标记不代替死亡结算', () => {
@@ -35,7 +38,7 @@ test('AA3: 多席同一武将只排除一次, 濒死体力或外部标记不代�
   game.enemy.dead = true;
   game.enemy.hp = 0;
   const drawn = change(game, () => G.draw(game, 'player', 100));
-  assert.equal(drawn.length, 69);
+  assert.equal(drawn.length, CATALOG_SIZE - 2);
   assert.ok(!drawn.includes('caocao') && !drawn.includes('zuoci'));
   assert.deepEqual(G.release(game, 'enemy', ['caocao']), []);
   G.assertConservation(game);
@@ -84,8 +87,8 @@ test('AA3: 跨席抽光只有一次落位, 空池抽取不改 RNG, 归还牌可�
   const game = gameOf();
   const first = change(game, () => G.draw(game, 'player', 20));
   const second = change(game, () => G.draw(game, 'enemy', 100));
-  assert.equal(second.length, 49);
-  assert.equal(new Set(first.concat(second)).size, 69);
+  assert.equal(second.length, CATALOG_SIZE - 2 - first.length);
+  assert.equal(new Set(first.concat(second)).size, CATALOG_SIZE - 2);
   const exhausted = snapshot(game);
   assert.deepEqual(G.draw(game, 'player', 2), []);
   assert.equal(snapshot(game), exhausted);
@@ -244,7 +247,7 @@ test('AA3: 引擎实体游戏牌 census 与牌堆顺序不受武将池操作影�
   assert.deepEqual(after.zoneEntries, before.zoneEntries);
   assert.deepEqual(game.deck.map(card => card.id), deck);
   assert.deepEqual(after.zoneDuplicates, []);
-  assert.equal(G.assertConservation(game).total, 71);
+  assert.equal(G.assertConservation(game).total, CATALOG_SIZE);
 });
 
 const result = await runTests();

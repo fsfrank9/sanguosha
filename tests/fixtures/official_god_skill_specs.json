@@ -1,0 +1,958 @@
+{
+  "schemaVersion": 1,
+  "pack": "神",
+  "includeFullSkillText": false,
+  "containsImplementationSpecs": true,
+  "source": {
+    "rawCachePath": "official-skill-cache/gltjk-sanguosha-rules/pages/",
+    "method": "local-mirror-extraction",
+    "gidPolicy": "独立 god_* 本地 ID；采用镜像 LE001–LE008 整卡版本，不编造官网 gid。",
+    "versionPolicy": "三国杀官方规则集3.0本地镜像风火林山神将；神赵云为山版体力X换牌。"
+  },
+  "versionDecision": "AB-G1 用户点单小粒度；风火林山8张独立神武将牌；不含虎牢关吕布",
+  "heroes": [
+    {
+      "localHeroId": "god_guanyu",
+      "name": "神关羽",
+      "maxHp": 5,
+      "printedCamp": "神",
+      "gender": "male",
+      "version": "风 LE001",
+      "headerSource": {
+        "sourceLine": "card__hero__legend.md:9",
+        "sourceTextSha256": "00dda3cd4a1aae755ee5c05cd97ef17345e8ff3dc4fb32d720d240e14c00c847",
+        "sourceTextRef": "00dda3cd4a1a"
+      },
+      "alternatePrintings": [],
+      "skills": [
+        {
+          "localSkillId": "wushen",
+          "name": "武神",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:11",
+          "sourceTextSha256": "5cce9917421341c89cad09103095cb11b2ca871a8268e5958d588dd4edcbc180",
+          "sourceTextRef": "5cce99174213",
+          "spec": {
+            "summary": "红桃手牌强制视为杀；使用红桃杀不受距离限制。",
+            "timing": "手牌牌面读取与使用红桃杀选择目标时",
+            "condition": "技能有效；前半仅手牌，后半按所使用杀的花色",
+            "cost": "无额外消耗",
+            "effect": "红桃手牌强制视为杀；使用红桃杀不受距离限制。",
+            "frequency": "锁定，持续有效",
+            "engineHooks": [
+              "onCardAs",
+              "shaUseReachAllowed"
+            ],
+            "boundaries": [
+              "不是红牌均转杀；装备区红桃不被强制转化。",
+              "强制视为杀影响弃置基本牌等牌名查询；红桃桃不能仍作桃使用。",
+              "丈八两红桃合成杀只有颜色无花色，不享受武神距离效果。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "wuhun",
+          "name": "武魂",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:13",
+          "sourceTextSha256": "fc61292a500ed6f5fc7af528477fee195ecae85cf0477f85637017c42aec7613",
+          "sourceTextRef": "fc61292a500e",
+          "spec": {
+            "summary": "按所受伤害点数令来源增加梦魇；死亡时选择梦魇数最高者判定，结果不是桃或桃园结义则令其直接死亡。",
+            "timing": "每受到1点伤害后；死亡时",
+            "condition": "前半存在伤害来源；后半其他存活角色至少一人拥有梦魇",
+            "cost": "无额外消耗",
+            "effect": "按所受伤害点数令来源增加梦魇；死亡时选择梦魇数最高者判定，结果不是桃或桃园结义则令其直接死亡。",
+            "frequency": "两个锁定效果",
+            "engineHooks": [
+              "onDamageAfter",
+              "onDeath"
+            ],
+            "boundaries": [
+              "最高值并列由神关羽选择；零枚不视为拥有。",
+              "直接死亡不经过濒死求桃，不作为伤害，不产生来源杀人奖惩。",
+              "判定须允许鬼才/鬼道等插入；游戏已结束优先终止。",
+              "HP为1且缠怨有效的角色被武魂杀死，仍以HP1死亡，相关被禁技能不可发动。"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "localHeroId": "god_lvmeng",
+      "name": "神吕蒙",
+      "maxHp": 3,
+      "printedCamp": "神",
+      "gender": "male",
+      "version": "风 LE002",
+      "headerSource": {
+        "sourceLine": "card__hero__legend.md:17",
+        "sourceTextSha256": "80a54cbb56395d4c6816f136361f1881612368dfd8b8d7c9531cdf42cfe0fe13",
+        "sourceTextRef": "80a54cbb5639"
+      },
+      "alternatePrintings": [],
+      "skills": [
+        {
+          "localSkillId": "shelie",
+          "name": "涉猎",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:19",
+          "sourceTextSha256": "6476b19c7a7c81c08bb6bb526fa99da3134f3142058614d9118915290108799d",
+          "sourceTextRef": "6476b19c7a7c",
+          "spec": {
+            "summary": "翻开牌堆顶五张，从每个实际出现的花色选一张加入手牌，其余弃置。",
+            "timing": "摸牌阶段开始时",
+            "condition": "存在正常摸牌阶段且技能有效",
+            "cost": "放弃此次普通摸牌",
+            "effect": "翻开牌堆顶五张，从每个实际出现的花色选一张加入手牌，其余弃置。",
+            "frequency": "每次摸牌阶段至多选择一次",
+            "engineHooks": [
+              "onDrawPhase"
+            ],
+            "boundaries": [
+              "非选五张任意保留；每种实际出现花色恰取一张。",
+              "短牌堆按现有补洗与实体牌移动规则；展示区纳入守恒。",
+              "跳过摸牌阶段不能发动；被放弃的普通摸牌不再继续。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "gongxin",
+          "name": "攻心",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:21",
+          "sourceTextSha256": "7576f8b513ea3d8e250f0dd0ce457cdec31eb0e757e018d190844e3c64811a36",
+          "sourceTextRef": "7576f8b513ea",
+          "spec": {
+            "summary": "合法查看目标手牌，可展示一张有效红桃，再将该牌弃置或放回牌堆顶。",
+            "timing": "出牌阶段",
+            "condition": "另一名存活角色有手牌",
+            "cost": "无额外消耗，消耗该阶段使用次数",
+            "effect": "合法查看目标手牌，可展示一张有效红桃，再将该牌弃置或放回牌堆顶。",
+            "frequency": "每出牌阶段一次",
+            "engineHooks": [
+              "onActiveSkill"
+            ],
+            "boundaries": [
+              "查看后可以不展示；没有红桃也能查看后结束。",
+              "小乔红颜令黑桃手牌有效为红桃，可被选择。",
+              "只有发动者获准看目标手牌；选择仅按本次合法揭示信息。",
+              "置顶不算弃置；两种结果都须走失牌和实体移动出口。"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "localHeroId": "god_zhouyu",
+      "name": "神周瑜",
+      "maxHp": 4,
+      "printedCamp": "神",
+      "gender": "male",
+      "version": "火 LE003",
+      "headerSource": {
+        "sourceLine": "card__hero__legend.md:25",
+        "sourceTextSha256": "678910de56726d7c614b96268a39540a2c89a12033328f4c920dc197b9e3152c",
+        "sourceTextRef": "678910de5672"
+      },
+      "alternatePrintings": [],
+      "skills": [
+        {
+          "localSkillId": "qinyin",
+          "name": "琴音",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:27",
+          "sourceTextSha256": "c032e5223e6dbf954a4443fefe3396bc8724ec384e77b5d7a0fdc35c0ce795fd",
+          "sourceTextRef": "c032e5223e6d",
+          "spec": {
+            "summary": "可选择令所有存活角色分别回复1体力，或分别失去1体力。",
+            "timing": "弃牌阶段结束时",
+            "condition": "在本弃牌阶段内因弃置失去自己的至少两张手牌",
+            "cost": "无额外消耗",
+            "effect": "可选择令所有存活角色分别回复1体力，或分别失去1体力。",
+            "frequency": "每个满足条件的弃牌阶段一次",
+            "engineHooks": [
+              "onDiscardPhaseEnd"
+            ],
+            "boundaries": [
+              "计数只含自己的手牌，装备弃置不计；计数不限手牌上限强制弃牌。",
+              "包括自己；失体力不算伤害，不触发伤害技能。",
+              "按行动顺序逐席结算，插入濒死后恢复队列；不能一口气修改所有HP。",
+              "与固政共时机，弃牌记录保留到该时机结束。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "yeyan",
+          "name": "业炎",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:29",
+          "sourceTextSha256": "7902f7dfd1dfa9f1f24129edc3d3c008247d68b45bfb35417e854c2bea2950d0",
+          "sourceTextRef": "7902f7dfd1df",
+          "spec": {
+            "summary": "按锁定分配对选中角色分别造成火焰伤害，整局只发动一次。",
+            "timing": "出牌阶段",
+            "condition": "尚未用过限定次数；1至3名合法角色，所分配正整数伤害合计至多3",
+            "cost": "若任一目标分配至少2点，弃四张花色各异的手牌并失去3体力；否则无牌/体力成本",
+            "effect": "按锁定分配对选中角色分别造成火焰伤害，整局只发动一次。",
+            "frequency": "限定，整局一次",
+            "engineHooks": [
+              "onActiveSkill"
+            ],
+            "boundaries": [
+              "可选择自己，不能只实现固定3人各1或单人3两档。",
+              "大业炎消耗可以在HP为1或2时支付，HP必须大于0；四牌必须来自手牌。",
+              "先验证全部目标/点数/成本，再原子锁定次数和成本；不合法输入不得部分扣除。",
+              "付体力后即使来源死亡，游戏未结束则按无来源伤害完成剩余效果；若被救回可继续对自己造成锁定伤害。",
+              "每次火伤单独经过大雾/狂风/藤甲/白银狮子/连环/濒死，不能只批量扣HP。"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "localHeroId": "god_zhugeliang",
+      "name": "神诸葛亮",
+      "maxHp": 3,
+      "printedCamp": "神",
+      "gender": "male",
+      "version": "火 LE004",
+      "headerSource": {
+        "sourceLine": "card__hero__legend.md:33",
+        "sourceTextSha256": "d5dcc0e412c60819339700dd8d8297b4960fb711ceb30421a6c03ee66c976bfe",
+        "sourceTextRef": "d5dcc0e412c6"
+      },
+      "alternatePrintings": [],
+      "skills": [
+        {
+          "localSkillId": "qixing",
+          "name": "七星",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:35",
+          "sourceTextSha256": "75e2455dccb7bae44e35c761b539f1030db2293f0380dca9111b4570485a28d3",
+          "sourceTextRef": "75e2455dccb7",
+          "spec": {
+            "summary": "初始看11张选4入手，其余7张面朝下作星；摸牌结束可将至少一张手牌与等量星交换。",
+            "timing": "分发起始手牌时；摸牌阶段结束时",
+            "condition": "初始效果拥有技能；换牌时至少有一张手牌与星",
+            "cost": "初始替换本人的普通四张发牌；后续等量互换而非弃置",
+            "effect": "初始看11张选4入手，其余7张面朝下作星；摸牌结束可将至少一张手牌与等量星交换。",
+            "frequency": "初始一次；每次摸牌阶段结束可换一次",
+            "engineHooks": [
+              "onInitialHand",
+              "onDrawPhaseEnd"
+            ],
+            "boundaries": [
+              "星是游戏实体牌，不是AA3场外武将牌；必须纳入普通牌守恒。",
+              "仅持有者可看星牌面，其他人只看数量；初始四牌不是普通发牌后额外补看11。",
+              "换牌必须严格等量、两侧IDs唯一且仍在相应区域；失败无移动。",
+              "失去技能不自动清空星；死亡时系统弃置星。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "kuangfeng",
+          "name": "狂风",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:41",
+          "sourceTextSha256": "3d95b509cc8965dba6756b254aed537b0e14035eaddbfbf059d51ea3bcf4bd65",
+          "sourceTextRef": "3d95b509cc89",
+          "spec": {
+            "summary": "给一名角色施加持续到施法者下个真实回合开始前的火伤+1效果。",
+            "timing": "结束阶段开始时；所选目标火伤结算开始时",
+            "condition": "有星，目标存活；效果仍在持续期",
+            "cost": "将一张星置入弃牌堆",
+            "effect": "给一名角色施加持续到施法者下个真实回合开始前的火伤+1效果。",
+            "frequency": "每个结束阶段一次",
+            "engineHooks": [
+              "onDamageBegin",
+              "beginEndPhase",
+              "clearWeather",
+              "recordDeath"
+            ],
+            "boundaries": [
+              "可选择自己；不得计入失体力，也不增强普通/雷伤。",
+              "效果独立于随后技能失效，但施法者死亡立即消失。",
+              "翻面跳过的轮次没有回合开始时，不提前清除效果。",
+              "与天香转移、连环、藤甲及大雾依各自伤害时机处理；重复施法者效果须分别溯源。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "dawu",
+          "name": "大雾",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:43",
+          "sourceTextSha256": "beb0d9f577b47b10212ebc9b321e37ea50344edd504b3b466ef7fc34747e75dd",
+          "sourceTextRef": "beb0d9f577b4",
+          "spec": {
+            "summary": "令选择的角色免受非雷电伤害，持续至施法者下个真实回合开始前。",
+            "timing": "结束阶段开始时；所选目标非雷伤结算开始时",
+            "condition": "有足够星，选择至少一名且目标各不相同",
+            "cost": "将与目标数相同的星置入弃牌堆",
+            "effect": "令选择的角色免受非雷电伤害，持续至施法者下个真实回合开始前。",
+            "frequency": "每个结束阶段一次",
+            "engineHooks": [
+              "onDamageBegin",
+              "beginEndPhase",
+              "clearWeather",
+              "recordDeath"
+            ],
+            "boundaries": [
+              "可以包括自己；普通和火伤防止，雷伤不防止。",
+              "失体力不受影响；被防止的伤害不生成受伤/造成伤害触发或连环。",
+              "技能失效不取消已支付的持续效果；施法者死亡立即消失；翻面跳过不算回合开始。",
+              "多角色/多星选择必须全部验证后移动，不能成本或目标只处理一部分。"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "localHeroId": "god_caocao",
+      "name": "神曹操",
+      "maxHp": 3,
+      "printedCamp": "神",
+      "gender": "male",
+      "version": "林 LE005（PR.LE005同正文）",
+      "headerSource": {
+        "sourceLine": "card__hero__legend.md:47",
+        "sourceTextSha256": "66a86f61185d554b1e98b8e47787f197733c387bdae384fd072037184a24da87",
+        "sourceTextRef": "66a86f61185d"
+      },
+      "alternatePrintings": [
+        {
+          "sourceLine": "card__hero__legend.md:49",
+          "sourceTextSha256": "933ea1c879e7ee25c04fdee98fddca9654dd7e5d377b3b65b56f3516b39f9076",
+          "sourceTextRef": "933ea1c879e7"
+        }
+      ],
+      "skills": [
+        {
+          "localSkillId": "guixin",
+          "name": "归心",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:51",
+          "sourceTextSha256": "9d7159cb30a495fbfa2d3188f829dbe25a0857e848d17a9e7ef95b4e40e79236",
+          "sourceTextRef": "9d7159cb30a4",
+          "spec": {
+            "summary": "可逐名其他角色获得其区域一张牌，然后将自己翻面；每点伤害分别决定。",
+            "timing": "每受到1点伤害后",
+            "condition": "至少一名其他存活角色手/装/判区域有牌",
+            "cost": "无额外消耗；翻面是后续效果",
+            "effect": "可逐名其他角色获得其区域一张牌，然后将自己翻面；每点伤害分别决定。",
+            "frequency": "每点伤害一次，可分别选择发动或放弃",
+            "engineHooks": [
+              "onDamageAfter"
+            ],
+            "boundaries": [
+              "手牌/装备/判定均可选；旁置星、田、权不属于目标区域选项。",
+              "获得暗手牌不得凭未授权牌面挑选；公开装备/判定可按牌面选。",
+              "获得所有人牌后才翻面，不是拿一张翻一次；双点伤害两次可翻回正面。",
+              "中途插入失装/屯田等事件，恢复后不得重复取同一席；各席资格在到达时检查。",
+              "获得目标牌须从当前回合角色开始按行动顺序逐席，持有者不能任意调整取牌次序。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "feiying",
+          "name": "飞影",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:53",
+          "sourceTextSha256": "1db90f5248ad46b2258bccfda4877cc7f667459a2a145845aa7b03f9dc0275d0",
+          "sourceTextRef": "1db90f5248ad",
+          "spec": {
+            "summary": "别人到你的距离增加1；你到别人的距离不变。",
+            "timing": "其他角色计算与你的距离时",
+            "condition": "技能当前有效且不是自身到自身",
+            "cost": "无额外消耗",
+            "effect": "别人到你的距离增加1；你到别人的距离不变。",
+            "frequency": "锁定，持续有效",
+            "engineHooks": [
+              "distanceBetween"
+            ],
+            "boundaries": [
+              "与防御马叠加，但技能抑制和防具/装备抑制不能混用。",
+              "必须沿AA技能有效性出口，失去/无效后立刻不再加距。"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "localHeroId": "god_lvbu",
+      "name": "神吕布",
+      "maxHp": 5,
+      "printedCamp": "神",
+      "gender": "male",
+      "version": "林 LE006（SP022同正文）",
+      "headerSource": {
+        "sourceLine": "card__hero__legend.md:57",
+        "sourceTextSha256": "bae2221727b9a9c19d88e24c8305e54ada67f0cd87c156163067e031f0aecd75",
+        "sourceTextRef": "bae2221727b9"
+      },
+      "alternatePrintings": [
+        {
+          "sourceLine": "card__hero__legend.md:59",
+          "sourceTextSha256": "f0c04f08b87397573419f40d3180033226d2ac9f08fe8e88de30278ff9e1d39a",
+          "sourceTextRef": "f0c04f08b873"
+        }
+      ],
+      "skills": [
+        {
+          "localSkillId": "kuangbao",
+          "name": "狂暴",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:61",
+          "sourceTextSha256": "bd90bb73f9b90aa808402577c0ff290994adf9ed2c3e43002b501cbe35769e8c",
+          "sourceTextRef": "bd90bb73f9b9",
+          "spec": {
+            "summary": "开局获得2暴怒；实际造成和受到的伤害按点分别增加暴怒。",
+            "timing": "游戏开始时；造成或受到每1点伤害后",
+            "condition": "技能有效；伤害实际发生",
+            "cost": "无额外消耗",
+            "effect": "开局获得2暴怒；实际造成和受到的伤害按点分别增加暴怒。",
+            "frequency": "锁定，每个满足条件的事件",
+            "engineHooks": [
+              "onDamageAfter",
+              "onDamageDealt",
+              "afterInitialHands"
+            ],
+            "boundaries": [
+              "开局初始化在发牌后真正游戏开始时；与七星时机分开。",
+              "同一次自己对自己伤害分别满足造成和受到，两边都计。",
+              "防止伤害/失体力不增加；多目标与连环按实际各次伤害。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "wumou",
+          "name": "无谋",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:63",
+          "sourceTextSha256": "354b67c50034e51537e90db47bb75a07faf9030d5f3687adfee3f0ccb3398bf5",
+          "sourceTextRef": "354b67c50034",
+          "spec": {
+            "summary": "每张符合条件的锦囊使用都先结算暴怒/体力选择。",
+            "timing": "使用非延时锦囊牌时",
+            "condition": "技能有效，牌种为非延时锦囊",
+            "cost": "选择弃1暴怒或失去1体力；无暴怒只能失体力",
+            "effect": "每张符合条件的锦囊使用都先结算暴怒/体力选择。",
+            "frequency": "锁定，无每回合次数上限",
+            "engineHooks": [
+              "beforeTrickUse"
+            ],
+            "boundaries": [
+              "无懈也是使用锦囊，需覆盖响应链；铁索重铸不是使用，不触发。",
+              "延时锦囊不触发；虚拟锦囊按实际使用牌种。",
+              "付体力产生濒死可挂起，恢复后不得重复扣成本。",
+              "无谋导致吕布死亡后，还未触发的无双不得发动；已锁定的其他牌效果按死亡规则继续。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "shenfen",
+          "name": "神愤",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:65",
+          "sourceTextSha256": "b744a1726392b348fe2cf889aa7419b68ab301e1806a6c0d0c42575bd7b650a1",
+          "sourceTextRef": "b744a1726392",
+          "spec": {
+            "summary": "所有其他角色先依次各受1伤害，再依次弃所有装备，再依次弃4手牌，最后自己翻面。",
+            "timing": "出牌阶段",
+            "condition": "至少6暴怒",
+            "cost": "弃6暴怒，消耗本阶段次数",
+            "effect": "所有其他角色先依次各受1伤害，再依次弃所有装备，再依次弃4手牌，最后自己翻面。",
+            "frequency": "每出牌阶段一次",
+            "engineHooks": [
+              "onActiveSkill"
+            ],
+            "boundaries": [
+              "不是每个目标伤害/装备/手牌一次做完；全体伤害一轮，再全体装备，再全体手牌。",
+              "不足4手牌尽量弃完；新获得牌按当时到达该步骤的状态。",
+              "天香、濒死、失装等插入后逐步恢复，不重复目标或阶段。",
+              "已支付后的伤害不因临时技能失效取消；死亡/游戏结束沿总规则。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "wuqian",
+          "name": "无前",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:67",
+          "sourceTextSha256": "5213d97700ea8a2cbe32a2b604057aa8fcf0a7dc6e9b4ab542814243c710c286",
+          "sourceTextRef": "5213d97700ea",
+          "spec": {
+            "summary": "本回合给自己无双技能并令指定角色防具技能无效。",
+            "timing": "出牌阶段",
+            "condition": "至少2暴怒且选择一名存活角色",
+            "cost": "弃2暴怒",
+            "effect": "本回合给自己无双技能并令指定角色防具技能无效。",
+            "frequency": "无每阶段次数上限，可多次选不同角色",
+            "engineHooks": [
+              "onActiveSkill",
+              "clearTurnEffects",
+              "clearDeathEffects"
+            ],
+            "boundaries": [
+              "文面允许选择自己；同一目标可再次发动但不叠加重复无双响应数。",
+              "已有原生无双不得在到期时误删除；用独立临时来源。",
+              "防具无效覆盖所有防具技能出口（含视为装备），不是只在自己杀该目标时忽略。",
+              "施法者本回合结束或死亡取消持续效果；已触发无双双响应数仍保留。"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "localHeroId": "god_zhaoyun",
+      "name": "神赵云",
+      "maxHp": 2,
+      "printedCamp": "神",
+      "gender": "male",
+      "version": "山 LE007：体力X换牌版",
+      "headerSource": {
+        "sourceLine": "card__hero__legend.md:71",
+        "sourceTextSha256": "510e389171e6bc382d68793bcd7e03a9ad3cf8946a9c4545920a98abd77f9079",
+        "sourceTextRef": "510e389171e6"
+      },
+      "alternatePrintings": [],
+      "skills": [
+        {
+          "localSkillId": "juejing",
+          "name": "绝境",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:73",
+          "sourceTextSha256": "e9dd88e17e091c6392e9c95b17fca6cd6eb03535e236084e316d429eb23702c3",
+          "sourceTextRef": "e9dd88e17e09",
+          "spec": {
+            "summary": "普通摸牌额外增加已损失体力值，手牌上限始终增加2。",
+            "timing": "普通摸牌阶段计算摸牌数；计算手牌上限",
+            "condition": "前半已受伤；后半只需技能有效",
+            "cost": "无额外消耗",
+            "effect": "普通摸牌额外增加已损失体力值，手牌上限始终增加2。",
+            "frequency": "锁定，持续/每摸牌阶段",
+            "engineHooks": [
+              "onDrawPhase",
+              "handLimit"
+            ],
+            "boundaries": [
+              "不是新版进濒死摸牌，也不是仅1HP触发。",
+              "即使全满体力仍有手牌上限+2；普通摸牌被替换则不独立再补摸。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "longhun",
+          "name": "龙魂",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:75",
+          "sourceTextSha256": "f2c0575968ff6c3231f6ebbf2b0fe64acfd1bea96c3d37102c115af335188b50",
+          "sourceTextRef": "f2c0575968ff",
+          "spec": {
+            "summary": "红桃转桃、方块转火杀、梅花转闪、黑桃转无懈可击；覆盖主动与响应使用/打出。",
+            "timing": "使用或打出相应牌的合法时机",
+            "condition": "选择X张同花色手牌或装备牌，X=max(1,当前体力)",
+            "cost": "消费这X张实体牌作为同一张虚拟牌",
+            "effect": "红桃转桃、方块转火杀、梅花转闪、黑桃转无懈可击；覆盖主动与响应使用/打出。",
+            "frequency": "无次数上限，仍受所用牌本身限制",
+            "engineHooks": [
+              "onCardAs",
+              "onActiveSkill"
+            ],
+            "boundaries": [
+              "不是新版两张增强效果；X在声明时按当前体力计算。",
+              "可混用手牌和装备，不能用判定/星等旁置牌；方块杀属性必须火。",
+              "多实体虚拟牌必须只移动一次每个ID并保留来源列表；JSON恢复不得丢失材料。",
+              "失去装备须走原出口，白银狮子因自己转化离区即使青釭在场也应回复。",
+              "救援桃、双闪逐张、决斗/南蛮杀、无懈链以及激将/护驾普通代打均属覆盖范围。",
+              "不得用AI读取其他角色暗手牌判定可用材料。",
+              "多材料虚拟牌同色则保留颜色但无花色；点数为各材料点数之和；混合区域材料不视为任一区域的一张牌。"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "localHeroId": "god_simayi",
+      "name": "神司马懿",
+      "maxHp": 4,
+      "printedCamp": "神",
+      "gender": "male",
+      "version": "山 LE008",
+      "headerSource": {
+        "sourceLine": "card__hero__legend.md:79",
+        "sourceTextSha256": "bdc20fe612c991e3a2a16de4fd71862fdc286c31359ac7241a9aa6cfa1e4df81",
+        "sourceTextRef": "bdc20fe612c9"
+      },
+      "alternatePrintings": [],
+      "skills": [
+        {
+          "localSkillId": "renjie",
+          "name": "忍戒",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:81",
+          "sourceTextSha256": "ac883d51d61dbd40ee71d229a266e7e946e470cf2491296f476b920e41972fd0",
+          "sourceTextRef": "ac883d51d61d",
+          "spec": {
+            "summary": "实际受伤多少点加多少忍；弃牌阶段每次弃掉多少手牌加多少忍。",
+            "timing": "受到伤害后；弃牌阶段内因弃置失去手牌后",
+            "condition": "技能有效；后一效果要求自己的手牌且确属弃置",
+            "cost": "无额外消耗",
+            "effect": "实际受伤多少点加多少忍；弃牌阶段每次弃掉多少手牌加多少忍。",
+            "frequency": "锁定，每个满足条件事件",
+            "engineHooks": [
+              "onDamageAfter",
+              "onDiscardPhaseLoss"
+            ],
+            "boundaries": [
+              "装备或被获得/使用打出的手牌不算弃牌触发。",
+              "同一伤后可先得忍，再支付本时机极略放逐。",
+              "多张弃牌合并或分事件不得重复计数。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "baiyin",
+          "name": "拜印",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:83",
+          "sourceTextSha256": "40b5cccf927143319f908068e966218ea5d716a90724388a804ba016f31681db",
+          "sourceTextRef": "40b5cccf9271",
+          "spec": {
+            "summary": "觉醒后永久获得派生极略，觉醒状态与技能来源独立保存。",
+            "timing": "准备阶段开始时",
+            "condition": "忍至少4且未觉醒",
+            "cost": "降低1点体力上限；不消耗忍标记",
+            "effect": "觉醒后永久获得派生极略，觉醒状态与技能来源独立保存。",
+            "frequency": "觉醒，整局一次",
+            "engineHooks": [
+              "onPreparePhase"
+            ],
+            "boundaries": [
+              "降低上限后当前HP按上限夹取；觉醒不会清空忍。",
+              "反复获得/激活该技能不重置已觉醒状态。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "lianpo",
+          "name": "连破",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:85",
+          "sourceTextSha256": "eccedc914ac4a1f03ccda9bbfde67dfe7d56c9c03b4cd939511e47504df87e6b",
+          "sourceTextRef": "eccedc914ac4",
+          "spec": {
+            "summary": "可获得自己的额外回合，插在此时已有额外/正常回合之前。",
+            "timing": "任意角色的回合结束后",
+            "condition": "本回合实际杀死过至少一名角色，当前存活且技能有效",
+            "cost": "无额外消耗",
+            "effect": "可获得自己的额外回合，插在此时已有额外/正常回合之前。",
+            "frequency": "每个满足条件的回合一次，不按杀人数多发回合",
+            "engineHooks": [
+              "onAfterTurnEnd",
+              "recordDeath"
+            ],
+            "boundaries": [
+              "必须使用AA真回合外边界，不在结束阶段内提前发动。",
+              "杀死当前回合角色计入刚结束回合；该角色死亡后其余结算发生的杀人不计。",
+              "断肠失去连破后，即使有本回合击杀也不可发动。",
+              "额外回合内再次满足可再连破；多个回合插入效果按实际时机顺序。"
+            ]
+          }
+        },
+        {
+          "localSkillId": "jilue",
+          "name": "极略",
+          "implementationStatus": "implemented",
+          "sourceLine": "card__hero__legend.md:83",
+          "sourceTextSha256": "40b5cccf927143319f908068e966218ea5d716a90724388a804ba016f31681db",
+          "sourceTextRef": "40b5cccf9271",
+          "spec": {
+            "summary": "可付忍调用鬼才、放逐、集智、制衡；或付忍令本回合拥有完杀的效果。",
+            "timing": "判定牌生效前；受到伤害后；使用锦囊时；出牌阶段",
+            "condition": "已获得极略且至少1忍，各分支满足原技能条件",
+            "cost": "每次弃1忍并支付所调用技能本身的成本",
+            "effect": "可付忍调用鬼才、放逐、集智、制衡；或付忍令本回合拥有完杀的效果。",
+            "frequency": "制衡每出牌阶段一次；其余按各时机，无额外总次数限制",
+            "engineHooks": [
+              "onDamageAfter",
+              "onCardUse",
+              "onActiveSkill",
+              "triggerGuicaiJudgementBeforeResolve"
+            ],
+            "boundaries": [
+              "此技能是拜印正文内的派生能力，不作为初始武将技能挂入。",
+              "鬼才仍需手牌、制衡仍需可弃牌；无效决策不能先扣忍。",
+              "集智文面为使用锦囊，包括延时锦囊，不能照旧标准集智非延时限制直接跳过。",
+              "放逐按当前已损失体力值，回复/扣血插入后重算原技能效果。",
+              "完杀获得的是本回合效果，不永久grant原生完杀；到期不移除原有完杀。",
+              "已经付忍发动的效果保持；未来新触发仍重新查询技能有效性。"
+            ]
+          },
+          "derivedFrom": "baiyin"
+        }
+      ]
+    }
+  ],
+  "interactions": [
+    {
+      "kind": "god-camp-required",
+      "sourceLine": "glossary__cardinfo.md:27",
+      "sourceTextSha256": "1b28d9f7860f7c1206430c7614d774676b215e0184efe17dec8a133dccd9f4e7",
+      "sourceTextRef": "1b28d9f7860f"
+    },
+    {
+      "kind": "god-camp-order",
+      "sourceLine": "glossary__cardinfo.md:31",
+      "sourceTextSha256": "5017b3741eb1c449c367c7c118126ff6f2c243169c8489553253eb807cd1c097",
+      "sourceTextRef": "5017b3741eb1"
+    },
+    {
+      "kind": "huashen-god-camp",
+      "sourceLine": "glossary__cardinfo.md:33",
+      "sourceTextSha256": "9bbbd26cda31cd0fef761ab1aabfb850306423df4d964c1a88850e19a3c855f3",
+      "sourceTextRef": "9bbbd26cda31"
+    },
+    {
+      "kind": "initial-hands-timing",
+      "sourceLine": "flow__game.md:15",
+      "sourceTextSha256": "cc542892fbb221d2fcc089082835874b4f9364e3a6e84895ee8811af48f4fe6b",
+      "sourceTextRef": "cc542892fbb2"
+    },
+    {
+      "kind": "no-gain-hooks-initial-hands",
+      "sourceLine": "flow__game.md:19",
+      "sourceTextSha256": "5f36519cf27b0c62ed1d33315aee439d0679cf21bc6bc13e3b2516a2bd8a55d6",
+      "sourceTextRef": "5f36519cf27b"
+    },
+    {
+      "kind": "kuangbao-game-start",
+      "sourceLine": "flow__game.md:27",
+      "sourceTextSha256": "bf730b3828598a9d32bb0b0a7f11318d273ec13ad09d7db4683eadaf8ab971eb",
+      "sourceTextRef": "bf730b382859"
+    },
+    {
+      "kind": "skip-face-down-turn",
+      "sourceLine": "flow__game.md:33",
+      "sourceTextSha256": "af0371e08d364b159588568fe9763e9c6e254681715c814481f044568955d11d",
+      "sourceTextRef": "af0371e08d36"
+    },
+    {
+      "kind": "real-turn-start",
+      "sourceLine": "flow__game.md:37",
+      "sourceTextSha256": "003cddc191cf7aae2cd9fd816425c2d2738d0cda98c92d4f78047b0f68a2c124",
+      "sourceTextRef": "003cddc191cf"
+    },
+    {
+      "kind": "wushen-no-suit-spear",
+      "sourceLine": "glossary__gamecard.md:126",
+      "sourceTextSha256": "186cccb3a3bee8b006cb8ffac48420a26a68c3048225322ad2b53edd64a2548b",
+      "sourceTextRef": "186cccb3a3be"
+    },
+    {
+      "kind": "longhun-mixed-zones",
+      "sourceLine": "glossary__gamecard.md:136",
+      "sourceTextSha256": "4b8c3f63c16b3c06e794bd2a08e029d5432ad286f33309d914542451fb290541",
+      "sourceTextRef": "4b8c3f63c16b"
+    },
+    {
+      "kind": "longhun-last-two-hand",
+      "sourceLine": "glossary__gamecard.md:138",
+      "sourceTextSha256": "9f5218a0d4b53d9969c2e53ef548b8642ffa747f5b789c60f7dc64c25596d73c",
+      "sourceTextRef": "9f5218a0d4b5"
+    },
+    {
+      "kind": "longhun-hand-plus-equip",
+      "sourceLine": "glossary__gamecard.md:140",
+      "sourceTextSha256": "412b0f1a3529e44703b43e68d9a3a221ea33ac48c61469ef189adcb8143951bf",
+      "sourceTextRef": "412b0f1a3529"
+    },
+    {
+      "kind": "armor-invalidation",
+      "sourceLine": "glossary__gamecard.md:177",
+      "sourceTextSha256": "456ee6994693b3fdc2c3e553985660bab4eeb8f991312e2cc58f5bbc4db99984",
+      "sourceTextRef": "456ee6994693"
+    },
+    {
+      "kind": "wushen-basic-cost",
+      "sourceLine": "glossary__gamecard.md:185",
+      "sourceTextSha256": "3f563560a3e897c7fb7387f2a9c9a66e023759eeb373a169b4080d6aec21f28a",
+      "sourceTextRef": "3f563560a3e8"
+    },
+    {
+      "kind": "gongxin-hongyan",
+      "sourceLine": "glossary__gamecard.md:252",
+      "sourceTextSha256": "237372e9f7e49ace2d8d20d4ba0867efe3bd751670a306406a18db9cdebdbfd3",
+      "sourceTextRef": "237372e9f7e4"
+    },
+    {
+      "kind": "longhun-silver-lion",
+      "sourceLine": "glossary__event.md:65",
+      "sourceTextSha256": "bcebf9dd49a34a2023f4f0c56d790c68be86ccf41d18defdf9516ce7dcf4c560",
+      "sourceTextRef": "bcebf9dd49a3"
+    },
+    {
+      "kind": "yeyan-low-hp-cost",
+      "sourceLine": "rule__element.md:36",
+      "sourceTextSha256": "3b6c1f5d0673bb04bfdd96e8fe7b7fef78b43a7697cd6354982fb423927586cf",
+      "sourceTextRef": "3b6c1f5d0673"
+    },
+    {
+      "kind": "wumou-dies-before-wushuang",
+      "sourceLine": "rule__element.md:77",
+      "sourceTextSha256": "f6f59a1e38a3b687da4b4effb115ec9e220601e1f5f0e925941c91984a7d0457",
+      "sourceTextRef": "f6f59a1e38a3"
+    },
+    {
+      "kind": "wuhun-tie-choice",
+      "sourceLine": "rule__element.md:95",
+      "sourceTextSha256": "54de530c1a7ddd14ab1b64f2784eaf437e35d1ca3e4cef0f40bbe3354fb901aa",
+      "sourceTextRef": "54de530c1a7d"
+    },
+    {
+      "kind": "new-skill-same-window",
+      "sourceLine": "rule__element.md:103",
+      "sourceTextSha256": "f19ea5d9cd99f6da6ad5f3064a09791d28e4e9efb5867f0343e1837289bdffd9",
+      "sourceTextRef": "f19ea5d9cd99"
+    },
+    {
+      "kind": "yeyan-source-dies",
+      "sourceLine": "rule__classification.md:60",
+      "sourceTextSha256": "3d4ff745b7472b7a0491b5abbba0892341a509f32ae6e0420f368344a3756f38",
+      "sourceTextRef": "3d4ff745b747"
+    },
+    {
+      "kind": "yeyan-source-rescued",
+      "sourceLine": "rule__classification.md:61",
+      "sourceTextSha256": "f35b72ba04a6f4791463e5f35e853ccc26ce8e50319616be8d811f6b5b347b98",
+      "sourceTextRef": "f35b72ba04a6"
+    },
+    {
+      "kind": "skill-loss-keeps-marks",
+      "sourceLine": "rule__classification.md:95",
+      "sourceTextSha256": "6664431940cac9d1518e86d34c25ef9457bec70ce8dc06cb76897db06fdca3ac",
+      "sourceTextRef": "6664431940ca"
+    },
+    {
+      "kind": "lianpo-duanchang",
+      "sourceLine": "rule__classification.md:134",
+      "sourceTextSha256": "237f018a55b55a9e4cee4fcc820c88817d8645895040ddf19bb3ecbc9a4a5c4d",
+      "sourceTextRef": "237f018a55b5"
+    },
+    {
+      "kind": "weather-source-death",
+      "sourceLine": "rule__classification.md:151",
+      "sourceTextSha256": "d37b5720b2546ff51f981ba3a25d3cb22183153d53e32004c49ff2aa467af3c3",
+      "sourceTextRef": "d37b5720b254"
+    },
+    {
+      "kind": "wuqian-source-death",
+      "sourceLine": "rule__classification.md:153",
+      "sourceTextSha256": "fdeb44556841a41ed9186d9e78e05c6820525aebc5dde250032e4fb456732528",
+      "sourceTextRef": "fdeb44556841"
+    },
+    {
+      "kind": "shenfen-interrupt",
+      "sourceLine": "rule__principle.md:44",
+      "sourceTextSha256": "a676c68f23440e7639cc6321475996ed4dc23faf04c6df5cd034f063922d4b37",
+      "sourceTextRef": "a676c68f2344"
+    },
+    {
+      "kind": "lianpo-huashen-order",
+      "sourceLine": "rule__principle.md:122",
+      "sourceTextSha256": "53511a4e3b14f30c0d6b6f3b210216915736e383b71c8dbdb19a160a18831179",
+      "sourceTextRef": "53511a4e3b14"
+    },
+    {
+      "kind": "renjie-before-jilue",
+      "sourceLine": "rule__principle.md:124",
+      "sourceTextSha256": "170093b79244e9194c767b81cd18ff5383fc4917c14a4341535f60aa93831b78",
+      "sourceTextRef": "170093b79244"
+    },
+    {
+      "kind": "death-gameover-priority",
+      "sourceLine": "flow__death.md:9",
+      "sourceTextSha256": "3af3f384e43f177657116a71398323e667cec952845f87544c9de6fa852519ca",
+      "sourceTextRef": "3af3f384e43f"
+    },
+    {
+      "kind": "wuhun-death-window",
+      "sourceLine": "flow__death.md:31",
+      "sourceTextSha256": "a6aea2f1159fdcbc9304e52a0be4c52a43eb83e77aeb6f932925c925fc56b7f5",
+      "sourceTextRef": "a6aea2f1159f"
+    },
+    {
+      "kind": "qinyin-guzheng",
+      "sourceLine": "flow__death.md:39",
+      "sourceTextSha256": "a77043eaa2932a70deee909b8fb4d38894029cfe2d71a2f796bee19a087230b7",
+      "sourceTextRef": "a77043eaa293"
+    },
+    {
+      "kind": "lianpo-kill-turn-owner",
+      "sourceLine": "flow__death.md:53",
+      "sourceTextSha256": "74dd75a17662ce0c9694c7cab9109f637e7a86bebf04d88f676a1a533856ec80",
+      "sourceTextRef": "74dd75a17662"
+    },
+    {
+      "kind": "lianpo-after-turn-owner-died",
+      "sourceLine": "flow__death.md:55",
+      "sourceTextSha256": "7f895bbffab583d791cb0dcf7c8c8c38ec4282ef492ede1f48ece616ceb461e9",
+      "sourceTextRef": "7f895bbffab5"
+    },
+    {
+      "kind": "lianpo-extra-turn-order",
+      "sourceLine": "glossary__flow.md:30",
+      "sourceTextSha256": "488ae97823ae659e67a6693d02eb7c04114f1dd669efff0990bffa1f69c4814b",
+      "sourceTextRef": "488ae97823ae"
+    },
+    {
+      "kind": "wuhun-chanyuan",
+      "sourceLine": "glossary__flow.md:114",
+      "sourceTextSha256": "b9aa5225be6cc600f80fe2660f2feb587201aa352e32bb1916c566d715c7913b",
+      "sourceTextRef": "b9aa5225be6c"
+    },
+    {
+      "kind": "weather-chain-tianxiang",
+      "sourceLine": "glossary__herocard.md:28",
+      "sourceTextSha256": "a3af75e1aa781ed19dd0cc484b6328bd8902bfa87f37cac709744a25bbca8120",
+      "sourceTextRef": "a3af75e1aa78"
+    },
+    {
+      "kind": "unqualified-phase-owner",
+      "sourceLine": "glossary__flow.md:54",
+      "sourceTextSha256": "ce6496c10db523e924761830f91aed19fac50d5c51dc5f27b9f5e966014f8629",
+      "sourceTextRef": "ce6496c10db5"
+    },
+    {
+      "kind": "multi-card-color-and-suit",
+      "sourceLine": "glossary__gamecard.md:122",
+      "sourceTextSha256": "27c0fffa8bcc1489d59d5bc9563217bf7d1e6352fea2a544d0effa716741ad66",
+      "sourceTextRef": "27c0fffa8bcc"
+    },
+    {
+      "kind": "multi-card-rank-sum",
+      "sourceLine": "glossary__gamecard.md:128",
+      "sourceTextSha256": "97098c598819f433b6dc09cdcca71b3e05b522990a87e447536589fd5ee149bd",
+      "sourceTextRef": "97098c598819"
+    },
+    {
+      "kind": "multi-card-zone",
+      "sourceLine": "glossary__gamecard.md:130",
+      "sourceTextSha256": "43fe0daf5cacb54bd185d0066a5181597a6eb477b0d6601a906dee759e8b6546",
+      "sourceTextRef": "43fe0daf5cac"
+    },
+    {
+      "kind": "multiple-target-order",
+      "sourceLine": "rule__principle.md:50",
+      "sourceTextSha256": "2cba0e2540d8ed32f57479c9298f9d7d72b52f6f0c56cc634dd8fa595c823288",
+      "sourceTextRef": "2cba0e2540d8"
+    },
+    {
+      "kind": "tuxi-gain-order",
+      "sourceLine": "rule__principle.md:54",
+      "sourceTextSha256": "1cfd8703ad33142372f5dadd224e5e59d1711c26f9cdae92395de0bc4d7934e3",
+      "sourceTextRef": "1cfd8703ad33"
+    }
+  ]
+}

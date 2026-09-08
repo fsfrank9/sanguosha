@@ -45,7 +45,7 @@
             + '，是否代打【' + spec.cardLabel + '】？';
         }
         if (els.lordAidChoices) {
-          var opts = pending.options || [];
+          var opts = (pending.options || []).filter(function (option) { return option.via !== '龙魂'; });
           els.lordAidChoices.innerHTML = opts.length
             ? opts.map(function (opt) {
                 var suit = suitLabel(opt.suit);

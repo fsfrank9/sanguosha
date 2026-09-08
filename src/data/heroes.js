@@ -124,6 +124,18 @@
         { id: 'sp_sunshangxiang', name: 'SP 孙尚香', camp: '蜀', gender: 'female', title: '梦醉良缘', maxHp: 3, quote: '夫君，身体要紧。', skills: [{ id: 'liangzhu', name: '良助', desc: '角色回复后可摸牌或令其摸牌。' }, { id: 'fanxiang', name: '返乡', desc: '觉醒技：获得枭姬。' }] }
       ]);
 
+      // AB-G1: 风火林山神将整卡版本；独立 ID 与名称，开局另选魏蜀吴群。
+      addHeroPack('god', [
+        { id: 'god_guanyu', name: '神关羽', camp: '神', gender: 'male', title: '鬼神再临', maxHp: 5, quote: '', skills: [{ id: 'wushen', name: '武神', desc: '锁定技：红桃手牌视为【杀】；使用红桃【杀】不受距离限制。' }, { id: 'wuhun', name: '武魂', desc: '锁定技：每受到1点伤害后，来源获得1枚“梦魇”。你死亡时，令一名梦魇最多的其他角色判定，若不是【桃】或【桃园结义】，其死亡。' }] },
+        { id: 'god_lvmeng', name: '神吕蒙', camp: '神', gender: 'male', title: '圣光之国士', maxHp: 3, quote: '', skills: [{ id: 'shelie', name: '涉猎', desc: '摸牌阶段开始时，可放弃摸牌，亮出牌堆顶5张牌，每种花色获得1张，其余弃置。' }, { id: 'gongxin', name: '攻心', desc: '出牌阶段限一次，观看一名其他角色的手牌，可展示其中1张红桃牌，再将其弃置或置于牌堆顶。' }] },
+        { id: 'god_zhouyu', name: '神周瑜', camp: '神', gender: 'male', title: '赤壁的火神', maxHp: 4, quote: '', skills: [{ id: 'qinyin', name: '琴音', desc: '弃牌阶段结束时，若你于此阶段弃置了至少2张手牌，可令所有角色各回复1点体力，或各失去1点体力。' }, { id: 'yeyan', name: '业炎', desc: '限定技：出牌阶段，对1至3名角色分配至多3点火焰伤害。若对一名角色分配至少2点，须弃4张花色各不相同的手牌并失去3点体力。' }] },
+        { id: 'god_zhugeliang', name: '神诸葛亮', camp: '神', gender: 'male', title: '赤壁的妖术师', maxHp: 3, quote: '', skills: [{ id: 'qixing', name: '七星', desc: '分发初始手牌时，改为观看牌堆顶11张牌，选4张为手牌，其余暗置为“星”。摸牌阶段结束时，可将手牌与等量星交换。' }, { id: 'kuangfeng', name: '狂风', desc: '结束阶段开始时，可弃1张星，令一名角色受到的火焰伤害+1，直到你的下个回合开始或你死亡。' }, { id: 'dawu', name: '大雾', desc: '结束阶段开始时，可弃任意张星，令等量角色防止非雷电伤害，直到你的下个回合开始或你死亡。' }] },
+        { id: 'god_caocao', name: '神曹操', camp: '神', gender: 'male', title: '超世之英杰', maxHp: 3, quote: '', skills: [{ id: 'guixin', name: '归心', desc: '每受到1点伤害后，可获得每名其他角色区域内的1张牌，然后将你的武将牌翻面。' }, { id: 'feiying', name: '飞影', desc: '锁定技：其他角色计算与你的距离+1。' }] },
+        { id: 'god_lvbu', name: '神吕布', camp: '神', gender: 'male', title: '修罗之道', maxHp: 5, quote: '', skills: [{ id: 'kuangbao', name: '狂暴', desc: '锁定技：游戏开始时获得2枚“暴怒”；每造成或受到1点伤害后，获得1枚暴怒。' }, { id: 'wumou', name: '无谋', desc: '锁定技：使用非延时锦囊时，须弃1枚暴怒或失去1点体力。' }, { id: 'shenfen', name: '神愤', desc: '出牌阶段限一次，弃6枚暴怒，令所有其他角色依次各受到1点伤害，再各弃所有装备，再各弃4张手牌，最后你翻面。' }, { id: 'wuqian', name: '无前', desc: '出牌阶段，可弃2枚暴怒并选择一名角色。本回合获得“无双”，且该角色的防具技能无效。' }] },
+        { id: 'god_zhaoyun', name: '神赵云', camp: '神', gender: 'male', title: '神威如龙', maxHp: 2, quote: '', skills: [{ id: 'juejing', name: '绝境', desc: '锁定技：摸牌阶段多摸已损失体力值张牌；手牌上限+2。' }, { id: 'longhun', name: '龙魂', desc: '可将X张同花色的手牌或装备牌转化：红桃当【桃】、方片当火【杀】、梅花当【闪】、黑桃当【无懈可击】。X为当前体力值，至少为1。' }] },
+        { id: 'god_simayi', name: '神司马懿', camp: '神', gender: 'male', title: '晋国之祖', maxHp: 4, quote: '', skills: [{ id: 'renjie', name: '忍戒', desc: '锁定技：每受到1点伤害后，获得1枚“忍”；弃牌阶段每弃置1张手牌，获得1枚忍。' }, { id: 'baiyin', name: '拜印', desc: '觉醒技：准备阶段，若有至少4枚忍，减1点体力上限并获得“极略”。' }, { id: 'lianpo', name: '连破', desc: '一名角色的回合结束后，若你于该回合杀死过角色，可获得一个额外回合。' }] },
+      ]);
+
       var HEROES = {
         player: HERO_CATALOG.liubei,
         enemy: HERO_CATALOG.caocao
@@ -284,6 +296,28 @@
         guzheng:  { trigger: 'discardPhase',      frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDiscardPhaseEnd'] },
         beige:    { trigger: 'damageAfter',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onDamageAfter'] },
         duanchang:{ trigger: 'death',             frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDeath'] },
+        // v16 AB: independent god cards; compound costs and derived Jilue remain explicit.
+        wushen: {"trigger": "cardConvert", "frequency": "passiveAlways", "optional": false, "mandatory": true, "cost": {"type": "none"}, "hooks": ["onCardAs", "shaUseReachAllowed"]},
+        wuhun: {"trigger": "damageAfter", "frequency": "passiveAlways", "optional": false, "mandatory": true, "cost": {"type": "none"}, "hooks": ["onDamageAfter", "onDeath"]},
+        shelie: {"trigger": "drawPhase", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "reduceDraw", "count": 2}, "hooks": ["onDrawPhase"]},
+        gongxin: {"trigger": "playPhase", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "none"}, "hooks": ["onActiveSkill"]},
+        qinyin: {"trigger": "discardPhase", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "none"}, "hooks": ["onDiscardPhaseEnd"]},
+        yeyan: {"trigger": "playPhase", "frequency": "oncePerGame", "optional": true, "mandatory": false, "cost": {"type": "compound", "condition": "anyTargetDamageAtLeast2", "costs": [{"type": "discardOwn", "count": 4, "zone": "hand", "distinctSuits": true}, {"type": "loseHp", "count": 3}]}, "hooks": ["onActiveSkill"]},
+        qixing: {"trigger": "phaseStart", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "exchange", "zone": "stars", "count": "any"}, "hooks": ["onInitialHand", "onDrawPhaseEnd"], "initialMandatory": true},
+        kuangfeng: {"trigger": "turnEnd", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "discardAttached", "zone": "stars", "count": 1}, "hooks": ["onDamageBegin", "beginEndPhase", "clearWeather", "recordDeath"]},
+        dawu: {"trigger": "turnEnd", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "discardAttached", "zone": "stars", "count": "any"}, "hooks": ["onDamageBegin", "beginEndPhase", "clearWeather", "recordDeath"]},
+        guixin: {"trigger": "damageAfter", "frequency": "unlimited", "optional": true, "mandatory": false, "cost": {"type": "none"}, "hooks": ["onDamageAfter"]},
+        feiying: {"trigger": "passive", "frequency": "passiveAlways", "optional": false, "mandatory": true, "cost": {"type": "none"}, "hooks": ["distanceBetween"]},
+        kuangbao: {"trigger": "damageAfter", "frequency": "passiveAlways", "optional": false, "mandatory": true, "cost": {"type": "none"}, "hooks": ["onDamageAfter", "onDamageDealt", "afterInitialHands"]},
+        wumou: {"trigger": "cardUse", "frequency": "passiveAlways", "optional": false, "mandatory": true, "cost": {"type": "choose", "options": [{"type": "discardMark", "mark": "rage", "count": 1}, {"type": "loseHp", "count": 1}]}, "hooks": ["beforeTrickUse"]},
+        shenfen: {"trigger": "playPhase", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "discardMark", "mark": "rage", "count": 6}, "hooks": ["onActiveSkill"]},
+        wuqian: {"trigger": "playPhase", "frequency": "unlimited", "optional": true, "mandatory": false, "cost": {"type": "discardMark", "mark": "rage", "count": 2}, "hooks": ["onActiveSkill", "clearTurnEffects", "clearDeathEffects"]},
+        juejing: {"trigger": "drawPhase", "frequency": "passiveAlways", "optional": false, "mandatory": true, "cost": {"type": "none"}, "hooks": ["onDrawPhase", "handLimit"]},
+        longhun: {"trigger": "cardConvert", "frequency": "unlimited", "optional": true, "mandatory": false, "cost": {"type": "playOwn", "count": "max(1,hp)", "zones": ["hand", "equipment"], "sameSuit": true}, "hooks": ["onCardAs", "onActiveSkill"]},
+        renjie: {"trigger": "damageAfter", "frequency": "passiveAlways", "optional": false, "mandatory": true, "cost": {"type": "none"}, "hooks": ["onDamageAfter", "onDiscardPhaseLoss"]},
+        baiyin: {"trigger": "preparePhase", "frequency": "oncePerGame", "optional": false, "mandatory": true, "cost": {"type": "reduceMaxHp", "count": 1}, "hooks": ["onPreparePhase"], "awakening": true},
+        jilue: {"trigger": "phaseStart", "frequency": "unlimited", "optional": true, "mandatory": false, "cost": {"type": "discardMark", "mark": "nin", "count": 1}, "hooks": ["onDamageAfter", "onCardUse", "onActiveSkill", "triggerGuicaiJudgementBeforeResolve"], "grantedBy": "baiyin", "desc": "可弃1枚忍发动鬼才、放逐、集智，或出牌阶段发动制衡（每阶段限一次），或令本回合拥有完杀的效果。"},
+        lianpo: {"trigger": "turnEnd", "frequency": "oncePerTurn", "optional": true, "mandatory": false, "cost": {"type": "none"}, "hooks": ["onAfterTurnEnd", "recordDeath"]},
       };
 
       for (var _heroId in HERO_CATALOG) {

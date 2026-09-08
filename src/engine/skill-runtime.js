@@ -58,7 +58,10 @@
   }
 
   function isSuppressed(state, skillId) {
-    return !!(state && state.hp === 1 && skillId !== 'chanyuan'
+    // 武魂直接死亡不先失去体力；死亡时技能仍按原体力值判缠怨。
+    // hp=0只是当前座席存活索引的内部标志，不能因此解除原HP1禁用。
+    var hp = state && state.directDeathHp !== undefined ? state.directDeathHp : state && state.hp;
+    return !!(state && hp === 1 && skillId !== 'chanyuan'
       && localSkillSources(state, 'chanyuan').some(function (entry) { return entry.enabled; }));
   }
 

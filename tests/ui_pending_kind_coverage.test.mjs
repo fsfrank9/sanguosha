@@ -24,13 +24,14 @@ const ENGINE_FILES = [
   'src/engine/game-engine.js', 'src/engine/sha-flow.js', 'src/engine/tricks.js',
   'src/engine/response.js', 'src/engine/equipment.js', 'src/engine/judge-area.js',
   'src/engine/damage-dying.js', 'src/engine/skills.js', 'src/engine/guhuo.js',
-  'src/engine/pindian.js',
+  'src/engine/pindian.js', 'src/engine/general-selection.js', 'src/engine/god-choices.js',
 ];
 const UI_FILES = [
   'src/ui/dom-adapter.js',
   'src/ui/panels/prompt-panels.js', 'src/ui/panels/response-panels.js',
   'src/ui/panels/mode-panels.js', 'src/ui/panels/lord-aid-panels.js',
-  'src/ui/panels/board-panels.js',
+  'src/ui/panels/board-panels.js', 'src/ui/panels/general-card-panels.js',
+  'src/ui/panels/god-choice-panels.js', 'src/ui/panels/longhun-response-panels.js',
 ];
 
 // 不需要专属面板的 kind, 每条写明为什么。

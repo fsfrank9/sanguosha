@@ -1,3 +1,5 @@
+import { StateRuntime } from '../../engine/state.js';
+import { CARD_CATALOG } from '../../data/cards.js';
   // v12 F6: 战场渲染域 — 英雄区/手牌/战报日志/中央状态栏/阶段条/装备判定区
   // 的纯渲染函数群, 自 dom-adapter.js 迁出。可变 UI 状态 (game/选择态) 经
   // renderBoard(view)/renderLog(view) 按次传入 (同 F4 lobby-panels 房规),
@@ -21,13 +23,29 @@
         return html;
       }
 
+      function godMarkText(state) {
+        var marks = state.godMarks || {}, labels = { rage: '暴怒', nin: '忍' };
+        var text = Object.keys(labels).filter(function (key) { return marks[key] > 0; })
+          .map(function (key) { return labels[key] + ' ' + marks[key]; });
+        if (state.nightmare > 0) text.push('梦魇 ' + state.nightmare);
+        if ((state.stars || []).length) text.push('星 ' + state.stars.length);
+        return text.length ? ' · ' + text.join(' · ') : '';
+      }
+
       function renderHero(actor) {
         var state = view.game[actor];
         els[actor + 'Name'].textContent = state.name;
         // v14 R1: 缠怨 (蛊惑质疑真牌惩罚) — 公开状态, 势力行附注 (影响
         // 质疑资格与 hp1 技能压制, 全场可见)。
         els[actor + 'Camp'].textContent = Engine.effectiveCamp(state) + ' · ' + state.title
-          + (state.chanyuan ? ' · 缠怨' : '');
+          + (state.chanyuan ? ' · 缠怨' : '') + godMarkText(state);
+        if (actor === 'player' && els.playerStarCards) {
+          var stars = state.stars || [];
+          els.playerStarCards.hidden = stars.length === 0;
+          els.playerStarCards.innerHTML = stars.length ? '<span class="badge">你的星 · ' + stars.length + '</span>'
+            + stars.map(function (card) { return '<span class="mini-card">' + escapeHtml(card.name || '') + ' '
+              + escapeHtml(suitLabel(card.suit)) + escapeHtml(card.rank || '') + '</span>'; }).join('') : '';
+        }
         els[actor + 'Quote'].textContent = state.quote;
         els[actor + 'Hp'].innerHTML = hpMarkup(state);
         els[actor + 'HandCount'].textContent = state.hand.length;
@@ -93,10 +111,13 @@
       }
 
       function playerCardAction(card) {
+        card = StateRuntime.effectiveCardView(view.game.player, card);
         var normal = Engine.canPlayCard(view.game, 'player', card);
         // v11 C4 (批次 28): 转化候选泛化 — 杀/乐不思蜀/过河拆桥 统一探测,
         // 面板据 conversions 动态列按钮; 唯一候选时直接按该 asType 转化。
-        var conversions = Engine.listCardConversions(view.game, 'player', card);
+        var conversions = Engine.listCardConversions(view.game, 'player', card).filter(function (entry) {
+          return !(card && card.wushenView && entry.skillName === '武神');
+        });
         // v15 T: 连环 (庞统) 令梅花手牌"可重铸" — 重铸是与使用并列的第三条
         // 出路, 有它就必须给玩家选择面 (否则唯一转化候选会被直发, 重铸入口
         // 永远不可达)。铁索牌自带重铸走既有铁索面板, 不在此处重复。
@@ -127,6 +148,8 @@
       }
 
       function cardButton(card) {
+        card = StateRuntime.effectiveCardView(view.game.player, card);
+        if (card && card.wushenView) card = Object.assign({}, card, CARD_CATALOG.sha, { label: '基本 · 武神' });
         var disabled = view.game.turn !== 'player' || view.game.phase === 'gameover' || view.enemyThinking;
         var discardMode = view.game.turn === 'player' && view.game.phase === 'discard' && Engine.needsDiscard(view.game, 'player') && !view.enemyThinking;
         var cardSkill = view.game.turn === 'player' && view.game.phase === 'play' && !view.enemyThinking ? activeCardSkillConfig() : null;

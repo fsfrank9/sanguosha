@@ -441,10 +441,21 @@
         return;
       }
       log(game, actorName(game, holderActor) + '发动【银月枪】，令' + actorName(game, targetActor) + '出闪或受 1 点伤害。');
+      var jiluePlayer = game.player;
+      var jiluePref = jiluePlayer && jiluePlayer.skillPreferences && jiluePlayer.skillPreferences.jilue;
+      if (deps.responseFlows && jiluePlayer && jiluePlayer.hp > 0
+          && skillEnabled(jiluePlayer, 'jilue', game) && jiluePlayer.godMarks && jiluePlayer.godMarks.nin > 0
+          && jiluePlayer.hand.length && jiluePref !== 'auto' && jiluePref !== 'always' && jiluePref !== 'decline') {
+        return deps.responseFlows.run(game, 'god-yinyue-bagua', { holderActor: holderActor, targetActor: targetActor, stage: 'bagua' });
+      }
       // v13 审计三轮: 银月枪的"打出【闪】"同样是"需要打出闪时" — 八卦阵
       // 先行判定 (J0-3 同款顺序: 防具先给机会, 红判定即化解且不开手牌
       // 窗口; 失败才回到真闪/询问)。
       if (tryBaguaDodge && tryBaguaDodge(game, targetActor, false)) return;
+      return resolveYinyueAfterBagua(game, holderActor, targetActor);
+    }
+
+    function resolveYinyueAfterBagua(game, holderActor, targetActor) {
       // v10 V4: 银月枪 触发 + 玩家为目标 + shanResponse=ask + 有闪 → 暂停.
       if (targetActor === 'player') {
         var yinyueTarget = game.player;
@@ -475,6 +486,28 @@
         damage(game, targetActor, 1, holderActor, '【银月枪】');
       }
     }
+
+    if (deps.responseFlows) deps.responseFlows.register('god-yinyue-bagua', {
+      key: 'godYinyueBagua',
+      advance: function (game, source) {
+        if (source.stage === 'bagua') {
+          source.stage = 'wait';
+          var result = tryBaguaDodge(game, source.targetActor, false, { flowId: source.responseFlowId });
+          if (result && result.pending) return success('【银月枪】等待八卦判定。');
+          source.baguaResult = { dodged: result === true };
+        }
+        if (source.stage === 'wait') {
+          if (!source.baguaResult) return success('【银月枪】等待八卦判定。');
+          source.stage = 'finish';
+          if (!source.baguaResult.dodged && game[source.targetActor] && game[source.targetActor].hp > 0) {
+            resolveYinyueAfterBagua(game, source.holderActor, source.targetActor);
+          }
+          if (game.pendingChoice) return success('【银月枪】等待响应。');
+        }
+        deps.responseFlows.finish(game, 'god-yinyue-bagua', source);
+        return success('【银月枪】结算完成。');
+      }
+    });
 
     // v10 V4: 银月枪 闪响应 — 玩家 decision 决定 化解 / damage(1).
     function resolveYinyueResponseChoice(game, pending, decision) {

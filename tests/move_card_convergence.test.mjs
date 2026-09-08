@@ -19,6 +19,12 @@ const ENGINE_RULE_FILES = [
   'src/engine/equipment.js',
   'src/engine/judge-area.js',
   'src/engine/ai.js',
+  'src/engine/god-cards.js',
+  'src/engine/god-conversion.js',
+  'src/engine/god-strategy.js',
+  'src/engine/god-wrath.js',
+  'src/engine/god-judgement.js',
+  'src/engine/god-choices.js',
 ];
 const engineSource = ENGINE_RULE_FILES
   .map((rel) => fs.readFileSync(path.join(root, rel), 'utf8'))
@@ -42,6 +48,7 @@ const RAW_MUTATION = new RegExp(
   + String.raw`|\bdeck\.(push|splice|shift|pop|unshift)\(`
   + String.raw`|\bdiscard\.(push|splice|shift|pop|unshift)\(`
   + String.raw`|\.judgeArea\.(push|splice|shift|pop|unshift)\(`
+  + String.raw`|\.(stars|tian)\.(push|splice|shift|pop|unshift)\(`
   + String.raw`|\.equipment\[[^\]]*\]\s*=[^=]`
   + String.raw`|\.equipment\.(weapon|armor|horseMinus|horsePlus)\s*=[^=]`
 );
@@ -76,6 +83,8 @@ test('UI 层不直接操作牌区域', () => {
   const uiSource = fs.readFileSync(path.join(root, 'src/ui/dom-adapter.js'), 'utf8')
     + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/response-panels.js'), 'utf8')
     + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/prompt-panels.js'), 'utf8')
+    + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/god-choice-panels.js'), 'utf8')
+    + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/longhun-response-panels.js'), 'utf8')
     + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/mode-panels.js'), 'utf8')
     + '\n' + fs.readFileSync(path.join(root, 'src/ui/panels/lobby-panels.js'), 'utf8');
   assert.doesNotMatch(uiSource, RAW_MUTATION, 'UI 层不应裸操作 hand/deck/discard/judgeArea/equipment');

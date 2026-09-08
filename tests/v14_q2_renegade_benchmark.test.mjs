@@ -1,3 +1,5 @@
+// AB: keep these explicitly enumerated historical rosters, seeds and thresholds.
+// Formal selection includes god heroes; their separate soak does not alter this baseline.
 // v14 Q2 验收基准: 内奸高阶博弈 (装忠节奏/拆家阈值/终局收割序/濒死救主)
 // 对 M3 骑墙初版的量化对照 — v13 "不设胜率门槛"的非目标在 v14 反转为带
 // 门槛目标 (路线图 Q2)。

@@ -42,6 +42,21 @@
       var target = game[targetActor];
       if (!target) return false;
       amount = Number(amount) || 0;
+      var damageNature = nature || 'normal';
+      if (sourceCard && sourceCard.type === 'fire_sha') damageNature = 'fire';
+      if (sourceCard && sourceCard.type === 'thunder_sha') damageNature = 'thunder';
+      if (/火攻/.test(reason || '')) damageNature = 'fire';
+      if (/闪电|雷/.test(reason || '')) damageNature = 'thunder';
+      var weatherContext = { game: game, targetActor: targetActor, sourceActor: sourceActor,
+        sourceCard: sourceCard, amount: amount, nature: damageNature };
+      if (!(opts && opts.godWeatherApplied) && deps.modifyGodWeather) deps.modifyGodWeather(weatherContext);
+      amount = weatherContext.amount;
+      if (amount <= 0) {
+        if (sourceCard) discardSourceCardIfPending(game, sourceCard);
+        if (opts && typeof opts.afterDamageSettled === 'function') opts.afterDamageSettled(game, false, null);
+        return false;
+      }
+
       // v13 审计三轮: 天香转移的接续结算不再享受来源武器效果 (青釭无视
       // 防具 / 古锭 / 寒冰), 见 transferOpts.sourceWeaponExpired。
       var sourceWeaponExpired = !!(opts && opts.sourceWeaponExpired);
@@ -67,7 +82,7 @@
             reason: reason,
             sourceCard: sourceCard,
             nature: nature,
-            opts: opts || null
+            opts: Object.assign({}, opts || {}, { godWeatherApplied: true })
           };
           setPendingChoice(game, {
             kind: 'tianxiang-ask',
@@ -89,11 +104,7 @@
       var armor = target.equipment && target.equipment.armor;
       var ignoreArmor = !sourceWeaponExpired
         && !!(armor && sourceActor && sourceCard && isArmorIgnoredBySha(game, sourceActor, sourceCard));
-      var damageNature = nature || 'normal';
-      if (sourceCard && sourceCard.type === 'fire_sha') damageNature = 'fire';
-      if (sourceCard && sourceCard.type === 'thunder_sha') damageNature = 'thunder';
-      if (/火攻/.test(reason || '')) damageNature = 'fire';
-      if (/闪电|雷/.test(reason || '')) damageNature = 'thunder';
+      if (target.godArmorSuppressedBy && target.godArmorSuppressedBy.length) ignoreArmor = true;
 
       // v13 J3: 伤害落点回调 — 调用方 (杀链的武器命中特效等) 需要区分
       // "伤害真的落在目标身上" 与 "被天香转移/被防止": landed=false 时
@@ -223,7 +234,7 @@
         // v7 PR-13: gltjk flow__neardeath.md — 进入濒死结算，按顺序响应；
         // 任何一名响应者将 hp 回复到 1+ 即存活；全部响应完毕仍为 0 才死亡。
         enterDying(game, targetActor, sourceActor);
-        if (game.pauseState && game.pauseState.dying) {
+        if (game.pauseState && (game.pauseState.dying || game.pauseState.deathTiming || game.pendingChoice)) {
           if (!game.pauseState.deferredDamageAfter) game.pauseState.deferredDamageAfter = [];
           // Z4/C28: 暂停快照只存结算数据。把 game 本身挂入其 pauseState
           // 会造成循环引用, 拼点后濒死时的 AI 克隆/模拟因此直接抛异常。
@@ -277,41 +288,31 @@
     // 且游戏未结束时), 再把未被技能获得的来源牌移入弃牌堆。同步路径由
     // damage() 直接调用; 濒死暂停路径由 flushDeferredDamageAfter 延迟调用。
     function finishDamageAfter(game, damageContext) {
-      if (damageContext.game !== game) {
-        damageContext = Object.assign({}, damageContext, { game: game });
-      }
-      var targetState = game[damageContext.targetActor];
-      var sourceCardClaimed = false;
-      var targetAlive = targetState && targetState.hp > 0;
-      // W2 (第五轮审计 F7, 高): "造成伤害后" 是**来源侧**时机, 与"受到伤害后"
-      // 的**受害侧**时机是两码事 —— 前者不关心受害者死没死。
-      // 暴虐 (董卓主公技) 官方逐字: 「每当其他角色**造成伤害后**, 若其于受到此
-      // 伤害的角色因受到此伤害而扣减体力前为群势力角色, 来源可以判定…」
-      // (card__hero__neutral.md:185)。此前它挂在 onDamageAfter 上, 而整条
-      // onDamageAfter 派发被 targetAlive 一起闸住 → **伤害一旦致死, 暴虐静默
-      // 失效**, 而这恰恰是它最常发生的场合。
-      // 不能简单去掉 targetAlive: 同挂 onDamageAfter 的 奸雄/反馈/刚烈/遗计/
-      // 节命/放逐/耀武 全是受害方技能, 死后不该再触发 (flow__damage.md:97)。
-      // 故拆出独立的来源侧时机 onDamageDealt, **不受 targetAlive 约束**。
-      if (game.phase !== 'gameover') {
-        SkillRuntime.runHook(skillRegistry, 'onDamageDealt', damageContext);
-      }
-      if (game.phase !== 'gameover' && targetAlive) {
-        var damageResults = SkillRuntime.runHook(skillRegistry, 'onDamageAfter', damageContext);
-        for (var damageIndex = 0; damageIndex < damageResults.length; damageIndex += 1) {
-          if (damageResults[damageIndex].result && damageResults[damageIndex].result.claimedSourceCard) {
-            sourceCardClaimed = true;
-          }
+      var context = Object.assign({}, damageContext);
+      delete context.game;
+      return flows.run(game, 'damage-after', { context: context, stage: 'dealt', index: 0, claimed: false });
+    }
+
+    function advanceDamageAfter(game, source) {
+      var context = Object.assign({}, source.context, { game: game });
+      while (source.stage !== 'done' && !game.pendingChoice && game.phase !== 'gameover') {
+        var target = game[context.targetActor];
+        var hookName = source.stage === 'dealt' ? 'onDamageDealt' : 'onDamageAfter';
+        var hooks = skillRegistry.hooks[hookName] || [];
+        if (source.stage === 'after' && (!target || target.hp <= 0)) source.index = hooks.length;
+        if (source.index >= hooks.length) {
+          source.stage = source.stage === 'dealt' ? 'after' : 'done';
+          source.index = 0;
+          continue;
         }
+        var outcome = hooks[source.index++].handler(context);
+        if (outcome && outcome.claimedSourceCard) source.claimed = true;
       }
-      if (damageContext.sourceCard && !sourceCardClaimed) {
-        discardSourceCardIfPending(game, damageContext.sourceCard);
-      }
-      // H4: 该角色的伤害结算 (含嵌套濒死 — deferred 路径在 flush 时才到这)
-      // 完毕后, 向其他横置角色传导属性伤害。
-      if (damageContext.chainTransmit) {
-        transmitChainDamage(game, damageContext);
-      }
+      if (game.pendingChoice) return { ok: true, suspended: true };
+      flows.finish(game, 'damage-after', source);
+      if (context.sourceCard && !source.claimed) discardSourceCardIfPending(game, context.sourceCard);
+      if (game.phase !== 'gameover' && context.chainTransmit) transmitChainDamage(game, context);
+      return { ok: true };
     }
 
     // H4: 铁索连环传导执行 — "其他处于连环状态的角色"逐一受传导。
@@ -520,6 +521,7 @@
         log(game, actorName(game, dyingActor) + '亮出身份牌：' + ((game.roles || {})[dyingActor] || '未知') + '。');
       }
       var killerActor = saved.source;
+      if (deps.onSettledDeath) deps.onSettledDeath(game, dyingActor, killerActor);
       var winner = determineWinner(game, dyingActor);
       if (winner) {
         game.phase = 'gameover';
@@ -537,7 +539,7 @@
       }
       // M1: 角色死亡 → 跳过其 "受到伤害后" hooks (finishDamageAfter 内部按
       // gameover/存活判断), 但仍要把来源牌移入弃牌堆保持牌守恒。
-      flushDeferredDamageAfter(game);
+      if (!game.pendingChoice) flushDeferredDamageAfter(game);
       return { died: true };
     }
 
@@ -563,6 +565,31 @@
     }
 
     function settleDeath(game, deadActor, killerActor) {
+      var seats = StateRuntime.seatList(game);
+      var anchor = game.turn && seats.indexOf(game.turn) >= 0 ? game.turn : seats[0];
+      var order = StateRuntime.seatsFrom(game, anchor, true);
+      return flows.run(game, 'death-timing', { deadActor: deadActor, killerActor: killerActor,
+        order: order, seatIndex: 0, hookIndex: 0 });
+    }
+
+    function advanceDeathTiming(game, source) {
+      var hooks = skillRegistry.hooks.onDeath || [];
+      while (source.seatIndex < source.order.length && !game.pendingChoice && game.phase !== 'gameover') {
+        while (source.hookIndex < hooks.length && !game.pendingChoice && game.phase !== 'gameover') {
+          hooks[source.hookIndex++].handler({ game: game, deadActor: source.deadActor,
+            killerActor: source.killerActor, resolvingSeat: source.order[source.seatIndex] });
+        }
+        if (game.pendingChoice) return { ok: true, suspended: true };
+        source.seatIndex += 1;
+        source.hookIndex = 0;
+      }
+      flows.finish(game, 'death-timing', source);
+      if (game.phase !== 'gameover') finishDeathCleanup(game, source.deadActor, source.killerActor);
+      if (!game.pendingChoice) flushDeferredDamageAfter(game);
+      return { ok: true, died: true };
+    }
+
+    function finishDeathCleanup(game, deadActor, killerActor) {
       var deadState = game[deadActor];
       if (!deadState) return;
       var roles = game.roles || {};
@@ -582,7 +609,6 @@
       // 之后才轮到蔡文姬的断肠夺走技能。反过来若曹丕是在**蔡文姬的回合**里
       // (刚烈/反馈反伤) 杀死她, 则从蔡文姬起算, 断肠先手, 行殇被夺权。
       // 固定注册序无论选哪个方向都会在另一种情形下出错 → 改为逐席派发。
-      runDeathTimingHooks(game, deadActor, killerActor);
       log(game, actorName(game, deadActor) + '阵亡（' + (roles[deadActor] || '未知身份') + '），弃置其所有牌。');
       discardAllZones(game, deadActor);
       // AA3 / flow__death.md:35: 死亡时技能及区域牌处理后、奖惩前归还武将牌。
@@ -590,6 +616,7 @@
       GeneralCardRuntime.releaseOnDeath(game, deadActor);
       deadState.chained = false;
       deadState.flags = {};
+      delete deadState.directDeathHp;
       var killer = killerActor && killerActor !== deadActor && game[killerActor] ? killerActor : null;
       if (killer && roles[deadActor] === '反贼' && game[killer].hp > 0) {
         log(game, actorName(game, killer) + '击杀反贼，摸三张牌。');
@@ -624,6 +651,30 @@
       });
       (state.judgeArea || []).splice(0).forEach(function (c) { discardCard(game, c); });
       (state.chuang || []).splice(0).forEach(function (c) { discardCard(game, c); });
+      ['tian', 'stars'].forEach(function (zone) {
+        (state[zone] || []).slice().forEach(function (card) {
+          discardCard(game, takeCard(game, card, { zone: zone, actor: seatActor }));
+        });
+      });
+    }
+
+    function directDeath(game, actor) {
+      if (game.phase === 'gameover' || !game[actor] || game[actor].hp <= 0) return { died: false };
+      // Direct death does not lose HP. Retain the last living HP for death
+      // timing skill validity (notably Chanyuan's suppression at HP 1), even
+      // though the engine uses HP 0 to represent a removed role.
+      game[actor].directDeathHp = game[actor].hp;
+      game[actor].hp = 0;
+      if (deps.onSettledDeath) deps.onSettledDeath(game, actor, null);
+      if (game.roleRevealed) game.roleRevealed[actor] = true;
+      log(game, actorName(game, actor) + '因【武魂】直接死亡。');
+      var winner = determineWinner(game, actor);
+      if (winner) {
+        game.phase = 'gameover'; game.winner = winner;
+        if (game.roleRevealed) StateRuntime.seatList(game).forEach(function (seat) { game.roleRevealed[seat] = true; });
+        return { died: true };
+      }
+      return settleDeath(game, actor, null);
     }
 
     function determineWinner(game, deadActor) {
@@ -659,10 +710,11 @@
       // 【桃】, 不禁; 急救是"将红色牌当【桃】使用", 属使用【桃】→ 同样禁。
       var wanshaBlocked = StateRuntime.wanshaBlocksTaoUse(game, responder, dyingActor);
       var taoCards = wanshaBlocked ? []
-        : (responderState.hand || []).filter(function (c) { return c && c.type === 'tao'; });
+        : (responderState.hand || []).filter(function (c) { return c && StateRuntime.effectiveCardView(responderState, c).type === 'tao'; });
       var jiuCards = (responder === dyingActor)
-        ? (responderState.hand || []).filter(function (c) { return c && c.type === 'jiu'; })
+        ? (responderState.hand || []).filter(function (c) { return c && StateRuntime.effectiveCardView(responderState, c).type === 'jiu'; })
         : [];
+      var longhunOptions = !wanshaBlocked && deps.godResponseOptions ? deps.godResponseOptions(responderState, 'tao') : [];
       // v8 PR-C3: 急救 (华佗) — 回合外可将红色牌当桃使用
       //   spec: gltjk card__hero__neutral.md 急救 "你于回合外可以将红色牌当桃使用"
       //   触发条件: responder 装 jijiu + game.turn !== responder + 手牌有非桃非酒的红色牌
@@ -684,7 +736,7 @@
       // → 手上没有桃/酒也要开窗 (仅玩家席 ask 路径)。
       var guhuoRescue = (pref === 'ask' || responder !== 'player') && deps.guhuoResponsePossible
         && deps.guhuoResponsePossible(game, responder);
-      if (!taoCards.length && !jiuCards.length && !jijiuCards.length && !guhuoRescue) {
+      if (!taoCards.length && !jiuCards.length && !jijiuCards.length && !longhunOptions.length && !guhuoRescue) {
         log(game, actorName(game, responder)
           + (wanshaBlocked ? '受【完杀】限制，不能使用【桃】救援。' : '没有可用的【桃】/【酒】，无法救援。'));
         return { skipped: true };
@@ -698,6 +750,8 @@
           kind: 'dying-rescue',
           actor: responder,
           dyingActor: dyingActor,
+          longhunOptions: longhunOptions,
+          longhunIds: longhunOptions.map(function (entry) { return entry.cardId; }),
           taoIds: taoCards.map(function (c) { return c.id; }),
           jiuIds: jiuCards.map(function (c) { return c.id; }),
           jijiuIds: jijiuCards.map(function (c) { return c.id; })
@@ -729,6 +783,9 @@
         if ((sameSide || renegadeSaveLord) && taoCards.length) {
           return executeDyingRescue(game, responder, dyingActor, 'tao', taoCards[0].id);
         }
+        if ((sameSide || renegadeSaveLord) && longhunOptions.length) {
+          return executeDyingRescue(game, responder, dyingActor, 'longhun', longhunOptions[0].cardId);
+        }
         if (sameSide || renegadeSaveLord) {
           var ghOther = tryGuhuoRescue(game, responder, dyingActor, taoCards, jiuCards, jijiuCards);
           if (ghOther) return ghOther;
@@ -742,6 +799,7 @@
       if (jiuCards.length) {
         return executeDyingRescue(game, responder, dyingActor, 'jiu', jiuCards[0].id);
       }
+      if (longhunOptions.length) return executeDyingRescue(game, responder, dyingActor, 'longhun', longhunOptions[0].cardId);
       var ghSelf = tryGuhuoRescue(game, responder, dyingActor, taoCards, jiuCards, jijiuCards);
       if (ghSelf) return ghSelf;
       if (!jijiuCards.length) return { skipped: true };
@@ -765,6 +823,13 @@
       var responderState = game[responder];
       var dyingState = game[dyingActor];
       if (!responderState || !dyingState) return { skipped: true };
+      if (kind === 'longhun') {
+        if (StateRuntime.wanshaBlocksTaoUse(game, responder, dyingActor)) return { invalid: true };
+        var response = { actor: responder, targetActor: dyingActor, cardId: cardId, stage: 'cost' };
+        var resolved = flows.run(game, 'god-rescue', response);
+        if (resolved && resolved.invalid) return resolved;
+        return game.pendingChoice ? { handled: true, paused: true } : { healed: !!response.healed };
+      }
       if (guhuoCard) {
         return finishDyingRescueWithCard(game, responder, dyingActor, kind, guhuoCard, function () {
           putCard(game, guhuoCard, { zone: 'hand', actor: responder });
@@ -892,16 +957,21 @@
         return fail('请通过 cardId 指定要使用的【桃】/【酒】。');
       }
       var allowed = (pending.taoIds || []).concat(pending.jiuIds || []).concat(pending.jijiuIds || []);
-      if (allowed.indexOf(cardId) < 0) {
+      var longhunChoice = typeof cardId === 'string' && cardId.indexOf('longhun:') === 0
+        && (pending.longhunOptions || []).length > 0;
+      if (allowed.indexOf(cardId) < 0 && !longhunChoice) {
         setPendingChoice(game, pending);
         return fail('该牌不在救援可用列表中。');
       }
       // v8 PR-C3: 三段 kind 判定 — 桃 / 酒 / 急救 (jijiu 红色当桃)
       var kind;
-      if ((pending.taoIds || []).indexOf(cardId) >= 0) kind = 'tao';
+      if (longhunChoice) kind = 'longhun';
+      else if ((pending.taoIds || []).indexOf(cardId) >= 0) kind = 'tao';
       else if ((pending.jiuIds || []).indexOf(cardId) >= 0) kind = 'jiu';
       else kind = 'jijiu';
       var executeResult = executeDyingRescue(game, responder, dyingActor, kind, cardId);
+      if (executeResult.invalid) { setPendingChoice(game, pending); return fail('请选择当前可用的龙魂救援材料。'); }
+      if (executeResult.paused) return success('等待龙魂救援的插入结算。');
       if (!executeResult.healed) {
         // 使用失败 (理论上不出现) → 跳过该响应者
         saved.idx += 1;
@@ -913,11 +983,35 @@
       return success('濒死结算完成。');
     }
 
+    flows.register('god-rescue', { key: 'godRescue', advance: function (game, source) {
+      if (source.stage === 'cost') {
+        source.stage = 'heal';
+        source.response = deps.takeGodResponse(game, source.actor, 'tao', source.cardId);
+        if (!source.response) { flows.finish(game, 'god-rescue', source); return { invalid: true }; }
+        source.response.extraCards.forEach(function (card) { discardCard(game, card); });
+        if (game.pendingChoice) return { ok: true, suspended: true };
+      }
+      if (game.phase !== 'gameover' && game[source.targetActor]) {
+        source.healed = true;
+        var amount = 1 + (taoRecoverBonus ? taoRecoverBonus(game, source.actor, source.targetActor) : 0);
+        game[source.targetActor].hp = Math.min(game[source.targetActor].maxHp, game[source.targetActor].hp + amount);
+        log(game, actorName(game, source.actor) + '发动【龙魂】，对' + actorName(game, source.targetActor) + '使用【桃】救援。');
+        StateRuntime.recordStance(game, { type: 'rescue', source: source.actor, beneficiary: source.targetActor });
+      }
+      flows.finish(game, 'god-rescue', source);
+      return { ok: true };
+    } });
+
+    flows.register('damage-after', { key: 'damageAfter', advance: advanceDamageAfter, cancel: function (game, source) {
+      if (source.context.sourceCard && !source.claimed) discardSourceCardIfPending(game, source.context.sourceCard);
+    } });
     flows.register('dying', { key: 'dying', advance: advanceDyingResponses });
+    flows.register('death-timing', { key: 'deathTiming', advance: advanceDeathTiming });
     flows.register('chain-transmit', { key: 'chainTransmit', advance: advanceChainTransmission });
 
     return {
       damage: damage,
+      directDeath: directDeath,
       enterDying: enterDying,
       resolveDyingRescueChoice: resolveDyingRescueChoice,
       // v15 T 评审收口: 濒死循环的重入口 — "处于濒死状态时"的可选技能

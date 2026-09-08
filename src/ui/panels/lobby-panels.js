@@ -1,10 +1,10 @@
       function heroPackLabel(pack) {
-        var labels = { standard: '标准', wind: '风', forest: '林', fire: '火', mountain: '山', sp: 'SP' };
+        var labels = { standard: '标准', wind: '风', forest: '林', fire: '火', mountain: '山', sp: 'SP', god: '神将' };
         return labels[pack] || pack || '扩展';
       }
 
       function heroSortKey(hero) {
-        var order = { standard: 1, wind: 2, forest: 3, fire: 4, mountain: 5, sp: 6 };
+        var order = { standard: 1, wind: 2, forest: 3, fire: 4, mountain: 5, sp: 6, god: 7 };
         return String(order[hero.pack] || 9) + '-' + hero.camp + '-' + hero.name;
       }
 
@@ -171,9 +171,16 @@
           if (skill.id === 'guanxing' && state.flags && state.flags.guanxingUsed) active = false;
           if ((skill.id === 'rende' || skill.id === 'fanjian') && !state.hand.length) active = false;
           if (skill.id === 'kurou' && state.hp <= 0) active = false;
+          if (skill.id === 'gongxin' && state.flags && state.flags.gongxinUsed) active = false;
+          if (skill.id === 'yeyan' && state.flags && state.flags.yeyanUsed) active = false;
+          if (skill.id === 'shenfen' && ((state.flags && state.flags.shenfenUsed) || ((state.godMarks || {}).rage || 0) < 6)) active = false;
+          if (skill.id === 'wuqian' && ((state.godMarks || {}).rage || 0) < 2) active = false;
+          if (skill.id === 'jilue' && ((state.godMarks || {}).nin || 0) < 1) active = false;
           var statusClass = skill.status ? ' skill-status-' + skill.status : '';
           var statusText = skill.statusText || (skill.status === 'todo' ? '未实现' : '');
           var label = skill.name + (skill.status === 'todo' ? '·未实现' : '');
+          if (skill.id === 'yeyan' && state.flags && state.flags.yeyanUsed) label += '·已用';
+          if (skill.id === 'baiyin' && state.flags && state.flags.baiyinAwakened) label += '·已觉醒';
           var title = formatSkillTooltip(skill, statusText);
           var dataAttrs = '';
           if (skill.id === 'luoyi' && skill.status === 'implemented') {
@@ -282,7 +289,7 @@
       var implemented = state.implementedIds || [];
       var active = state.activeIds || [];
       var campFilter = state.campFilter || 'all'; // v13 续批-2: 阵营筛选
-      var camps = ['魏', '蜀', '吴', '群'].filter(function (camp) {
+      var camps = ['魏', '蜀', '吴', '群', '神'].filter(function (camp) {
         return campFilter === 'all' || camp === campFilter;
       });
       var heroes = Object.keys(Engine.HERO_CATALOG).map(function (id) { return Engine.HERO_CATALOG[id]; });
@@ -312,7 +319,8 @@
             + '<span class="hb-card__hp">' + hero.maxHp + ' 勾玉</span>'
             + (hero.pack === 'wind' ? '<span class="hb-card__pack">风</span>' : '')
             // v15 T: 火包徽章 (与风包同款)
-            + (hero.pack === 'fire' ? '<span class="hb-card__pack">火</span>' : '') + '</div>'
+            + (hero.pack === 'fire' ? '<span class="hb-card__pack">火</span>' : '')
+            + (hero.pack === 'god' ? '<span class="hb-card__pack">神将</span>' : '') + '</div>'
             + '<ul class="hb-card__skills">' + skills + '</ul></article>';
         }).join('');
         return '<section class="hb-camp hb-camp--' + camp + '"><h3 class="hb-camp__title">' + camp

@@ -477,7 +477,7 @@
             + ((pdFoeState && pdFoeState.name) || '对方') + '拼点，点选一张手牌扣置（点数大者赢）。';
         }
         if (els.pindianChoices) {
-          els.pindianChoices.innerHTML = (pending.options || []).map(function (opt) {
+          els.pindianChoices.innerHTML = (pending.options || []).filter(function (option) { return option.via !== '龙魂'; }).map(function (opt) {
             return '<button class="mini-card" data-pindian-card-id="' + escapeHtml(opt.cardId) + '">'
               + escapeHtml(opt.name) + ' ' + suitLabel(opt.suit)
               + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
@@ -609,7 +609,7 @@
           }).join('');
         }
         if (els.luanwuChoices) {
-          els.luanwuChoices.innerHTML = (pending.options || []).map(function (opt) {
+          els.luanwuChoices.innerHTML = (pending.options || []).filter(function (option) { return option.via !== '龙魂'; }).map(function (opt) {
             return '<button class="mini-card" data-luanwu-card-id="' + escapeHtml(opt.cardId) + '">'
               + escapeHtml(opt.name) + ' ' + suitLabel(opt.suit)
               + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
@@ -629,7 +629,7 @@
             + ' 令你选择是否对其使用一张【杀】；选择否则被其弃置一张牌。';
         }
         if (els.tiaoxinChoices) {
-          els.tiaoxinChoices.innerHTML = (pending.options || []).map(function (opt) {
+          els.tiaoxinChoices.innerHTML = (pending.options || []).filter(function (option) { return option.via !== '龙魂'; }).map(function (opt) {
             return '<button class="mini-card" data-tiaoxin-card-id="' + escapeHtml(opt.cardId) + '">'
               + escapeHtml(opt.name) + ' ' + suitLabel(opt.suit)
               + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';
@@ -690,7 +690,7 @@
             + (pending.shaName || '杀') + '】对其无效。';
         }
         if (els.xiangleChoices) {
-          els.xiangleChoices.innerHTML = (pending.options || []).map(function (opt) {
+          els.xiangleChoices.innerHTML = (pending.options || []).filter(function (option) { return option.via !== '龙魂'; }).map(function (opt) {
             return '<button class="mini-card" data-xiangle-card-id="' + escapeHtml(opt.cardId) + '">'
               + escapeHtml(opt.name) + ' ' + suitLabel(opt.suit)
               + (opt.rank ? String(opt.rank).toUpperCase() : '') + '</button>';

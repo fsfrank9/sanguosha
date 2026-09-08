@@ -113,7 +113,12 @@
         'xiangle', 'fangquan', 'ruoyu', 'jiang', 'hunzi', 'zhiba',
         'zhijian', 'guzheng', 'beige', 'duanchang',
         // v16 Z1: 本地逐字源可核对的 SP 3 技。
-        'danji', 'yongsi', 'weidi'
+        'danji', 'yongsi', 'weidi',
+        // AB: 八张神将整卡共 20 个原生技能及拜印授予的极略。
+        'wushen', 'wuhun', 'shelie', 'gongxin', 'qinyin', 'yeyan',
+        'qixing', 'kuangfeng', 'dawu', 'guixin', 'feiying', 'kuangbao',
+        'wumou', 'shenfen', 'wuqian', 'juejing', 'longhun', 'renjie',
+        'baiyin', 'lianpo', 'jilue'
       ];
       // v8: qingnang 主动出牌阶段技; luoshen / guanxing 准备阶段自动 + ask
       // 走 pendingChoice. 其他 (guose / liuli / jijiu) 是 card-as / 触发型,
@@ -132,6 +137,7 @@
         // v15 V: 山包主动技 — 挑衅 (指定一名攻击范围含你的角色) /
         // 直谏 (选一张手牌装备 + 一名其他角色) / 制霸 (吴势力发起拼点);
         // 其余山包技能为触发/锁定/觉醒/转化类。
-        'tiaoxin', 'zhijian', 'zhiba'];
+        'tiaoxin', 'zhijian', 'zhiba',
+        'gongxin', 'yeyan', 'wuqian', 'shenfen', 'jilue', 'longhun'];
 
       export { IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS };

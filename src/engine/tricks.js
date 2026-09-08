@@ -5,6 +5,7 @@
   // registerWuxieContinuation 注册进来; 后续批次随锦囊结算函数一并迁入。
   import { CardRuntime } from './card-runtime.js';
   import { StateRuntime } from './state.js';
+  import { longhunResponseOptions } from './god-conversion.js';
 
   var putCard = CardRuntime.putCard;
   var actorName = StateRuntime.actorName;
@@ -90,6 +91,7 @@
     // (card__hero__shu.md:340)。候选枚举/开窗门槛/消费三处共用本谓词,
     // 颜色走 effectiveCardColor (红颜的黑桃视为红桃 → 不可当无懈)。
     function wuxieOptionForCard(state, card) {
+      card = StateRuntime.effectiveCardView(state, card);
       if (!card) return null;
       if (card.type === 'wuxie') return { via: null };
       if (skillEnabled(state, 'kanpo') && StateRuntime.effectiveCardColor(state, card) === 'black') {
@@ -110,7 +112,7 @@
           });
         }
       });
-      return opts;
+      return opts.concat(longhunResponseOptions(state, 'wuxie'));
     }
 
     function hasWuxieResponseAvailable(state) {
@@ -955,7 +957,10 @@
             && !(opponentState.skillPreferences && opponentState.skillPreferences.zhangba === 'decline'))
           || (deps.guhuoResponsePossible && deps.guhuoResponsePossible(game, opponentActor));
         var canHit = game[jdVictim] && game[jdVictim].hp > 0
-          && canReachWithSha(game, opponentActor, jdVictim)
+          && (canReachWithSha(game, opponentActor, jdVictim)
+            || listShaResponseOptions(opponentState).some(function (option) {
+              return StateRuntime.shaUseReachAllowed(game, opponentActor, jdVictim, { type: 'sha', suit: option.suit });
+            }))
           && !cardTargetProtection(game, opponentActor, jdVictim, { type: 'sha', color: 'black', name: '杀' }, '杀');
         if (!hasSha || !canHit) {
           if (!hasSha) {
@@ -973,7 +978,8 @@
             kind: 'jiedao-decision',
             actor: opponentActor,
             sourceActor: sourceActor,
-            victimActor: jdVictim
+            victimActor: jdVictim,
+            options: listShaResponseOptions(opponentState)
           });
           return success('【借刀杀人】等待目标决定…');
         }
@@ -988,7 +994,7 @@
         return jiedaoFireOpponentSha(game, sourceActor, opponentActor, jdVictim);
       }
 
-      function jiedaoFireOpponentSha(game, sourceActor, opponentActor, victimActor) {
+      function jiedaoFireOpponentSha(game, sourceActor, opponentActor, victimActor, preferredCardId) {
         var opponentState = game[opponentActor];
         // v15 S: 蛊惑声明的【杀】(响应中的使用流程) — 牌已亮出并锚在处理
         // 区, 直接顶替手牌摘取 (受害目标由借刀本身确定, 声明期不另选)。
@@ -997,11 +1003,21 @@
           : null;
         // W2-F8: 点火与闸口同点收口 — findResponseCard 覆盖 真杀 + 武圣/
         // 龙胆转化 (含装备区来源) + 丈八两张手牌合成, 取牌即离区。
+        var godUseOptions = { target: victimActor || sourceActor, skipShaCount: true };
+        var wantsGodSha = (typeof preferredCardId === 'string' && preferredCardId.indexOf('longhun:') === 0)
+          || (!preferredCardId && longhunResponseOptions(opponentState, 'sha').length
+            && !(opponentState.hand || []).some(function (card) {
+              return CardRuntime.isShaType(StateRuntime.effectiveCardView(opponentState, card).type);
+            }));
         var response = guhuoSha
           ? { card: guhuoSha.physical, asName: guhuoSha.declaredName, skillName: '蛊惑' }
-          : findResponseCard(opponentState, 'sha', null, game);
+          : (wantsGodSha ? deps.takeGodResponse(game, opponentActor, 'sha', preferredCardId, godUseOptions)
+            : findResponseCard(opponentState, 'sha', preferredCardId || null, game));
         if (!response || !response.card) {
           return transferWeaponJiedao(game, sourceActor, opponentActor);
+        }
+        if (response.skillName === '龙魂') {
+          return deps.playGodResponseSha(game, opponentActor, response, { target: victimActor || sourceActor, skipShaCount: true });
         }
         var borrowedSha = guhuoSha ? CardRuntime.makeTestCard(guhuoSha.declareType, {
           id: guhuoSha.physical.id, physicalCard: guhuoSha.physical,
@@ -1072,7 +1088,7 @@
           log(game, actorName(game, opponentActor) + '选择不出【杀】，交出武器。');
           return transferWeaponJiedao(game, sourceActor, opponentActor);
         }
-        return jiedaoFireOpponentSha(game, sourceActor, opponentActor, pending.victimActor);
+        return jiedaoFireOpponentSha(game, sourceActor, opponentActor, pending.victimActor, decision && decision.cardId);
       }
 
       // v12 H2: 无双需求量按"决斗的另一方"判定 — 显式传入 demanderActor
@@ -1298,9 +1314,15 @@
         // (全座席统一; 此前玩家座席在窗口后/真闪后才试), 红判定即化解。
         // 【南蛮入侵】需【杀】, responseType==='sha', 不触发八卦。
         var baguaPaid = false;
+        if (aoe.baguaResult) {
+          baguaPaid = aoe.baguaResult.dodged;
+          delete aoe.baguaResult;
+        }
         if (responseType === 'shan' && aoe.baguaCheckedIdx !== aoe.idx) {
           aoe.baguaCheckedIdx = aoe.idx;
-          baguaPaid = tryBaguaDodge(game, targetActor, false);
+          var baguaAttempt = tryBaguaDodge(game, targetActor, false, { flowId: aoe.responseFlowId });
+          if (baguaAttempt && baguaAttempt.pending) return success('AOE等待八卦判定。');
+          baguaPaid = baguaAttempt === true;
         }
         if (baguaPaid) {
           log(game, actorName(game, targetActor) + '成功化解【' + title + '】。');

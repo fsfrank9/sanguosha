@@ -298,7 +298,7 @@ test('AA3 pure general selection, filters, and pending metadata never pollute ca
   assert(game.pendingChoice.options.every(option => option.skills.every(skill => !skill.lord && skill.frequency !== 'oncePerGame' && skill.status === 'implemented')));
   assert.deepEqual(game.pendingChoice.options.find(option => option.heroId === 'sp_yuanshu').skills.map(skill => skill.id), ['yongsi']);
   assert(game.pendingChoice.options.some(option => option.heroId === 'sp_machao' && option.disabledReason));
-  assert.equal(game.generalCards.catalogIds.length, 71, 'unimplemented heroes remain in the conserved outside pool');
+  assert.equal(game.generalCards.catalogIds.length, Object.keys(Engine.HERO_CATALOG).length, 'unimplemented heroes remain in the conserved outside pool');
   assert.deepEqual(collectCardCensus(game).ids, before);
   assertCardConservation(game, () => answer(game, 'huangyueying', 'jizhi'));
   Engine.requestGeneralSelection(game, 'player', { applySkill: false });

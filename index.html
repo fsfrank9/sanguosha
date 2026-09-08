@@ -120,6 +120,7 @@
           <button type="button" class="btn small" data-camp="蜀">蜀</button>
           <button type="button" class="btn small" data-camp="吴">吴</button>
           <button type="button" class="btn small" data-camp="群">群</button>
+          <button type="button" class="btn small" data-camp="神">神将</button>
         </div>
         <button type="button" class="btn small" id="heroBrowserBackBtn">返回大厅</button>
       </div>
@@ -192,6 +193,7 @@
             <button type="button" class="btn small" data-camp="蜀">蜀</button>
             <button type="button" class="btn small" data-camp="吴">吴</button>
             <button type="button" class="btn small" data-camp="群">群</button>
+            <button type="button" class="btn small" data-camp="神">神将</button>
           </div>
           <div class="hero-pick__grid" id="heroPickGrid" aria-live="polite"></div>
           <div class="hero-pick__random-row">
@@ -447,6 +449,7 @@
       </section>
 
       <section class="hand-dock" id="playerHandDock">
+        <div class="god-star-cards" id="playerStarCards" aria-label="你的星" hidden></div>
         <div class="hand-title">
           <span>你的手牌</span>
           <div class="discard-controls">
@@ -784,6 +787,25 @@
           <div class="mengjin-actions pending-prompt-panel__actions">
             <button class="btn small" id="mengjinDeclineBtn">不发动</button>
           </div>
+        </div>
+        <!-- AB: 神将选择及龙魂多牌响应，候选仅取自玩家当前窗口。 -->
+        <div class="pending-prompt-panel" id="godChoicePanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="godChoiceHint">选择技能效果</span>
+          <div class="pending-prompt-panel__choices" id="godChoiceOptions" aria-label="技能选项" aria-live="polite"></div>
+          <div class="pending-prompt-panel__choices" id="godChoiceCards" aria-label="可选牌" aria-live="polite"></div>
+          <div class="pending-prompt-panel__choices" id="godChoiceStars" aria-label="星" aria-live="polite"></div>
+          <div class="pending-prompt-panel__choices" id="godChoiceTargets" aria-label="目标角色" aria-live="polite"></div>
+          <div class="pending-prompt-panel__actions">
+            <button class="btn small" id="godChoiceConfirmBtn" disabled>确定</button>
+            <button class="btn small" id="godChoiceDeclineBtn" hidden>不发动</button>
+          </div>
+        </div>
+        <div class="pending-prompt-panel" id="longhunResponsePanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="longhunResponseHint">龙魂：选择同花色的牌响应</span>
+          <div class="pending-prompt-panel__choices" id="longhunResponseTypes" aria-label="龙魂响应类型" aria-live="polite"></div>
+          <div class="pending-prompt-panel__choices" id="longhunResponseCards" aria-label="龙魂成本牌" aria-live="polite"></div>
+          <div class="pending-prompt-panel__choices" id="longhunResponseTargets" aria-label="龙魂杀目标" aria-live="polite"></div>
+          <button class="btn small" id="longhunResponseConfirmBtn" disabled>发动龙魂</button>
         </div>
         <!-- AA3: 场外武将牌只展示当前窗口公开给玩家的候选。 -->
         <div class="pending-prompt-panel" id="generalCardPanel" hidden>
