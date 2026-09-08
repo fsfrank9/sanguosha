@@ -134,32 +134,34 @@ test('L1: 黄天按钮 — 忠臣华雄给 AI 主公张角交闪 (按钮 → 选
   $('modeIdentity3Btn').click();
   $('roleLoyalBtn').click();
   $('playerHeroSelect').value = 'huaxiong';
-  $('enemyHeroSelect').value = 'caocao';
-  $('allyHeroSelect').value = 'zhangjiao';
+  // 忠臣档轮转为 [忠,主,反]，通过真实选将直接把张角放到主公席。
+  $('enemyHeroSelect').value = 'zhangjiao';
+  $('allyHeroSelect').value = 'caocao';
   $('startGameBtn').click();
   $('exitConfirmModal').hidden = true;
   const game = UI.getGame();
   assert.equal(game.roles.player, '忠臣');
-  // 3p 玩家=忠臣轮转: [忠,主,反] → 主公=enemy? 预设 [主,反,忠] offset 2:
-  // player=忠, enemy=主, ally=反。张角必须坐主公席 → 换 enemy 席武将。
-  driveTimers(300);
   const lordSeat = game.seats.find((s) => game.roles[s] === '主公');
-  // 把主公席武将换成张角 (UI 下拉只有敌方/第三席, 直接改 state 等价布局)。
-  if (game[lordSeat].name !== '张角') {
-    const zj = Engine.newGame({ seed: 9, playerHero: 'zhangjiao' }).player;
-    game[lordSeat].name = zj.name;
-    game[lordSeat].camp = zj.camp;
-    game[lordSeat].skills = zj.skills;
+  assert.equal(lordSeat, 'enemy');
+  assert.equal(game[lordSeat].name, '张角');
+  // AC 发布回归：seed=1788855842762 时，旧布局先随机打死主公，再
+  // 只改武将名/清挂起，死亡主公当然不显示黄天。交牌测试应先保证
+  // 可交牌的真实前提；空牌局仍经定时器逐席轮转，不强改回合或复活。
+  for (const seat of game.seats) {
+    game[seat].hand = [];
+    game[seat].judgeArea = [];
   }
-  game.turn = 'player';
-  game.phase = 'play';
-  game.pendingChoice = null;
-  game.pendingChoiceQueue = [];
-  game.pauseState = {};
-  game.player.hp = game.player.maxHp;
+  game.deck = [];
+  game.discard = [];
+  assert.ok(driveTimers(300) > 0, 'AI 主公先手链真实推进');
+  assert.equal(game.turn, 'player', '真实轮转进入忠臣回合');
+  assert.equal(game.phase, 'play');
+  assert.equal(Engine.getPendingChoice(game), null, '没有被夹断的响应窗');
+  assert.equal(game.winner, null);
+  assert.ok(game[lordSeat].hp > 0, '交牌目标主公存活');
+  assert.ok(Engine.hasLordSkill(game, lordSeat, 'huangtian'));
   game.player.hand = [c('shan', { id: 'ht-shan' })];
-  game.player.flags = {};
-  drainTimersAtPlayerIdle(); // 复位 enemyThinking (中断的 AI 链可能残留 true)
+  drainTimersAtPlayerIdle();
   UI.render();
   assert.ok($('playerSkillBar').innerHTML.indexOf('data-skill-id="huangtian"') >= 0,
     '黄天·交牌按钮出现 (玩家群势力忠臣 + AI 主公张角)');
