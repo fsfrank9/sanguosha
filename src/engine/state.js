@@ -71,10 +71,12 @@
 
   function hasEquipmentEffect(state, effectName) {
     var equipped = equipmentSlots(state).some(function (card) {
+      if (card.slot === 'armor' && state.godArmorSuppressedBy && state.godArmorSuppressedBy.length) return false;
       return !!equipmentEffectValue(card.type, effectName);
     });
     if (equipped) return true;
     return virtualEquipmentTypes(state).some(function (type) {
+      if (state.godArmorSuppressedBy && state.godArmorSuppressedBy.length) return false;
       return !!equipmentEffectValue(type, effectName);
     });
   }
@@ -389,6 +391,8 @@
     var distance = Math.max(1, ring);
     if (to.equipment && to.equipment.horsePlus) distance += 1;
     if (from.equipment && from.equipment.horseMinus) distance -= 1;
+    // AB: Feiying changes only other roles' distance to its enabled owner.
+    if (fromActor !== toActor && skillEnabled(to, 'feiying', game)) distance += 1;
     distance += SkillRuntime.sumPassiveEffect(from, 'outgoingDistance');
     // W2 (第五轮审计 F4, 高): 屯田 (邓艾) 官方逐字「你与其他角色的距离 -X
     // (X 为"田"数)」(card__hero__wei.md:365) —— v15 V 只做了"置田"那一半,
@@ -436,9 +440,14 @@
     return true;
   }
 
-  function shaUseReachAllowed(game, actor, targetActor) {
+  function shaUseReachAllowed(game, actor, targetActor, card) {
     var self = game[actor];
     if (self && self.flags && self.flags.tianyiWon) return true;
+    // 武神只放宽使用红桃【杀】的目标距离。多材料虚拟牌没有花色，
+    // 即使两张材料均为红桃也不享受此效果。
+    if (self && skillEnabled(self, 'wushen', game) && card
+        && ['sha', 'fire_sha', 'thunder_sha'].indexOf(card.type) >= 0
+        && effectiveCardSuit(self, card) === 'heart') return true;
     return canReachWithSha(game, actor, targetActor);
   }
 
@@ -456,16 +465,17 @@
 
   function handLimit(game, actor) {
     var state = game[actor];
+    var juejingBonus = skillEnabled(state, 'juejing', game) ? 2 : 0;
     // AA1 复核当前新风不屈 (card__hero__wu.md:365)：有创时基础上限
     // 为创数。旧摘要误写成 maxHp - 创数；妄尊等回合级修正照常叠加。
     // AA1: 创作为区域牌保留，手牌上限的锁定技视图则只在不屈有效时适用。
     if (skillEnabled(state, 'buqu', game) && state.chuang && state.chuang.length > 0) {
-      return Math.max(0, state.chuang.length + (state.handLimitDelta || 0));
+      return Math.max(0, state.chuang.length + (state.handLimitDelta || 0) + juejingBonus);
     }
     // v11 C8 (批次 32): handLimitDelta — 回合级手牌上限修正 (妄尊 -1 等),
     // 由 resetActorTurnState / resetEndOfTurnState 复位。
     // v15 T: 血裔 (袁绍) — 主公技锁定技, 手牌上限 +2X。
-    return Math.max(0, (state.hp || 0) + (state.handLimitDelta || 0) + xueyiHandLimitBonus(game, actor));
+    return Math.max(0, (state.hp || 0) + (state.handLimitDelta || 0) + xueyiHandLimitBonus(game, actor) + juejingBonus);
   }
 
   // v15 T: 血裔 — "主公技，锁定技，你的手牌上限+2X（X为其他群势力角色数）"
@@ -494,6 +504,18 @@
     if (!card) return null;
     if (state && skillEnabled(state, 'hongyan') && card.suit === 'spade') return 'red';
     return card.color;
+  }
+
+  // 武神是持续牌面视图。只读取仍在该角色手牌里的实体，绝不改写物理牌，
+  // 因而同一红桃装备离手后仍是原装备，也能安全用于AI克隆与弃牌分类。
+  function effectiveCardView(state, card) {
+    if (!card || card.virtual || card.wushenView || !state || !skillEnabled(state, 'wushen')
+        || effectiveCardSuit(state, card) !== 'heart'
+        || !(state.hand || []).some(function (own) { return own === card || own.id === card.id; })) return card;
+    return Object.assign({}, card, {
+      type: 'sha', name: '杀', family: 'basic', group: 'basic',
+      physicalCard: card, wushenView: true
+    });
   }
 
   function getActorStatus(game, actor) {
@@ -565,6 +587,7 @@
     handLimit: handLimit,
     effectiveCardSuit: effectiveCardSuit,
     effectiveCardColor: effectiveCardColor,
+    effectiveCardView: effectiveCardView,
     effectiveCamp: effectiveCamp,
     effectiveGender: effectiveGender,
     setIdentityOverride: setIdentityOverride,

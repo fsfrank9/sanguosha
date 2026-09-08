@@ -15,6 +15,12 @@
       import { createJudgeAreaRuntime } from './judge-area.js';
       import { GeneralCardRuntime } from './general-card-runtime.js';
       import { createGeneralSelectionRuntime } from './general-selection.js';
+      import { createGodChoiceRuntime } from './god-choices.js';
+      import { createGodJudgementRuntime } from './god-judgement.js';
+      import { installGodConversionHandlers } from './god-conversion.js';
+      import { installGodCardHandlers } from './god-cards.js';
+      import { installGodWrathHandlers } from './god-wrath.js';
+      import { installGodStrategyHandlers } from './god-strategy.js';
       import { installStandardSkillHandlers, PLAY_PHASE_ACTIVE_SKILLS } from './skills.js';
       import { HERO_CATALOG, HEROES } from '../data/heroes.js';
       import { CARD_CATALOG, CARD_INFO, PHASES } from '../data/cards.js';
@@ -70,6 +76,7 @@
 
       SkillRuntime.annotateSkillStatus(HERO_CATALOG, IMPLEMENTED_SKILL_IDS, ACTIVE_SKILL_IDS);
       var skillRegistry = SkillRuntime.createRegistry();
+      var godJudgementRegistrations = [];
 
       function cardTargetProtection(game, actor, targetActor, card, displayName) {
         var cardType = card && card.type ? card.type : card;
@@ -126,6 +133,7 @@
           drawCount: 2
         };
         SkillRuntime.runHook(skillRegistry, 'onDrawPhase', drawContext);
+        if (GodCards.captureShelieDrawCount(game, drawContext)) return { suspended: true };
         // v14 Q3: 突袭玩家 ask — 摸牌决策挂起 (发动=放弃摸牌, 摸与否由
         // resolver 收尾), 快照补记 hook 后的最终 drawCount。
         if (game.pauseState && game.pauseState.tuxiAsk && game.pendingChoice) {
@@ -314,7 +322,14 @@
       }
 
       function removeFirstCardOfType(state, type) {
-        return removeFirstMatchingCard(state, function (card) { return type === 'sha' ? isShaCard(card) : card.type === type; });
+        var card = (state.hand || []).find(function (physical) {
+          var view = StateRuntime.effectiveCardView(state, physical);
+          return type === 'sha' ? isShaCard(view) : view.type === type;
+        });
+        if (!card) return null;
+        var view = StateRuntime.effectiveCardView(state, card);
+        removeCardFromHand(state, card.id);
+        return view;
       }
 
       function firstMatchingCard(state, predicate) {
@@ -453,6 +468,8 @@
       var resumeSuspendedTurnFlowIfReady = ResponseRuntime.resumeSuspendedTurnFlowIfReady;
       var finishPendingChoiceResolution = ResponseRuntime.finishPendingChoiceResolution;
       var pendingChoiceGuard = ResponseRuntime.pendingChoiceGuard;
+      var GodChoices = createGodChoiceRuntime({ requestPlayerResponse: requestPlayerResponse,
+        registerResponseKind: registerResponseKind, success: success, fail: fail });
       var GeneralSelectionRuntime = createGeneralSelectionRuntime({
         catalog: HERO_CATALOG,
         responseFlows: ResponseRuntime.responseFlows,
@@ -526,6 +543,14 @@
       // ./damage-dying.js, 引擎闭包能力经 createDamageDyingRuntime 依赖注入。
       var DamageDyingRuntime = createDamageDyingRuntime({
         responseFlows: ResponseRuntime.responseFlows,
+        modifyGodWeather: function (context) { return GodStrategy.modifyWeather(context); },
+        onSettledDeath: function (game, actor, killer) {
+          GodStrategy.recordDeath(game, actor, killer);
+          GodWrath.clearDeathEffects(game, actor);
+          if (game.turn === actor) game.godTurnEnded = true;
+        },
+        godResponseOptions: function (state, type) { return GodConversion.responseOptions(state, type); },
+        takeGodResponse: function (game, actor, type, id, options) { return GodConversion.takeResponse(game, actor, type, id, options); },
         tryAIResponseGuhuo: tryAIResponseGuhuo,
         // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
         guhuoResponsePossible: guhuoResponsePossible,
@@ -581,6 +606,7 @@
           if (hand[i] && hand[i].id === cardId) { card = hand[i]; break; }
         }
         if (!card) return null;
+        card = StateRuntime.effectiveCardView(state, card);
         if (card.type === 'shan') return { via: null };
         if (skillEnabled(state, 'longdan') && isShaCard(card)) return { via: '龙胆' };
         if (skillEnabled(state, 'qingguo') && card.color === 'black') return { via: '倾国' };
@@ -606,6 +632,7 @@
           });
         }
         if (!card) return null;
+        card = StateRuntime.effectiveCardView(state, card);
         if (isShaCard(card)) return { via: null };
         if (skillEnabled(state, 'longdan') && card.type === 'shan') return { via: '龙胆' };
         if (skillEnabled(state, 'wusheng') && card.color === 'red') return { via: '武圣' };
@@ -630,7 +657,7 @@
             add(state.equipment[slot]);
           });
         }
-        return opts;
+        return opts.concat(GodConversion ? GodConversion.responseOptions(state, 'sha') : []);
       }
 
       function hasShaResponseAvailable(state) {
@@ -640,11 +667,15 @@
 
       function findResponseCard(state, type, preferredCardId, game) {
         var card = null;
+        var godActor = game && seatOfState(game, state);
+        if (godActor && typeof preferredCardId === 'string' && preferredCardId.indexOf('longhun:') === 0) {
+          return GodConversion.takeResponse(game, godActor, type, preferredCardId);
+        }
         if (type === 'shan') {
           // v9 PR-E26: 玩家指定了用哪张牌当【闪】 → 直接消耗那张 (真闪 / 龙胆 / 倾国).
           if (preferredCardId) {
             var picked = shanOptionForCard(state, preferredCardId);
-            if (!picked) return null;
+            if (!picked) return godActor ? GodConversion.takeResponse(game, godActor, type, preferredCardId) : null;
             return {
               card: removeOwnCardFromAnyZone(state, preferredCardId, game),
               asName: '闪',
@@ -653,6 +684,8 @@
           }
           card = removeFirstCardOfType(state, 'shan');
           if (card) return { card: card, asName: '闪', skillName: null };
+          var godShan = godActor && GodConversion.takeResponse(game, godActor, type);
+          if (godShan) return godShan;
           var shanResponseContext = { mode: 'response', state: state, asType: 'shan' };
           var shanConversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', shanResponseContext));
           // v6.1: convert through hand-or-equipment so 武圣 can pull a red
@@ -665,15 +698,20 @@
           // v10 V6: 玩家指定用哪张牌当【杀】 → 直接消耗那张 (真杀 / 龙胆 / 武圣).
           if (preferredCardId) {
             var pickedSha = shaOptionForCard(state, preferredCardId);
-            if (!pickedSha) return null;
+            if (!pickedSha) return godActor ? GodConversion.takeResponse(game, godActor, type, preferredCardId) : null;
+            var pickedPhysical = findOwnCardById(state, preferredCardId);
+            var pickedView = pickedPhysical && StateRuntime.effectiveCardView(state, pickedPhysical.card);
+            var pickedRemoved = removeOwnCardFromAnyZone(state, preferredCardId, game);
             return {
-              card: removeOwnCardFromAnyZone(state, preferredCardId, game),
+              card: pickedView && pickedView.physicalCard ? Object.assign({}, pickedView, { physicalCard: pickedRemoved }) : pickedRemoved,
               asName: '杀',
               skillName: pickedSha.via
             };
           }
           card = removeFirstCardOfType(state, 'sha');
           if (card) return { card: card, asName: '杀', skillName: null };
+          var godSha = godActor && GodConversion.takeResponse(game, godActor, type);
+          if (godSha) return godSha;
           var responseContext = { mode: 'response', state: state, asType: 'sha' };
           var conversion = selectCardAsConversion(SkillRuntime.runHook(skillRegistry, 'onCardAs', responseContext));
           // Same: support equipment-zone sources for 武圣 's response path.
@@ -700,9 +738,9 @@
                 id: 'zhangba-resp-' + zbFirst.id + '-' + zbSecond.id,
                 type: 'sha',
                 name: '丈八杀',
-                suit: zbFirst.suit,
-                color: zbFirst.color,
-                rank: zbFirst.rank,
+                suit: null,
+                color: zbFirst.color === zbSecond.color ? zbFirst.color : null,
+                rank: cardRankValue(zbFirst) + cardRankValue(zbSecond),
                 physicalCard: null,
                 virtual: true
               },
@@ -785,12 +823,18 @@
 
       function consumeWuxie(game, actor, reason, preferredCardId) {
         var card;
+        var godResponse = null;
         var wuxieVia = null; // v15 T: 看破等转化来源 (日志用)
         // v15 S1: 蛊惑声明的【无懈可击】(响应中的使用流程) — 牌面已亮出,
         // 实体牌在处理区, 直接顶替手牌扫描。
         var guhuoWuxie = takeGuhuoResponseCard(game, actor, ['wuxie']);
         if (guhuoWuxie) {
           card = guhuoWuxie.physical;
+        } else if (preferredCardId && String(preferredCardId).indexOf('longhun:') === 0) {
+          godResponse = GodConversion.takeResponse(game, actor, 'wuxie', preferredCardId);
+          if (!godResponse) return false;
+          card = godResponse.card;
+          wuxieVia = '龙魂';
         } else if (preferredCardId) {
           // v10 V5: 玩家指定用哪张无懈 (面板候选选定)
           // v15 T: 看破 — 黑色手牌同样可指定 (候选/门槛/消费三处共用
@@ -826,12 +870,26 @@
             }
           }
         }
+        if (!card && !preferredCardId) {
+          godResponse = GodConversion.takeResponse(game, actor, 'wuxie');
+          if (godResponse) { card = godResponse.card; wuxieVia = '龙魂'; }
+        }
         if (!card) return false;
+        if (godResponse) godResponse.extraCards.forEach(function (physical) { discardCard(game, physical); });
         discardCard(game, card);
         log(game, actorName(game, actor)
           + (guhuoWuxie ? '发动【蛊惑】，将【' + card.name + '】当'
             : (wuxieVia ? '发动【' + wuxieVia + '】，将【' + card.name + '】当' : '打出'))
           + '【无懈可击】抵消' + reason + '。');
+        var usedWuxie = Object.assign({}, card, { type: 'wuxie', family: 'trick', name: '无懈可击' });
+        if (skillEnabled(game[actor], 'wumou', game) || skillEnabled(game[actor], 'jilue', game)) {
+          ResponseRuntime.responseFlows.run(game, 'god-card-use', { actor: actor, card: usedWuxie,
+            options: { response: true }, stage: 'wumou', response: true });
+        } else finishWuxieUse(game, actor, usedWuxie);
+        return true;
+      }
+
+      function finishWuxieUse(game, actor, card) {
         SkillRuntime.runHook(skillRegistry, 'onCardUse', {
           game: game,
           actor: actor,
@@ -844,7 +902,7 @@
         if (game.turn !== actor && StateRuntime.effectiveCardColor(game[actor], card) === 'black') {
           triggerYinyueQiang(game, actor);
         }
-        return true;
+        return success('无懈可击使用时机完成。');
       }
 
       // v11 B1: 无懈链框架迁往 ./tricks.js (createTricksRuntime 依赖注入);
@@ -852,6 +910,14 @@
       // consumeWuxie/requestPlayerResponse 为函数声明/已装配别名, 提升与
       // 装配顺序保证前向引用安全。
       var TricksRuntime = createTricksRuntime({
+        godJudgements: {
+          register: function (key, callback, options) { if (GodJudgements) return GodJudgements.register(key, callback, options); godJudgementRegistrations.push([key, callback, options]); },
+          start: function (game, actor, reason, key, context) { return GodJudgements.start(game, actor, reason, key, context); }
+        },
+        findResponseCard: function (state, type, id, game) { return findResponseCard(state, type, id, game); },
+        listShaResponseOptions: listShaResponseOptions,
+        takeGodResponse: function (game, actor, type, id, options) { return GodConversion.takeResponse(game, actor, type, id, options); },
+        playGodResponseSha: function (game, actor, response, options) { return GodConversion.playResponseSha(game, actor, response, options); },
         responseFlows: ResponseRuntime.responseFlows,
         tryAIResponseGuhuo: tryAIResponseGuhuo,
         // v15 U 评审收口: AOE 建队列时的目标合法性过滤 (帷幕等"目标合法性"
@@ -890,7 +956,7 @@
         scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); },
         // v11 D1 (批次 33): AI 无懈期望值 — ai 域后置装配, 包装注入
         // v12 F5: 锦囊结算函数迁入所需能力 — 杀链域后置装配, 经闭包晚绑定
-        tryBaguaDodge: function (g, t, i) { return tryBaguaDodge(g, t, i); },
+        tryBaguaDodge: function (g, t, i, continuation) { return tryBaguaDodge(g, t, i, continuation); },
         isArmorIgnoredBySha: function (g, a, c) { return isArmorIgnoredBySha(g, a, c); },
         listShanResponseOptions: function (st) { return listShanResponseOptions(st); },
         hasShanResponseAvailable: function (st) { return hasShanResponseAvailable(st); },
@@ -948,6 +1014,10 @@
       // v11 B1: 装备域装配 — 依赖注入引擎闭包能力 (函数声明经包装注入,
       // 提升保证前向引用); yinyue-response 在工厂内自注册。
       var EquipmentRuntime = createEquipmentRuntime({
+        godJudgements: {
+          register: function (key, callback, options) { if (GodJudgements) return GodJudgements.register(key, callback, options); godJudgementRegistrations.push([key, callback, options]); },
+          start: function (game, actor, reason, key, context) { return GodJudgements.start(game, actor, reason, key, context); }
+        },
         responseFlows: ResponseRuntime.responseFlows,
         tryAIResponseGuhuo: tryAIResponseGuhuo,
         // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
@@ -969,7 +1039,7 @@
         hasShanResponseAvailable: function (s) { return hasShanResponseAvailable(s); },
         listShanResponseOptions: function (s) { return listShanResponseOptions(s); },
         // v13 审计三轮: 银月枪八卦先行 (sha-flow 域后置装配, 包装注入)
-        tryBaguaDodge: function (g, t, ig) { return tryBaguaDodge(g, t, ig); }
+        tryBaguaDodge: function (g, t, ig, continuation) { return tryBaguaDodge(g, t, ig, continuation); }
       });
       var equipCard = EquipmentRuntime.equipCard;
       var loseEquipment = EquipmentRuntime.loseEquipment;
@@ -991,6 +1061,14 @@
       // (AIRuntime 后置), 其余 deps 此时均已就绪。直调面回绑同名 var,
       // registerResponseKind 注册行与 PLAY_HANDLERS/导出表零文本改动。
       var ShaFlowRuntime = createShaFlowRuntime({
+        godJudgements: {
+          register: function (key, callback, options) { if (GodJudgements) return GodJudgements.register(key, callback, options); godJudgementRegistrations.push([key, callback, options]); },
+          start: function (game, actor, reason, key, context) { return GodJudgements.start(game, actor, reason, key, context); }
+        },
+        findResponseCard: function (state, type, id, game) { return findResponseCard(state, type, id, game); },
+        listShaResponseOptions: listShaResponseOptions,
+        takeGodResponse: function (game, actor, type, id, options) { return GodConversion.takeResponse(game, actor, type, id, options); },
+        playGodResponseSha: function (game, actor, response, options) { return GodConversion.playResponseSha(game, actor, response, options); },
         responseFlows: ResponseRuntime.responseFlows,
         tryAIResponseGuhuo: tryAIResponseGuhuo,
         // v15 S1: 蛊惑响应窗口开窗谓词 (于吉手上没有所需牌型也要开窗)
@@ -1053,6 +1131,10 @@
 
       var JudgeAreaRuntime = createJudgeAreaRuntime({
         skillRegistry: skillRegistry,
+        orderedJudgements: {
+          enabled: function (g) { return GodJudgements.usesOrderedReplacements(g); },
+          start: function (g, a, r, c) { return GodJudgements.startReplacement(g, a, r, c); }
+        },
         reshuffleIfNeeded: reshuffleIfNeeded,
         takeCard: takeCard,
         putCard: putCard,
@@ -1076,6 +1158,21 @@
       var judgementReasonFor = JudgeAreaRuntime.judgementReasonFor;
       var processJudgeArea = JudgeAreaRuntime.processJudgeArea;
       var applyJudgeAreaOutcome = JudgeAreaRuntime.applyJudgeAreaOutcome;
+      var GodJudgements = createGodJudgementRuntime({ responseFlows: ResponseRuntime.responseFlows,
+        judge: judge, resolveJudgementCard: resolveJudgementCard, discardCard: discardCard,
+        requestPlayerResponse: requestPlayerResponse,
+        scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); },
+        resumeLegacyJudgement: function (g, a, c) {
+          var saved = g.pauseState && g.pauseState.leiji;
+          if (!saved || saved.targetActor !== a) saved = g.pauseState && g.pauseState.judgeArea;
+          if (saved) saved.currentJudgementCard = c;
+          return SkillDomain.resolveGuicaiReplaceChoice(g,
+            { actor: a, judgementActor: a, orderedJudgementComplete: true }, {});
+        },
+        applyHongyanJudgementView: applyHongyanJudgementView,
+        restoreHongyanJudgementView: restoreHongyanJudgementView,
+        triggerEquipmentLoss: triggerEquipmentLoss, log: log, success: success, fail: fail });
+      godJudgementRegistrations.forEach(function (args) { GodJudgements.register.apply(null, args); });
 
       function getPendingChoice(game) {
         return (game && game.pendingChoice) || null;
@@ -1134,6 +1231,11 @@
       // 与 tricks/judge-area 的既有包装先例一致)。直调面回绑同名 var, 使
       // registerResponseKind 注册块 / processPreparePhase / 导出表零改动。
       var SkillDomain = installStandardSkillHandlers(skillRegistry, {
+        godJudgements: GodJudgements, finishDrawPhaseAndAdvance: finishDrawPhaseAndAdvance,
+        findResponseCard: function (state, type, id, game) { return findResponseCard(state, type, id, game); },
+        listShaResponseOptions: listShaResponseOptions,
+        takeGodResponse: function (game, actor, type, id, options) { return GodConversion.takeResponse(game, actor, type, id, options); },
+        playGodResponseSha: function (game, actor, response, options) { return GodConversion.playResponseSha(game, actor, response, options); },
         skillEnabled: skillEnabled,
         // v15 T 评审收口: 涅槃 ask 挂起后重入濒死循环 (DamageDyingRuntime
         // 早于本处装配, 直绑即可)。
@@ -1234,8 +1336,73 @@
         handLimit: handLimit,
         recordDiscardPhaseLoss: recordDiscardPhaseLoss,
         CARD_INFO: CARD_INFO,
+        resolveGodJudgementReplacement: function (g, p, d, o) { return GodJudgements.resolveReplacement(g, p, d, o); },
         scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); }
       });
+      var godDeps = {
+        responseFlows: ResponseRuntime.responseFlows, godChoices: GodChoices,
+        godJudgements: GodJudgements, skillRegistry: skillRegistry,
+        registerBoundaryHook: GeneralSelectionRuntime.registerBoundaryHook,
+        registerResponseKind: registerResponseKind, requestPlayerResponse: requestPlayerResponse,
+        log: log, success: success, fail: fail, actorName: actorName, seatList: seatList,
+        drawCards: drawCards, reshuffleIfNeeded: reshuffleIfNeeded,
+        discardCard: discardCard, removeCardFromHand: removeCardFromHand,
+        removeOwnCardFromAnyZone: removeOwnCardFromAnyZone, removeTargetZoneCard: removeTargetZoneCard,
+        triggerEquipmentLoss: triggerEquipmentLoss, notifyCardLoss: notifyCardLoss,
+        randomHandIndex: randomHandIndex, isLegalCardTarget: isLegalCardTarget,
+        damage: damage, enterDying: enterDying,
+        directDeath: function (g, a) { return DamageDyingRuntime.directDeath(g, a); },
+        judge: judge, resolveJudgementCard: resolveJudgementCard,
+        canPlayCard: canPlayCard, playCardWithRegisteredHandler: playCardWithRegisteredHandler,
+        playSha: function (g, a, c, o) { return playSha(g, a, c, o); },
+        useSkill: useSkill, finishDrawPhaseAndAdvance: finishDrawPhaseAndAdvance,
+        scoreCardForAI: function (g, a, c) { return scoreCardForAI(g, a, c); },
+        scoreCardForDiscard: function (g, a, c) { return AIRuntime.scoreCardForDiscard(g, a, c); },
+        aiHostilityToward: function (g, a, t) { return AIRuntime.aiHostilityToward(g, a, t); }
+      };
+      var GodConversion = installGodConversionHandlers(skillRegistry, godDeps);
+      var GodCards = installGodCardHandlers(skillRegistry, godDeps);
+      var GodWrath = installGodWrathHandlers(skillRegistry, godDeps);
+      var GodStrategy = installGodStrategyHandlers(skillRegistry, godDeps);
+
+      GodChoices.register('faction', function (game, pending, decision) {
+        if (['魏', '蜀', '吴', '群'].indexOf(decision.optionId) < 0) {
+          game.pendingChoice = pending;
+          return fail('请选择魏、蜀、吴或群势力。');
+        }
+        game[pending.actor].camp = decision.optionId;
+        log(game, actorName(game, pending.actor) + '选择' + decision.optionId + '势力。');
+        return success('势力选择完成。');
+      });
+      ResponseRuntime.responseFlows.register('god-factions', { key: 'godFactions',
+        advance: function (game, source) {
+          while (source.index < source.seats.length && !game.pendingChoice) {
+            var actor = source.seats[source.index++];
+            if (game[actor].camp !== '神') continue;
+            var camp = source.camps[actor];
+            GodChoices.request(game, actor, 'faction', { title: '选择势力',
+              prompt: actorName(game, actor) + '在游戏开始前选择势力。',
+              options: ['魏', '蜀', '吴', '群'].map(function (id) { return { id: id, label: id }; }),
+              auto: ['魏', '蜀', '吴', '群'].indexOf(camp) >= 0
+            }, { optionId: camp || ({ god_guanyu: '蜀', god_zhaoyun: '蜀', god_zhugeliang: '蜀',
+              god_lvmeng: '吴', god_zhouyu: '吴', god_caocao: '魏', god_simayi: '魏' }[game[actor].heroId] || '群') });
+          }
+          if (game.pendingChoice) return success('等待选择势力。');
+          ResponseRuntime.responseFlows.finish(game, 'god-factions', source);
+          return GeneralSelectionRuntime.runBoundary(game, 'onGameStart', source.actor,
+            { kind: 'initial-hands', startWithFirstTurn: source.startWithFirstTurn });
+        } });
+      ResponseRuntime.responseFlows.register('god-initial-hands', { key: 'godInitialHands',
+        advance: function (game, source) {
+          while (source.index < source.seats.length && !game.pendingChoice) {
+            var actor = source.seats[source.index++];
+            if (skillEnabled(game[actor], 'qixing', game)) GodStrategy.beginInitialHand(game, actor);
+            else drawCards(game, actor, 4);
+          }
+          if (game.pendingChoice) return success('等待分配初始手牌。');
+          ResponseRuntime.responseFlows.finish(game, 'god-initial-hands', source);
+          return finishInitialHands(game, source.actor, source.startWithFirstTurn);
+        } });
       var triggerGuanxingPreview = SkillDomain.triggerGuanxingPreview;
       var triggerShensuPrepare = SkillDomain.triggerShensuPrepare;
       var resolveShensuOptionsChoice = SkillDomain.resolveShensuOptionsChoice;
@@ -1615,15 +1782,23 @@
         game.deck = buildDeck(game, random);
         game.turn = null;
         game.phase = 'setup';
-        GeneralSelectionRuntime.runBoundary(game, 'onGameStart', firstActor,
-          { kind: 'initial-hands', startWithFirstTurn: !!options.startWithFirstTurn });
+        ResponseRuntime.responseFlows.run(game, 'god-factions', { actor: firstActor,
+          seats: seatsFrom(game, firstActor, true), index: 0, camps: options.godCamps || {},
+          startWithFirstTurn: !!options.startWithFirstTurn });
         return game;
       }
 
       function finishGameSetup(game, firstActor, startWithFirstTurn) {
+        return ResponseRuntime.responseFlows.run(game, 'god-initial-hands', {
+          actor: firstActor, startWithFirstTurn: startWithFirstTurn, index: 0,
+          seats: seatList(game)
+        });
+      }
+
+      function finishInitialHands(game, firstActor, startWithFirstTurn) {
+        GodWrath.afterInitialHands(game);
         game.turn = firstActor;
         game.phase = 'play';
-        seatList(game).forEach(function (seat) { drawCards(game, seat, 4); });
         log(game, '乱世开局：' + actorName(game, firstActor) + '为主公先手。');
         if (startWithFirstTurn) return startTurn(game, firstActor);
         return success('开局完成。');
@@ -1713,6 +1888,7 @@
       }
 
       function canPlayCard(game, actor, card) {
+        card = StateRuntime.effectiveCardView(game[actor], card);
         if (!card) return fail('找不到这张牌。');
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         if (game.turn !== actor) return fail('还没有轮到你行动。');
@@ -1892,6 +2068,7 @@
       // playCard 显式 options.target 校验共用。"可指定但可能无效果" (火攻
       // 空手牌目标等) 沿用 1v1 变体语义, 不在此处收紧。
       function isLegalCardTarget(game, actor, card, seat) {
+        card = StateRuntime.effectiveCardView(game[actor], card);
         if (!card || !game[seat]) return false;
         var seatState = game[seat];
         if (typeof seatState.hp !== 'number' || seatState.hp <= 0) return false;
@@ -1929,7 +2106,7 @@
         }
         // 评审收口 [中]: 使用【杀】的距离面走 shaUseReachAllowed (天义无
         // 距离限制) — 这条正是 UI 高亮与 aiShaTargetSeat 读的谓词。
-        if (isShaCard(card)) return StateRuntime.shaUseReachAllowed(game, actor, seat) && !cardTargetProtection(game, actor, seat, card, '杀');
+        if (isShaCard(card)) return StateRuntime.shaUseReachAllowed(game, actor, seat, card) && !cardTargetProtection(game, actor, seat, card, '杀');
         if (card.type === 'tao') return false; // v13 J0-4: 出牌阶段【桃】目标恒为自己
         // v13 K2 (座席泛化桶销账): 【酒】使用方法Ⅰ按官方语义放开他指 —
         // gltjk card__basic.md:58 (军争/国-标) "使用目标: 包括你在内的一名
@@ -2034,6 +2211,7 @@
       // 令"梅花手牌"也能重铸 (card__hero__shu.md:322 逐字)。判定统一走
       // 本谓词 + onCanRecast hook, 技能侧只声明"哪些牌可重铸"。
       function canRecastCard(game, actor, card) {
+        card = StateRuntime.effectiveCardView(game[actor], card);
         if (!card) return false;
         if (card.type === 'tiesuo') return true;
         return SkillRuntime.runHook(skillRegistry, 'onCanRecast', {
@@ -2067,6 +2245,8 @@
         options = options || {};
         if (!self) return fail('未知角色。');
         var card = self.hand.find(function (item) { return item.id === cardId; });
+        var cardView = StateRuntime.effectiveCardView(self, card);
+        card = cardView;
         // v15 T: 非铁索牌的重铸请求经统一入口 (连环的梅花重铸面) —
         // 铁索自身的重铸仍走既有 handler 分支, 行为逐字不变。
         if (options.mode === 'recast' && card && card.type !== 'tiesuo') {
@@ -2094,7 +2274,8 @@
           if (!huogongChoice.ok) return fail(huogongChoice.message);
           if (huogongChoice.usableCostIds.indexOf(options.huogongCostCardId) < 0) return fail('请选择与展示牌同花色的手牌。');
         }
-        card = removeCardFromHand(self, cardId);
+        var physicalPlayed = removeCardFromHand(self, cardId);
+        card = cardView && cardView.physicalCard ? Object.assign({}, cardView, { physicalCard: physicalPlayed }) : physicalPlayed;
         return playCardWithRegisteredHandler(game, actor, card, options, self);
       }
 
@@ -2111,9 +2292,40 @@
       }
 
       function playCardWithRegisteredHandler(game, actor, card, options, self) {
+        var isTrickUse = card && (card.family === 'trick' || card.family === 'delayed')
+          && !(options && options.mode === 'recast');
+        if (isTrickUse && (skillEnabled(self, 'wumou', game) || skillEnabled(self, 'jilue', game))) {
+          var requested = options && (options.targets || (options.target ? [options.target] : [])) || [];
+          if (requested.some(function (target) { return !isLegalCardTarget(game, actor, card, resolveSeatOption(game, target)); })) {
+            if (!card.virtual && !findCardZone(game, physicalCardOf(card))) putCard(game, physicalCardOf(card), { zone: 'hand', actor: actor });
+            return fail('请选择合法目标。');
+          }
+          return ResponseRuntime.responseFlows.run(game, 'god-card-use', { actor: actor, card: card,
+            options: options || {}, stage: 'wumou' });
+        }
         var handler = PLAY_HANDLERS[playHandlerKey(card)] || PLAY_HANDLERS.default;
         return handler(game, actor, card, options || {}, self);
       }
+
+      ResponseRuntime.responseFlows.register('god-card-use', { key: 'godCardUse',
+        cancel: function (game, source) { discardSourceCardIfPending(game, source.card); },
+        advance: function (game, source) {
+          if (source.stage === 'wumou') {
+            source.stage = 'jilue';
+            GodWrath.beforeTrickUse(game, source.actor, source.card);
+            if (game.pendingChoice) return success('等待无谋结算。');
+          }
+          if (source.stage === 'jilue' && game.phase !== 'gameover') {
+            source.stage = 'effect';
+            GodStrategy.beforeCardUse(game, source.actor, source.card);
+            if (game.pendingChoice) return success('等待极略结算。');
+          }
+          ResponseRuntime.responseFlows.finish(game, 'god-card-use', source);
+          if (game.phase === 'gameover') { discardSourceCardIfPending(game, source.card); return success('游戏结束。'); }
+          if (source.response) return finishWuxieUse(game, source.actor, source.card);
+          var handler = PLAY_HANDLERS[playHandlerKey(source.card)] || PLAY_HANDLERS.default;
+          return handler(game, source.actor, source.card, source.options, game[source.actor]);
+        } });
 
       function playShaCardHandler(game, actor, card, options, self) {
         var result = playSha(game, actor, card, options);
@@ -2452,6 +2664,7 @@
         game.turn = actor;
         var state = game[actor];
         resetActorTurnState(state);
+        GodStrategy.resetTurn(game, actor);
         // v15 S1: 蛊惑"每名角色的回合内限一次"是全场按回合刷新的额度
         // (响应窗口声明发生在他人回合内) → 每席随回合切换复位。
         resetGuhuoTurnLimit(game);
@@ -2629,6 +2842,24 @@
       }
 
       function finishDrawPhaseAndAdvance(game, actor) {
+        if (skillEnabled(game[actor], 'qixing', game)) {
+          return ResponseRuntime.responseFlows.run(game, 'god-draw-end', { actor: actor, started: false });
+        }
+        return finishDrawPhaseAfterGodSkills(game, actor);
+      }
+
+      ResponseRuntime.responseFlows.register('god-draw-end', { key: 'godDrawEnd', advance: function (game, source) {
+        if (!source.started) {
+          source.started = true;
+          GodStrategy.beginDrawPhaseEnd(game, source.actor);
+          if (game.pendingChoice) return success('等待摸牌阶段结束时的技能选择。');
+        }
+        ResponseRuntime.responseFlows.finish(game, 'god-draw-end', source);
+        if (game.phase === 'gameover') return success('游戏结束。');
+        return finishDrawPhaseAfterGodSkills(game, source.actor);
+      } });
+
+      function finishDrawPhaseAfterGodSkills(game, actor) {
         runBeforePlayPhaseHooks(game, actor);
         if (game.pendingChoice) return success('等待出牌阶段前的技能选择。');
         return continueTurnAfterBeforePlayPhase(game, actor);
@@ -2700,6 +2931,7 @@
           log(game, actorName(game, actor) + '选择不发动【双雄】。');
         } else {
           SkillDomain.applyShuangxiongDrawPhase(game, actor, shell);
+          if (game.pendingChoice) return success('等待双雄判定。');
         }
         if (shell.drawCount > 0) drawCards(game, actor, shell.drawCount);
         return finishDrawPhaseAndAdvance(game, actor);
@@ -2795,6 +3027,7 @@
         state.flags = state.flags || {};
         state.flags.discardPhaseCards = (state.flags.discardPhaseCards || []).concat(cards);
         state.flags.discardPhaseAllCards = (state.flags.discardPhaseAllCards || []).concat(allCards);
+        SkillRuntime.runHook(skillRegistry, 'onDiscardPhaseLoss', { game: game, actor: actor, cards: cards });
         notifyCardLoss(game, actor); // v15 V: 屯田 (回合外过滤在技能侧)
       }
 
@@ -2868,6 +3101,11 @@
         if (game.phase === 'play') return finishPlayPhase(game);
         if (game.phase === 'discard') {
           if (needsDiscard(game, actor)) return fail('需要先弃置 ' + getDiscardCount(game, actor) + ' 张牌。');
+          if (skillEnabled(game[actor], 'qinyin', game)) {
+            return ResponseRuntime.responseFlows.run(game, 'god-discard-end', { actor: actor, index: 0,
+              discardedCards: (game[actor].flags.discardPhaseCards || []).slice(),
+              allDiscardedCards: (game[actor].flags.discardPhaseAllCards || game[actor].flags.discardPhaseCards || []).slice() });
+          }
           runDiscardPhaseEndHooks(game, actor);
           setPhase(game, actor, 'finish');
           log(game, actorName(game, actor) + '进入结束阶段。');
@@ -2889,7 +3127,43 @@
         });
       }
 
+      ResponseRuntime.responseFlows.register('god-discard-end', { key: 'godDiscardEnd', advance: function (game, source) {
+        var handlers = (skillRegistry.hooks.onDiscardPhaseEnd || []).slice().sort(function (a, b) {
+          return (a.skillId === 'qinyin' ? -1 : 0) - (b.skillId === 'qinyin' ? -1 : 0);
+        });
+        while (source.index < handlers.length && !game.pendingChoice && game.phase !== 'gameover') {
+          handlers[source.index++].handler({ game: game, actor: source.actor,
+            discardedCards: source.discardedCards, allDiscardedCards: source.allDiscardedCards });
+        }
+        if (game.pendingChoice) return success('等待弃牌阶段结束时的技能选择。');
+        ResponseRuntime.responseFlows.finish(game, 'god-discard-end', source);
+        game[source.actor].flags.discardPhaseCards = [];
+        delete game[source.actor].flags.discardPhaseAllCards;
+        if (game.phase === 'gameover') return success('游戏结束。');
+        setPhase(game, source.actor, 'finish');
+        return success('进入结束阶段。');
+      } });
+
       function completeTurn(game, ending) {
+        if (game[ending] && game[ending].hp > 0
+            && (skillEnabled(game[ending], 'kuangfeng', game) || skillEnabled(game[ending], 'dawu', game))) {
+          return ResponseRuntime.responseFlows.run(game, 'god-end-phase', { actor: ending, started: false });
+        }
+        return completeTurnAfterGodSkills(game, ending);
+      }
+
+      ResponseRuntime.responseFlows.register('god-end-phase', { key: 'godEndPhase', advance: function (game, source) {
+        if (!source.started) {
+          source.started = true;
+          GodStrategy.beginEndPhase(game, source.actor);
+          if (game.pendingChoice) return success('等待结束阶段技能选择。');
+        }
+        ResponseRuntime.responseFlows.finish(game, 'god-end-phase', source);
+        if (game.phase === 'gameover') return success('游戏结束。');
+        return completeTurnAfterGodSkills(game, source.actor);
+      } });
+
+      function completeTurnAfterGodSkills(game, ending) {
         // v12 H5: 阵亡角色的回合终止 — 不再触发其回合结束时机 (闭月/据守等)。
         if (game[ending] && game[ending].hp <= 0) {
           log(game, actorName(game, ending) + '的回合因阵亡终止。');
@@ -2927,6 +3201,8 @@
 
       function afterTurnEndBoundary(game, ending) {
         if (game.phase === 'gameover') return success('游戏结束。');
+        GodWrath.clearTurnEffects(game, ending);
+        seatList(game).forEach(function (seat) { StateRuntime.clearSkillSource(game[seat], 'jilue-wansha'); });
         game.turn = null;
         game.phase = 'between-turns';
         return GeneralSelectionRuntime.runBoundary(game, 'onAfterTurnEnd', ending, { kind: 'next-turn' });
@@ -3003,9 +3279,9 @@
         // 会跳过), 奸雄等"获得造成伤害的牌"改为获得这两张组成实体牌。
         var virtualSha = makeTestCard('sha', {
           id: 'zhangba-' + first.id + '-' + second.id,
-          suit: first.suit,
-          rank: first.rank,
-          color: first.color,
+          suit: null,
+          rank: cardRankValue(first) + cardRankValue(second),
+          color: first.color === second.color ? first.color : null,
           name: '丈八蛇矛杀',
           virtual: true,
           physicalCards: [first, second]
@@ -3038,6 +3314,12 @@
           original = cardOrId;
         }
         if (!original) return fail('找不到这张牌。');
+        if (skillEnabled(self, 'longhun', game) && ['sha', 'fire_sha', 'tao'].indexOf(asType) >= 0
+            && StateRuntime.effectiveCardSuit(self, original) === (asType === 'tao' ? 'heart' : 'diamond')) {
+          var godPlayable = GodConversion.canPlayLonghun(game, actor, [original.id], {});
+          if (godPlayable.error) return fail(godPlayable.error);
+          return Object.assign(success('发动【龙魂】。'), { skillName: '龙魂' });
+        }
         // v8 PR-C1: 国色把方片当乐; v11 C3: 奇袭把黑牌当拆;
         // v15 T: 火计→火攻 / 连环→铁索连环 / 双雄→决斗 — 白名单改由
         // 转化牌工厂表驱动 (新增牌名只改一处)。
@@ -3080,6 +3362,7 @@
         var original = hit.card;
         var playable = canPlayCardAs(game, actor, original, asType);
         if (!playable.ok) return playable;
+        if (playable.skillName === '龙魂') return GodConversion.playLonghun(game, actor, [cardId], options || {});
         // v13 K2 (结算加压自审): 转化牌目标此前硬编码 opponent(actor) —
         // 4/5 席身份场中非 player/enemy 座席发动国色/奇袭会把乐/拆错误
         // 指向二元 opponent() 解出的座席。改为与普通乐/拆同路:
@@ -3313,7 +3596,7 @@
         if (!skillEnabled(self, skillId, game) && !lordWideSkillAvailable(game, skillId)) return fail('没有这个技能。');
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         if (game.turn !== actor) return fail('还没有轮到你行动。');
-        if (PLAY_PHASE_ACTIVE_SKILLS[skillId] && game.phase !== 'play') return fail('主动技能只能在出牌阶段发动。');
+        if ((PLAY_PHASE_ACTIVE_SKILLS[skillId] || ['gongxin', 'yeyan', 'wuqian', 'shenfen', 'jilue', 'longhun'].indexOf(skillId) >= 0) && game.phase !== 'play') return fail('主动技能只能在出牌阶段发动。');
         self.flags = self.flags || {};
         // audit4-H2: 显式目标与 playCard 同一存活约束 — 座席名合法但已阵亡
         // 一律拒绝 (此前反间/结姻可对尸体生效, 重放濒死+死亡结算+奖惩)。
@@ -3413,6 +3696,15 @@
 
       // 引擎闭包能力经 createAIRuntime 依赖注入; 公开 API 形状不变。
       var AIRuntime = createAIRuntime({
+        godActiveAction: function (game, actor) {
+          var domains = [GodWrath, GodCards, GodStrategy, GodConversion];
+          for (var index = 0; index < domains.length; index += 1) {
+            if (!domains[index].runAIActiveSkills) continue;
+            var action = domains[index].runAIActiveSkills(game, actor);
+            if (action && action.acted) return action;
+          }
+          return { acted: false };
+        },
         success: success,
         fail: fail,
         playCard: playCard,

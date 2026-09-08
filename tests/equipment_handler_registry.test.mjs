@@ -22,6 +22,10 @@ const RULE_FILES = [
   'src/engine/response.js',
   'src/engine/tricks.js',
   'src/engine/ai.js',
+  'src/engine/god-cards.js',
+  'src/engine/god-conversion.js',
+  'src/engine/god-strategy.js',
+  'src/engine/god-wrath.js',
 ];
 
 test('引擎规则文件不含裸装备型号判断 (收口到 flag/handler 注册表)', () => {

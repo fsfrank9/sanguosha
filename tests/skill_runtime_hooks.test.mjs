@@ -16,6 +16,18 @@ function normalize(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function assertDamageAfterRegistryDispatch(source) {
+  // AB keeps the same registered hooks, but a serial frame now stops when a
+  // handler opens a paid Jilue judgement. The cursor advances before calling
+  // the handler, so restoring the frame cannot repeat a paid skill.
+  assert.match(source, /flows\.run\(game, 'damage-after', \{ context: context, stage: 'dealt', index: 0/);
+  assert.match(source, /source\.stage === 'dealt' \? 'onDamageDealt' : 'onDamageAfter'/);
+  assert.match(source, /var hooks = skillRegistry\.hooks\[hookName\] \|\| \[\]/);
+  assert.match(source, /hooks\[source\.index\+\+\]\.handler\(context\)/);
+  assert.match(source, /while \(source\.stage !== 'done' && !game\.pendingChoice && game\.phase !== 'gameover'\)/);
+  assert.match(source, /if \(game\.pendingChoice\) return \{ ok: true, suspended: true \}/);
+}
+
 test('SkillRuntime exposes a minimal hook registry API', () => {
   assert.equal(typeof SkillRuntime.createRegistry, 'function', 'createRegistry should be exported');
   assert.equal(typeof SkillRuntime.registerSkill, 'function', 'registerSkill should be exported');
@@ -216,8 +228,10 @@ test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
 
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tieqi['"]/, 'Tieqi should be registered with SkillRuntime.registerSkill');
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tieqi['"][\s\S]*?onNeedResponse\s*:/, 'Tieqi should register an onNeedResponse hook');
-  assert.match(skillsSource, /triggerTieqiNeedResponse\(context\.game, context\.actor, context\.targetActor, context\.responseType, context\.card\)/, 'Tieqi hook should forward the triggering card for narrow response-window filtering');
-  assert.match(skillsSource, /function triggerTieqiNeedResponse\(game, actor, targetActor, responseType, triggeringCard\)/, 'Tieqi response helper should accept the triggering card');
+  // AB: retain all five original arguments and carry the serializable parent
+  // continuation so an interactive Jilue judgement resumes this exact Sha.
+  assert.match(skillsSource, /triggerTieqiNeedResponse\(context\.game, context\.actor, context\.targetActor, context\.responseType, context\.card, context\.godJudgeResume\)/, 'Tieqi hook should forward its triggering card and parent continuation');
+  assert.match(skillsSource, /function triggerTieqiNeedResponse\(game, actor, targetActor, responseType, triggeringCard, godJudgeResume\)/, 'Tieqi helper should accept the triggering card and parent continuation');
   assert.match(skillsSource, /!isShaCard\(triggeringCard\)/, 'Tieqi response helper should self-filter to Sha response windows only');
   assert.match(playShaSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onNeedResponse['"]/, 'playSha should dispatch the Shan response window through onNeedResponse');
   assert.doesNotMatch(playShaSource, /(?:hasSkill|skillEnabled)\([^)]*['"]tieqi['"]|tieqiLocked/, 'playSha should no longer directly own Tieqi response locking');
@@ -238,7 +252,7 @@ test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
   assert.match(skillsSource, /triggerJianxiongDamageAfter\(context\.game, context\.targetActor, context\.sourceCard\)/, 'Jianxiong hook should forward the damaged actor and damaging card');
   assert.match(skillsSource, /function triggerJianxiongDamageAfter\(game, targetActor, sourceCard\)/, 'Jianxiong helper should isolate the damage-after side effect');
   assert.match(damageSource, /var damageContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should build a complete damage-after context');
-  assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch through onDamageAfter');
+  assertDamageAfterRegistryDispatch(damageSource);
   assert.doesNotMatch(damageSource, /(?:hasSkill|skillEnabled)\([^)]*['"]jianxiong['"]|发动【奸雄】/, 'damage should no longer directly own Jianxiong skill logic');
 });
 
@@ -263,7 +277,7 @@ test('game engine dispatches Ganglie through onDamageAfter and finalizes its jud
   assert.match(ganglieSource, /judge\(\s*game\s*,\s*targetActor\s*,\s*['"]【刚烈】['"]\s*\)/, 'Ganglie should perform a judgment owned by the damaged Xiahou Dun actor');
   assert.match(ganglieSource, /resolveJudgementCard\(\s*game\s*,\s*targetActor\s*,\s*target\s*,\s*['"]【刚烈】['"]\s*,\s*ganglieJudge\s*\)/, 'Ganglie should route its judgment card through the shared finalizer');
   assert.match(ganglieSource, /ganglieJudge\.suit\s*!==\s*['"]heart['"]/, 'Ganglie should only retaliate when the judgment is not heart');
-  assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch through onDamageAfter');
+  assertDamageAfterRegistryDispatch(damageSource);
   assert.doesNotMatch(damageSource, /(?:hasSkill|skillEnabled)\([^)]*['"]ganglie['"]|发动【刚烈】/, 'damage should not directly own Ganglie skill logic');
 });
 
@@ -289,7 +303,7 @@ test('game engine dispatches Fankui through onDamageAfter and gains a source-are
   assert.match(fankuiSource, /removeTargetZoneCard\(\s*game\s*,\s*sourceActor\s*,\s*autoZone\s*\)/, 'Fankui should remove one gainable card from the damage source area');
   // v11 A2: 获得牌统一走 moveCard 原语 (putCard 入手牌), 不再裸 push。
   assert.match(fankuiSource, /putCard\(\s*game\s*,\s*gained\.card\s*,\s*\{\s*zone:\s*['"]hand['"]\s*,\s*actor:\s*targetActor\s*\}\s*\)/, 'Fankui should move the gained source card into Sima Yi hand via putCard');
-  assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch through onDamageAfter');
+  assertDamageAfterRegistryDispatch(damageSource);
   assert.doesNotMatch(damageSource, /(?:hasSkill|skillEnabled)\([^)]*['"]fankui['"]|发动【反馈】/, 'damage should not directly own Fankui skill logic');
 });
 
@@ -392,7 +406,7 @@ test('game engine dispatches Yiji per-damage-point draw through onDamageAfter ho
   assert.match(skillsSource, /triggerYijiDamageAfter\(context\)/, 'Yiji hook should delegate to an isolated helper');
   assert.match(skillsSource, /function triggerYijiDamageAfter\(context\) \{[\s\S]*var target = game\[targetActor\][\s\S]*(?:hasSkill|skillEnabled)\(target, ['"]yiji['"]\)[\s\S]*for \(var i = 0; i < context\.amount; i \+= 1\) \{[\s\S]*drawCards\(game, targetActor, 2\);[\s\S]*\}/, 'Yiji helper should self-filter and draw two cards once per damage point');
   assert.match(damageSource, /var damageContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should include damage amount in the hook context');
-  assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch damage-after skills through SkillRuntime');
+  assertDamageAfterRegistryDispatch(damageSource);
 });
 
 test('game engine dispatches Luoyi through draw and damage-modifier hook seams', () => {

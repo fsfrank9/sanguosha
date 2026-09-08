@@ -6,6 +6,7 @@
   import { StateRuntime } from './state.js';
   import { CardRuntime } from './card-runtime.js';
   import { CARD_INFO } from '../data/cards.js';
+  import { longhunResponseOptions } from './god-conversion.js';
 
   var actorName = StateRuntime.actorName;
   var opponent = StateRuntime.opponent;
@@ -84,7 +85,7 @@
             opts.push({ cardId: card.id, via: opt.via, name: card.name, suit: card.suit, rank: card.rank });
           }
         });
-        return opts;
+        return opts.concat(longhunResponseOptions(state, 'shan'));
       }
 
       function defaultHostileTarget(game, actor) {
@@ -124,6 +125,9 @@
         var self = game[actor];
         if (!self || !hasEquipmentEffect(self, 'fangtianLastHandBonus')) return false;
         if (!card || (self.hand && self.hand.length > 0)) return false;
+        // 龙魂多材料在付费前记录“全是最后手牌”，该快照不依赖不可枚举
+        // _handOrigin，因此装备失去后的挂起/JSON克隆不会丢失方天资格。
+        if (card.skillId === 'longhun') return card.godLastHandSha === true;
         // 实体溯源覆盖三种形态: 普通实体杀 [card] / 转化虚拟杀 physicalCard
         // (武圣/龙胆/playCardAs) / 组合虚拟杀 physicalCards (丈八/青龙转化)。
         // 装备区来源的转化实体无 _handOrigin (takeCard 仅对手牌打标) →
@@ -148,10 +152,10 @@
         var self = game[actor];
         if (!self) return 0;
         var hand = self.hand || [];
-        if (hand.length !== 1 || !hand[0] || hand[0].id !== cardId || !isShaCard(hand[0])) {
+        if (hand.length !== 1 || !hand[0] || hand[0].id !== cardId || !isShaCard(StateRuntime.effectiveCardView(self, hand[0]))) {
           // 方天资格要求"仅剩的一张手牌", 天义不要求 — 非独张时只给天义。
           var loose = (hand || []).some(function (card) {
-            return card && card.id === cardId && isShaCard(card);
+            return card && card.id === cardId && isShaCard(StateRuntime.effectiveCardView(self, card));
           });
           return loose ? tianyiExtraTargets(self) : 0;
         }
@@ -192,8 +196,7 @@
         for (var vi = 0; vi < targets.length; vi += 1) {
           var protection = cardTargetProtection(game, actor, targets[vi], card, '杀');
           if (protection) return { error: protection.message };
-          if (!options.ignoreDistance && !tianyiIgnoresDistance(game[actor])
-              && !canReachWithSha(game, actor, targets[vi])) {
+          if (!options.ignoreDistance && !StateRuntime.shaUseReachAllowed(game, actor, targets[vi], card)) {
             return { error: '距离不足，当前武器范围无法对' + actorName(game, targets[vi]) + '使用【杀】。' };
           }
         }
@@ -229,8 +232,7 @@
         var targetProtection = cardTargetProtection(game, actor, targetActor, card, '杀');
         if (targetProtection) return fail(targetProtection.message);
         // v12 G2: 神速的视为使用【杀】"无距离限制" 且不计入出牌阶段次数。
-        if (!options.ignoreDistance && !tianyiIgnoresDistance(self)
-            && !canReachWithSha(game, actor, targetActor)) return fail('距离不足，当前武器范围无法使用【杀】。');
+        if (!options.ignoreDistance && !StateRuntime.shaUseReachAllowed(game, actor, targetActor, card)) return fail('距离不足，当前武器范围无法使用【杀】。');
         if (!options.skipShaCount) {
           // v15 T: 天义"额外次数上限 +1" — 已用过时消耗一次额外次数,
           // 用尽后 usedSha 才恒真 (canPlayCard 的次数闸读同一状态)。
@@ -286,7 +288,11 @@
 
       // v14 P3: 单目标"指定目标后"(雌雄) + 响应/伤害结算 — 自 playSha 尾部
       // 拆出, 供 流离 resolver 在转移收束后重入 (语句与拆出前逐行一致)。
-      function designateCixiongAndResolve(game, actor, card, amount, targetActor) {
+      function designateCixiongAndResolve(game, actor, card, amount, targetActor, precomputed) {
+        if (!precomputed && needsInteractiveJilue(game)) {
+          return flows.run(game, 'god-sha-designate', { actor: actor, card: card, amount: amount,
+            targetActor: targetActor, requirement: shaResponseRequirement(game, actor, targetActor), stage: 'locks' });
+        }
         // v7 PR-4: 雌雄双股剑 fires at "指定目标后" (gltjk flow__use.md step 5).
         // 在响应窗口之前结算；若需要 source/target 的 pendingChoice，则把
         // sha 的剩余状态保存到 pauseState.playSha，由 resolveCixiong* 完成
@@ -298,8 +304,8 @@
         // 相反。锁定结果随 pauseState.playSha 快照携带, 雌雄挂起恢复后经
         // presetLock 传入, 不重跑 hook (铁骑不二次判定)。判定挂起风险与
         // 原位置等同 (同一同步调用, 仅时点前移)。
-        var requirement = shaResponseRequirement(game, actor, targetActor);
-        var responseLocked = computeShaResponseLock(game, actor, card, targetActor);
+        var requirement = precomputed || shaResponseRequirement(game, actor, targetActor);
+        var responseLocked = precomputed ? !!precomputed.responseLocked : computeShaResponseLock(game, actor, card, targetActor);
         var cixiongResult = applyCixiongOnDesignate(game, actor, targetActor);
         if (cixiongResult && cixiongResult.paused) {
           if (!game.pauseState) game.pauseState = {};
@@ -313,6 +319,28 @@
         return continueShaAfterCixiong(game, actor, card, amount, targetActor,
           Object.assign({ responseLocked: responseLocked }, requirement));
       }
+
+      flows.register('god-sha-designate', {
+        key: 'godShaDesignate',
+        cancel: function (game, source) { discardSourceCardIfPending(game, source.card); },
+        advance: function (game, source) {
+          if (source.stage === 'locks') {
+            source.stage = 'use';
+            var locked = computeShaResponseLock(game, source.actor, source.card, source.targetActor,
+              { flowId: source.responseFlowId, field: 'responseLocked' });
+            source.responseLocked = !!(source.responseLocked || locked);
+            if (game.pendingChoice) return success('【杀】等待铁骑判定。');
+          }
+          if (source.stage === 'use') {
+            source.stage = 'finish';
+            designateCixiongAndResolve(game, source.actor, source.card, source.amount, source.targetActor,
+              Object.assign({}, source.requirement, { responseLocked: !!source.responseLocked }));
+            if (game.pendingChoice) return success('【杀】等待指定目标后的结算。');
+          }
+          flows.finish(game, 'god-sha-designate', source);
+          return success('【杀】指定目标后的结算完成。');
+        }
+      });
 
       // ── v14 P3: 流离时机驱动 — 对当前目标跑 onShaTargeted hook; 技能侧
       // (skills.js) 负责 候选计算/偏好路由/AI 立场决策/玩家 setPendingChoice。
@@ -359,7 +387,7 @@
       // continueShaAfterCixiong 内联 hook 调用抽出, 供多目标链在锁定阶段
       // 按目标逐一预结算 (官方 rule__principle.md 铁骑判例: 对全部目标
       // 决定并结算完毕后, 再开始【杀】的使用结算)。
-      function computeShaResponseLock(game, actor, card, targetActor) {
+      function computeShaResponseLock(game, actor, card, targetActor, godJudgeResume) {
         var responseContext = {
           game: game,
           actor: actor,
@@ -367,7 +395,8 @@
           responseType: 'shan',
           reason: '【杀】',
           card: card,
-          responseLocked: false
+          responseLocked: false,
+          godJudgeResume: godJudgeResume || null
         };
         var responseResults = SkillRuntime.runHook(skillRegistry, 'onNeedResponse', responseContext);
         for (var responseIndex = 0; responseIndex < responseResults.length; responseIndex += 1) {
@@ -475,7 +504,8 @@
             // 后续目标结算时即使断肠/化身使来源技能失效，也不重新裁定。
             chain.responseRequirements = chain.responseRequirements || [];
             chain.responseRequirements[lockIdxNow] = shaResponseRequirement(game, chain.actor, lockSeat);
-            chain.locks[lockIdxNow] = computeShaResponseLock(game, chain.actor, chain.card, lockSeat);
+            var computedLock = computeShaResponseLock(game, chain.actor, chain.card, lockSeat, { chain: true, index: lockIdxNow });
+            chain.locks[lockIdxNow] = !!(chain.locks[lockIdxNow] || computedLock);
             if (game.pendingChoice) return success('等待响应结算…'); // 防御 (铁骑判定链上的改判挂起等)
           }
           chain.stage = 'cixiong';
@@ -724,9 +754,22 @@
           return success('【杀】目标已阵亡。');
         }
         while (!saved.failed && saved.shanRemaining > 0) {
+          if (saved.stage === 'bagua-wait') {
+            if (!saved.baguaResult) return success('【杀】等待八卦判定。');
+            var waitedBagua = saved.baguaResult.dodged;
+            delete saved.baguaResult;
+            saved.stage = 'response';
+            if (waitedBagua) { saved.shanRemaining -= 1; saved.stage = 'bagua'; }
+            if (saved.shanRemaining <= 0) break;
+          }
           if (saved.stage === 'bagua') {
             saved.stage = 'response';
-            if (tryBaguaDodge(game, targetActor, isArmorIgnoredBySha(game, actor, saved.card))) {
+            var baguaResult = tryBaguaDodge(game, targetActor, isArmorIgnoredBySha(game, actor, saved.card), { flowId: saved.responseFlowId });
+            if (baguaResult && baguaResult.pending) {
+              saved.stage = 'bagua-wait';
+              return success('【杀】等待八卦判定。');
+            }
+            if (baguaResult === true) {
               saved.shanRemaining -= 1;
               saved.stage = 'bagua';
             }
@@ -789,11 +832,42 @@
       // 八卦且未被无视, 进行判定; 红色视为打出【闪】。返回是否因此闪避; 无
       // 八卦 / 被无视 → 返回 false 且无副作用。统一【杀】与【万箭齐发】两类
       // 需闪场景, 此前【万箭齐发】缺失此兜底 (有八卦无闪的目标必中)。
-      function tryBaguaDodge(game, targetActor, ignoreArmor) {
+      function needsInteractiveJilue(game) {
+        var player = game && game.player;
+        var pref = player && player.skillPreferences && player.skillPreferences.jilue;
+        return !!(player && player.hp > 0 && skillEnabled(player, 'jilue', game)
+          && player.godMarks && player.godMarks.nin > 0 && player.hand.length
+          && pref !== 'auto' && pref !== 'always' && pref !== 'decline');
+      }
+
+      if (deps.godJudgements) deps.godJudgements.register('god-bagua-result', function (game, result) {
+        var frame = ((game.pauseState && game.pauseState.responseFlows) || []).find(function (entry) {
+          return entry.id === result.context.continuation.flowId;
+        });
+        var dodged = !!(result.card && result.card.color === 'red');
+        if (frame) frame.source.baguaResult = { dodged: dodged };
+        if (dodged && game.phase !== 'gameover') {
+          log(game, actorName(game, result.actor) + '的【八卦阵】判定为红色，视为打出【闪】。');
+          SkillRuntime.runHook(skillRegistry, 'onShanUsed', { game: game, actor: result.actor });
+        }
+        return success('【八卦阵】判定完成。');
+      });
+
+      function tryBaguaDodge(game, targetActor, ignoreArmor, continuation) {
         var target = game[targetActor];
         if (!target || !hasEquipmentEffect(target, 'baguaShanJudge') || ignoreArmor) return false;
         // v13 J0-3: "你可以判定" — 可选发动; decline 偏好整体关闭 (缺省 auto)。
         if (target.skillPreferences && target.skillPreferences.bagua === 'decline') return false;
+        if (continuation && needsInteractiveJilue(game) && deps.godJudgements) {
+          deps.godJudgements.start(game, targetActor, '【八卦阵】', 'god-bagua-result', { continuation: continuation });
+          var parent = ((game.pauseState && game.pauseState.responseFlows) || []).find(function (entry) { return entry.id === continuation.flowId; });
+          if (!game.pendingChoice && parent && parent.source.baguaResult) {
+            var immediate = parent.source.baguaResult.dodged;
+            delete parent.source.baguaResult;
+            return immediate;
+          }
+          return { pending: true };
+        }
         var baguaJudge = judge(game, targetActor, '【八卦阵】');
         var dodged = false;
         if (baguaJudge && baguaJudge.color === 'red') {
@@ -984,6 +1058,13 @@
               && !(self.skillPreferences && self.skillPreferences.qinglong === 'decline')) {
             var follow = removeFirstCardOfType(self, 'sha');
             var followPhysicals = null;
+            if (!follow && longhunResponseOptions(self, 'sha').length && deps.takeGodResponse) {
+              var godFollow = deps.takeGodResponse(game, actor, 'sha', null, { target: targetActor, skipShaCount: true });
+              if (godFollow) {
+                settleShaCardAfterOutcome(game, card);
+                return deps.playGodResponseSha(game, actor, godFollow, { target: targetActor, skipShaCount: true });
+              }
+            }
             if (!follow) {
               // audit4-L1: 无物理杀时经 onCardAs 找可当杀的转化 (龙胆闪/武圣
               // 红牌…) — 官方"对其使用【杀】"含一切合法视为手段, 与主动出杀/
@@ -996,6 +1077,7 @@
               // 可来自装备区 (firstMatchingOwnCard), 只扫手牌会静默漏掉,
               // 装备来源顺带走统一失去时机。
               var chaseBest = selectCardAsConversion(chaseAsResults);
+              if (chaseBest && chaseBest.skillName === '龙魂') chaseBest = null;
               var chaseOrigin = chaseBest && CardRuntime.findCardZoneByRef(game, chaseBest.card);
               var chasePhysical = chaseBest && removeOwnCardFromAnyZone(self, chaseBest.card.id, game);
               if (chasePhysical) {
@@ -1104,7 +1186,7 @@
         var source = game[saved.actor];
         var paid = null;
         if (!d.decline && !d.skip && source) {
-          var basics = (source.hand || []).filter(function (item) { return item.family === 'basic'; });
+          var basics = (source.hand || []).filter(function (item) { return StateRuntime.effectiveCardView(source, item).family === 'basic'; });
           if (d.cardId) {
             var picked = basics.find(function (item) { return item.id === d.cardId; });
             if (!picked) {

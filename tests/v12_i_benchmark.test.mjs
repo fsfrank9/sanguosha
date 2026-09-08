@@ -1,3 +1,5 @@
+// AB: keep these explicitly enumerated historical rosters, seeds and thresholds.
+// Formal selection includes god heroes; their separate soak does not alter this baseline.
 // v12 I 验收基准: v12 AI vs v11 AI 固定种子自对弈, 胜率 ≥55% (路线图验收线)。
 //
 // 设计:

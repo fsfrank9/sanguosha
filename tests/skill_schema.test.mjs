@@ -8,6 +8,7 @@ import {
   SKILL_METADATA,
 } from './helpers/load-engine.mjs';
 import { test, runTests } from './helpers/harness.mjs';
+import { actualSkillRegistrations } from './helpers/skill-registrations.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -27,6 +28,7 @@ const CACHE_PATHS = [
   // v15 V: 山包接入
   'official-skill-cache/sanguosha-shan/official_shan_skill_cache.json',
   'official-skill-cache/sanguosha-sp/official_sp_skill_cache.json',
+  'official-skill-cache/sanguosha-god/official_god_skill_cache.json',
 ];
 const SPECS_PATHS = [
   'tests/fixtures/official_standard_skill_specs.json',
@@ -35,6 +37,8 @@ const SPECS_PATHS = [
   'tests/fixtures/official_lin_skill_specs.json',
   'tests/fixtures/official_shan_skill_specs.json',
   'tests/fixtures/official_sp_skill_specs.json',
+  // AB: the eight independent god heroes and derived Jilue share this audit.
+  'tests/fixtures/official_god_skill_specs.json',
 ];
 
 function indexByLocalId(docs, specKey) {
@@ -125,6 +129,8 @@ const VALID_COST_TYPES = new Set([
   'reduceMaxHp',
   // v15 T: 驱虎/天义 的成本是与目标拼点 (双方各扣置一张手牌)
   'rankCompare',
+  // AB: mark costs, attached stars, multi-zone conversion and conditional costs.
+  'discardMark', 'discardAttached', 'playOwn', 'exchange', 'compound', 'choose',
 ]);
 
 test('every implemented skill has structured metadata with valid tag values', () => {
@@ -229,37 +235,16 @@ test('cache and specs fixtures agree on every shared skill', () => {
 // 本测只管**注册表类**的 hook 名 (onXxx): 声称了就必须真注册, 真注册了就必须
 // 声称。非注册表机制 (processPreparePhase / hasPassiveEffect / handLimit …)
 // 是直调口, 名字由各自域自定, 不在此校验范围。
-const REGISTRY_HOOK_NAMES = new Set([
-  'onActiveSkill', 'onBeforeDiscardPhase', 'onCanRecast', 'onCardAs',
-  'onCardTarget', 'onCardUse', 'onDamageAfter', 'onDamageModify', 'onDeath',
-  'onDrawPhase', 'onDyingEnter', 'onJudgementAfterResolve',
-  'onJudgementBeforeResolve', 'onNeedResponse', 'onPreparePhase',
-  'onShaDamageDealt', 'onShaDodged', 'onShaTargeted', 'onShanUsed',
-  'onSkillPreview', 'onTurnEnd',
-  // v15 V 新增
-  'onCardLost', 'onDiscardPhaseEnd', 'onBeforePlayPhase', 'onTrickTargeted',
-  'onShaEffectiveness',
-  // v15 W2: 来源侧"造成伤害后"
-  'onDamageDealt',
-]);
-
-function actualRegistrations() {
-  const src = fs.readFileSync(path.join(root, 'src/engine/skills.js'), 'utf8');
-  const map = new Map();
-  for (const m of src.matchAll(/registerSkill\(skillRegistry, '([a-z0-9]+)', \{([\s\S]*?)\n      \}\);/g)) {
-    map.set(m[1], [...m[2].matchAll(/^\s*(on[A-Za-z]+):/gm)].map((h) => h[1]));
-  }
-  return map;
-}
-
-test('W2-F3: SKILL_METADATA 声称的注册表 hook 名与实际 registerSkill 逐条一致', () => {
-  const registered = actualRegistrations();
+// AB: capture actual installation instead of parsing only skills.js. Any onXxx
+// entry is a registry claim, including newly introduced AB hook names.
+test('W2-F3: SKILL_METADATA 声称的注册表 hook 名与实际 registerSkill 逐条一致', async () => {
+  const registered = await actualSkillRegistrations();
   assert.ok(registered.size >= 70, `registerSkill 扫描口径可能失效 (只扫到 ${registered.size} 条)`);
   const drift = [];
   for (const skillId of IMPLEMENTED_SKILL_IDS) {
     const meta = SKILL_METADATA[skillId];
     if (!meta) continue;
-    const declared = (meta.hooks || []).filter((h) => REGISTRY_HOOK_NAMES.has(h));
+    const declared = (meta.hooks || []).filter((h) => /^on[A-Z]/.test(h));
     const actual = registered.get(skillId) || [];
     for (const h of declared) {
       if (!actual.includes(h)) drift.push(`${skillId}: metadata 声称 ${h}, 但 registerSkill 里没有`);

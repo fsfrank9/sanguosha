@@ -1,4 +1,5 @@
       import { SanguoshaEngine } from '../engine/game-engine.js';
+      import { StateRuntime } from '../engine/state.js';
       // v13 L1: 身份轮转直接读预设表 (与引擎同源, 构成恒一致)。
       import { IDENTITY_PRESETS } from '../data/identity.js';
       // v13 武将图鉴: 实现状态标注数据源。
@@ -10,6 +11,8 @@
       import { createBoardPanels } from './panels/board-panels.js';
       import { createLordAidPanels } from './panels/lord-aid-panels.js';
       import { createGeneralCardPanels } from './panels/general-card-panels.js';
+      import { createGodChoicePanels } from './panels/god-choice-panels.js';
+      import { createLonghunResponsePanels } from './panels/longhun-response-panels.js';
 
       var Engine = SanguoshaEngine;
       var game = null;
@@ -170,6 +173,21 @@
         escapeHtml: function (text) { return escapeHtml(text); }
       });
 
+      var godChoicePanels = createGodChoicePanels({
+        els: els, Engine: Engine, getGame: function () { return game; },
+        render: render, renderLog: renderLog, escapeHtml: escapeHtml, suitLabel: suitLabel
+      });
+
+      var longhunResponsePanels = createLonghunResponsePanels({
+        els: els, Engine: Engine, getGame: function () { return game; },
+        render: render, renderLog: renderLog, escapeHtml: escapeHtml, suitLabel: suitLabel,
+        stage: function (payload, selector) {
+          stagedModalChoice = payload ? { kind: 'pending', payload: payload, selector: selector,
+            window: game ? Engine.getPendingChoice(game) : null } : null;
+          render();
+        }
+      });
+
       function $(id) {
         return document.getElementById(id);
       }
@@ -231,6 +249,10 @@
           'pindianPanel', 'pindianHint', 'pindianChoices',
           'generalCardPanel', 'generalCardHint', 'generalCardCurrent', 'generalCardOptions',
           'generalCardSkills', 'generalCardConfirmBtn', 'generalCardDeclineBtn',
+          'godChoicePanel', 'godChoiceHint', 'godChoiceOptions', 'godChoiceCards', 'godChoiceStars',
+          'godChoiceTargets', 'godChoiceConfirmBtn', 'godChoiceDeclineBtn', 'playerStarCards',
+          'longhunResponsePanel', 'longhunResponseHint', 'longhunResponseTypes',
+          'longhunResponseCards', 'longhunResponseTargets', 'longhunResponseConfirmBtn',
           // v15 T 评审收口: 官方"你可以 / 你选择"的四个决策面。
           'niepanPanel', 'niepanHint', 'niepanConfirmBtn', 'niepanDeclineBtn',
           // v15 U (林包) 六个决策窗
@@ -386,6 +408,8 @@
         // AA3: 公共确认/取消栏读取面板按钮状态，先同步当前选择窗口。
         var generalPending = game && Engine.getPendingChoice(game);
         generalCardPanels.render(generalPending && generalPending.kind, generalPending);
+        godChoicePanels.render(generalPending && generalPending.kind, generalPending);
+        longhunResponsePanels.render(generalPending && generalPending.kind, generalPending);
         boardPanels.renderBoard(uiView());
         renderPendingChoice();
         // v9 PR-E24: pendingChoice 已消失 (响应面板关闭) → 清掉 stale 的 staged.
@@ -498,7 +522,8 @@
       }
 
       function findPlayerCard(cardId) {
-        return game && game.player.hand.find(function (card) { return card.id === cardId; });
+        var card = game && game.player.hand.find(function (card) { return card.id === cardId; });
+        return game ? StateRuntime.effectiveCardView(game.player, card) : card;
       }
 
       // v11 B2: 模式面板显示/隐藏与观星簇已迁往 ./panels/mode-panels.js。
@@ -881,14 +906,16 @@
         }
         // v13 UI修缮1: 直发型主动技 (苦肉自伤) 改 stage-then-confirm — 此前
         // 点技能按钮即掉血, 是唯一零确认的主动结算入口。再点同技能取消暂存。
-        if (skillId === 'kurou') {
+        if (skillId === 'kurou' || skillId === 'shenfen') {
           var stagedNow = stagedModalChoice;
           if (stagedNow && stagedNow.kind === 'skill' && stagedNow.skillId === skillId) {
             stagedModalChoice = null;
             if (els.handHint) els.handHint.textContent = '';
           } else {
             stagedModalChoice = { kind: 'skill', skillId: skillId };
-            if (els.handHint) els.handHint.textContent = '已选择发动【苦肉】(失去 1 点体力摸两张)，点「确定」发动';
+            if (els.handHint) els.handHint.textContent = skillId === 'shenfen'
+              ? '已选择发动【神愤】(消耗 6 枚暴怒，伤害并弃置所有其他角色的牌)，点「确定」发动'
+              : '已选择发动【苦肉】(失去 1 点体力摸两张)，点「确定」发动';
           }
           render();
           return;
@@ -1460,6 +1487,7 @@
         { panelId: 'mengjinPanel',          confirmBtnId: null,                     cancelBtnId: 'mengjinDeclineBtn' },
         { panelId: 'pindianPanel',          confirmBtnId: null,                     cancelBtnId: null },
         { panelId: 'generalCardPanel',      confirmBtnId: 'generalCardConfirmBtn',  cancelBtnId: 'generalCardDeclineBtn' },
+        { panelId: 'godChoicePanel',        confirmBtnId: 'godChoiceConfirmBtn',    cancelBtnId: 'godChoiceDeclineBtn' },
         // v15 T 评审收口: 涅槃/双雄 是二选一按钮型; 驱虎受害者是必选
         // (赢已成事实, 伤害必落, 只是选谁 → 无 cancel); 节命可逐点放弃。
         { panelId: 'niepanPanel',           confirmBtnId: 'niepanConfirmBtn',       cancelBtnId: 'niepanDeclineBtn' },
@@ -1584,6 +1612,7 @@
       function _handCancel() {
         // v9 PR-E23/E24: 已 stage 面板候选 → 先撤销 stage (面板保持打开).
         if (stagedModalChoice) {
+          longhunResponsePanels.clear();
           stagedModalChoice = null;
           _highlightStaged(null);
           render();
@@ -1695,6 +1724,8 @@
         // v12 H6/H7: 激将/护驾 求助响应面板 (候选 stage 两步 + 不响应)。
         lordAidPanels.bind();
         generalCardPanels.bind();
+        godChoicePanels.bind();
+        longhunResponsePanels.bind();
         // v12 H6: 对战模式切换按钮 — duel / identity3。v13 K3: + 4/5 人档。
         if (els.modeDuelBtn) els.modeDuelBtn.addEventListener('click', function () { setMatchMode('duel'); });
         if (els.modeIdentity3Btn) els.modeIdentity3Btn.addEventListener('click', function () { setMatchMode('identity3'); });

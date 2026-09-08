@@ -40,7 +40,13 @@
           // passes `{ pausable: true }`; others leave the default false.
           pausable: !!(opts && opts.pausable)
         };
-        SkillRuntime.runHook(skillRegistry, 'onJudgementBeforeResolve', judgementContext);
+        if (!(opts && opts.skipReplacement)) {
+          if (judgementContext.pausable && deps.orderedJudgements && deps.orderedJudgements.enabled(game)) {
+            applyHongyanJudgementView(game, actor, card);
+            return deps.orderedJudgements.start(game, actor, reason, card).card;
+          }
+          SkillRuntime.runHook(skillRegistry, 'onJudgementBeforeResolve', judgementContext);
+        }
         // v12 G2: 红颜 (小乔) — 锁定技: 判定归属者的黑桃判定牌视为红桃。
         // 时机在改判 (鬼才/鬼道) 之后, 对最终生效的判定牌应用; 采用朱雀
         // 同款"临时改写 + 收尾还原"手法, 物理牌入弃牌堆前还原, 不污染牌堆。

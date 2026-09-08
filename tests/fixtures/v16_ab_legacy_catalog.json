@@ -1,0 +1,1156 @@
+{
+  "baselineCommit": "12ab4ed06315c9d21124402de115ed87166a596a",
+  "heroes": [
+    {
+      "id": "liubei",
+      "name": "刘备",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "rende",
+          "name": "仁德"
+        },
+        {
+          "id": "jijiang",
+          "name": "激将"
+        }
+      ]
+    },
+    {
+      "id": "zhangfei",
+      "name": "张飞",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "paoxiao",
+          "name": "咆哮"
+        }
+      ]
+    },
+    {
+      "id": "guanyu",
+      "name": "关羽",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "wusheng",
+          "name": "武圣"
+        }
+      ]
+    },
+    {
+      "id": "zhaoyun",
+      "name": "赵云",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "longdan",
+          "name": "龙胆"
+        }
+      ]
+    },
+    {
+      "id": "sunquan",
+      "name": "孙权",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "zhiheng",
+          "name": "制衡"
+        },
+        {
+          "id": "jiuyuan",
+          "name": "救援"
+        }
+      ]
+    },
+    {
+      "id": "huanggai",
+      "name": "黄盖",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "kurou",
+          "name": "苦肉"
+        }
+      ]
+    },
+    {
+      "id": "caocao",
+      "name": "曹操",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "jianxiong",
+          "name": "奸雄"
+        },
+        {
+          "id": "hujia",
+          "name": "护驾"
+        }
+      ]
+    },
+    {
+      "id": "machao",
+      "name": "马超",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "mashu",
+          "name": "马术"
+        },
+        {
+          "id": "tieqi",
+          "name": "铁骑"
+        }
+      ]
+    },
+    {
+      "id": "zhangliao",
+      "name": "张辽",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "tuxi",
+          "name": "突袭"
+        }
+      ]
+    },
+    {
+      "id": "zhouyu",
+      "name": "周瑜",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "yingzi",
+          "name": "英姿"
+        },
+        {
+          "id": "fanjian",
+          "name": "反间"
+        }
+      ]
+    },
+    {
+      "id": "zhugeliang",
+      "name": "诸葛亮",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "guanxing",
+          "name": "观星"
+        },
+        {
+          "id": "kongcheng",
+          "name": "空城"
+        }
+      ]
+    },
+    {
+      "id": "xiahoudun",
+      "name": "夏侯惇",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "ganglie",
+          "name": "刚烈"
+        }
+      ]
+    },
+    {
+      "id": "xuchu",
+      "name": "许褚",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "luoyi",
+          "name": "裸衣"
+        }
+      ]
+    },
+    {
+      "id": "simayi",
+      "name": "司马懿",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "fankui",
+          "name": "反馈"
+        },
+        {
+          "id": "guicai",
+          "name": "鬼才"
+        }
+      ]
+    },
+    {
+      "id": "guojia",
+      "name": "郭嘉",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "tiandu",
+          "name": "天妒"
+        },
+        {
+          "id": "yiji",
+          "name": "遗计"
+        }
+      ]
+    },
+    {
+      "id": "zhenji",
+      "name": "甄姬",
+      "camp": "魏",
+      "gender": "female",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "luoshen",
+          "name": "洛神"
+        },
+        {
+          "id": "qingguo",
+          "name": "倾国"
+        }
+      ]
+    },
+    {
+      "id": "ganning",
+      "name": "甘宁",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "qixi",
+          "name": "奇袭"
+        }
+      ]
+    },
+    {
+      "id": "sunshangxiang",
+      "name": "孙尚香",
+      "camp": "吴",
+      "gender": "female",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "jieyin",
+          "name": "结姻"
+        },
+        {
+          "id": "xiaoji",
+          "name": "枭姬"
+        }
+      ]
+    },
+    {
+      "id": "lvmeng",
+      "name": "吕蒙",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "keji",
+          "name": "克己"
+        }
+      ]
+    },
+    {
+      "id": "luxun",
+      "name": "陆逊",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "qianxun",
+          "name": "谦逊"
+        },
+        {
+          "id": "lianying",
+          "name": "连营"
+        }
+      ]
+    },
+    {
+      "id": "daqiao",
+      "name": "大乔",
+      "camp": "吴",
+      "gender": "female",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "guose",
+          "name": "国色"
+        },
+        {
+          "id": "liuli",
+          "name": "流离"
+        }
+      ]
+    },
+    {
+      "id": "huangyueying",
+      "name": "黄月英",
+      "camp": "蜀",
+      "gender": "female",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "jizhi",
+          "name": "集智"
+        },
+        {
+          "id": "qicai",
+          "name": "奇才"
+        }
+      ]
+    },
+    {
+      "id": "huatuo",
+      "name": "华佗",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "jijiu",
+          "name": "急救"
+        },
+        {
+          "id": "qingnang",
+          "name": "青囊"
+        }
+      ]
+    },
+    {
+      "id": "lvbu",
+      "name": "吕布",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "wushuang",
+          "name": "无双"
+        }
+      ]
+    },
+    {
+      "id": "diaochan",
+      "name": "貂蝉",
+      "camp": "群",
+      "gender": "female",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "lijian",
+          "name": "离间"
+        },
+        {
+          "id": "biyue",
+          "name": "闭月"
+        }
+      ]
+    },
+    {
+      "id": "huaxiong",
+      "name": "华雄",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 6,
+      "skills": [
+        {
+          "id": "yaowu",
+          "name": "耀武"
+        }
+      ]
+    },
+    {
+      "id": "yuanshu",
+      "name": "袁术",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "wangzun",
+          "name": "妄尊"
+        },
+        {
+          "id": "tongji",
+          "name": "同疾"
+        }
+      ]
+    },
+    {
+      "id": "xiahouyuan",
+      "name": "夏侯渊",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "shensu",
+          "name": "神速"
+        }
+      ]
+    },
+    {
+      "id": "caoren",
+      "name": "曹仁",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "jushou",
+          "name": "据守"
+        }
+      ]
+    },
+    {
+      "id": "huangzhong",
+      "name": "黄忠",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "liegong",
+          "name": "烈弓"
+        }
+      ]
+    },
+    {
+      "id": "weiyan",
+      "name": "魏延",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "kuanggu",
+          "name": "狂骨"
+        }
+      ]
+    },
+    {
+      "id": "xiaoqiao",
+      "name": "小乔",
+      "camp": "吴",
+      "gender": "female",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "tianxiang",
+          "name": "天香"
+        },
+        {
+          "id": "hongyan",
+          "name": "红颜"
+        }
+      ]
+    },
+    {
+      "id": "zhoutai",
+      "name": "周泰",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "buqu",
+          "name": "不屈"
+        }
+      ]
+    },
+    {
+      "id": "zhangjiao",
+      "name": "张角",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "leiji",
+          "name": "雷击"
+        },
+        {
+          "id": "guidao",
+          "name": "鬼道"
+        },
+        {
+          "id": "huangtian",
+          "name": "黄天"
+        }
+      ]
+    },
+    {
+      "id": "yuji",
+      "name": "于吉",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "guhuo",
+          "name": "蛊惑"
+        }
+      ]
+    },
+    {
+      "id": "xuhuang",
+      "name": "徐晃",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "duanliang",
+          "name": "断粮"
+        }
+      ]
+    },
+    {
+      "id": "caopi",
+      "name": "曹丕",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "xingshang",
+          "name": "行殇"
+        },
+        {
+          "id": "fangzhu",
+          "name": "放逐"
+        },
+        {
+          "id": "songwei",
+          "name": "颂威"
+        }
+      ]
+    },
+    {
+      "id": "sunjian",
+      "name": "孙坚",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "yinghun",
+          "name": "英魂"
+        }
+      ]
+    },
+    {
+      "id": "lusu",
+      "name": "鲁肃",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "haoshi",
+          "name": "好施"
+        },
+        {
+          "id": "dimeng",
+          "name": "缔盟"
+        }
+      ]
+    },
+    {
+      "id": "menghuo",
+      "name": "孟获",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "huoshou",
+          "name": "祸首"
+        },
+        {
+          "id": "zaiqi",
+          "name": "再起"
+        }
+      ]
+    },
+    {
+      "id": "zhurong",
+      "name": "祝融",
+      "camp": "蜀",
+      "gender": "female",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "juxiang",
+          "name": "巨象"
+        },
+        {
+          "id": "lieren",
+          "name": "烈刃"
+        }
+      ]
+    },
+    {
+      "id": "jiaxu",
+      "name": "贾诩",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "wansha",
+          "name": "完杀"
+        },
+        {
+          "id": "luanwu",
+          "name": "乱武"
+        },
+        {
+          "id": "weimu",
+          "name": "帷幕"
+        }
+      ]
+    },
+    {
+      "id": "dongzhuo",
+      "name": "董卓",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 8,
+      "skills": [
+        {
+          "id": "jiuchi",
+          "name": "酒池"
+        },
+        {
+          "id": "roulin",
+          "name": "肉林"
+        },
+        {
+          "id": "benghuai",
+          "name": "崩坏"
+        },
+        {
+          "id": "baonue",
+          "name": "暴虐"
+        }
+      ]
+    },
+    {
+      "id": "dianwei",
+      "name": "典韦",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "qiangxi",
+          "name": "强袭"
+        }
+      ]
+    },
+    {
+      "id": "xunyu",
+      "name": "荀彧",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "quhu",
+          "name": "驱虎"
+        },
+        {
+          "id": "jieming",
+          "name": "节命"
+        }
+      ]
+    },
+    {
+      "id": "wolong",
+      "name": "卧龙诸葛亮",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "bazhen",
+          "name": "八阵"
+        },
+        {
+          "id": "huoji",
+          "name": "火计"
+        },
+        {
+          "id": "kanpo",
+          "name": "看破"
+        }
+      ]
+    },
+    {
+      "id": "pangtong",
+      "name": "庞统",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "lianhuan",
+          "name": "连环"
+        },
+        {
+          "id": "niepan",
+          "name": "涅槃"
+        }
+      ]
+    },
+    {
+      "id": "taishici",
+      "name": "太史慈",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "tianyi",
+          "name": "天义"
+        }
+      ]
+    },
+    {
+      "id": "pangde",
+      "name": "庞德",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "mashu",
+          "name": "马术"
+        },
+        {
+          "id": "mengjin",
+          "name": "猛进"
+        }
+      ]
+    },
+    {
+      "id": "yanliangwenchou",
+      "name": "颜良文丑",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "shuangxiong",
+          "name": "双雄"
+        }
+      ]
+    },
+    {
+      "id": "yuanshao",
+      "name": "袁绍",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "luanji",
+          "name": "乱击"
+        },
+        {
+          "id": "xueyi",
+          "name": "血裔"
+        }
+      ]
+    },
+    {
+      "id": "zhanghe",
+      "name": "张郃",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "qiaobian",
+          "name": "巧变"
+        }
+      ]
+    },
+    {
+      "id": "dengai",
+      "name": "邓艾",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "tuntian",
+          "name": "屯田"
+        },
+        {
+          "id": "zaoxian",
+          "name": "凿险"
+        }
+      ]
+    },
+    {
+      "id": "liushan",
+      "name": "刘禅",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "xiangle",
+          "name": "享乐"
+        },
+        {
+          "id": "fangquan",
+          "name": "放权"
+        },
+        {
+          "id": "ruoyu",
+          "name": "若愚"
+        }
+      ]
+    },
+    {
+      "id": "jiangwei",
+      "name": "姜维",
+      "camp": "蜀",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "tiaoxin",
+          "name": "挑衅"
+        },
+        {
+          "id": "zhiji",
+          "name": "志继"
+        }
+      ]
+    },
+    {
+      "id": "sunce",
+      "name": "孙策",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "jiang",
+          "name": "激昂"
+        },
+        {
+          "id": "hunzi",
+          "name": "魂姿"
+        },
+        {
+          "id": "zhiba",
+          "name": "制霸"
+        }
+      ]
+    },
+    {
+      "id": "erzhang",
+      "name": "张昭张纮",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "zhijian",
+          "name": "直谏"
+        },
+        {
+          "id": "guzheng",
+          "name": "固政"
+        }
+      ]
+    },
+    {
+      "id": "caiwenji",
+      "name": "蔡文姬",
+      "camp": "群",
+      "gender": "female",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "beige",
+          "name": "悲歌"
+        },
+        {
+          "id": "duanchang",
+          "name": "断肠"
+        }
+      ]
+    },
+    {
+      "id": "zuoci",
+      "name": "左慈",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "huashen",
+          "name": "化身"
+        },
+        {
+          "id": "xinsheng",
+          "name": "新生"
+        }
+      ]
+    },
+    {
+      "id": "sp_zhaoyun",
+      "name": "SP 赵云",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "longdan",
+          "name": "龙胆"
+        },
+        {
+          "id": "chongzhen",
+          "name": "冲阵"
+        }
+      ]
+    },
+    {
+      "id": "sp_diaochan",
+      "name": "SP 貂蝉",
+      "camp": "群",
+      "gender": "female",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "lihun",
+          "name": "离魂"
+        },
+        {
+          "id": "biyue",
+          "name": "闭月"
+        }
+      ]
+    },
+    {
+      "id": "sp_machao",
+      "name": "SP 马超",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "zhuiji",
+          "name": "追击"
+        },
+        {
+          "id": "shichou",
+          "name": "誓仇"
+        }
+      ]
+    },
+    {
+      "id": "sp_guanyu",
+      "name": "SP 关羽",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "wusheng",
+          "name": "武圣"
+        },
+        {
+          "id": "danji",
+          "name": "单骑"
+        }
+      ]
+    },
+    {
+      "id": "sp_jiaxu",
+      "name": "SP 贾诩",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "zhenlue",
+          "name": "缜略"
+        },
+        {
+          "id": "jianshu",
+          "name": "间书"
+        },
+        {
+          "id": "yongdi",
+          "name": "拥嫡"
+        }
+      ]
+    },
+    {
+      "id": "sp_caoren",
+      "name": "SP 曹仁",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "weikui",
+          "name": "伪溃"
+        },
+        {
+          "id": "lizhan",
+          "name": "励战"
+        }
+      ]
+    },
+    {
+      "id": "sp_ganning",
+      "name": "SP 甘宁",
+      "camp": "吴",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "yinling",
+          "name": "银铃"
+        },
+        {
+          "id": "junwei",
+          "name": "军威"
+        }
+      ]
+    },
+    {
+      "id": "sp_pangde",
+      "name": "SP 庞德",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "mashu",
+          "name": "马术"
+        },
+        {
+          "id": "jianchu",
+          "name": "鞬出"
+        }
+      ]
+    },
+    {
+      "id": "sp_yuanshu",
+      "name": "SP 袁术",
+      "camp": "群",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "yongsi",
+          "name": "庸肆"
+        },
+        {
+          "id": "weidi",
+          "name": "伪帝"
+        }
+      ]
+    },
+    {
+      "id": "sp_daqiao",
+      "name": "SP 大乔",
+      "camp": "吴",
+      "gender": "female",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "yanxiao",
+          "name": "言笑"
+        },
+        {
+          "id": "anxian",
+          "name": "安娴"
+        }
+      ]
+    },
+    {
+      "id": "sp_xiahoudun",
+      "name": "SP 夏侯惇",
+      "camp": "魏",
+      "gender": "male",
+      "maxHp": 4,
+      "skills": [
+        {
+          "id": "fenyong",
+          "name": "愤勇"
+        },
+        {
+          "id": "xuehen",
+          "name": "雪恨"
+        }
+      ]
+    },
+    {
+      "id": "sp_sunshangxiang",
+      "name": "SP 孙尚香",
+      "camp": "蜀",
+      "gender": "female",
+      "maxHp": 3,
+      "skills": [
+        {
+          "id": "liangzhu",
+          "name": "良助"
+        },
+        {
+          "id": "fanxiang",
+          "name": "返乡"
+        }
+      ]
+    }
+  ]
+}

@@ -186,6 +186,7 @@
     if (ref.zone === 'chuang') return game[ref.actor] && game[ref.actor].chuang;
     // v15 V: "田" (邓艾屯田) — 与"创"同形的武将牌上置牌区。
     if (ref.zone === 'tian') return game[ref.actor] && game[ref.actor].tian;
+    if (ref.zone === 'stars') return state.stars;
     return null;
   }
 
@@ -218,6 +219,7 @@
       // 让 discardSourceCardIfPending 误判在途补弃 (守恒破坏)。
       refs.push({ zone: 'chuang', actor: seats[a] });
       refs.push({ zone: 'tian', actor: seats[a] });
+      refs.push({ zone: 'stars', actor: seats[a] });
     }
     for (var i = 0; i < refs.length; i += 1) {
       var list = zoneArrayOf(game, refs[i]);
@@ -254,6 +256,7 @@
       refs.push({ zone: 'judgeArea', actor: seats[a] });
       refs.push({ zone: 'chuang', actor: seats[a] });
       refs.push({ zone: 'tian', actor: seats[a] });
+      refs.push({ zone: 'stars', actor: seats[a] });
     }
     for (var i = 0; i < refs.length; i += 1) {
       var list = zoneArrayOf(game, refs[i]);

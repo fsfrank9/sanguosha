@@ -45,12 +45,24 @@ test('v10 V4: playAOE shan 路径走 requestPlayerResponse(kind:wanjian-response
 });
 
 test('v10 V4: triggerYinyueQiang 走 requestPlayerResponse(kind:yinyue-response, pauseKey:yinyueResponse)', () => {
-  const fn = equipmentSrc.match(/function triggerYinyueQiang\(game, holderActor\)\s*\{[\s\S]*?\n {4}\}/);
+  // AB: 八卦改判可挂起；触发入口和判定续跑共同委托响应生产者，
+  // requestPlayerResponse 三件套仍须在实际被调用的生产者中成立。
+  const entry = equipmentSrc.match(/function triggerYinyueQiang\(game, holderActor\)\s*\{[\s\S]*?\n {4}\}/);
+  assert.ok(entry);
+  assert.match(entry[0], /return resolveYinyueAfterBagua\(game, holderActor, targetActor\)/);
+  assert.match(entry[0], /return deps\.responseFlows\.run\(game, 'god-yinyue-bagua'/);
+  const continuation = equipmentSrc.match(/deps\.responseFlows\.register\('god-yinyue-bagua',\s*\{[\s\S]*?\n {4}\}\);/);
+  assert.ok(continuation);
+  assert.match(continuation[0], /resolveYinyueAfterBagua\(game, source\.holderActor, source\.targetActor\)/);
+  const fn = equipmentSrc.match(/function resolveYinyueAfterBagua\(game, holderActor, targetActor\)\s*\{[\s\S]*?\n {4}\}/);
   assert.ok(fn);
   assert.match(fn[0], /requestPlayerResponse\(game,\s*\{/);
   assert.match(fn[0], /kind:\s*'yinyue-response'/);
   assert.match(fn[0], /pauseKey:\s*'yinyueResponse'/);
   assert.match(fn[0], /shanResponse\s*===\s*'ask'/);
+  [entry[0], continuation[0], fn[0]].forEach(source => {
+    assert.doesNotMatch(source, /game\.pendingChoice\s*=\s*\{/, '银月枪窗口必须由共享响应框架创建');
+  });
 });
 
 // ───── 引擎: 两 resolver 注册到 RESPONSE_KIND_RESOLVERS ───────────────

@@ -1,6 +1,7 @@
       import { SkillRuntime } from './skill-runtime.js';
       import { StateRuntime } from './state.js';
       import { CardRuntime } from './card-runtime.js';
+      import { longhunResponseOptions, parseLonghunChoice } from './god-conversion.js';
       // v15 V: 觉醒技授予新技能时需要写入技能描述 —— data/heroes.js 是叶子模块
       // (自身无 import),从引擎侧引用不会成环。
       import { SKILL_METADATA } from '../data/heroes.js';
@@ -168,7 +169,16 @@
           var components = sourceCard.physicalCards || [];
           var gainedNames = [];
           components.forEach(function (component) {
-            if (!moveCard(game, component, { zone: 'discard' }, { zone: 'hand', actor: targetActor })) return;
+            var zone = CardRuntime.findCardZoneByRef(game, component);
+            // AB Longhun keeps its paid physical bundle in the processing
+            // area until the whole card finishes. A component already gained
+            // by an earlier Jianxiong target must never be taken a second time.
+            if (zone && zone.zone !== 'discard') return;
+            if (zone) {
+              if (!moveCard(game, component, zone, { zone: 'hand', actor: targetActor })) return;
+            } else if (sourceCard.conversionSkill === 'longhun' || sourceCard.skillId === 'longhun') {
+              putCard(game, component, { zone: 'hand', actor: targetActor });
+            } else return;
             gainedNames.push(component.name);
           });
           if (!gainedNames.length) return null;
@@ -553,6 +563,17 @@
         var self = game[actor];
         // 询问不等于发动：尚未放弃摸牌时，必须重新确认当前技能有效。
         if (!self || !StateRuntime.skillEnabled(self, 'shuangxiong', game)) return null;
+        if (deps.godJudgements && needsInteractiveJilueJudgement(game)) {
+          context.drawCount = 0; // the draw replacement is committed before asking
+          var continuation = { resumeDraw: false };
+          var godResult = deps.godJudgements.start(game, actor, '【双雄】', 'ab-shuangxiong', continuation);
+          if (game.pendingChoice) {
+            continuation.resumeDraw = true;
+            game.pauseState.shuangxiongAsk = { actor: actor, drawCount: 0 };
+            return { suspended: true, suspendedForShuangxiong: true };
+          }
+          return godResult;
+        }
         var judgeResult = judge(game, actor, '【双雄】');
         if (!judgeResult) return null;
         context.drawCount = 0; // 放弃摸牌
@@ -568,6 +589,25 @@
           + '手牌当【决斗】使用。');
         return { shuangxiongApplied: true };
       }
+
+
+      if (deps.godJudgements) deps.godJudgements.register('ab-shuangxiong', function (game, outcome) {
+        if (outcome.card) log(game, actorName(game, outcome.actor) + '发动【双雄】，放弃摸牌并获得判定牌【'
+          + outcome.card.name + '】，本回合可将' + (outcome.card.color === 'red' ? '黑色' : '红色') + '手牌当【决斗】使用。');
+        if (outcome.context.resumeDraw) {
+          game.pauseState.shuangxiongAsk = null;
+          return deps.finishDrawPhaseAndAdvance(game, outcome.actor);
+        }
+        return { shuangxiongApplied: true };
+      }, { settle: function (game, outcome) {
+        var state = game[outcome.actor];
+        if (!state || !outcome.card) return;
+        state.flags = state.flags || {};
+        state.flags.shuangxiongColor = outcome.outcome.color;
+        state.flags.shuangxiongClaimPending = true;
+        resolveJudgementCard(game, outcome.actor, state, outcome.reason, outcome.card);
+        state.flags.shuangxiongClaimPending = false;
+      } });
 
 
       // 双雄的判定牌认领 (与天妒同一 claimed 通道; 只在本次双雄判定的
@@ -1076,13 +1116,56 @@
         return success('耀武奖励结算完成。');
       }
 
+      // AB: only the new paid player judgement window changes this legacy
+      // path. Explicit auto/decline and the old benchmark rosters keep their
+      // existing synchronous decisions; Jilue never silently loses an ask.
+      function needsInteractiveJilueJudgement(game) {
+        var player = game && game.player;
+        if (!player || player.hp <= 0 || !skillEnabled(player, 'jilue', game)
+            || !(player.godMarks && player.godMarks.nin > 0) || !(player.hand || []).length) return false;
+        var preference = player.skillPreferences && player.skillPreferences.jilue;
+        return !preference || preference === 'ask';
+      }
+
+      if (deps.godJudgements) {
+        deps.godJudgements.register('native-ganglie', function (game, outcome) {
+          return finishGanglieJudgement(game, outcome.actor, outcome.context.sourceActor, outcome.card);
+        });
+        deps.godJudgements.register('native-baonue', function (game, outcome) {
+          applyBaonueJudgement(game, outcome.context.lord, outcome.card);
+          return advanceBaonueJudgements(game, outcome.context);
+        });
+        deps.godJudgements.register('native-beige', function (game, outcome) {
+          if (outcome.card && game[outcome.actor] && game[outcome.actor].hp > 0) {
+            applyBeigeOutcome(game, outcome.context.holder, outcome.actor,
+              outcome.context.sourceActor, outcome.card.suit);
+          }
+          return { beigeApplied: true };
+        });
+        deps.godJudgements.register('native-tieqi', function (game, outcome) {
+          return finishTieqiJudgement(game, outcome.actor, outcome.context.targetActor,
+            outcome.card, outcome.context.resume);
+        });
+      }
+
       function runGanglieJudgement(game, targetActor, sourceActor) {
         var target = game[targetActor];
         var source = game[sourceActor];
         if (!source) return null;
+        if (deps.godJudgements && needsInteractiveJilueJudgement(game)) {
+          return deps.godJudgements.start(game, targetActor, '【刚烈】', 'native-ganglie',
+            { sourceActor: sourceActor });
+        }
         var ganglieJudge = judge(game, targetActor, '【刚烈】');
-        var retaliates = !!(ganglieJudge && ganglieJudge.suit !== 'heart');
+        var ganglieOutcome = ganglieJudge && Object.assign({}, ganglieJudge);
         resolveJudgementCard(game, targetActor, target, '【刚烈】', ganglieJudge);
+        return finishGanglieJudgement(game, targetActor, sourceActor, ganglieOutcome);
+      }
+
+      function finishGanglieJudgement(game, targetActor, sourceActor, ganglieJudge) {
+        var source = game[sourceActor];
+        if (!source || source.hp <= 0 || game.phase === 'gameover') return null;
+        var retaliates = !!(ganglieJudge && ganglieJudge.suit !== 'heart');
         if (!ganglieJudge) {
           log(game, actorName(game, targetActor) + '发动【刚烈】，但没有判定牌。');
           return { triggeredGanglie: true, retaliated: false };
@@ -1272,7 +1355,9 @@
         var order = StateRuntime.seatsFrom(game, anchorActor, true);
         for (var i = 0; i < order.length; i += 1) {
           var s = game[order[i]];
-          if (s && s.hp > 0 && skillEnabled(s, skillId) && canPay(s)) return order[i];
+          if (s && s.hp > 0 && (skillEnabled(s, skillId, game)
+              || (skillId === 'guicai' && skillEnabled(s, 'jilue', game)
+                && s.godMarks && s.godMarks.nin > 0)) && canPay(s)) return order[i];
         }
         return null;
       }
@@ -1290,7 +1375,8 @@
         });
         if (!holder) return null;
         var holderState = game[holder];
-        var pref = (holderState.skillPreferences && holderState.skillPreferences.guicai)
+        var jilueGuicai = !skillEnabled(holderState, 'guicai', game);
+        var pref = (holderState.skillPreferences && holderState.skillPreferences[jilueGuicai ? 'jilue' : 'guicai'])
           || (holder === 'player' ? 'ask' : 'auto');
         if (pref === 'decline') {
           log(game, actorName(game, holder) + '选择不发动【鬼才】。');
@@ -1311,6 +1397,7 @@
           setPendingChoice(game, {
             kind: 'guicai-replace',
             actor: holder,
+            jilueGuicai: jilueGuicai,
             judgementActor: judgementActor,
             reason: context.reason || '',
             judgementCard: {
@@ -1341,6 +1428,10 @@
         var replacement = sortedGuicai[0].card;
         var paidCard = removeCardFromHand(holderState, replacement.id);
         if (!paidCard) return null;
+        if (jilueGuicai) {
+          holderState.godMarks.nin -= 1;
+          log(game, actorName(game, holder) + '发动【极略·鬼才】，弃置一枚“忍”。');
+        }
         discardCard(game, originalCard);
         context.card = replacement;
         context.replaced = true;
@@ -2008,10 +2099,30 @@
         var source = game[sourceActor];
         var pref = source.skillPreferences && source.skillPreferences.baonue;
         if (pref === 'decline') return null; // "来源**可以**判定"
+        if (deps.godJudgements && needsInteractiveJilueJudgement(game)) {
+          return advanceBaonueJudgements(game, { sourceActor: sourceActor, lords: lords, index: 0 });
+        }
         lords.forEach(function (lord) {
         var result = judge(game, sourceActor, '【暴虐】');
         if (!result) return;
         resolveJudgementCard(game, sourceActor, source, '【暴虐】', result);
+        applyBaonueJudgement(game, lord, result);
+        });
+        return { baonueApplied: true };
+      }
+
+      function advanceBaonueJudgements(game, context) {
+        while (context.index < context.lords.length && game.phase !== 'gameover') {
+          var lord = context.lords[context.index++];
+          if (!game[lord] || game[lord].hp <= 0 || !StateRuntime.hasLordSkill(game, lord, 'baonue')) continue;
+          return deps.godJudgements.start(game, context.sourceActor, '【暴虐】', 'native-baonue',
+            { sourceActor: context.sourceActor, lords: context.lords.slice(), index: context.index, lord: lord });
+        }
+        return { baonueApplied: true };
+      }
+
+      function applyBaonueJudgement(game, lord, result) {
+        if (!result || !game[lord] || game[lord].hp <= 0 || game.phase === 'gameover') return;
         if (result.suit === 'spade') {
           var lordState = game[lord];
           if (lordState.hp < lordState.maxHp) {
@@ -2021,8 +2132,6 @@
             log(game, '【暴虐】判定为黑桃，但' + actorName(game, lord) + '体力已满。');
           }
         }
-        });
-        return { baonueApplied: true };
       }
 
       // ═════ v15 U (林包): 贾诩 乱武 ═════
@@ -2081,10 +2190,10 @@
           if (seat === 'player') {
             // 玩家席开窗: 选一张可用的【杀】与一名距离最小的目标, 或放弃 (失 1 体力)。
             var shaOptions = (state.hand || []).filter(function (card) {
-              return isShaType(card.type);
+              return isShaType(StateRuntime.effectiveCardView(state, card).type);
             }).map(function (card) {
               return { cardId: card.id, name: card.name, suit: card.suit, rank: card.rank };
-            });
+            }).concat(longhunResponseOptions(state, 'sha'));
             setPendingChoice(game, {
               kind: 'luanwu-sha',
               actor: seat,
@@ -2115,13 +2224,21 @@
           target = StateRuntime.perceivedHostileFirstPool(game, seat, targets)[0] || targets[0];
         }
         var shaCard = null;
-        if (cardId) {
-          shaCard = (state.hand || []).find(function (card) { return card.id === cardId && isShaType(card.type); });
-          if (shaCard) shaCard = removeCardFromHand(state, cardId);
-        } else {
-          shaCard = removeFirstCardOfType(state, 'sha')
-            || removeFirstCardOfType(state, 'fire_sha')
-            || removeFirstCardOfType(state, 'thunder_sha');
+        if (cardId !== false && target && deps.takeGodResponse
+            && (parseLonghunChoice(cardId) !== null || (!cardId && !(state.hand || []).some(function (card) {
+              return isShaType(StateRuntime.effectiveCardView(state, card).type);
+            })))) {
+          var godResponse = deps.takeGodResponse(game, seat, 'sha', cardId, { target: target, skipShaCount: true });
+          if (godResponse) return deps.playGodResponseSha(game, seat, godResponse, { target: target, skipShaCount: true });
+        }
+        if (cardId !== false) {
+          var physicalSha = (state.hand || []).find(function (card) {
+            return (!cardId || card.id === cardId) && isShaType(StateRuntime.effectiveCardView(state, card).type);
+          });
+          if (physicalSha) {
+            shaCard = StateRuntime.effectiveCardView(state, physicalSha);
+            removeCardFromHand(state, physicalSha.id);
+          }
         }
         if (shaCard && target) {
           log(game, actorName(game, seat) + '被【乱武】驱使，对' + actorName(game, target)
@@ -2134,12 +2251,12 @@
           var result = deps.playSha(game, seat, shaCard, { target: target, skipShaCount: true });
           if (result && result.ok) return result;
           // 使用被拒 (距离/目标保护等) → 退牌并按"否则"失去 1 点体力。
-          putCard(game, shaCard, { zone: 'hand', actor: seat });
+          putCard(game, CardRuntime.physicalCardOf(shaCard), { zone: 'hand', actor: seat });
           log(game, '【乱武】：' + actorName(game, seat) + '的【杀】不合法，改为失去 1 点体力。');
         } else if (shaCard) {
           // 评审收口 [牌守恒红线]: 摸到了杀但没有合法目标 —— 此前直接落到
           // 掉血分支, 那张已离手的杀**凭空消失**。必须退回手牌。
-          putCard(game, shaCard, { zone: 'hand', actor: seat });
+          putCard(game, CardRuntime.physicalCardOf(shaCard), { zone: 'hand', actor: seat });
         }
         state.hp -= 1;
         log(game, actorName(game, seat) + '未对距离最小的角色使用【杀】，因【乱武】失去 1 点体力。');
@@ -2153,7 +2270,7 @@
         var d = decision || {};
         var chain = game.pauseState && game.pauseState.luanwu;
         if (d.decline || d.skip || !d.cardId) {
-          applyLuanwuForSeat(game, seat, null, StateRuntime.resolveSeatOption(game, d.target));
+          applyLuanwuForSeat(game, seat, false, StateRuntime.resolveSeatOption(game, d.target));
         } else {
           var legalTargets = (pending.targets || []).map(function (t) { return t.seat; });
           var target = StateRuntime.resolveSeatOption(game, d.target);
@@ -2293,6 +2410,9 @@
         if (game.turn === actor) return null; // "于**回合外**失去牌后"
         var pref = (state.skillPreferences && state.skillPreferences.tuntian) || 'auto';
         if (pref === 'decline') return null;
+        if (deps.godJudgements && needsInteractiveJilueJudgement(game)) {
+          return deps.godJudgements.start(game, actor, '【屯田】', 'ab-tuntian', {});
+        }
         var result = judge(game, actor, '【屯田】');
         if (!result) return null;
         if (result.suit === 'heart') {
@@ -2307,6 +2427,17 @@
         state.flags.tuntianClaimPending = false;
         return { tuntianPlaced: true };
       }
+
+      if (deps.godJudgements) deps.godJudgements.register('ab-tuntian', function (game, outcome) {
+        return outcome.card && outcome.card.suit !== 'heart' ? { tuntianPlaced: true } : { tuntianMissed: true };
+      }, { settle: function (game, outcome) {
+        var state = game[outcome.actor];
+        if (!state || !outcome.card) return;
+        state.flags = state.flags || {};
+        state.flags.tuntianClaimPending = outcome.outcome.suit !== 'heart';
+        resolveJudgementCard(game, outcome.actor, state, outcome.reason, outcome.card);
+        state.flags.tuntianClaimPending = false;
+      } });
 
       function triggerTuntianClaim(context) {
         var game = context.game;
@@ -2378,10 +2509,10 @@
         if (!targetState) return success('挑衅结算完成。');
         if (target === 'player') {
           var shaOptions = (targetState.hand || []).filter(function (card) {
-            return isShaType(card.type);
+            return isShaType(StateRuntime.effectiveCardView(targetState, card).type);
           }).map(function (card) {
             return { cardId: card.id, name: card.name, suit: card.suit, rank: card.rank };
-          });
+          }).concat(longhunResponseOptions(targetState, 'sha'));
           setPendingChoice(game, {
             kind: 'tiaoxin-demand',
             actor: target,
@@ -2392,9 +2523,15 @@
           return success('等待【挑衅】响应。');
         }
         // AI 席: 手上有杀就打 (对姜维用杀通常优于白丢一张牌)。
-        var shaCard = removeFirstCardOfType(targetState, 'sha')
-          || removeFirstCardOfType(targetState, 'fire_sha')
-          || removeFirstCardOfType(targetState, 'thunder_sha');
+        var physicalSha = (targetState.hand || []).find(function (card) {
+          return isShaType(StateRuntime.effectiveCardView(targetState, card).type);
+        });
+        var shaCard = physicalSha && StateRuntime.effectiveCardView(targetState, physicalSha);
+        if (physicalSha) removeCardFromHand(targetState, physicalSha.id);
+        if (!shaCard && deps.takeGodResponse) {
+          var godResponse = deps.takeGodResponse(game, target, 'sha', null, { target: actor, skipShaCount: true });
+          if (godResponse) return deps.playGodResponseSha(game, target, godResponse, { target: actor, skipShaCount: true });
+        }
         if (shaCard) {
           var result = deps.playSha(game, target, shaCard, { target: actor, skipShaCount: true });
           if (result && result.ok) {
@@ -2403,7 +2540,7 @@
             triggerTiaoxinYinyue(game, target, [shaCard]);
             return result;
           }
-          putCard(game, shaCard, { zone: 'hand', actor: target });
+          putCard(game, CardRuntime.physicalCardOf(shaCard), { zone: 'hand', actor: target });
         }
         return applyTiaoxinDiscard(game, actor, target);
       }
@@ -2425,22 +2562,29 @@
         var actor = pending.sourceActor;
         var d = decision || {};
         if (d.cardId) {
+          if (parseLonghunChoice(d.cardId) !== null && deps.takeGodResponse) {
+            var godResponse = deps.takeGodResponse(game, target, 'sha', d.cardId, { target: actor, skipShaCount: true });
+            if (godResponse) return deps.playGodResponseSha(game, target, godResponse, { target: actor, skipShaCount: true });
+            setPendingChoice(game, pending);
+            return fail('请选择合法的【龙魂】材料，或放弃使用【杀】。');
+          }
           var state = game[target];
           var card = (state.hand || []).find(function (item) {
-            return item.id === d.cardId && isShaType(item.type);
+            return item.id === d.cardId && isShaType(StateRuntime.effectiveCardView(state, item).type);
           });
           if (!card) {
             setPendingChoice(game, pending);
             return fail('请选择一张【杀】，或放弃 (将被弃置一张牌)。');
           }
-          var shaCard = removeCardFromHand(state, d.cardId);
+          var shaCard = StateRuntime.effectiveCardView(state, card);
+          removeCardFromHand(state, d.cardId);
           var result = deps.playSha(game, target, shaCard, { target: actor, skipShaCount: true });
           if (result && result.ok) {
             // W2-F11: 同 AI 分支 — 回合外"使用"黑色手牌触发银月枪。
             triggerTiaoxinYinyue(game, target, [shaCard]);
             return result;
           }
-          putCard(game, shaCard, { zone: 'hand', actor: target });
+          putCard(game, CardRuntime.physicalCardOf(shaCard), { zone: 'hand', actor: target });
         }
         return applyTiaoxinDiscard(game, actor, target);
       }
@@ -2513,7 +2657,7 @@
         if (!target || !skillEnabled(target, 'xiangle')) return null;
         if (sourceActor === targetActor) return null; // "其他角色使用的【杀】"
         if (!source || source.hp <= 0) return { cancelSha: true }; // "其已死亡"
-        var basics = (source.hand || []).filter(function (card) { return card.family === 'basic'; });
+        var basics = (source.hand || []).filter(function (card) { return StateRuntime.effectiveCardView(source, card).family === 'basic'; });
         if (!basics.length) {
           log(game, actorName(game, sourceActor) + '没有基本牌可弃，【享乐】令此【杀】对'
             + actorName(game, targetActor) + '无效。');
@@ -2889,6 +3033,10 @@
         if (!cost) return null;
         discardCard(game, cost);
         log(game, actorName(game, holder) + '发动【悲歌】，弃置【' + cost.name + '】。');
+        if (deps.godJudgements && needsInteractiveJilueJudgement(game)) {
+          return deps.godJudgements.start(game, victim, '【悲歌】', 'native-beige',
+            { holder: holder, sourceActor: sourceActor });
+        }
         var result = judge(game, victim, '【悲歌】');
         if (!result) return null;
         resolveJudgementCard(game, victim, victimState, '【悲歌】', result);
@@ -3933,6 +4081,32 @@
       }
 
       function resolveGuicaiReplaceChoice(game, pending, decision) {
+        // The ordered AB round owns its complete validation and both costs.
+        if (pending.orderedReplacement && deps.resolveGodJudgementReplacement) {
+          return deps.resolveGodJudgementReplacement(game, pending, decision, {});
+        }
+        // AB: the paid alternative borrows this single invocation only. A
+        // cancelled or invalid choice spends neither a hand card nor a mark.
+        var payer = game[pending.actor];
+        if (pending.jilueGuicai && decision.cardId) {
+          if (!payer || payer.hp <= 0 || !skillEnabled(payer, 'jilue', game)
+              || !payer.godMarks || payer.godMarks.nin < 1) {
+            decision = {}; // this opportunity expired; continue the judgement
+          } else if (!(payer.hand || []).some(function (card) { return card.id === decision.cardId; })
+              || !(pending.candidates || []).some(function (card) { return card.id === decision.cardId; })) {
+            setPendingChoice(game, pending);
+            return fail('找不到用于极略·鬼才的手牌。');
+          } else {
+            payer.godMarks.nin -= 1;
+            log(game, actorName(game, pending.actor) + '发动【极略·鬼才】，弃置一枚“忍”。');
+          }
+        }
+        if (!pending.orderedJudgementComplete && deps.resolveGodJudgementReplacement) {
+          var godJudgementResult = deps.resolveGodJudgementReplacement(game, pending, decision, {
+            requireBlack: false, allowEquip: false, gainOriginal: false, skillLabel: '鬼才'
+          });
+          if (godJudgementResult) return godJudgementResult;
+        }
         // v6.1: pending.actor is the 鬼才 HOLDER (the actor whose hand is used
         // to replace the judgement card). pending.judgementActor is whose
         // judgement is being replaced — usually the same as holder when 司马懿
@@ -3967,7 +4141,7 @@
           // 替换牌成为新判定牌, 未经 judge() → 在此补施红颜视图 (判定归属者)。
           applyHongyanJudgementView(game, judgementActor, resolvedCard);
           log(game, actorName(game, holder) + '发动【鬼才】，用【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）代替' + actorName(game, judgementActor) + '的判定牌。');
-        } else {
+        } else if (!pending.orderedJudgementComplete) {
           log(game, actorName(game, holder) + '选择不发动【鬼才】。');
         }
         applyJudgeAreaOutcome(game, judgementActor, judgementActorState, saved.currentTrick, saved.currentReason, resolvedCard);
@@ -4006,7 +4180,7 @@
       //   'auto' / undefined — fire on every Sha (legacy behavior, AI uses)
       //   'decline'          — skip 铁骑 entirely (no judgement, target may
       //                        still 闪 normally)
-      function triggerTieqiNeedResponse(game, actor, targetActor, responseType, triggeringCard) {
+      function triggerTieqiNeedResponse(game, actor, targetActor, responseType, triggeringCard, godJudgeResume) {
         var source = game[actor];
         if (!source || responseType !== 'shan' || !isShaCard(triggeringCard) || !skillEnabled(source, 'tieqi')) return null;
         var pref = source.skillPreferences && source.skillPreferences.tieqi;
@@ -4014,14 +4188,32 @@
           log(game, actorName(game, actor) + '选择不发动【铁骑】。');
           return null;
         }
+        if (deps.godJudgements && needsInteractiveJilueJudgement(game)) {
+          return deps.godJudgements.start(game, actor, '【铁骑】', 'native-tieqi',
+            { targetActor: targetActor, resume: godJudgeResume || null });
+        }
         var tieqiJudge = judge(game, actor, '【铁骑】');
+        var tieqiOutcome = tieqiJudge && Object.assign({}, tieqiJudge);
+        resolveJudgementCard(game, actor, source, '【铁骑】', tieqiJudge);
+        return finishTieqiJudgement(game, actor, targetActor, tieqiOutcome);
+      }
+
+      function finishTieqiJudgement(game, actor, targetActor, tieqiJudge, resume) {
         if (tieqiJudge && tieqiJudge.color === 'red') {
           log(game, actorName(game, actor) + '发动【铁骑】，红色判定令' + actorName(game, targetActor) + '不能打出【闪】。');
-          resolveJudgementCard(game, actor, source, '【铁骑】', tieqiJudge);
+          // Store only the monotone true result: an already triggered Liegong
+          // lock must not be cleared by a later black Tieqi judgement.
+          if (resume && resume.chain && game.pauseState && game.pauseState.shaChain) {
+            game.pauseState.shaChain.locks[resume.index] = true;
+          } else if (resume && resume.flowId && resume.field === 'responseLocked') {
+            var parent = (game.pauseState && game.pauseState.responseFlows || []).find(function (entry) {
+              return entry.id === resume.flowId;
+            });
+            if (parent) parent.source.responseLocked = true;
+          }
           return { responseLocked: true };
         }
         log(game, actorName(game, actor) + '发动【铁骑】，判定未命中。');
-        resolveJudgementCard(game, actor, source, '【铁骑】', tieqiJudge);
         return null;
       }
 
@@ -4057,6 +4249,15 @@
 
       function runLuoshenJudge(game, actor, pref) {
         var state = game[actor];
+        if (deps.godJudgements && needsInteractiveJilueJudgement(game)) {
+          var continuation = { pref: pref, resumePrepare: false };
+          var godResult = deps.godJudgements.start(game, actor, '【洛神】', 'ab-luoshen', continuation);
+          if (game.pendingChoice) {
+            continuation.resumePrepare = true;
+            return { suspended: true };
+          }
+          return godResult;
+        }
         var card = judge(game, actor, '【洛神】');
         if (!card) return null;
         if (card.color === 'black') {
@@ -4069,6 +4270,25 @@
         if (game.pauseState) game.pauseState.luoshen = null;
         return null;
       }
+
+      if (deps.godJudgements) deps.godJudgements.register('ab-luoshen', function (game, outcome) {
+        var result = null;
+        if (outcome.card && outcome.card.color === 'black') {
+          result = startLuoshenStep(game, outcome.actor, outcome.context.pref);
+        } else {
+          log(game, '【洛神】判定为红色，结束。');
+          if (game.pauseState) game.pauseState.luoshen = null;
+        }
+        if (game.pendingChoice) return { suspended: true };
+        if (outcome.context.resumePrepare) return continueTurnAfterPreparePhase(game, outcome.actor);
+        return result;
+      }, { settle: function (game, outcome) {
+        if (!outcome.card) return;
+        if (outcome.outcome.color === 'black') {
+          putCard(game, outcome.card, { zone: 'hand', actor: outcome.actor });
+          log(game, actorName(game, outcome.actor) + '获得【洛神】判定牌【' + outcome.card.name + '】。');
+        } else discardCard(game, outcome.card);
+      } });
 
       function resolveLuoshenContinueChoice(game, pending, decision) {
         var actor = pending.actor;
@@ -4431,7 +4651,7 @@
             applyHongyanJudgementView(game, judgementActor, resolvedCard);
             log(game, actorName(game, holder) + '发动【' + opts.skillLabel + '】，' + opts.playVerb + '【' + replacement.name + '】' + replacement.suit + ' ' + replacement.rank + '（' + replacement.id + '）' + opts.replaceVerb + actorName(game, judgementActor) + '的判定牌。');
             settleReplacedOriginal(game, holder, originalCard, opts);
-          } else {
+          } else if (!pending.orderedJudgementComplete) {
             log(game, actorName(game, holder) + '选择不发动【' + opts.skillLabel + '】。');
           }
           game.pauseState.leiji = null;
@@ -4610,6 +4830,12 @@
         }
 
         function resolveGuidaoReplaceChoice(game, pending, decision) {
+          if (deps.resolveGodJudgementReplacement) {
+            var godJudgementResult = deps.resolveGodJudgementReplacement(game, pending, decision, {
+              requireBlack: true, allowEquip: true, gainOriginal: true, skillLabel: '鬼道'
+            });
+            if (godJudgementResult) return godJudgementResult;
+          }
           var holder = pending.actor;
           var judgementActor = pending.judgementActor || holder;
           var holderState = game[holder];
@@ -4820,7 +5046,7 @@
       });
         SkillRuntime.registerSkill(skillRegistry, 'tieqi', {
         onNeedResponse: function (context) {
-          return triggerTieqiNeedResponse(context.game, context.actor, context.targetActor, context.responseType, context.card);
+          return triggerTieqiNeedResponse(context.game, context.actor, context.targetActor, context.responseType, context.card, context.godJudgeResume);
         }
       });
         SkillRuntime.registerSkill(skillRegistry, 'jianxiong', {

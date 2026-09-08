@@ -347,3 +347,10 @@
     .hero.is-chained {
       box-shadow: 0 0 0 2px rgba(127,240,255,.34), 0 20px 60px var(--shadow), inset 0 1px rgba(255, 255, 255, .08);
     }
+
+/* AB: 神将仍按开局选择的四势力着色；图鉴与选将保留独立神将标签。 */
+.hero-pick-card--camp-神 { border-color: #d6b35f; }
+.hb-camp--神 .hb-camp__title { color: #efd58e; }
+.god-star-cards { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; margin-bottom: .5rem; }
+.god-star-cards[hidden] { display: none; }
+.god-star-cards .mini-card { padding: .3rem .45rem; }

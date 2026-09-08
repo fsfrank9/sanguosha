@@ -9,8 +9,8 @@ const { Engine }=await import('./helpers/load-engine.mjs');
 await import('../src/ui/dom-adapter.js');
 const UI=window.SanguoshaUI, $=dom.$, start=makeStartGameViaUI($,UI);
 
-test('SP UI catalog marks 单骑 庸肆 伪帝 implemented without changing 71-hero boundary',()=>{
-  assert.equal(Object.keys(Engine.HERO_CATALOG).length,71);
+test('SP UI catalog marks 单骑 庸肆 伪帝 implemented while preserving the SP subset in the expanded catalog',()=>{
+  assert.equal(Object.keys(Engine.HERO_CATALOG).length,79);
   for(const [hero,id] of [['sp_guanyu','danji'],['sp_yuanshu','yongsi'],['sp_yuanshu','weidi']])
     assert.equal(Engine.HERO_CATALOG[hero].skills.find(s=>s.id===id).status,'implemented');
   start('sp_guanyu','caocao'); $('lobbyHeroesBtn').click();
