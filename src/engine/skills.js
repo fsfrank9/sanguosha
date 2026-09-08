@@ -5,8 +5,10 @@
       // v15 V: 觉醒技授予新技能时需要写入技能描述 —— data/heroes.js 是叶子模块
       // (自身无 import),从引擎侧引用不会成环。
       import { SKILL_METADATA } from '../data/heroes.js';
+      import { createForcedDiscardRuntime } from './forced-discard.js';
 
       export function installStandardSkillHandlers(skillRegistry, deps) {
+        var ForcedDiscard = createForcedDiscardRuntime(deps);
         var skillEnabled = StateRuntime.skillEnabled;
         var opponent = deps.opponent;
         var actorName = deps.actorName;
@@ -230,7 +232,9 @@
         var sourceActor = context.sourceActor;
         var target = game[targetActor];
         var source = game[sourceActor];
-        if (!target || !sourceActor || !source || sourceActor === targetActor
+        // AC WS2: wei.md:61 says damage source, without excluding self.
+        // Chain damage can make Sima Yi his own source; own equipment is gainable.
+        if (!target || !sourceActor || !source
           || !skillEnabled(target, 'fankui') || game.phase === 'gameover') return null;
         var pref = (target.skillPreferences && target.skillPreferences.fankui)
           || (targetActor === 'player' ? 'ask' : 'auto');
@@ -279,6 +283,10 @@
         var sourceActor = pending.sourceActor;
         var holderState = game[holder];
         if (!holderState) return fail('未知角色。');
+        // AC WS9: this optional prompt has not accepted a skill activation yet.
+        if (holderState.hp <= 0 || !skillEnabled(holderState, 'fankui', game) || game.phase === 'gameover') {
+          return success('反馈已不可发动。');
+        }
         var d = decision || {};
         // W2 (第五轮审计 F2): 反馈官方逐字是"每当你受到伤害后, 你**可以**获得
         // 来源的一张牌" (card__hero__wei.md:61, sha256 前 12 位 c11735ad316a
@@ -669,7 +677,7 @@
       // 体力回复至 3)。ask 档由 resolveNiepanAskChoice 调用。
       function applyNiepan(game, dyingActor) {
         var self = game[dyingActor];
-        if (!self) return null;
+        if (!self || !skillEnabled(self, 'niepan', game) || self.hp > 0 || game.phase === 'gameover') return null;
         self.flags = self.flags || {};
         if (self.flags.niepanUsed) return null;
         self.flags.niepanUsed = true;
@@ -696,8 +704,8 @@
         var inFlight = game.pauseState && game.pauseState.judgeAreaInFlight;
         if (inFlight && inFlight.actor === dyingActor) {
           inFlight.pending.forEach(function (card) {
-            if (!card || inFlight.claimed.indexOf(card) >= 0) return;
-            if (CardRuntime.findCardZoneByRef(game, card)) return; // 已落回某区域, 上面已处理
+            if (!card || inFlight.claimed.some(function (claimed) { return claimed.id === card.id; })) return;
+            if (CardRuntime.findCardZone(game, card.id)) return; // JSON副本也识别已落区的实体牌
             inFlight.claimed.push(card);
             discardCard(game, card);
           });
@@ -1016,15 +1024,17 @@
       // v12 G1 (修复批): 狂骨 (魏延·风) — 锁定技: "当你对距离 1 以内的一名
       // 角色造成 1 点伤害后, 你回复 1 点体力"。修复两处规则偏差: 补距离 ≤1
       // 前置判定 (此前无距离约束), 回复量按伤害点数逐点计 (此前恒 +1)。
-      // 锁定技不设 pref 开关。1v1 中"击杀后不回复"边界不可达 (目标死亡即
-      // gameover, finishDamageAfter 不再派发 hooks), 不建模。
+      // 锁定技不设 pref 开关。AC WS6: 挂来源造成伤害后时机，目标死亡
+      // 但多人对局尚未结束时也回复；来源已死亡或真正终局则不再触发。
       function triggerKuangguDamageAfter(context) {
         var game = context.game;
         var sourceActor = context.sourceActor;
         var targetActor = context.targetActor;
         var source = game[sourceActor];
-        if (!source || !skillEnabled(source, 'kuanggu') || game.phase === 'gameover') return null;
-        if (distanceBetween(game, sourceActor, targetActor) > 1) return null;
+        if (!source || source.hp <= 0 || !skillEnabled(source, 'kuanggu') || game.phase === 'gameover') return null;
+        // AC WS6: shu.md:304 samples distance immediately before HP deduction.
+        // Later Fankui/equipment loss or a dead target must not change eligibility.
+        if (context.sourceDistanceBeforeDamage == null || context.sourceDistanceBeforeDamage > 1) return null;
         var heal = Math.min(source.maxHp - source.hp, context.amount || 0);
         if (heal <= 0) return null;
         source.hp += heal;
@@ -1044,7 +1054,7 @@
         var target = game[targetActor];
         if (responseType !== 'shan' || !isShaCard(triggeringCard)) return null;
         if (!source || !target || !skillEnabled(source, 'liegong')) return null;
-        if (game.turn !== actor) return null;
+        if (game.turn !== actor || game.phase !== 'play') return null;
         var pref = source.skillPreferences && source.skillPreferences.liegong;
         if (pref === 'decline') {
           log(game, actorName(game, actor) + '选择不发动【烈弓】。');
@@ -1584,9 +1594,9 @@
       // ═════ v15 U (林包): 曹丕 行殇 / 放逐 / 颂威 ═════
       // 行殇 (card__hero__wei.md:349): "每当其他角色死亡时，你可以获得其所有牌。"
       // 时机在死亡结算**弃置其所有牌之前** (damage-dying.js settleDeath →
-      // discardAllZones), 由该处派发 onDeath 钩子。"所有牌" = 手牌 + 装备区 +
-      // 判定区 (判定区的牌不为角色所拥有, 但官方"其所有牌"在死亡结算语境下
-      // 指其区域里的牌 — 与 discardAllZones 的覆盖面一致, 取同一集合)。
+      // discardAllZones), 由该处派发 onDeath 钩子。AC WS5: "其所有牌"
+      // 只取手牌与装备；glossary__zone.md:80 明确排除判定区里的牌。
+      // 死亡清理的"区域里的牌"不能替代行殇的"其所有牌"措辞。
       function triggerXingshangDeath(context) {
         var game = context.game;
         var deadActor = context.deadActor;
@@ -1613,10 +1623,6 @@
             var equip = dead.equipment && dead.equipment[slot];
             if (!equip) return;
             var taken = takeCard(game, equip, { zone: 'equipment', actor: deadActor, slot: slot });
-            if (taken) { putCard(game, taken, { zone: 'hand', actor: seat }); gained += 1; }
-          });
-          (dead.judgeArea || []).slice().forEach(function (card) {
-            var taken = takeCard(game, card, { zone: 'judgeArea', actor: deadActor });
             if (taken) { putCard(game, taken, { zone: 'hand', actor: seat }); gained += 1; }
           });
           if (gained > 0) {
@@ -1683,6 +1689,9 @@
 
       function resolveFangzhuPickChoice(game, pending, decision) {
         var actor = pending.actor;
+        // AC WS9: unlike a paid Jilue effect, the native ask is still optional.
+        if (!game[actor] || game[actor].hp <= 0 || !skillEnabled(game[actor], 'fangzhu', game)
+            || game.phase === 'gameover') return success('放逐已不可发动。');
         var d = decision || {};
         if (d.decline || d.skip) {
           log(game, actorName(game, actor) + '选择不发动【放逐】。');
@@ -1779,25 +1788,10 @@
         var drawCount = option === 2 ? 1 : x;
         var discardCount = option === 2 ? x : 1;
         drawCards(game, targetSeat, drawCount);
-        // 弃置由目标自己选牌 — AI 席走弃牌估值, 玩家席同样走该出口 (与
-        // 五谷/铁索那类"令其弃置"同款: 本仓对被动弃牌统一用 AI 估值挑,
-        // 不为被动方开窗; 如实记录为已知局限)。
-        var actuallyDiscarded = 0;
-        for (var i = 0; i < discardCount; i += 1) {
-          var hand = target.hand || [];
-          if (!hand.length) break;
-          var pickId = deps.aiDiscardCandidates
-            ? (deps.aiDiscardCandidates(game, targetSeat) || [])[0]
-            : null;
-          var picked = pickId
-            ? hand.find(function (c) { return c.id === pickId; })
-            : hand[0];
-          var removed = removeCardFromHand(target, (picked || hand[0]).id);
-          if (removed) { discardCard(game, removed); actuallyDiscarded += 1; }
-        }
         log(game, actorName(game, actor) + '发动【英魂】，令' + actorName(game, targetSeat)
-          + '摸 ' + drawCount + ' 张牌并弃置 ' + actuallyDiscarded + ' 张牌。');
-        return { yinghunApplied: true };
+          + '摸 ' + drawCount + ' 张牌，然后由其选择弃牌。');
+        ForcedDiscard.discard(game, targetSeat, discardCount, 'yinghun', '英魂');
+        return { yinghunApplied: true, suspendedForYinghun: !!game.pendingChoice };
       }
 
       function resolveYinghunChoice(game, pending, decision) {
@@ -1939,48 +1933,107 @@
         var countA = (game[seatA].hand || []).length;
         var countB = (game[seatB].hand || []).length;
         var cost = Math.abs(countA - countB);
-        if ((self.hand || []).length < cost) {
-          return fail('【缔盟】需要弃置 ' + cost + ' 张牌，你的手牌不足。');
+        var available = ownSkillCostCards(game, actor);
+        if (available.length < cost) return fail('【缔盟】需要弃置 ' + cost + ' 张手牌或装备牌。');
+        var costIds = Array.isArray(context.cardIds) ? context.cardIds.slice() : [];
+        if (!costIds.length && cost) {
+          available.slice().sort(function (a, b) {
+            return deps.scoreCardForDiscard(game, actor, a.card) - deps.scoreCardForDiscard(game, actor, b.card);
+          }).slice(0, cost).forEach(function (entry) { costIds.push(entry.card.id); });
         }
-        // 先付成本再交换 (成本不足在上面已拒, 零副作用)。
-        var costIds = Array.isArray(context.cardIds) ? context.cardIds.slice(0, cost) : [];
-        if (costIds.length < cost) {
-          var ranked = deps.aiDiscardCandidates ? (deps.aiDiscardCandidates(game, actor) || []) : [];
-          (self.hand || []).slice()
-            .sort(function (a, b) {
-              var ia = ranked.indexOf(a.id); var ib = ranked.indexOf(b.id);
-              return (ia < 0 ? Infinity : ia) - (ib < 0 ? Infinity : ib);
-            })
-            .forEach(function (card) {
-              if (costIds.length < cost && costIds.indexOf(card.id) < 0) costIds.push(card.id);
-            });
+        if (costIds.length !== cost || new Set(costIds).size !== cost
+            || costIds.some(function (id) { return !available.some(function (entry) { return entry.card.id === id; }); })) {
+          return fail('【缔盟】须选择 ' + cost + ' 张不同的现有手牌或装备牌。');
         }
-        for (var ci = 0; ci < costIds.length; ci += 1) {
-          var removed = removeCardFromHand(self, costIds[ci]);
-          if (removed) discardCard(game, removed);
-        }
+        var selected = costIds.map(function (id) { return available.find(function (entry) { return entry.card.id === id; }); });
         self.flags.dimengUsed = true;
-        swapHands(game, seatA, seatB);
-        log(game, actorName(game, actor) + '发动【缔盟】，弃置 ' + cost + ' 张牌，令'
-          + actorName(game, seatA) + '与' + actorName(game, seatB) + '交换手牌。');
-        return success('缔盟结算完成。');
+        var paid = selected.map(function (entry) { return takeCard(game, entry.card.id, entry.ref); });
+        paid.forEach(function (card) { discardCard(game, card); });
+        return deps.responseFlows.run(game, 'dimeng-payment', { actor: actor, seatA: seatA, seatB: seatB, cost: cost,
+          equipmentLosses: selected.filter(function (entry) { return entry.ref.zone === 'equipment'; })
+            .map(function (entry) { return { id: entry.card.id, type: entry.card.type }; }), index: 0, lossNotified: false });
       }
 
-      // 整手牌交换 — 必须走 CardRuntime 移动出口 (守恒红线)。先把两边手牌
-      // 都取出到在途数组, 再交叉放回; 中途不经弃牌堆 (交换不是弃置)。
-      function swapHands(game, seatA, seatB) {
-        var a = game[seatA];
-        var b = game[seatB];
-        if (!a || !b) return;
-        var fromA = (a.hand || []).slice().map(function (card) {
-          return takeCard(game, card, { zone: 'hand', actor: seatA });
-        }).filter(Boolean);
-        var fromB = (b.hand || []).slice().map(function (card) {
-          return takeCard(game, card, { zone: 'hand', actor: seatB });
-        }).filter(Boolean);
-        fromA.forEach(function (card) { putCard(game, card, { zone: 'hand', actor: seatB }); });
-        fromB.forEach(function (card) { putCard(game, card, { zone: 'hand', actor: seatA }); });
+      function ownSkillCostCards(game, actor) {
+        return (game[actor].hand || []).map(function (card) {
+          return { card: card, ref: { zone: 'hand', actor: actor } };
+        }).concat(equipmentList(game[actor]).map(function (entry) {
+          return { card: entry.card, ref: { zone: 'equipment', actor: actor, slot: entry.slot } };
+        }));
       }
+
+      function advanceDimengPayment(game, source) {
+        // These are committed loss-event facts, not another physical card zone.
+        // Earlier Xiaoji draws can shuffle later materials out of discard; that
+        // movement does not erase their already-paid equipment loss events.
+        while (source.index < source.equipmentLosses.length && game.phase !== 'gameover') {
+          var loss = source.equipmentLosses[source.index++];
+          triggerEquipmentLoss(game, source.actor, loss);
+          if (game.pendingChoice) return { ok: true, suspended: true };
+        }
+        if (!source.lossNotified) {
+          source.lossNotified = true;
+          if (source.cost && deps.notifyCardLoss) deps.notifyCardLoss(game, source.actor);
+          if (game.pendingChoice) return { ok: true, suspended: true };
+        }
+        if (!source.exchange) {
+          if (game.phase === 'gameover' || !game[source.seatA] || game[source.seatA].hp <= 0
+              || !game[source.seatB] || game[source.seatB].hp <= 0) {
+            deps.responseFlows.finish(game, 'dimeng-payment', source);
+            return success('缔盟结算结束。');
+          }
+          source.exchange = [source.seatA, source.seatB].map(function (actor) {
+            return { actor: actor, target: actor === source.seatA ? source.seatB : source.seatA,
+              cards: (game[actor].hand || []).slice().map(function (card) {
+                return takeCard(game, card, { zone: 'hand', actor: actor });
+              }), lossIndex: 0, notified: false };
+          });
+          var order = StateRuntime.seatsFrom(game, game.turn || source.actor, true);
+          source.exchange.sort(function (a, b) { return order.indexOf(a.actor) - order.indexOf(b.actor); });
+          source.exchangeIndex = 0;
+        }
+        // flow__move:97: both old hands are already in the saved processing
+        // snapshot. Their loss effects finish before either old hand is gained.
+        while (source.exchangeIndex < source.exchange.length) {
+          var entry = source.exchange[source.exchangeIndex];
+          while (entry.lossIndex < entry.cards.length) {
+            var lost = entry.cards[entry.lossIndex++];
+            CardRuntime.commitHandLossToProcessing(game, lost, entry.actor);
+            if (game.pendingChoice) return { ok: true, suspended: true };
+          }
+          if (!entry.notified) {
+            entry.notified = true;
+            if (entry.cards.length && deps.notifyCardLoss) deps.notifyCardLoss(game, entry.actor);
+            if (game.pendingChoice) return { ok: true, suspended: true };
+          }
+          source.exchangeIndex++;
+          if (game.phase === 'gameover') {
+            cancelDimengPayment(game, source);
+            deps.responseFlows.finish(game, 'dimeng-payment', source);
+            return success('缔盟结算结束。');
+          }
+        }
+        source.exchange.forEach(function (entry) {
+          var cards = entry.cards; entry.cards = [];
+          cards.forEach(function (card) {
+            if (game[entry.target] && game[entry.target].hp > 0) putCard(game, card, { zone: 'hand', actor: entry.target });
+            else discardCard(game, card);
+          });
+        });
+        deps.responseFlows.finish(game, 'dimeng-payment', source);
+        log(game, actorName(game, source.actor) + '发动【缔盟】，弃置 ' + source.cost + ' 张牌，令'
+          + actorName(game, source.seatA) + '与' + actorName(game, source.seatB) + '交换手牌。');
+        return success('缔盟结算完成。');
+      }
+      function cancelDimengPayment(game, source) {
+        (source.exchange || []).forEach(function (entry) {
+          var cards = entry.cards; entry.cards = [];
+          cards.forEach(function (card) { discardCard(game, card); });
+        });
+      }
+      if (deps.responseFlows) deps.responseFlows.register('dimeng-payment', {
+        key: 'dimengPayment', advance: advanceDimengPayment, cancel: cancelDimengPayment
+      });
 
       // ═════ v15 U (林包): 孟获 再起 ═════
       // 官方逐字 (card__hero__shu.md:406): "摸牌阶段开始时，若你已受伤，你可以
@@ -2507,42 +2560,85 @@
       function resolveTiaoxinDemand(game, actor, target) {
         var targetState = game[target];
         if (!targetState) return success('挑衅结算完成。');
+        var shaOptions = deps.listShaResponseOptions(targetState);
         if (target === 'player') {
-          var shaOptions = (targetState.hand || []).filter(function (card) {
-            return isShaType(StateRuntime.effectiveCardView(targetState, card).type);
-          }).map(function (card) {
-            return { cardId: card.id, name: card.name, suit: card.suit, rank: card.rank };
-          }).concat(longhunResponseOptions(targetState, 'sha'));
           setPendingChoice(game, {
-            kind: 'tiaoxin-demand',
-            actor: target,
-            sourceActor: actor,
-            options: shaOptions
+            kind: 'tiaoxin-demand', actor: target, sourceActor: actor, options: shaOptions
           });
           log(game, '等待' + actorName(game, target) + '决定是否对' + actorName(game, actor) + '使用【杀】。');
           return success('等待【挑衅】响应。');
         }
-        // AI 席: 手上有杀就打 (对姜维用杀通常优于白丢一张牌)。
+        // Preserve physical-Sha preference; native conversions and Longhun are
+        // available when no real Sha exists. Only this actor's own cards are read.
         var physicalSha = (targetState.hand || []).find(function (card) {
           return isShaType(StateRuntime.effectiveCardView(targetState, card).type);
         });
-        var shaCard = physicalSha && StateRuntime.effectiveCardView(targetState, physicalSha);
-        if (physicalSha) removeCardFromHand(targetState, physicalSha.id);
-        if (!shaCard && deps.takeGodResponse) {
-          var godResponse = deps.takeGodResponse(game, target, 'sha', null, { target: actor, skipShaCount: true });
-          if (godResponse) return deps.playGodResponseSha(game, target, godResponse, { target: actor, skipShaCount: true });
-        }
-        if (shaCard) {
-          var result = deps.playSha(game, target, shaCard, { target: actor, skipShaCount: true });
-          if (result && result.ok) {
-            // W2-F11: 挑衅逼出的杀是回合外"使用"手牌 — 黑色时触发银月枪
-            // (consumeResponse 只覆盖"打出"面; 时机取二次合法性成立之后)。
-            triggerTiaoxinYinyue(game, target, [shaCard]);
-            return result;
-          }
-          putCard(game, CardRuntime.physicalCardOf(shaCard), { zone: 'hand', actor: target });
+        var selections = shaOptions.map(function (entry) { return entry.cardId; });
+        if (physicalSha) selections = [physicalSha.id].concat(selections.filter(function (id) { return id !== physicalSha.id; }));
+        for (var optionIndex = 0; optionIndex < selections.length; optionIndex += 1) {
+          var result = playTiaoxinSha(game, actor, target, selections[optionIndex]);
+          if (result && result.ok) return result;
         }
         return applyTiaoxinDiscard(game, actor, target);
+      }
+
+      // AC WS1: shu.md:354 asks to USE Sha. Wusheng/Longdan pay their original
+      // physical card and enter the regular Sha use chain (not consumeResponse).
+      function playTiaoxinSha(game, actor, target, cardId) {
+        if (parseLonghunChoice(cardId) !== null && deps.takeGodResponse) {
+          var godResponse = deps.takeGodResponse(game, target, 'sha', cardId, { target: actor, skipShaCount: true });
+          return godResponse ? deps.playGodResponseSha(game, target, godResponse, { target: actor, skipShaCount: true })
+            : fail('请选择合法的【龙魂】材料。');
+        }
+        var state = game[target];
+        var origin = CardRuntime.findCardZone(game, cardId);
+        var selected = deps.listShaResponseOptions(state).find(function (entry) { return entry.cardId === cardId; });
+        if (!selected || !origin || origin.actor !== target) return fail('请选择一张可作为【杀】使用的牌。');
+        var material = origin.zone === 'equipment' ? state.equipment[origin.slot]
+          : (state.hand || []).find(function (card) { return card.id === cardId; });
+        if (!material || !game[actor] || game[actor].hp <= 0) return fail('此【杀】已无合法目标。');
+        var previewState = Object.assign({}, state, {
+          hand: (state.hand || []).filter(function (card) { return card.id !== cardId; }),
+          equipment: Object.assign({}, state.equipment)
+        });
+        if (origin.zone === 'equipment') previewState.equipment[origin.slot] = null;
+        var previewGame = Object.assign({}, game); previewGame[target] = previewState;
+        var previewCard = selected.via ? CardRuntime.makeTestCard('sha', {
+          id: material.id, suit: StateRuntime.effectiveCardSuit(state, material),
+          color: StateRuntime.effectiveCardColor(state, material), rank: material.rank, physicalCard: material
+        }) : StateRuntime.effectiveCardView(state, material);
+        // AC peer WS1: glossary__card.md:41/49-52 excludes a consumed weapon
+        // or horse before legality. Reject before any Xiaoji / card-loss effect.
+        if (!StateRuntime.shaUseReachAllowed(previewGame, target, actor, previewCard)) {
+          return fail('距离不足，消耗该牌后无法使用【杀】。');
+        }
+        var protection = cardTargetProtection(previewGame, target, actor, previewCard, '杀');
+        if (protection) return fail(protection.message);
+        var response = deps.findResponseCard(state, 'sha', cardId, game);
+        if (!response || !response.card) return fail('请选择一张可作为【杀】使用的牌。');
+        var physical = physicalCardOf(response.card);
+        var shaCard = response.card;
+        if (response.skillName) {
+          shaCard = CardRuntime.makeTestCard('sha', {
+            id: physical.id, suit: StateRuntime.effectiveCardSuit(state, physical),
+            color: StateRuntime.effectiveCardColor(state, physical), rank: physical.rank,
+            physicalCard: physical, name: physical.name + '（当杀）'
+          });
+          log(game, actorName(game, target) + '发动【' + response.skillName + '】，将【'
+            + physical.name + '】当【杀】使用。');
+        }
+        var result = deps.playSha(game, target, shaCard, { target: actor, skipShaCount: true });
+        if (result && result.ok) {
+          // Equipment materials are not hand cards. Only a hand-origin black
+          // material qualifies for Yinyue's out-of-turn USE trigger.
+          if (origin && origin.zone === 'hand') triggerTiaoxinYinyue(game, target, [physical]);
+          return result;
+        }
+        CardRuntime.removeCardRefFromZones(game, shaCard);
+        if (!CardRuntime.findCardZoneByRef(game, physical)) {
+          putCard(game, physical, origin || { zone: 'hand', actor: target });
+        }
+        return result || fail('此【杀】已不合法。');
       }
 
       function applyTiaoxinDiscard(game, actor, target) {
@@ -2562,29 +2658,19 @@
         var actor = pending.sourceActor;
         var d = decision || {};
         if (d.cardId) {
-          if (parseLonghunChoice(d.cardId) !== null && deps.takeGodResponse) {
-            var godResponse = deps.takeGodResponse(game, target, 'sha', d.cardId, { target: actor, skipShaCount: true });
-            if (godResponse) return deps.playGodResponseSha(game, target, godResponse, { target: actor, skipShaCount: true });
+          var legal = deps.listShaResponseOptions(game[target]).some(function (option) {
+            return option.cardId === d.cardId;
+          }) || parseLonghunChoice(d.cardId) !== null;
+          if (!legal) {
+            pending.options = deps.listShaResponseOptions(game[target]);
             setPendingChoice(game, pending);
-            return fail('请选择合法的【龙魂】材料，或放弃使用【杀】。');
+            return fail('请选择一张可作为【杀】使用的牌，或放弃。');
           }
-          var state = game[target];
-          var card = (state.hand || []).find(function (item) {
-            return item.id === d.cardId && isShaType(StateRuntime.effectiveCardView(state, item).type);
-          });
-          if (!card) {
-            setPendingChoice(game, pending);
-            return fail('请选择一张【杀】，或放弃 (将被弃置一张牌)。');
-          }
-          var shaCard = StateRuntime.effectiveCardView(state, card);
-          removeCardFromHand(state, d.cardId);
-          var result = deps.playSha(game, target, shaCard, { target: actor, skipShaCount: true });
-          if (result && result.ok) {
-            // W2-F11: 同 AI 分支 — 回合外"使用"黑色手牌触发银月枪。
-            triggerTiaoxinYinyue(game, target, [shaCard]);
-            return result;
-          }
-          putCard(game, CardRuntime.physicalCardOf(shaCard), { zone: 'hand', actor: target });
+          var result = playTiaoxinSha(game, actor, target, d.cardId);
+          if (result && result.ok) return result;
+          pending.options = deps.listShaResponseOptions(game[target]);
+          setPendingChoice(game, pending);
+          return result;
         }
         return applyTiaoxinDiscard(game, actor, target);
       }
@@ -2712,7 +2798,11 @@
         var actor = context.actor;
         var state = game[actor];
         if (!state || !skillEnabled(state, 'fangquan')) return null;
-        var pref = (state.skillPreferences && state.skillPreferences.fangquan) || 'decline';
+        // AC WS8: glossary__flow.md:81 explicitly forbids paying a phase that
+        // Lebusishu (or another effect) has already skipped.
+        if (state.flags && state.flags.skipPlay) return null;
+        var pref = (state.skillPreferences && state.skillPreferences.fangquan)
+          || (actor !== 'player' && deps.aiShouldUseFangquan && deps.aiShouldUseFangquan(game, actor) ? 'auto' : 'decline');
         if (pref === 'decline') return null;
         state.flags = state.flags || {};
         // skipPlay 是引擎既有的跳过出牌阶段单点 (nextPlayablePhase 读它);
@@ -2727,7 +2817,9 @@
         var game = context.game;
         var actor = context.actor;
         var state = game[actor];
-        if (!state || !skillEnabled(state, 'fangquan') || game.phase === 'gameover') return null;
+        // AC WS8: Fangquan is a delayed effect (rule__classification.md:88).
+        // Losing the skill does not refund or cancel its already-paid skip.
+        if (!state || state.hp <= 0 || game.phase === 'gameover') return null;
         if (!state.flags || !state.flags.fangquanSkipped) return null;
         state.flags.fangquanSkipped = false;
         if (!(state.hand || []).length) return null;
@@ -2987,18 +3079,19 @@
         var pref = (game[holder].skillPreferences && game[holder].skillPreferences.guzheng) || 'auto';
         if (pref === 'decline') return null;
         // 只认此刻仍在弃牌堆里的那批 (中途被别的技能拿走的不算)。
-        var stillInDiscard = discarded.filter(function (card) {
-          return game.discard.indexOf(card) >= 0;
-        });
+        var stillInDiscard = discarded.map(function (card) {
+          return game.discard.find(function (entry) { return entry.id === card.id; });
+        }).filter(Boolean);
         if (!stillInDiscard.length) return null;
         // 归还一张给弃牌者, 其余全归固政持有者。
         var giveBack = stillInDiscard[0];
         moveCard(game, giveBack, { zone: 'discard' }, { zone: 'hand', actor: discarder });
         var gained = 0;
         (context.allDiscardedCards || stillInDiscard).forEach(function (card) {
-          if (card === giveBack) return;
-          if (game.discard.indexOf(card) < 0) return;
-          moveCard(game, card, { zone: 'discard' }, { zone: 'hand', actor: holder });
+          if (card.id === giveBack.id) return;
+          var current = game.discard.find(function (entry) { return entry.id === card.id; });
+          if (!current) return;
+          moveCard(game, current, { zone: 'discard' }, { zone: 'hand', actor: holder });
           gained += 1;
         });
         log(game, actorName(game, holder) + '发动【固政】，将【' + giveBack.name + '】交还给'
@@ -3025,24 +3118,46 @@
         var holderState = game[holder];
         var pref = (holderState.skillPreferences && holderState.skillPreferences.beige) || 'auto';
         if (pref === 'decline') return null;
-        // 成本: 弃置一张牌 (手牌或装备区; 缺省取最不值钱的手牌)。
-        if (!(holderState.hand || []).length) return null;
+        // A complete own-card cost includes equipment. Put it in discard before
+        // any loss hook can suspend, and save the judgement continuation by ID.
+        var available = ownSkillCostCards(game, holder);
+        if (!available.length) return null;
         var ranked = deps.aiDiscardCandidates ? (deps.aiDiscardCandidates(game, holder) || []) : [];
-        var costId = ranked[0] || holderState.hand[0].id;
-        var cost = removeCardFromHand(holderState, costId);
+        var selected = available.find(function (entry) { return entry.card.id === ranked[0]; }) || available[0];
+        var cost = takeCard(game, selected.card.id, selected.ref);
         if (!cost) return null;
         discardCard(game, cost);
         log(game, actorName(game, holder) + '发动【悲歌】，弃置【' + cost.name + '】。');
-        if (deps.godJudgements && needsInteractiveJilueJudgement(game)) {
-          return deps.godJudgements.start(game, victim, '【悲歌】', 'native-beige',
-            { holder: holder, sourceActor: sourceActor });
+        return deps.responseFlows.run(game, 'beige-payment', { holder: holder, victim: victim, sourceActor: sourceActor,
+          costId: cost.id, equipment: selected.ref.zone === 'equipment', step: 'equipment' });
+      }
+
+      function advanceBeigePayment(game, source) {
+        if (source.step === 'equipment') {
+          source.step = 'loss';
+          var cost = game.discard.find(function (entry) { return entry.id === source.costId; });
+          if (source.equipment && cost) triggerEquipmentLoss(game, source.holder, cost);
+          if (game.pendingChoice) return { ok: true, suspended: true };
         }
-        var result = judge(game, victim, '【悲歌】');
+        if (source.step === 'loss') {
+          source.step = 'judge';
+          if (deps.notifyCardLoss) deps.notifyCardLoss(game, source.holder);
+          if (game.pendingChoice) return { ok: true, suspended: true };
+        }
+        deps.responseFlows.finish(game, 'beige-payment', source);
+        var victimState = game[source.victim];
+        if (game.phase === 'gameover' || !victimState || victimState.hp <= 0) return { beigeApplied: true };
+        if (deps.godJudgements && needsInteractiveJilueJudgement(game)) {
+          return deps.godJudgements.start(game, source.victim, '【悲歌】', 'native-beige',
+            { holder: source.holder, sourceActor: source.sourceActor });
+        }
+        var result = judge(game, source.victim, '【悲歌】');
         if (!result) return null;
-        resolveJudgementCard(game, victim, victimState, '【悲歌】', result);
-        applyBeigeOutcome(game, holder, victim, sourceActor, result.suit);
+        resolveJudgementCard(game, source.victim, victimState, '【悲歌】', result);
+        applyBeigeOutcome(game, source.holder, source.victim, source.sourceActor, result.suit);
         return { beigeApplied: true };
       }
+      if (deps.responseFlows) deps.responseFlows.register('beige-payment', { key: 'beigePayment', advance: advanceBeigePayment });
 
       function applyBeigeOutcome(game, holder, victim, sourceActor, suit) {
         var victimState = game[victim];
@@ -3055,14 +3170,7 @@
           log(game, '【悲歌】判定为方片，' + actorName(game, victim) + '摸两张牌。');
         } else if (suit === 'club') {
           if (source && source.hp > 0) {
-            var discarded = 0;
-            for (var i = 0; i < 2; i += 1) {
-              var removed = removeTargetZoneCard(game, sourceActor, null, null);
-              if (!removed || !removed.card) break;
-              discardCard(game, removed.card);
-              discarded += 1;
-            }
-            log(game, '【悲歌】判定为梅花，' + actorName(game, sourceActor) + '弃置 ' + discarded + ' 张牌。');
+            return ForcedDiscard.discard(game, sourceActor, 2, 'beige', '悲歌');
           }
         } else if (suit === 'spade') {
           if (source && source.hp > 0) {
@@ -3103,7 +3211,8 @@
         var state = game[actor];
         if (!state || !skillEnabled(state, 'qiaobian')) return null;
         if (!(state.hand || []).length) return null;
-        var pref = (state.skillPreferences && state.skillPreferences.qiaobian) || 'decline';
+        var pref = (state.skillPreferences && state.skillPreferences.qiaobian)
+          || (actor !== 'player' && deps.aiShouldUseQiaobianDraw && deps.aiShouldUseQiaobianDraw(game, actor) ? 'auto' : 'decline');
         if (pref === 'decline') return null;
         // 成本: 弃置一张手牌
         var ranked = deps.aiDiscardCandidates ? (deps.aiDiscardCandidates(game, actor) || []) : [];
@@ -3461,12 +3570,7 @@
           enterDying(game, actor, actor);
           if (game.pauseState && game.pauseState.dying) {
             if (!game.pauseState.deferredAfterDying) game.pauseState.deferredAfterDying = [];
-            game.pauseState.deferredAfterDying.push(function () {
-              if (game.phase !== 'gameover' && self.hp > 0) {
-                log(game, actorName(game, actor) + '因【苦肉】摸两张牌。');
-                drawCards(game, actor, 2);
-              }
-            });
+            game.pauseState.deferredAfterDying.push({ kind: 'kurou-draw', actor: actor });
             return success('苦肉：等待濒死结算。');
           }
           if (game.phase === 'gameover' || self.hp <= 0) {
@@ -3610,9 +3714,11 @@
       // resumeSuspendedTurnFlowIfReady 经 resumeQiangxiDamage 续跑。
       function applyQiangxiDamage(game, actor, targetActor) {
         if (game.phase === 'gameover') return success('强袭结算完成。');
-        if (!game[actor] || game[actor].hp <= 0) return success('强袭发动者已阵亡。');
         if (!game[targetActor] || game[targetActor].hp <= 0) return success('强袭目标已不在场。');
-        damage(game, targetActor, 1, actor, '【强袭】');
+        // AC WS7: the cost is already paid. Continue executable effects after
+        // source death (rule__classification.md:9/60), with no damage source.
+        var sourceActor = game[actor] && game[actor].hp > 0 ? actor : null;
+        damage(game, targetActor, 1, sourceActor, '【强袭】');
         return success('强袭完成。');
       }
 
@@ -4437,10 +4543,11 @@
           // 选项二非法"时原决策整包重挂, 重试会重放已成功的选项一 (违反
           // "每回合每个选项至多一次", 多打一张无距离杀)。校验通过后应用
           // 阶段不再存在可失败路径, 也就不再需要中途重挂。
-          var invalid = options.some(function (o) { return o !== 1 && o !== 2; });
+          var invalid = options.some(function (o) { return o !== 1 && o !== 2; })
+            || new Set(options).size !== options.length;
           if (invalid) {
             setPendingChoice(game, pending);
-            return fail('【神速】选项只能是 1 或 2。');
+            return fail('【神速】选项只能是 1 或 2，且每项至多选择一次。');
           }
           if (options.indexOf(2) >= 0) {
             if (!decision.equipCardId) {
@@ -4490,15 +4597,7 @@
           discardCard(game, cost);
           log(game, actorName(game, targetActor) + '发动【天香】，弃置【' + cost.name + '】' + cost.suit + ' ' + cost.rank + '，将伤害转移给' + actorName(game, transferee) + '。');
           context.transferTo = transferee;
-          context.onTransferred = function (g, t) {
-            var ts = g[t];
-            if (!ts || ts.hp <= 0) return;
-            var lost = Math.max(0, (ts.maxHp || 0) - ts.hp);
-            if (lost > 0) {
-              drawCards(g, t, lost);
-              log(g, actorName(g, t) + '因【天香】摸 ' + lost + ' 张牌。');
-            }
-          };
+          context.transferDraw = true;
           return { triggeredTianxiang: true };
         }
 
@@ -5260,7 +5359,7 @@
         }
       });
         SkillRuntime.registerSkill(skillRegistry, 'kuanggu', {
-        onDamageAfter: function (context) {
+        onDamageDealt: function (context) {
           return triggerKuangguDamageAfter(context);
         }
       });

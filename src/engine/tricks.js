@@ -24,6 +24,7 @@
     var setPendingChoice = deps.setPendingChoice;
     var damage = deps.damage;
     var discardCard = deps.discardCard;
+    var discardSourceCardIfPending = deps.discardSourceCardIfPending;
     var drawCards = deps.drawCards;
     var finishTrickUse = deps.finishTrickUse;
     var removeCardFromHand = deps.removeCardFromHand;
@@ -155,13 +156,19 @@
       return ctx.currentTarget || ctx.targetActor || ctx.victimActor || ctx.ownerActor || null;
     }
 
-    // v12 H2: 当前净状态下的询问队列 — 自 initialResponder 起顺时针全部存活
-    // 座席, 净通过态跳过锦囊来源, 净抵消态跳过刚打出无懈的座席。
+    // v12 H2: 当前净状态下的询问队列。
+    // AC-R2: card__scroll.md:76-104 无使用者排除；玩家 ask 必须保留
+    // 无懈自己锦囊／反消自己无懈的机会。原跳过仅保留为 auto 的策略。
+    // rule__principle.md:50：同一事件的多人响应从当前回合角色起。
+    // 无当前回合的旧快照才回退到原目标锚；死亡回合角色由存活过滤跳过。
     function wuxieResponderQueue(game, chain) {
       var skip = chain.wuxied ? chain.lastWuxieBy : (chain.ctx && chain.ctx.actor);
-      return seatsFrom(game, chain.initialResponder, true).filter(function (seat) {
+      var anchor = game.turn && game[game.turn] ? game.turn : chain.initialResponder;
+      return seatsFrom(game, anchor, true).filter(function (seat) {
         var state = game[seat];
-        return state && state.hp > 0 && seat !== skip;
+        var manual = seat === 'player' && state && state.skillPreferences
+          && state.skillPreferences.wuxieResponse === 'ask';
+        return state && state.hp > 0 && (seat !== skip || manual);
       });
     }
 
@@ -341,7 +348,16 @@
     }
 
     registerResponseKind('wuxie-response', resolveWuxieResponseChoice);
-    flows.register('wuxie', { key: 'wuxieChain', advance: advanceWuxieResponses });
+    flows.register('wuxie', {
+      key: 'wuxieChain', advance: advanceWuxieResponses,
+      // AC-R4: 银月等插入结算可在无懈未完成时终局。释放帧前由通用
+      // 协议调用此资源收尾；不可执行锦囊效果或 onCardUse 钩子。
+      cancel: function (game, chain) {
+        var ctx = chain.ctx || {};
+        if (ctx.card) discardSourceCardIfPending(game, ctx.card);
+        if (chain.trickName === 'wugu-target' && ctx.pool) finishWugu(game, ctx);
+      }
+    });
 
     // v10 V5: 无懈链 settle 时调用. ctx = { actor, card, options, targetActor? }.
     // wuxied: true → 锦囊被抵消; false → 锦囊照常结算.
@@ -529,6 +545,11 @@
       if (wuxied) {
         return finishTrickUse(game, ctx.actor, ctx.card, success('无中生有被无懈可击。'), ctx.options);
       }
+      // AC-R3: 无懈插入的银月/死亡结算可能令当前目标阵亡；反无懈
+      // 恢复的是锦囊效果，不能恢复已结束的角色，也不能向尸体发牌。
+      if (!game[ctx.wzTargetActor] || game[ctx.wzTargetActor].hp <= 0) {
+        return finishTrickUse(game, ctx.actor, ctx.card, success('【无中生有】目标已阵亡。'), ctx.options);
+      }
       log(game, actorName(game, ctx.wzTargetActor) + '摸两张牌。');
       drawCards(game, ctx.wzTargetActor, 2);
       return finishTrickUse(game, ctx.actor, ctx.card, success('摸两张牌。'), ctx.options);
@@ -611,7 +632,7 @@
       var side = ctx.targets[ctx.idx];
       if (wuxied) {
         log(game, '【铁索连环】对' + actorName(game, side) + '的效果被【无懈可击】抵消。');
-      } else if (game[side]) {
+      } else if (game[side] && game[side].hp > 0) {
         game[side].chained = !game[side].chained;
         log(game, actorName(game, ctx.actor) + '使用【铁索连环】，' + actorName(game, side) + (game[side].chained ? '横置。' : '重置。'));
       }
@@ -642,8 +663,8 @@
     var TAOYUAN_QUEUE_HOOKS = {
       list: function (ctx) { return ctx.targets; },
       shouldSkip: function (game, ctx, target) {
-        // 期间已被治满 (理论不出现) → 跳过
-        return !game[target] || game[target].hp >= game[target].maxHp;
+        // 无懈的银月等插入结算可在轮到此席前造成死亡，死亡者退出队列。
+        return !game[target] || game[target].hp <= 0 || game[target].hp >= game[target].maxHp;
       },
       wuxieReason: function (game, ctx, target) {
         return '【桃园结义】（' + actorName(game, target) + '）';
@@ -662,7 +683,7 @@
       var target = ctx.targets[ctx.idx];
       if (wuxied) {
         log(game, '【桃园结义】对' + actorName(game, target) + '的回复被【无懈可击】抵消。');
-      } else if (game[target] && game[target].hp < game[target].maxHp) {
+      } else if (game[target] && game[target].hp > 0 && game[target].hp < game[target].maxHp) {
         game[target].hp = Math.min(game[target].maxHp, game[target].hp + 1);
         log(game, actorName(game, target) + '因【桃园结义】回复 1 点体力。');
       }
@@ -706,6 +727,12 @@
     function wuguPickForCurrent(game, ctx) {
       var picker = ctx.order[ctx.idx];
       var pool = ctx.pool;
+      // AC-R3: shouldSkip 在无懈前检查过，仍须在无懈后重验；死亡目标
+      // 不获得池牌，池与后续目标继续按原队列结算。
+      if (!game[picker] || game[picker].hp <= 0) {
+        ctx.idx += 1;
+        return advanceWuguTargets(game, ctx);
+      }
       if (!pool.length) { ctx.idx += 1; return advanceWuguTargets(game, ctx); }
       if (pool.length === 1) {
         var only = pool.shift();  // pool 是在途池
@@ -886,9 +913,8 @@
         // advanceWuguTargets / wuguPickForCurrent (定义在无懈续延区附近)。
         return advanceWuguTargets(game, {
           sourceActor: sourceActor,
-          // v13 评审收口: 无懈链 ctx 契约 — wuxieResponderQueue 按 ctx.actor
-          // 跳过来源, 缺失时出牌者会被询问无懈自己的五谷 (随首询锚点改为
-          // picker 而暴露的既有缺口)。
+          // 无懈链 ctx 契约：auto 策略仍需识别原使用者，避免自动
+          // 抵消自己的五谷。AC-R2 玩家 ask 不受此策略排除。
           actor: sourceActor,
           wuguCardId: wuguCard && wuguCard.id,
           pool: pool,

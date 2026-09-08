@@ -249,6 +249,12 @@ test('Y1 无懈：银月插入结算完成前不推进反无懈询问', () => {
   game.enemy.hand = [black('wuxie', 'nullify')];
   game.enemy.equipment.weapon = c('yinyue', { id: 'weapon' });
   Engine.playCard(game, 'player', 'attack');
+  // AC-R2: rule__principle.md:50 当前回合角色先有响应机会，且
+  // card__scroll.md:76-104 允许使用者无懈自己的牌。先明确放弃此机会，
+  // 后续银月内层未完不得提前询问反无懈的原有Y断言全部保留。
+  assert.equal(game.pendingChoice.kind, 'wuxie-response');
+  assert.equal(game.pendingChoice.chainWuxied, false);
+  settle(game, { decline: true });
   assert.equal(game.pendingChoice.kind, 'yinyue-response');
   assert.equal(game.pendingChoiceQueue.length, 0, '反无懈窗口尚未产生');
   settle(game, { cardId: 'defend' });

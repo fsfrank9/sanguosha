@@ -65,6 +65,12 @@ const MANDATORY_DECISIONS = {
 
 function settlePending(game) {
   const before = game.pendingChoice;
+  // AC-C26 has no decline route; respond through the real mandatory choice API.
+  if (before.kind === 'god-choice' && before.godChoiceType === 'effect-discard') {
+    Engine.resolvePendingChoice(game, { choiceId: before.choiceId,
+      cardIds: before.cards.slice(0, before.cardMin).map(card => card.id) });
+    return game.pendingChoice !== before;
+  }
   const special = MANDATORY_DECISIONS[before.kind];
   if (special) {
     Engine.resolvePendingChoice(game, special(before, game));

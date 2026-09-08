@@ -357,12 +357,12 @@ import { CARD_CATALOG } from '../../data/cards.js';
         }
         // v13 K3: 胜负归属走 seatWon (身份场按阵营, 1v1 按座席名不变)。
         els.playerState.innerHTML = stateStatusMarkup('player', isGameOver ? (seatWon('player') ? '胜利' : '败北') : (isPlayerTurn ? '行动' : '等待'));
-        els.enemyState.innerHTML = stateStatusMarkup('enemy', isGameOver ? (seatWon('enemy') ? '胜利' : '败北') : (!isPlayerTurn ? '行动' : '等待'));
+        els.enemyState.innerHTML = stateStatusMarkup('enemy', isGameOver ? (seatWon('enemy') ? '胜利' : '败北') : (view.game.turn === 'enemy' ? '行动' : '等待'));
         // v9 PR-E14: 之前默认显示 "电脑" / "玩家" 是冗余信息 (1v1 位置一目了然),
         // 而且 turn-badge 在 hero-head 右侧与右上 lord/rebel-badge 重叠造成文字
         // 被遮挡. 改成: 仅 "当前回合" 时显示, 其余 hidden.
         var playerTurnActive = isPlayerTurn && !isGameOver;
-        var enemyTurnActive = !isPlayerTurn && !isGameOver;
+        var enemyTurnActive = view.game.turn === 'enemy' && !isGameOver;
         els.playerTurnBadge.textContent = playerTurnActive ? '当前回合' : '';
         els.playerTurnBadge.hidden = !playerTurnActive;
         els.enemyTurnBadge.textContent = enemyTurnActive ? '当前回合' : '';

@@ -240,7 +240,9 @@
             "frequency": "初始一次；每次摸牌阶段结束可换一次",
             "engineHooks": [
               "onInitialHand",
-              "onDrawPhaseEnd"
+              "onDrawPhaseEnd",
+              "beginInitialHand",
+              "beginDrawPhaseEnd"
             ],
             "boundaries": [
               "星是游戏实体牌，不是AA3场外武将牌；必须纳入普通牌守恒。",
@@ -558,7 +560,9 @@
             "frequency": "无次数上限，仍受所用牌本身限制",
             "engineHooks": [
               "onCardAs",
-              "onActiveSkill"
+              "onActiveSkill",
+              "longhunResponseOptions",
+              "takeResponse"
             ],
             "boundaries": [
               "不是新版两张增强效果；X在声明时按当前体力计算。",

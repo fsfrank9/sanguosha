@@ -4,6 +4,7 @@
   import { Runtime } from './runtime.js';
   import { CardRuntime } from './card-runtime.js';
   import { StateRuntime } from './state.js';
+  import { CARD_CATALOG } from '../data/cards.js';
 
   var makeRng = Runtime.makeRng;
   var isShaType = CardRuntime.isShaType;
@@ -858,7 +859,9 @@
         if (mode === 'asSha') {
           result = playCardAs(clone, actor, card.id, 'sha');
         } else if (mode && mode !== 'normal') {
-          result = playCardAs(clone, actor, card.id, mode);
+          var conversionOptions = aiNewConversionOptions(clone, actor, card, mode);
+          if (conversionOptions === null) return null;
+          result = playCardAs(clone, actor, card.id, mode, conversionOptions);
         } else {
           result = playCard(clone, actor, card.id, options || null);
         }
@@ -909,6 +912,44 @@
       return base - incoming * 25;
     }
 
+    // AC3: newer conversions need the converted identity and the same legal
+    // public target in both simulation and execution. Undefined preserves the
+    // historical guose/qixi/as-Sha routes; null rejects a new candidate.
+    function aiNewConversionOptions(game, actor, card, type) {
+      if (['huogong', 'tiesuo', 'bingliang', 'jiu', 'juedou', 'shunshou'].indexOf(type) < 0) return undefined;
+      if (type === 'jiu') return {};
+      var info = CARD_CATALOG[type];
+      var view = Object.assign({}, card, { type: type, family: info.family, name: info.name });
+      var legal = legalTargetsForCard(game, actor, view);
+      if (type === 'shunshou') {
+        // The Engine gate accounts for the field card leaving before target
+        // distance is checked. Selection shares that exact cost predicate.
+        legal = legal.filter(function (seat) {
+          return canPlayCardAs(game, actor, card, type, { target: seat }).ok;
+        });
+      }
+      if (type === 'tiesuo') {
+        var chainedFriends = legal.filter(function (seat) {
+          return game[seat].chained && !StateRuntime.perceivedHostile(game, actor, seat);
+        });
+        if (chainedFriends.length) return { mode: 'chain', targets: chainedFriends.slice(0, 2) };
+        var elemental = ownHandView(game[actor]).some(function (held) {
+          return held.id !== card.id && (held.type === 'fire_sha' || held.type === 'thunder_sha' || held.type === 'huogong');
+        });
+        if (!elemental) return null;
+        var chainTargets = legal.filter(function (seat) {
+          return !game[seat].chained && StateRuntime.perceivedHostile(game, actor, seat);
+        });
+        return chainTargets.length ? { mode: 'chain', targets: chainTargets.slice(0, 2) } : null;
+      }
+      var hostile = legal.filter(function (seat) {
+        return StateRuntime.perceivedHostile(game, actor, seat)
+          && (type !== 'huogong' || game[seat].hand.length > 0);
+      });
+      if (!hostile.length) return null;
+      return { target: aiPickHostileTarget(game, actor, hostile) };
+    }
+
     // 转化模式按"转化后的虚拟牌形状"打启发分 — 杀/乐不思蜀/过河拆桥 各按
     // 其 scoreCardForAI 分支评估 (v11 C5, 自 aiScoreCardWithLookahead 抽出
     // 供两步精化复用)。
@@ -921,6 +962,20 @@
       }
       if (mode === 'guohe') {
         return scoreCardForAI(g, actor, { type: 'guohe', family: 'trick', color: card.color });
+      }
+      if (mode && mode !== 'normal' && CARD_CATALOG[mode]) {
+        var options = aiNewConversionOptions(g, actor, card, mode);
+        if (options === null) return -100;
+        if (mode === 'tiesuo') return 45;
+        if (mode === 'huogong') {
+          // Cost feasibility only uses our remaining hand. No target suit is
+          // inspected until the real card effect reveals it.
+          return ownHandView(g[actor]).some(function (held) { return held.id !== card.id; }) ? 40 : -100;
+        }
+        if (mode === 'shunshou' && options && options.target) return 65;
+        return scoreCardForAI(g, actor, Object.assign({}, card, {
+          type: mode, family: CARD_CATALOG[mode].family, name: CARD_CATALOG[mode].name
+        }));
       }
       return scoreCardForAI(g, actor, card);
     }
@@ -1014,6 +1069,15 @@
             { card: card, mode: 'normal', score: healScore });
         }
       });
+      // 急袭's physical material is in the public field zone, not in hand.
+      // Enumerate only our own field and retain the normal conversion gate.
+      if (skillEnabled(self, 'jixi')) {
+        (self.tian || []).forEach(function (card) {
+          if (!canPlayCardAs(game, actor, card, 'shunshou').ok) return;
+          var fieldScore = aiScoreCardWithLookahead(game, actor, card, 'shunshou');
+          if (fieldScore > 0) candidates.push({ card: card, mode: 'convert', asType: 'shunshou', score: fieldScore });
+        });
+      }
       candidates.sort(function (a, b) { return b.score - a.score; });
       // v12 I1: 两步精化 — 对单步综合分 top-3 候选追加"对手最优回应"评估,
       // 重打分后再排序 (剪枝: 其余候选保持单步分)。基线取"我方 pass → 对手
@@ -1119,7 +1183,12 @@
       // 天义 (太史慈): 手上有【杀】才值得赌 (赢=多一次杀+无距离+多目标,
       // 没赢=本回合不能出杀); 手上没杀时拼点毫无收益, 不发动。
       if (skillEnabled(self, 'tianyi') && !self.flags.tianyiUsed && !self.flags.tianyiLost) {
-        var tyHasSha = hand.some(function (card) { return isShaType(card.type); });
+        var tyCost = aiPickPindianCard(game, actor, { key: 'tianyi' });
+        // AC3: the highest-rank card may itself be the only Sha. Winning
+        // after spending it leaves no attack to use the temporary benefits.
+        var tyHasSha = hand.some(function (card) {
+          return isShaType(card.type) && (!tyCost || card.id !== tyCost.id);
+        });
         var tyTargets = StateRuntime.perceivedHostileFirstPool(game, actor,
           StateRuntime.aliveSeats(game).filter(function (seat) {
             return seat !== actor && deps.pindianEligible && deps.pindianEligible(game, actor, seat);
@@ -1139,7 +1208,12 @@
         var qhTargets = StateRuntime.perceivedHostileFirstPool(game, actor,
           StateRuntime.aliveSeats(game).filter(function (seat) {
             return seat !== actor && game[seat].hp > self.hp
-              && deps.pindianEligible && deps.pindianEligible(game, actor, seat);
+              && deps.pindianEligible && deps.pindianEligible(game, actor, seat)
+              && StateRuntime.aliveSeats(game).some(function (victim) {
+                return victim !== seat && victim !== actor
+                  && StateRuntime.perceivedHostile(game, actor, victim)
+                  && StateRuntime.canReachWithSha(game, seat, victim);
+              });
           }));
         if (qhTargets.length) {
           var qhPick = qhTargets.slice().sort(function (a, b) {
@@ -1349,6 +1423,46 @@
       return null;
     }
 
+    // Optional phase skills preserve an explicit preference. These helpers are
+    // called by their hooks only for an unconfigured AI seat.
+    function aiShouldUseQiaobianDraw(game, actor) {
+      var self = game && game[actor];
+      if (!self || !(self.hand || []).length) return false;
+      var victims = StateRuntime.aliveSeats(game).filter(function (seat) {
+        return seat !== actor && StateRuntime.perceivedHostile(game, actor, seat)
+          && (game[seat].hand || []).length > 0;
+      });
+      // Two enemy cards offset the cost and the ordinary two-card draw. Keep
+      // healing and attack resources; do not pay merely to empty an ally hand.
+      // Use the hook's exact discard ranking (or its hand[0] fallback).
+      var ranked = aiDiscardCandidates(game, actor);
+      var cost = self.hand.find(function (card) { return card.id === ranked[0]; }) || self.hand[0];
+      return victims.length >= 2 && cost.type !== 'tao' && !isShaType(cost.type) && cost.type !== 'wuxie';
+    }
+
+    function aiShouldUseFangquan(game, actor) {
+      var self = game && game[actor];
+      if (!self || !(self.hand || []).length || handLimit(game, actor) < 1
+          || self.hand.length > handLimit(game, actor)) return false;
+      if (self.hand[0].type === 'tao' || self.hand[0].type === 'wuxie') return false;
+      // This hook occurs before the phase flips to play, so inspect legal card
+      // potential on a shallow phase view; neither identities nor hands change.
+      var playView = Object.assign({}, game, { phase: 'play', turn: actor });
+      if (ownHandView(self).some(function (card) {
+        return canPlayCard(playView, actor, card).ok && scoreCardForAI(playView, actor, card) > 0;
+      })) return false;
+      // applyFangquan selects the first perceived friend; judge that exact
+      // recipient, rather than assuming a different friend will receive it.
+      var friend = StateRuntime.aliveSeats(game).find(function (seat) {
+        return seat !== actor && !StateRuntime.perceivedHostile(game, actor, seat);
+      });
+      if (!friend || game[friend].turnedOver || game[friend].hp < 2) return false;
+      return StateRuntime.aliveSeats(game).some(function (foe) {
+        return StateRuntime.perceivedHostile(game, friend, foe)
+          && StateRuntime.canReachWithSha(game, friend, foe);
+      });
+    }
+
     function aiTakeAction(game, actor) {
       if (!game || game.turn !== actor || game.phase !== 'play') {
         var blocked = success('当前不是出牌阶段。');
@@ -1403,7 +1517,8 @@
       } else if (choice.mode === 'convert') {
         // v11 C5 (批次 29): 锦囊类转化 (国色/奇袭) — 按 asType 走 playCardAs;
         // AI 侧 guohe 结算走 resolveGuohe1v1 的 auto 路径, 无需目标参数。
-        cardResult = playCardAs(game, actor, card.id, choice.asType);
+        cardResult = playCardAs(game, actor, card.id, choice.asType,
+          aiNewConversionOptions(game, actor, card, choice.asType));
       } else {
         var cardOptions;
         // v12 H5: 铁索缺省横置敌对座席 (至多 2 名); 1v1 恒为 [对手]。
@@ -1779,6 +1894,8 @@
       aiDeepTurnEval: aiDeepTurnEval,
       aiChooseCard: aiChooseCard,
       aiChooseSkillAction: aiChooseSkillAction,
+      aiShouldUseQiaobianDraw: aiShouldUseQiaobianDraw,
+      aiShouldUseFangquan: aiShouldUseFangquan,
       aiTakeAction: aiTakeAction,
       aiDiscardCandidates: aiDiscardCandidates,
       // v15 T: 拼点出牌启发

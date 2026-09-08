@@ -119,14 +119,14 @@
           "sourceTextRef": "eb62fbb21352",
           "sourceTextSha256": "eb62fbb21352fcb3e7dcab6c91b43052dcc8e38a47b9239cfc719f6880477a55",
           "implementationSpec": {
-            "summary": "锁定技：对距离1以内的角色每造成1点伤害即回复1点体力。",
-            "timing": "对距离1以内的一名角色造成的伤害结算完成后。",
-            "condition": "锁定技强制发动；伤害目标与你的距离不大于1。",
+            "summary": "锁定技：每当你造成1点伤害后，若受伤角色与你距离不大于1，你回复1点体力。",
+            "timing": "来源侧造成伤害后（onDamageDealt）；距离取造成伤害时快照，目标阵亡不取消已成立触发。",
+            "condition": "锁定技强制发动；伤害来源存活且技能有效，造成伤害时来源到目标距离不大于1。",
             "cost": "无成本。",
             "effect": "每造成1点伤害回复1点体力，不超过体力上限。",
             "frequency": "锁定技，每次符合条件的伤害均触发。",
             "engineHooks": [
-              "onDamageAfter",
+              "onDamageDealt",
               "distanceBetween",
               "recoverHp"
             ]
@@ -193,7 +193,7 @@
           "implementationStatus": "implemented",
           "sourceTextRef": "3682f489eb5a",
           "sourceTextSha256": "3682f489eb5a48b8a17dbe334f82a3a82c3e4dd3b74ec729bc5a0b4f93788eb2",
-          "sourceVerification": "AA1 2026-09-08：复核 gltjk pages/card__hero__wu.md:365（风）不屈，现有濒死回复至1点机制对应此行，X 为创数。修正原人工摘要的 maxHp-创数；此武将牌另有奋激，本仓目录尚未收录，不能据此宣称整张新风周泰覆盖完整。旧风:371 为负体力不进入濒死的另一机制，不在本次替换范围。",
+          "sourceVerification": "AA1 2026-09-08：复核 gltjk pages/card__hero__wu.md:365（风）不屈，现有濒死回复至1点机制对应此行，X 为创数。修正原人工摘要的 maxHp-创数；此武将牌另有奋激，本仓目录尚未收录，不能据此宣称整张新风周泰覆盖完整。旧风:371 为负体力不进入濒死的另一机制，不在本次替换范围。 AC 2026-09-08：目录及安全规格已补回奋激为TODO，完整技能名覆盖修复；奋激行为仍未实现。",
           "implementationSpec": {
             "summary": "锁定技：濒死时置牌堆顶牌为\"创\"，点数均不同则体力回复至1点；技能有效且有\"创\"时，基础手牌上限为\"创\"数。",
             "timing": "当你处于濒死状态时。",
@@ -207,8 +207,33 @@
               "handLimit"
             ]
           }
+        },
+        {
+          "name": "奋激",
+          "localSkillId": "fenji",
+          "implementationStatus": "pending",
+          "sourceLine": "card__hero__wu.md:367",
+          "sourceTextRef": "a7f329728b7a",
+          "sourceTextSha256": "a7f329728b7ac310ca7e5afe96270b1f03157d9d66898b2186cc4713414d2548",
+          "deferredReason": "AC 2026-09-08整卡来源修正：目录补回AA已确认缺失的奋激；保留未实现，需后续内容批接入带原因与操作者的手牌移动事件、失体力濒死续接及UI/AI。",
+          "implementationSpec": {
+            "summary": "当角色因另一角色弃置或获得而失去手牌后，可失去一点体力令失牌角色摸两张牌。",
+            "timing": "角色因另一角色弃置或获得而失去手牌后",
+            "condition": "失去的是手牌且移动原因为另一角色的弃置或获得；不含自行使用、打出、弃置或交换",
+            "cost": "失去1点体力；必要时先处理濒死及死亡，再继续已支付效果",
+            "effect": "令该失去手牌的角色摸两张牌",
+            "frequency": "每次满足条件的手牌失去后可发动",
+            "engineHooks": [
+              "onHandLostByOther"
+            ],
+            "boundaries": [
+              "必须保留移动原因和操作者，不能把所有 onCardLost 都当作触发条件。",
+              "同名新风周泰完整卡为不屈、奋激；本条仅补全目录与来源规格，未接入运行态。"
+            ]
+          }
         }
-      ]
+      ],
+      "version": "风 WU 013：不屈、奋激（后者未实现）"
     },
     {
       "gid": 222,

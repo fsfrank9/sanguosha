@@ -37,6 +37,19 @@
     // v12 H5: 身份场死亡奖惩 (击杀反贼摸三张)
     var drawCards = deps.drawCards;
 
+    // Tianxiang's draw belongs to the transferred damage's end timing. Keeping
+    // its actor on that damage context survives JSON and waits for every
+    // damage-after window, including Guixin, before drawing or propagating.
+    function finishTianxiangDraw(game, actor) {
+      var state = actor && game[actor];
+      if (!state || state.hp <= 0 || game.phase === 'gameover') return;
+      var lost = Math.max(0, state.maxHp - state.hp);
+      if (lost > 0) {
+        drawCards(game, actor, lost);
+        log(game, actorName(game, actor) + '因【天香】摸 ' + lost + ' 张牌。');
+      }
+    }
+
     function damage(game, targetActor, amount, sourceActor, reason, sourceCard, nature, opts) {
       if (game.phase === 'gameover') return false;
       var target = game[targetActor];
@@ -53,6 +66,7 @@
       amount = weatherContext.amount;
       if (amount <= 0) {
         if (sourceCard) discardSourceCardIfPending(game, sourceCard);
+        finishTianxiangDraw(game, opts && opts.tianxiangDrawActor);
         if (opts && typeof opts.afterDamageSettled === 'function') opts.afterDamageSettled(game, false, null);
         return false;
       }
@@ -133,8 +147,8 @@
 
       // v12 G2: 天香 (小乔) — "受到伤害时"时机的伤害转移。handler (skills.js)
       // 在 onDamageModify 内完成 弃红桃成本 + 合法性校验 后置 transferTo;
-      // 此处把整笔伤害改结算到转移目标 (其装备/濒死按自身结算), 完成后经
-      // onTransferred 回调补摸 X 张 (X = 其已损失体力, 官方"然后其摸X张牌")。
+      // 此处把整笔伤害改结算到转移目标 (其装备/濒死按自身结算), 完成后由
+      // 数据上下文补摸 X 张 (X = 其已损失体力, 官方"然后其摸X张牌")。
       // 嵌套转移经 opts.noTianxiangTransfer 防递归。
       if (damageModifyContext.transferTo && game[damageModifyContext.transferTo]) {
         var transferee = damageModifyContext.transferTo;
@@ -143,22 +157,9 @@
         // 不得穿透转移落点的防具; 同理 古锭/寒冰 ("使用【杀】对目标角色
         // 造成伤害时") 的条件目标是杀的原目标, 不对转移接收者重新判定。
         // 接收者自己的防具 (藤甲② 火+1 / 白银 clamp) 照常生效。
-        var transferOpts = { noTianxiangTransfer: true, sourceWeaponExpired: true };
+        var transferOpts = { noTianxiangTransfer: true, sourceWeaponExpired: true,
+          tianxiangDrawActor: damageModifyContext.transferDraw ? transferee : null };
         var transferResult = damage(game, transferee, amount, sourceActor, reason, sourceCard, damageNature, transferOpts);
-        if (typeof damageModifyContext.onTransferred === 'function' && game.phase !== 'gameover') {
-          // v12 G2 复核修复: 转移致命且濒死暂停等待救援时, 补牌回调若立即
-          // 执行会因 hp<=0 被跳过且永不重触发 ("摸 X 张"永久丢失)。挂入
-          // deferredAfterDying, 由 flushDeferredDamageAfter 在濒死结束后统一
-          // 执行 (X 按救援后的已损体力计, 与官方"然后其摸X张牌"时序一致)。
-          if (game.pauseState && game.pauseState.dying) {
-            if (!game.pauseState.deferredAfterDying) game.pauseState.deferredAfterDying = [];
-            game.pauseState.deferredAfterDying.push(function () {
-              damageModifyContext.onTransferred(game, transferee);
-            });
-          } else {
-            damageModifyContext.onTransferred(game, transferee);
-          }
-        }
         if (notifyDamageSettled) notifyDamageSettled(false, transferee);
         return transferResult;
       }
@@ -177,7 +178,10 @@
         sourceWeaponExpired: sourceWeaponExpired
       });
       if (equipModify.prevented) {
-        if (sourceCard) discardSourceCardIfPending(game, sourceCard);
+        // A Hanbing loss window still owns this use; its frame disposes the
+        // source only after both loss effects settle (flow__use.md:157).
+        if (sourceCard && !equipModify.sourceCardRetained) discardSourceCardIfPending(game, sourceCard);
+        finishTianxiangDraw(game, opts && opts.tianxiangDrawActor);
         if (notifyDamageSettled) notifyDamageSettled(false, null);
         return false;
       }
@@ -185,6 +189,7 @@
 
       if (amount <= 0) {
         if (sourceCard) discardSourceCardIfPending(game, sourceCard);
+        finishTianxiangDraw(game, opts && opts.tianxiangDrawActor);
         if (notifyDamageSettled) notifyDamageSettled(false, null);
         return false;
       }
@@ -193,6 +198,8 @@
       // 0, 否则深度致命伤被一张【桃】抹平, 严重削弱【闪电】/【酒】+【杀】等。
       // 暴虐读取伤害来源在受伤者扣血前的势力，保留此时快照跨濒死挂起。
       var sourceCampBeforeDamage = sourceActor && game[sourceActor] ? StateRuntime.effectiveCamp(game[sourceActor]) : null;
+      var sourceDistanceBeforeDamage = sourceActor && game[sourceActor]
+        ? StateRuntime.distanceBetween(game, sourceActor, targetActor) : null;
       target.hp = target.hp - amount;
       log(game, actorName(game, targetActor) + '因' + reason + '受到 ' + amount + ' 点伤害。');
       // v12 I3: 敌意记账 (AI 目标评估用, 纯遥测不影响规则) — 记录"谁伤了谁",
@@ -218,11 +225,13 @@
         targetActor: targetActor,
         sourceActor: sourceActor,
         sourceCampBeforeDamage: sourceCampBeforeDamage,
+        sourceDistanceBeforeDamage: sourceDistanceBeforeDamage,
         reason: reason,
         sourceCard: sourceCard,
         amount: amount,
         nature: damageNature,
-        chainTransmit: chainTransmit
+        chainTransmit: chainTransmit,
+        tianxiangDrawActor: opts && opts.tianxiangDrawActor || null
       };
       // M1 (审计二轮): gltjk flow__decreaselife.md / flow__damage.md — 濒死
       // 结算嵌套在「扣减体力」内, "受到伤害后" 时机 (奸雄/反馈/刚烈/遗计)
@@ -311,6 +320,7 @@
       if (game.pendingChoice) return { ok: true, suspended: true };
       flows.finish(game, 'damage-after', source);
       if (context.sourceCard && !source.claimed) discardSourceCardIfPending(game, context.sourceCard);
+      finishTianxiangDraw(game, context.tianxiangDrawActor);
       if (game.phase !== 'gameover' && context.chainTransmit) transmitChainDamage(game, context);
       return { ok: true };
     }
@@ -374,31 +384,33 @@
 
     function flushDeferredDamageAfter(game) {
       var deferred = game.pauseState && game.pauseState.deferredDamageAfter;
-      if (deferred && deferred.length) {
-        game.pauseState.deferredDamageAfter = [];
-        for (var i = 0; i < deferred.length; i += 1) {
-          finishDamageAfter(game, deferred[i]);
-          // v12 H 复核修复: finishDamageAfter 经铁索传导环可能触发新的濒死
-          // ask 暂停 → 剩余 deferred 项留待选择排空后再冲刷 (随濒死结算
-          // 再次调本函数), 避免暂停期间越序结算。
-          if (game.pendingChoice) {
-            var rest = deferred.slice(i + 1);
-            if (rest.length) {
-              game.pauseState.deferredDamageAfter =
-                (game.pauseState.deferredDamageAfter || []).concat(rest);
-            }
-            return;
-          }
+      var effects = game.pauseState && game.pauseState.deferredAfterDying;
+      if (!(deferred && deferred.length || effects && effects.length)) return;
+      game.pauseState.deferredDamageAfter = [];
+      game.pauseState.deferredAfterDying = [];
+      // The parent frame stays below damage-after/Guixin/Yinyue children. Their
+      // completion resumes the next paid effect even if no new dying occurred.
+      return flows.run(game, 'deferred-damage-effects', { contexts: deferred || [],
+        effects: effects || [], contextIndex: 0, effectIndex: 0 });
+    }
+
+    function advanceDeferredDamageEffects(game, source) {
+      while (source.contextIndex < source.contexts.length && !game.pendingChoice && game.phase !== 'gameover') {
+        finishDamageAfter(game, source.contexts[source.contextIndex++]);
+      }
+      if (game.pendingChoice) return { ok: true, suspended: true };
+      while (source.effectIndex < source.effects.length && !game.pendingChoice && game.phase !== 'gameover') {
+        var effect = source.effects[source.effectIndex++];
+        if (effect && effect.kind === 'kurou-draw' && game[effect.actor] && game[effect.actor].hp > 0) {
+          log(game, actorName(game, effect.actor) + '因【苦肉】摸两张牌。');
+          drawCards(game, effect.actor, 2);
+        } else if (effect && effect.kind === 'yinyue-trigger' && triggerYinyueQiang) {
+          triggerYinyueQiang(game, effect.holderActor);
         }
       }
-      // v12 G2 复核修复: 濒死期间挂起的转移收尾回调 (天香补牌等) 一并冲刷。
-      var deferredCallbacks = game.pauseState && game.pauseState.deferredAfterDying;
-      if (deferredCallbacks && deferredCallbacks.length && game.phase !== 'gameover') {
-        game.pauseState.deferredAfterDying = [];
-        for (var j = 0; j < deferredCallbacks.length; j += 1) {
-          deferredCallbacks[j]();
-        }
-      }
+      if (game.pendingChoice) return { ok: true, suspended: true };
+      flows.finish(game, 'deferred-damage-effects', source);
+      return { ok: true };
     }
 
     // v7 PR-13: 濒死结算流程 (gltjk flow__neardeath.md)。在 1v1 中：
@@ -1005,6 +1017,12 @@
     flows.register('damage-after', { key: 'damageAfter', advance: advanceDamageAfter, cancel: function (game, source) {
       if (source.context.sourceCard && !source.claimed) discardSourceCardIfPending(game, source.context.sourceCard);
     } });
+    flows.register('deferred-damage-effects', { key: 'deferredDamageEffects', advance: advanceDeferredDamageEffects,
+      cancel: function (game, source) {
+        source.contexts.slice(source.contextIndex).forEach(function (context) {
+          if (context.sourceCard) discardSourceCardIfPending(game, context.sourceCard);
+        });
+      } });
     flows.register('dying', { key: 'dying', advance: advanceDyingResponses });
     flows.register('death-timing', { key: 'deathTiming', advance: advanceDeathTiming });
     flows.register('chain-transmit', { key: 'chainTransmit', advance: advanceChainTransmission });

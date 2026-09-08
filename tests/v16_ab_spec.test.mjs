@@ -74,8 +74,13 @@ test('AB catalog expands by eight complete cards while preserving all original 7
     for (const key of ['id', 'name', 'camp', 'gender', 'maxHp']) {
       assert.equal(current[key], old[key], old.id + '.' + key);
     }
-    assert.deepEqual(current.skills.map(({ id, name }) => ({ id, name })), old.skills,
-      old.id + ' must not be upgraded to a different card version');
+    // AC whole-card source correction: printed SHAN007 also has Fenji
+    // (wu.md:367). Preserve the AB snapshot; allow only this explicit TODO.
+    const expectedSkills = old.id === 'zhoutai'
+      ? old.skills.concat([{ id: 'fenji', name: '奋激' }]) : old.skills;
+    assert.deepEqual(current.skills.map(({ id, name }) => ({ id, name })), expectedSkills,
+      old.id + ' must not change beyond the sourced AC Fenji correction');
+    if (old.id === 'zhoutai') assert.equal(current.skills.find(skill => skill.id === 'fenji').status, 'todo');
   }
   assert.deepEqual(specs.heroes.map(hero => hero.localHeroId).sort(), Object.keys(expectedHeroes).sort());
   for (const spec of specs.heroes) {
@@ -118,8 +123,8 @@ test('AB skill status, safe cache, structured specs and real registry installati
   }
   assert.equal(IMPLEMENTED_SKILL_IDS.length, 125, '104 existing plus 21 AB skill IDs');
   const native = Object.values(HERO_CATALOG).flatMap(hero => hero.skills);
-  assert.equal(native.length, 148);
-  assert.equal(new Set(native.map(skill => skill.id)).size, 143);
+  assert.equal(native.length, 149);
+  assert.equal(new Set(native.map(skill => skill.id)).size, 144);
 });
 
 test('AB adds god cards to the full outside-general resource without filtering deferred skills', () => {

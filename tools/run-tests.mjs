@@ -27,6 +27,7 @@ const QUICK_TIER = [
   'move_card_convergence.test.mjs',     // 裸区域操作零容忍红线
   'equipment_handler_registry.test.mjs',// 裸装备判断零容忍红线
   'v13_m_hidden_roles.test.mjs',        // AI 零直读 (去全知) 守护红线
+  'v16_ac_invariants.test.mjs',         // AC2: direct skill paths / current counts / five pause chains
   'skill_schema.test.mjs',              // 技能元数据 schema 一致性
   'card_rules.test.mjs',                // 牌规则 schema 一致性
   'v6_skill_audit.test.mjs',            // cache⇄specs⇄heroes⇄cards 四方一致

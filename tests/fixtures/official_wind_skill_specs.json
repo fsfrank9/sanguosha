@@ -100,14 +100,14 @@
           "implementationStatus": "implemented",
           "sourceTextRef": "eb62fbb21352",
           "spec": {
-            "summary": "锁定技：对距离1以内的角色每造成1点伤害即回复1点体力。",
-            "timing": "对距离1以内的一名角色造成的伤害结算完成后。",
-            "condition": "锁定技强制发动；伤害目标与你的距离不大于1。",
+            "summary": "锁定技：每当你造成1点伤害后，若受伤角色与你距离不大于1，你回复1点体力。",
+            "timing": "来源侧造成伤害后（onDamageDealt）；距离取造成伤害时快照，目标阵亡不取消已成立触发。",
+            "condition": "锁定技强制发动；伤害来源存活且技能有效，造成伤害时来源到目标距离不大于1。",
             "cost": "无成本。",
             "effect": "每造成1点伤害回复1点体力，不超过体力上限。",
             "frequency": "锁定技，每次符合条件的伤害均触发。",
             "engineHooks": [
-              "onDamageAfter",
+              "onDamageDealt",
               "distanceBetween",
               "recoverHp"
             ]
@@ -184,8 +184,33 @@
               "handLimit"
             ]
           }
+        },
+        {
+          "name": "奋激",
+          "localSkillId": "fenji",
+          "implementationStatus": "pending",
+          "sourceLine": "card__hero__wu.md:367",
+          "sourceTextRef": "a7f329728b7a",
+          "sourceTextSha256": "a7f329728b7ac310ca7e5afe96270b1f03157d9d66898b2186cc4713414d2548",
+          "deferredReason": "AC 2026-09-08整卡来源修正：目录补回AA已确认缺失的奋激；保留未实现，需后续内容批接入带原因与操作者的手牌移动事件、失体力濒死续接及UI/AI。",
+          "spec": {
+            "summary": "当角色因另一角色弃置或获得而失去手牌后，可失去一点体力令失牌角色摸两张牌。",
+            "timing": "角色因另一角色弃置或获得而失去手牌后",
+            "condition": "失去的是手牌且移动原因为另一角色的弃置或获得；不含自行使用、打出、弃置或交换",
+            "cost": "失去1点体力；必要时先处理濒死及死亡，再继续已支付效果",
+            "effect": "令该失去手牌的角色摸两张牌",
+            "frequency": "每次满足条件的手牌失去后可发动",
+            "engineHooks": [
+              "onHandLostByOther"
+            ],
+            "boundaries": [
+              "必须保留移动原因和操作者，不能把所有 onCardLost 都当作触发条件。",
+              "同名新风周泰完整卡为不屈、奋激；本条仅补全目录与来源规格，未接入运行态。"
+            ]
+          }
         }
-      ]
+      ],
+      "version": "风 WU 013：不屈、奋激（后者未实现）"
     },
     {
       "gid": 222,

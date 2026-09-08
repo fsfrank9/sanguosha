@@ -1,0 +1,6664 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-08",
+  "engine": "real SanguoshaEngine; native non-player defaults",
+  "scope": {
+    "tuvNative": 46,
+    "tuvDerived": [
+      "jixi"
+    ],
+    "z": 3,
+    "abNative": 20,
+    "abDerived": [
+      "jilue"
+    ],
+    "deferredExcluded": [
+      "huashen",
+      "xinsheng"
+    ]
+  },
+  "baseline": [
+    {
+      "pack": "fire",
+      "hero": "dianwei",
+      "id": "qiangxi",
+      "name": "强袭",
+      "opportunity": "出牌阶段，满体力且近距离敌方存活",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "付1体力换敌方1伤害；局部代价，不直接认定自伤误用。",
+      "logs": [
+        "典韦发动【强袭】，失去 1 点体力。",
+        "关羽因【强袭】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "xunyu",
+      "id": "quhu",
+      "name": "驱虎",
+      "opportunity": "较高体力敌方有手牌，自己有K点牌",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "记录拼点整次结算；敌方最高牌仅由对照场景设定，AI仍只读手牌数。",
+      "logs": [
+        "荀彧与甘宁进行【驱虎】拼点。",
+        "荀彧扣置一张手牌作为拼点牌。",
+        "甘宁扣置一张手牌作为拼点牌。",
+        "荀彧亮出【闪】（点数 13），甘宁亮出【闪】（点数 2）。",
+        "荀彧拼点赢。",
+        "张飞因【驱虎】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "xunyu",
+      "id": "jieming",
+      "name": "节命",
+      "opportunity": "自己受到1点伤害，友方有补牌缺口",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 4,
+          "hand": 4,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁对荀彧使用【杀】。",
+        "荀彧因【杀】受到 1 点伤害。",
+        "张飞摸了 4 张牌。",
+        "荀彧发动【节命】，令张飞将手牌补至 4 张。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "wolong",
+      "id": "bazhen",
+      "name": "八阵",
+      "opportunity": "无防具时受到杀，判定顶牌红色",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定虚拟八卦；使用=本次挡下杀。",
+      "logs": [
+        "甘宁对卧龙诸葛亮使用【杀】。",
+        "卧龙诸葛亮进行【八卦阵】判定：【杀】heart 5。",
+        "卧龙诸葛亮的【八卦阵】判定为红色，视为打出【闪】。",
+        "卧龙诸葛亮闪避成功，没有受到伤害。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "wolong",
+      "id": "huoji",
+      "name": "火计",
+      "opportunity": "红色手牌可当火攻，敌人有手牌，另有同花色付款牌",
+      "opportunities": 1,
+      "uses": 0,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": []
+    },
+    {
+      "pack": "fire",
+      "hero": "wolong",
+      "id": "kanpo",
+      "name": "看破",
+      "opportunity": "敌方使用无中，自己只有黑色转换材料",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁使用【无中生有】。",
+        "卧龙诸葛亮发动【看破】，将【闪】当【无懈可击】抵消【无中生有】。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "pangtong",
+      "id": "lianhuan",
+      "name": "连环",
+      "opportunity": "梅花手牌可当铁索，存在敌方目标",
+      "opportunities": 1,
+      "uses": 0,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": []
+    },
+    {
+      "pack": "fire",
+      "hero": "pangtong",
+      "id": "niepan",
+      "name": "涅槃",
+      "opportunity": "限定技未用，1体力承受致命杀",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 2,
+          "maxHp": 0,
+          "cards": 3,
+          "hand": 3,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "使用=濒死后复活，包含摸3和重置状态。",
+      "logs": [
+        "甘宁对庞统使用【杀】。",
+        "庞统因【杀】受到 1 点伤害。",
+        "庞统体力为 0，进入濒死状态。",
+        "甘宁没有可用的【桃】/【酒】，无法救援。",
+        "张飞没有可用的【桃】/【酒】，无法救援。",
+        "关羽没有可用的【桃】/【酒】，无法救援。",
+        "庞统摸了 3 张牌。",
+        "庞统发动【涅槃】：弃置区域内所有牌，武将牌复原，摸三张牌，体力回复至 3 点。",
+        "庞统脱离濒死状态。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "taishici",
+      "id": "tianyi",
+      "name": "天义",
+      "opportunity": "有杀与K点拼点牌，敌方有牌",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "太史慈与甘宁进行【天义】拼点。",
+        "太史慈扣置一张手牌作为拼点牌。",
+        "甘宁扣置一张手牌作为拼点牌。",
+        "太史慈亮出【闪】（点数 13），甘宁亮出【闪】（点数 2）。",
+        "太史慈拼点赢。",
+        "太史慈【天义】拼点赢：本回合【杀】的使用次数上限 +1、无距离限制、额外目标数上限 +1。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "pangde",
+      "id": "mengjin",
+      "name": "猛进",
+      "opportunity": "自己使用杀被敌方闪避，目标还有可弃牌",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "庞德对关羽使用【杀】。",
+        "关羽打出【闪】响应【杀】。",
+        "庞德发动【猛进】，弃置关羽的一张手牌。",
+        "关羽闪避成功，没有受到伤害。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "yanliangwenchou",
+      "id": "shuangxiong",
+      "name": "双雄",
+      "opportunity": "摸牌阶段有至少3张手牌，可选择替代摸牌",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "局部摸牌量减少1；本行未假设后续决斗收益。",
+      "logs": [
+        "颜良文丑的摸牌阶段。",
+        "颜良文丑进行【双雄】判定：【杀】diamond 5。",
+        "颜良文丑发动【双雄】，放弃摸牌并获得判定牌【杀】，本回合可将黑色手牌当【决斗】使用。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "yuanshao",
+      "id": "luanji",
+      "name": "乱击",
+      "opportunity": "同花色手牌2张；敌方数多于友方数",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "袁绍发动【乱击】，将两张黑桃手牌当【万箭齐发】使用。",
+        "袁绍使用【万箭齐发】。",
+        "甘宁因【万箭齐发】受到 1 点伤害。",
+        "张飞因【万箭齐发】受到 1 点伤害。",
+        "关羽因【万箭齐发】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "yuanshao",
+      "id": "xueyi",
+      "name": "血裔",
+      "opportunity": "主公有其他群势力存活且手牌超普通上限",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定技保留超过普通上限的牌；非主动选择。",
+      "logs": [
+        "袁绍结束出牌，进入弃牌阶段。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "xuhuang",
+      "id": "duanliang",
+      "name": "断粮",
+      "opportunity": "黑色非锦囊手牌，合法敌方判定区无兵粮",
+      "opportunities": 1,
+      "uses": 0,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": []
+    },
+    {
+      "pack": "lin",
+      "hero": "caopi",
+      "id": "xingshang",
+      "name": "行殇",
+      "opportunity": "其他角色即将死亡且区域有牌",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "张飞对甘宁使用【杀】。",
+        "甘宁因【杀】受到 1 点伤害。",
+        "甘宁体力为 0，进入濒死状态。",
+        "张飞没有可用的【桃】/【酒】，无法救援。",
+        "关羽没有可用的【桃】/【酒】，无法救援。",
+        "曹丕没有可用的【桃】/【酒】，无法救援。",
+        "甘宁没有可用的【桃】/【酒】，无法救援。",
+        "甘宁没有人救援，死亡。",
+        "曹丕发动【行殇】，获得甘宁的所有牌（1 张）。",
+        "甘宁阵亡（忠臣），弃置其所有牌。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "caopi",
+      "id": "fangzhu",
+      "name": "放逐",
+      "opportunity": "自己受到伤害，场上有其他角色",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 1
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁对曹丕使用【杀】。",
+        "曹丕因【杀】受到 1 点伤害。",
+        "关羽摸了 2 张牌。",
+        "曹丕发动【放逐】，令关羽摸 2 张牌并将武将牌翻面。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "caopi",
+      "id": "songwei",
+      "name": "颂威",
+      "opportunity": "主公曹丕存活，同势力角色黑色判定",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁的判定阶段。",
+        "甘宁进行【乐不思蜀】判定：【杀】spade 5。",
+        "曹丕摸了 1 张牌。",
+        "甘宁的黑色判定牌生效，发动【颂威】令曹丕摸一张牌。",
+        "甘宁【乐不思蜀】判定失败，跳过出牌阶段。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "sunjian",
+      "id": "yinghun",
+      "name": "英魂",
+      "opportunity": "准备阶段已损失2体力",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "孙坚的准备阶段。",
+        "关羽摸了 1 张牌。",
+        "孙坚发动【英魂】，令关羽摸 1 张牌并弃置 1 张牌。",
+        "孙坚的判定阶段。",
+        "孙坚的摸牌阶段。",
+        "孙坚摸了 2 张牌。",
+        "孙坚进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "lusu",
+      "id": "haoshi",
+      "name": "好施",
+      "opportunity": "正常摸牌阶段，可多摸2张",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 4,
+          "hand": 4,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "鲁肃的摸牌阶段。",
+        "鲁肃发动【好施】，多摸两张牌。",
+        "鲁肃摸了 4 张牌。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "lusu",
+      "id": "dimeng",
+      "name": "缔盟",
+      "opportunity": "敌方3手牌、友方1手牌，自己3手牌可支付差额",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "鲁肃发动【缔盟】，弃置 2 张牌，令甘宁与张飞交换手牌。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "menghuo",
+      "id": "huoshou",
+      "name": "祸首",
+      "opportunity": "其他角色使用南蛮",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定南蛮免疫；整次AOE其他伤害归于完整窗口。",
+      "logs": [
+        "甘宁使用【南蛮入侵】。",
+        "张飞因【南蛮入侵】受到 1 点伤害。",
+        "关羽因【南蛮入侵】受到 1 点伤害。",
+        "孟获的锁定技令【南蛮入侵】对其无效。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "menghuo",
+      "id": "zaiqi",
+      "name": "再起",
+      "opportunity": "摸牌阶段损失2体力；待亮牌有红桃",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 1,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "孟获的摸牌阶段。",
+        "孟获发动【再起】，放弃摸牌并亮出牌堆顶 2 张牌（红桃 1 张）。",
+        "孟获回复 1 点体力（现为 3）。",
+        "孟获获得其余 1 张牌。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "zhurong",
+      "id": "juxiang",
+      "name": "巨象",
+      "opportunity": "其他角色使用南蛮，实体牌待结算",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁使用【南蛮入侵】。",
+        "张飞因【南蛮入侵】受到 1 点伤害。",
+        "关羽因【南蛮入侵】受到 1 点伤害。",
+        "祝融的锁定技令【南蛮入侵】对其无效。",
+        "祝融发动【巨象】，获得结算完毕的【南蛮入侵】。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "zhurong",
+      "id": "lieren",
+      "name": "烈刃",
+      "opportunity": "自己杀造成伤害，双方仍有拼点牌",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "祝融对关羽使用【杀】。",
+        "关羽因【杀】受到 1 点伤害。",
+        "祝融与关羽进行【烈刃】拼点。",
+        "祝融扣置一张手牌作为拼点牌。",
+        "等待关羽选择拼点的牌。",
+        "关羽扣置一张手牌作为拼点牌。",
+        "祝融亮出【闪】（点数 13），关羽亮出【杀】（点数 2）。",
+        "祝融拼点赢。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "jiaxu",
+      "id": "wansha",
+      "name": "完杀",
+      "opportunity": "自己回合杀濒死敌人，第三方持桃",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定救援限制；固定杀由测试提供触发，救援响应为原生AI。",
+      "logs": [
+        "贾诩对甘宁使用【杀】。",
+        "甘宁因【杀】受到 1 点伤害。",
+        "甘宁体力为 0，进入濒死状态。",
+        "贾诩没有可用的【桃】/【酒】，无法救援。",
+        "甘宁没有可用的【桃】/【酒】，无法救援。",
+        "张飞受【完杀】限制，不能使用【桃】救援。",
+        "关羽受【完杀】限制，不能使用【桃】救援。",
+        "甘宁没有人救援，死亡。",
+        "甘宁阵亡（忠臣），弃置其所有牌。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "jiaxu",
+      "id": "luanwu",
+      "name": "乱武",
+      "opportunity": "至少2敌方且其中一人2体力，限定技未用",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "贾诩发动限定技【乱武】，所有其他角色需对距离最小的另一名角色使用【杀】。",
+        "甘宁未对距离最小的角色使用【杀】，因【乱武】失去 1 点体力。",
+        "张飞未对距离最小的角色使用【杀】，因【乱武】失去 1 点体力。",
+        "等待关羽决定【乱武】的响应。",
+        "关羽未对距离最小的角色使用【杀】，因【乱武】失去 1 点体力。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "jiaxu",
+      "id": "weimu",
+      "name": "帷幕",
+      "opportunity": "自己成为黑色南蛮候选目标",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定黑锦囊目标免疫。",
+      "logs": [
+        "甘宁使用【南蛮入侵】。",
+        "张飞因【南蛮入侵】受到 1 点伤害。",
+        "关羽因【南蛮入侵】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "dongzhuo",
+      "id": "jiuchi",
+      "name": "酒池",
+      "opportunity": "黑桃非酒手牌与杀，敌人存活",
+      "opportunities": 1,
+      "uses": 0,
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "董卓对关羽使用【杀】。",
+        "关羽因【杀】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "dongzhuo",
+      "id": "roulin",
+      "name": "肉林",
+      "opportunity": "杀女性目标，目标仅持1闪",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定双闪门槛；使用=一闪不足时命中。",
+      "logs": [
+        "董卓对关羽使用【杀】。",
+        "【肉林】锁定：关羽需依次使用两张【闪】。",
+        "关羽打出【闪】响应【杀】。",
+        "关羽因【杀】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "dongzhuo",
+      "id": "benghuai",
+      "name": "崩坏",
+      "opportunity": "结束阶段自己体力高于另一角色",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": -1,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "强制负面技能，损失不可称为AI滥用。",
+      "logs": [
+        "董卓发动【崩坏】，减 1 点体力上限（现为 7）。",
+        "董卓的体力值随体力上限降至 7。",
+        "董卓结束回合。",
+        "甘宁的准备阶段。",
+        "甘宁的判定阶段。",
+        "甘宁的摸牌阶段。",
+        "甘宁摸了 2 张牌。",
+        "甘宁进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "dongzhuo",
+      "id": "baonue",
+      "name": "暴虐",
+      "opportunity": "董卓主公受伤，同群角色造成伤害，判定黑桃",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "张飞对甘宁使用【杀】。",
+        "甘宁因【杀】受到 1 点伤害。",
+        "张飞进行【暴虐】判定：【杀】spade 5。",
+        "【暴虐】判定为黑桃，董卓回复 1 点体力（现为 8）。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "zhanghe",
+      "id": "qiaobian",
+      "name": "巧变",
+      "opportunity": "有成本牌；摸牌阶段两名敌方各有手牌",
+      "opportunities": 1,
+      "uses": 0,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "本行单独量摸牌分支；Z出牌移动分支另有测试。",
+      "logs": [
+        "张郃的摸牌阶段。",
+        "张郃摸了 2 张牌。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "dengai",
+      "id": "tuntian",
+      "name": "屯田",
+      "opportunity": "回合外失去一张手牌，判定非红桃",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 1,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "邓艾进行【屯田】判定：【杀】spade 5。",
+        "邓艾发动【屯田】，将【杀】置于武将牌上称为\"田\"（共 1 张）。",
+        "甘宁使用【顺手牵羊】，获得了邓艾手牌的一张牌。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "dengai",
+      "id": "zaoxian",
+      "name": "凿险",
+      "opportunity": "准备阶段有3张田，尚未觉醒",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": -1,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定觉醒：减上限，获得急袭；后续能力不折算为HP。",
+      "logs": [
+        "邓艾的准备阶段。",
+        "邓艾减 1 点体力上限（现为 3）。",
+        "邓艾因【凿险】觉醒，获得【急袭】。",
+        "邓艾的判定阶段。",
+        "邓艾的摸牌阶段。",
+        "邓艾摸了 2 张牌。",
+        "邓艾进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "dengai",
+      "id": "jixi",
+      "name": "急袭",
+      "opportunity": "已获得急袭，有田和合法敌方可获取区域牌",
+      "opportunities": 1,
+      "uses": 0,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": []
+    },
+    {
+      "pack": "shan",
+      "hero": "jiangwei",
+      "id": "tiaoxin",
+      "name": "挑衅",
+      "opportunity": "敌方攻击范围内有自己，敌方持可弃牌",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "姜维发动【挑衅】，令甘宁选择是否对其使用【杀】。",
+        "甘宁选择不使用【杀】，姜维弃置其一张手牌牌。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "jiangwei",
+      "id": "zhiji",
+      "name": "志继",
+      "opportunity": "准备阶段手牌为空，尚未觉醒",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": -1,
+          "cards": 4,
+          "hand": 4,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定觉醒，局部包括所选回血/摸牌。",
+      "logs": [
+        "姜维的准备阶段。",
+        "姜维摸了 2 张牌。",
+        "姜维减 1 点体力上限（现为 3）。",
+        "姜维因【志继】觉醒，获得【观星】。",
+        "姜维发动【观星】，观看牌堆顶 4 张牌。",
+        "姜维的判定阶段。",
+        "姜维的摸牌阶段。",
+        "姜维摸了 2 张牌。",
+        "姜维进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "liushan",
+      "id": "xiangle",
+      "name": "享乐",
+      "opportunity": "敌方使用杀且无额外基本牌可付",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定杀附加成本。",
+      "logs": [
+        "甘宁对刘禅使用【杀】。",
+        "甘宁没有基本牌可弃，【享乐】令此【杀】对刘禅无效。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "liushan",
+      "id": "fangquan",
+      "name": "放权",
+      "opportunity": "出牌前仅有闪可支付，存活友方有杀且敌方存活",
+      "opportunities": 1,
+      "uses": 0,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "支付1牌换友方额外回合；窗口只观察授予，不估算整个额外回合胜率。",
+      "logs": [
+        "刘禅进入出牌阶段。",
+        "刘禅结束出牌，进入弃牌阶段。",
+        "刘禅进入结束阶段。",
+        "刘禅结束回合。",
+        "甘宁的准备阶段。",
+        "甘宁的判定阶段。",
+        "甘宁的摸牌阶段。",
+        "甘宁摸了 2 张牌。",
+        "甘宁进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "liushan",
+      "id": "ruoyu",
+      "name": "若愚",
+      "opportunity": "主公准备阶段最低体力，尚未觉醒",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 1,
+          "maxHp": 1,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "刘禅的准备阶段。",
+        "刘禅因【若愚】加 1 点体力上限并回复 1 点体力（现为 3 / 4）。",
+        "刘禅因【若愚】觉醒，获得【激将】。",
+        "刘禅的判定阶段。",
+        "刘禅的摸牌阶段。",
+        "刘禅摸了 2 张牌。",
+        "刘禅进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "sunce",
+      "id": "jiang",
+      "name": "激昂",
+      "opportunity": "自己使用红色杀",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "孙策对关羽使用【杀】。",
+        "孙策摸了 1 张牌。",
+        "孙策发动【激昂】，摸一张牌。",
+        "关羽因【杀】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "sunce",
+      "id": "hunzi",
+      "name": "魂姿",
+      "opportunity": "准备阶段1体力，尚未觉醒",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": -1,
+          "cards": 3,
+          "hand": 3,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "孙策的准备阶段。",
+        "孙策减 1 点体力上限（现为 3）。",
+        "孙策因【魂姿】觉醒，获得【英姿】。",
+        "孙策因【魂姿】觉醒，获得【英魂】。",
+        "关羽摸了 1 张牌。",
+        "孙策发动【英魂】，令关羽摸 1 张牌并弃置 1 张牌。",
+        "孙策的判定阶段。",
+        "孙策的摸牌阶段。",
+        "孙策发动【英姿】，摸牌阶段额外摸一张牌。",
+        "孙策摸了 3 张牌。",
+        "孙策进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "sunce",
+      "id": "zhiba",
+      "name": "制霸",
+      "opportunity": "吴势力友方有2手牌；孙策主公有K点牌",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "发动者为主公友方AI；收益归技能持有者。",
+      "logs": [
+        "张飞与孙策进行【制霸】拼点。",
+        "张飞扣置一张手牌作为拼点牌。",
+        "孙策扣置一张手牌作为拼点牌。",
+        "张飞亮出【闪】（点数 3），孙策亮出【闪】（点数 13）。",
+        "张飞拼点没赢。",
+        "孙策发动【制霸】，获得两张拼点的牌。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "erzhang",
+      "id": "zhijian",
+      "name": "直谏",
+      "opportunity": "自己手持装备，存活友方有相应空装备栏",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "张飞装备了【青釭剑】。",
+        "张昭张纮发动【直谏】，将【青釭剑】置入张飞的装备区并摸一张牌。",
+        "张昭张纮摸了 1 张牌。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "erzhang",
+      "id": "guzheng",
+      "name": "固政",
+      "opportunity": "其他角色弃牌阶段弃2张手牌",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁弃置 2 张牌，满足手牌上限。",
+        "张昭张纮发动【固政】，将【闪】交还给甘宁，并获得其余 1 张弃牌。",
+        "甘宁进入结束阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "caiwenji",
+      "id": "beige",
+      "name": "悲歌",
+      "opportunity": "友方受到杀伤害，自己有弃牌成本，判定红桃",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁对张飞使用【杀】。",
+        "张飞因【杀】受到 1 点伤害。",
+        "蔡文姬发动【悲歌】，弃置【闪】。",
+        "张飞进行【悲歌】判定：【杀】heart 5。",
+        "【悲歌】判定为红桃，张飞回复 1 点体力。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "caiwenji",
+      "id": "duanchang",
+      "name": "断肠",
+      "opportunity": "自己1体力被有技能的敌方杀死",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 3,
+          "hand": 3,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "死亡后的锁定惩罚；自己死亡不是主动AI成本。",
+      "logs": [
+        "甘宁对蔡文姬使用【杀】。",
+        "蔡文姬因【杀】受到 1 点伤害。",
+        "蔡文姬体力为 0，进入濒死状态。",
+        "甘宁没有可用的【桃】/【酒】，无法救援。",
+        "张飞没有可用的【桃】/【酒】，无法救援。",
+        "关羽没有可用的【桃】/【酒】，无法救援。",
+        "蔡文姬没有可用的【桃】/【酒】，无法救援。",
+        "蔡文姬没有人救援，死亡。",
+        "蔡文姬的【断肠】令甘宁失去其所有技能（1 个）。",
+        "蔡文姬阵亡（反贼），弃置其所有牌。",
+        "甘宁击杀反贼，摸三张牌。",
+        "甘宁摸了 3 张牌。"
+      ]
+    },
+    {
+      "pack": "sp",
+      "hero": "sp_guanyu",
+      "id": "danji",
+      "name": "单骑",
+      "opportunity": "曹操主公，准备阶段手牌数高于体力",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": -1,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "SP 关羽的准备阶段。",
+        "SP 关羽减 1 点体力上限（现为 3）。",
+        "SP 关羽因【单骑】觉醒，获得【马术】。",
+        "SP 关羽的判定阶段。",
+        "SP 关羽的摸牌阶段。",
+        "SP 关羽摸了 2 张牌。",
+        "SP 关羽进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "sp",
+      "hero": "sp_yuanshu",
+      "id": "yongsi",
+      "name": "庸肆",
+      "opportunity": "摸牌阶段有多个存活势力",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 5,
+          "hand": 5,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "只量额外摸牌；强制弃牌成本在另一个阶段，不能将这里净增牌当整回合收益。",
+      "logs": [
+        "SP 袁术的摸牌阶段。",
+        "SP 袁术因【庸肆】多摸 3 张牌。",
+        "SP 袁术摸了 5 张牌。"
+      ]
+    },
+    {
+      "pack": "sp",
+      "hero": "sp_yuanshu",
+      "id": "weidi",
+      "name": "伪帝",
+      "opportunity": "非主公袁术视为拥有主公颂威，其他魏角色黑色判定",
+      "opportunities": 1,
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "视为拥有主公技能后获得颂威摸牌；不将伪帝本身视为主动发动。",
+      "logs": [
+        "甘宁的判定阶段。",
+        "甘宁进行【乐不思蜀】判定：【杀】spade 5。",
+        "曹丕摸了 1 张牌。",
+        "甘宁的黑色判定牌生效，发动【颂威】令曹丕摸一张牌。",
+        "SP 袁术摸了 1 张牌。",
+        "甘宁的黑色判定牌生效，发动【颂威】令SP 袁术摸一张牌。",
+        "甘宁【乐不思蜀】判定失败，跳过出牌阶段。"
+      ]
+    }
+  ],
+  "controlled": [
+    {
+      "pack": "fire",
+      "hero": "dianwei",
+      "id": "qiangxi",
+      "name": "强袭",
+      "opportunity": "出牌阶段，满体力且近距离敌方存活",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "付1体力换敌方1伤害；局部代价，不直接认定自伤误用。",
+      "logs": [
+        "典韦发动【强袭】，失去 1 点体力。",
+        "关羽因【强袭】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "xunyu",
+      "id": "quhu",
+      "name": "驱虎",
+      "opportunity": "较高体力敌方有手牌，自己有K点牌",
+      "opportunities": 2,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "记录拼点整次结算；敌方最高牌仅由对照场景设定，AI仍只读手牌数。",
+      "logs": [],
+      "additional": {
+        "opportunity": "拼点目标装备长距离武器，可令其伤害另一敌方",
+        "uses": 1,
+        "delta": {
+          "player": {
+            "hp": -1,
+            "maxHp": 0,
+            "cards": 0,
+            "hand": 0,
+            "tian": 0,
+            "turned": 0
+          },
+          "enemy": {
+            "hp": 0,
+            "maxHp": 0,
+            "cards": -1,
+            "hand": -1,
+            "tian": 0,
+            "turned": 0
+          },
+          "ally": {
+            "hp": 0,
+            "maxHp": 0,
+            "cards": -1,
+            "hand": -1,
+            "tian": 0,
+            "turned": 0
+          },
+          "ally2": {
+            "hp": 0,
+            "maxHp": 0,
+            "cards": 0,
+            "hand": 0,
+            "tian": 0,
+            "turned": 0
+          }
+        },
+        "logs": [
+          "荀彧与甘宁进行【驱虎】拼点。",
+          "荀彧扣置一张手牌作为拼点牌。",
+          "甘宁扣置一张手牌作为拼点牌。",
+          "荀彧亮出【闪】（点数 13），甘宁亮出【闪】（点数 2）。",
+          "荀彧拼点赢。",
+          "关羽因【驱虎】受到 1 点伤害。"
+        ]
+      }
+    },
+    {
+      "pack": "fire",
+      "hero": "xunyu",
+      "id": "jieming",
+      "name": "节命",
+      "opportunity": "自己受到1点伤害，友方有补牌缺口",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 4,
+          "hand": 4,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁对荀彧使用【杀】。",
+        "荀彧因【杀】受到 1 点伤害。",
+        "张飞摸了 4 张牌。",
+        "荀彧发动【节命】，令张飞将手牌补至 4 张。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "wolong",
+      "id": "bazhen",
+      "name": "八阵",
+      "opportunity": "无防具时受到杀，判定顶牌红色",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定虚拟八卦；使用=本次挡下杀。",
+      "logs": [
+        "甘宁对卧龙诸葛亮使用【杀】。",
+        "卧龙诸葛亮进行【八卦阵】判定：【杀】heart 5。",
+        "卧龙诸葛亮的【八卦阵】判定为红色，视为打出【闪】。",
+        "卧龙诸葛亮闪避成功，没有受到伤害。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "wolong",
+      "id": "huoji",
+      "name": "火计",
+      "opportunity": "红色手牌可当火攻，敌人有手牌，另有同花色付款牌",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "卧龙诸葛亮发动【火计】，将【闪】当【火攻】使用。",
+        "甘宁展示【闪】（spade）。",
+        "卧龙诸葛亮弃置同花色【杀】发动【火攻】。",
+        "甘宁因【火攻】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "wolong",
+      "id": "kanpo",
+      "name": "看破",
+      "opportunity": "敌方使用无中，自己只有黑色转换材料",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁使用【无中生有】。",
+        "卧龙诸葛亮发动【看破】，将【闪】当【无懈可击】抵消【无中生有】。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "pangtong",
+      "id": "lianhuan",
+      "name": "连环",
+      "opportunity": "梅花手牌可当铁索，存在敌方目标",
+      "opportunities": 2,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [],
+      "additional": {
+        "opportunity": "友方已横置，可解除连锁",
+        "uses": 1,
+        "delta": {
+          "player": {
+            "hp": 0,
+            "maxHp": 0,
+            "cards": 0,
+            "hand": 0,
+            "tian": 0,
+            "turned": 0
+          },
+          "enemy": {
+            "hp": 0,
+            "maxHp": 0,
+            "cards": -1,
+            "hand": -1,
+            "tian": 0,
+            "turned": 0
+          },
+          "ally": {
+            "hp": 0,
+            "maxHp": 0,
+            "cards": 0,
+            "hand": 0,
+            "tian": 0,
+            "turned": 0
+          },
+          "ally2": {
+            "hp": 0,
+            "maxHp": 0,
+            "cards": 0,
+            "hand": 0,
+            "tian": 0,
+            "turned": 0
+          }
+        },
+        "logs": [
+          "庞统发动【连环】，将【闪】当【铁索连环】使用。",
+          "庞统使用【铁索连环】，张飞重置。"
+        ]
+      }
+    },
+    {
+      "pack": "fire",
+      "hero": "pangtong",
+      "id": "niepan",
+      "name": "涅槃",
+      "opportunity": "限定技未用，1体力承受致命杀",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 2,
+          "maxHp": 0,
+          "cards": 3,
+          "hand": 3,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "使用=濒死后复活，包含摸3和重置状态。",
+      "logs": [
+        "甘宁对庞统使用【杀】。",
+        "庞统因【杀】受到 1 点伤害。",
+        "庞统体力为 0，进入濒死状态。",
+        "甘宁没有可用的【桃】/【酒】，无法救援。",
+        "张飞没有可用的【桃】/【酒】，无法救援。",
+        "关羽没有可用的【桃】/【酒】，无法救援。",
+        "庞统摸了 3 张牌。",
+        "庞统发动【涅槃】：弃置区域内所有牌，武将牌复原，摸三张牌，体力回复至 3 点。",
+        "庞统脱离濒死状态。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "taishici",
+      "id": "tianyi",
+      "name": "天义",
+      "opportunity": "有杀与K点拼点牌，敌方有牌",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "太史慈与甘宁进行【天义】拼点。",
+        "太史慈扣置一张手牌作为拼点牌。",
+        "甘宁扣置一张手牌作为拼点牌。",
+        "太史慈亮出【闪】（点数 13），甘宁亮出【闪】（点数 2）。",
+        "太史慈拼点赢。",
+        "太史慈【天义】拼点赢：本回合【杀】的使用次数上限 +1、无距离限制、额外目标数上限 +1。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "pangde",
+      "id": "mengjin",
+      "name": "猛进",
+      "opportunity": "自己使用杀被敌方闪避，目标还有可弃牌",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "庞德对关羽使用【杀】。",
+        "关羽打出【闪】响应【杀】。",
+        "庞德发动【猛进】，弃置关羽的一张手牌。",
+        "关羽闪避成功，没有受到伤害。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "yanliangwenchou",
+      "id": "shuangxiong",
+      "name": "双雄",
+      "opportunity": "摸牌阶段有至少3张手牌，可选择替代摸牌",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "局部摸牌量减少1；本行未假设后续决斗收益。",
+      "logs": [
+        "颜良文丑的摸牌阶段。",
+        "颜良文丑进行【双雄】判定：【杀】diamond 5。",
+        "颜良文丑发动【双雄】，放弃摸牌并获得判定牌【杀】，本回合可将黑色手牌当【决斗】使用。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "yuanshao",
+      "id": "luanji",
+      "name": "乱击",
+      "opportunity": "同花色手牌2张；敌方数多于友方数",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [],
+        "foes": [
+          "player",
+          "ally",
+          "ally2"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "袁绍发动【乱击】，将两张黑桃手牌当【万箭齐发】使用。",
+        "袁绍使用【万箭齐发】。",
+        "甘宁因【万箭齐发】受到 1 点伤害。",
+        "张飞因【万箭齐发】受到 1 点伤害。",
+        "关羽因【万箭齐发】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "fire",
+      "hero": "yuanshao",
+      "id": "xueyi",
+      "name": "血裔",
+      "opportunity": "主公有其他群势力存活且手牌超普通上限",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally"
+        ],
+        "foes": [
+          "player",
+          "ally2"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定技保留超过普通上限的牌；非主动选择。",
+      "logs": [
+        "袁绍结束出牌，进入弃牌阶段。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "xuhuang",
+      "id": "duanliang",
+      "name": "断粮",
+      "opportunity": "黑色非锦囊手牌，合法敌方判定区无兵粮",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "徐晃发动【断粮】，将【闪】当【兵粮寸断】使用。",
+        "徐晃将【兵粮寸断】置入关羽的判定区。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "caopi",
+      "id": "xingshang",
+      "name": "行殇",
+      "opportunity": "其他角色即将死亡且区域有牌",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "张飞对甘宁使用【杀】。",
+        "甘宁因【杀】受到 1 点伤害。",
+        "甘宁体力为 0，进入濒死状态。",
+        "张飞没有可用的【桃】/【酒】，无法救援。",
+        "关羽没有可用的【桃】/【酒】，无法救援。",
+        "曹丕没有可用的【桃】/【酒】，无法救援。",
+        "甘宁没有可用的【桃】/【酒】，无法救援。",
+        "甘宁没有人救援，死亡。",
+        "曹丕发动【行殇】，获得甘宁的所有牌（1 张）。",
+        "甘宁阵亡（忠臣），弃置其所有牌。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "caopi",
+      "id": "fangzhu",
+      "name": "放逐",
+      "opportunity": "自己受到伤害，场上有其他角色",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 1
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁对曹丕使用【杀】。",
+        "曹丕因【杀】受到 1 点伤害。",
+        "关羽摸了 2 张牌。",
+        "曹丕发动【放逐】，令关羽摸 2 张牌并将武将牌翻面。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "caopi",
+      "id": "songwei",
+      "name": "颂威",
+      "opportunity": "主公曹丕存活，同势力角色黑色判定",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally"
+        ],
+        "foes": [
+          "player",
+          "ally2"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁的判定阶段。",
+        "甘宁进行【乐不思蜀】判定：【杀】spade 5。",
+        "曹丕摸了 1 张牌。",
+        "甘宁的黑色判定牌生效，发动【颂威】令曹丕摸一张牌。",
+        "甘宁【乐不思蜀】判定失败，跳过出牌阶段。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "sunjian",
+      "id": "yinghun",
+      "name": "英魂",
+      "opportunity": "准备阶段已损失2体力",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "孙坚的准备阶段。",
+        "关羽摸了 1 张牌。",
+        "孙坚发动【英魂】，令关羽摸 1 张牌，然后由其选择弃牌。",
+        "【英魂】令关羽弃置 1 张牌。",
+        "孙坚的判定阶段。",
+        "孙坚的摸牌阶段。",
+        "孙坚摸了 2 张牌。",
+        "孙坚进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "lusu",
+      "id": "haoshi",
+      "name": "好施",
+      "opportunity": "正常摸牌阶段，可多摸2张",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 4,
+          "hand": 4,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "鲁肃的摸牌阶段。",
+        "鲁肃发动【好施】，多摸两张牌。",
+        "鲁肃摸了 4 张牌。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "lusu",
+      "id": "dimeng",
+      "name": "缔盟",
+      "opportunity": "敌方3手牌、友方1手牌，自己3手牌可支付差额",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "鲁肃发动【缔盟】，弃置 2 张牌，令甘宁与张飞交换手牌。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "menghuo",
+      "id": "huoshou",
+      "name": "祸首",
+      "opportunity": "其他角色使用南蛮",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定南蛮免疫；整次AOE其他伤害归于完整窗口。",
+      "logs": [
+        "甘宁使用【南蛮入侵】。",
+        "张飞因【南蛮入侵】受到 1 点伤害。",
+        "关羽因【南蛮入侵】受到 1 点伤害。",
+        "孟获的锁定技令【南蛮入侵】对其无效。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "menghuo",
+      "id": "zaiqi",
+      "name": "再起",
+      "opportunity": "摸牌阶段损失2体力；待亮牌有红桃",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 1,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "孟获的摸牌阶段。",
+        "孟获发动【再起】，放弃摸牌并亮出牌堆顶 2 张牌（红桃 1 张）。",
+        "孟获回复 1 点体力（现为 3）。",
+        "孟获获得其余 1 张牌。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "zhurong",
+      "id": "juxiang",
+      "name": "巨象",
+      "opportunity": "其他角色使用南蛮，实体牌待结算",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁使用【南蛮入侵】。",
+        "张飞因【南蛮入侵】受到 1 点伤害。",
+        "关羽因【南蛮入侵】受到 1 点伤害。",
+        "祝融的锁定技令【南蛮入侵】对其无效。",
+        "祝融发动【巨象】，获得结算完毕的【南蛮入侵】。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "zhurong",
+      "id": "lieren",
+      "name": "烈刃",
+      "opportunity": "自己杀造成伤害，双方仍有拼点牌",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "祝融对关羽使用【杀】。",
+        "关羽因【杀】受到 1 点伤害。",
+        "祝融与关羽进行【烈刃】拼点。",
+        "祝融扣置一张手牌作为拼点牌。",
+        "等待关羽选择拼点的牌。",
+        "关羽扣置一张手牌作为拼点牌。",
+        "祝融亮出【闪】（点数 13），关羽亮出【杀】（点数 2）。",
+        "祝融拼点赢。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "jiaxu",
+      "id": "wansha",
+      "name": "完杀",
+      "opportunity": "自己回合杀濒死敌人，第三方持桃",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定救援限制；固定杀由测试提供触发，救援响应为原生AI。",
+      "logs": [
+        "贾诩对甘宁使用【杀】。",
+        "甘宁因【杀】受到 1 点伤害。",
+        "甘宁体力为 0，进入濒死状态。",
+        "贾诩没有可用的【桃】/【酒】，无法救援。",
+        "甘宁没有可用的【桃】/【酒】，无法救援。",
+        "张飞受【完杀】限制，不能使用【桃】救援。",
+        "关羽受【完杀】限制，不能使用【桃】救援。",
+        "甘宁没有人救援，死亡。",
+        "甘宁阵亡（忠臣），弃置其所有牌。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "jiaxu",
+      "id": "luanwu",
+      "name": "乱武",
+      "opportunity": "至少2敌方且其中一人2体力，限定技未用",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "贾诩发动限定技【乱武】，所有其他角色需对距离最小的另一名角色使用【杀】。",
+        "甘宁未对距离最小的角色使用【杀】，因【乱武】失去 1 点体力。",
+        "张飞未对距离最小的角色使用【杀】，因【乱武】失去 1 点体力。",
+        "等待关羽决定【乱武】的响应。",
+        "关羽未对距离最小的角色使用【杀】，因【乱武】失去 1 点体力。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "jiaxu",
+      "id": "weimu",
+      "name": "帷幕",
+      "opportunity": "自己成为黑色南蛮候选目标",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定黑锦囊目标免疫。",
+      "logs": [
+        "甘宁使用【南蛮入侵】。",
+        "张飞因【南蛮入侵】受到 1 点伤害。",
+        "关羽因【南蛮入侵】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "dongzhuo",
+      "id": "jiuchi",
+      "name": "酒池",
+      "opportunity": "黑桃非酒手牌与杀，敌人存活",
+      "opportunities": 2,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "董卓对关羽使用【杀】。",
+        "关羽因【杀】受到 1 点伤害。"
+      ],
+      "additional": {
+        "opportunity": "敌方2体力，酒杀可达击杀线",
+        "uses": 1,
+        "delta": {
+          "player": {
+            "hp": 0,
+            "maxHp": 0,
+            "cards": 0,
+            "hand": 0,
+            "tian": 0,
+            "turned": 0
+          },
+          "enemy": {
+            "hp": 0,
+            "maxHp": 0,
+            "cards": -1,
+            "hand": -1,
+            "tian": 0,
+            "turned": 0
+          },
+          "ally": {
+            "hp": 0,
+            "maxHp": 0,
+            "cards": 0,
+            "hand": 0,
+            "tian": 0,
+            "turned": 0
+          },
+          "ally2": {
+            "hp": 0,
+            "maxHp": 0,
+            "cards": 0,
+            "hand": 0,
+            "tian": 0,
+            "turned": 0
+          }
+        },
+        "logs": [
+          "董卓发动【酒池】，将【闪】当【酒】使用。",
+          "董卓饮下【酒】，本回合下一张【杀】伤害 +1。"
+        ]
+      }
+    },
+    {
+      "pack": "lin",
+      "hero": "dongzhuo",
+      "id": "roulin",
+      "name": "肉林",
+      "opportunity": "杀女性目标，目标仅持1闪",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定双闪门槛；使用=一闪不足时命中。",
+      "logs": [
+        "董卓对关羽使用【杀】。",
+        "【肉林】锁定：关羽需依次使用两张【闪】。",
+        "关羽打出【闪】响应【杀】。",
+        "关羽因【杀】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "dongzhuo",
+      "id": "benghuai",
+      "name": "崩坏",
+      "opportunity": "结束阶段自己体力高于另一角色",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": -1,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "强制负面技能，损失不可称为AI滥用。",
+      "logs": [
+        "董卓发动【崩坏】，减 1 点体力上限（现为 7）。",
+        "董卓的体力值随体力上限降至 7。",
+        "董卓结束回合。",
+        "甘宁的准备阶段。",
+        "甘宁的判定阶段。",
+        "甘宁的摸牌阶段。",
+        "甘宁摸了 2 张牌。",
+        "甘宁进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "lin",
+      "hero": "dongzhuo",
+      "id": "baonue",
+      "name": "暴虐",
+      "opportunity": "董卓主公受伤，同群角色造成伤害，判定黑桃",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally"
+        ],
+        "foes": [
+          "player",
+          "ally2"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "张飞对甘宁使用【杀】。",
+        "甘宁因【杀】受到 1 点伤害。",
+        "张飞进行【暴虐】判定：【杀】spade 5。",
+        "【暴虐】判定为黑桃，董卓回复 1 点体力（现为 8）。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "zhanghe",
+      "id": "qiaobian",
+      "name": "巧变",
+      "opportunity": "有成本牌；摸牌阶段两名敌方各有手牌",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "本行单独量摸牌分支；Z出牌移动分支另有测试。",
+      "logs": [
+        "张郃的摸牌阶段。",
+        "张郃发动【巧变】，弃置一张手牌跳过摸牌阶段。",
+        "张郃发动【巧变】，获得关羽的一张手牌。",
+        "张郃发动【巧变】，获得甘宁的一张手牌。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "dengai",
+      "id": "tuntian",
+      "name": "屯田",
+      "opportunity": "回合外失去一张手牌，判定非红桃",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 1,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "邓艾进行【屯田】判定：【杀】spade 5。",
+        "邓艾发动【屯田】，将【杀】置于武将牌上称为\"田\"（共 1 张）。",
+        "甘宁使用【顺手牵羊】，获得了邓艾手牌的一张牌。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "dengai",
+      "id": "zaoxian",
+      "name": "凿险",
+      "opportunity": "准备阶段有3张田，尚未觉醒",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": -1,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定觉醒：减上限，获得急袭；后续能力不折算为HP。",
+      "logs": [
+        "邓艾的准备阶段。",
+        "邓艾减 1 点体力上限（现为 3）。",
+        "邓艾因【凿险】觉醒，获得【急袭】。",
+        "邓艾的判定阶段。",
+        "邓艾的摸牌阶段。",
+        "邓艾摸了 2 张牌。",
+        "邓艾进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "dengai",
+      "id": "jixi",
+      "name": "急袭",
+      "opportunity": "已获得急袭，有田和合法敌方可获取区域牌",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": -1,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "邓艾发动【急袭】，将【闪】当【顺手牵羊】使用。",
+        "邓艾使用【顺手牵羊】，获得了甘宁手牌的一张牌。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "jiangwei",
+      "id": "tiaoxin",
+      "name": "挑衅",
+      "opportunity": "敌方攻击范围内有自己，敌方持可弃牌",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "姜维发动【挑衅】，令甘宁选择是否对其使用【杀】。",
+        "甘宁选择不使用【杀】，姜维弃置其一张手牌牌。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "jiangwei",
+      "id": "zhiji",
+      "name": "志继",
+      "opportunity": "准备阶段手牌为空，尚未觉醒",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": -1,
+          "cards": 4,
+          "hand": 4,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定觉醒，局部包括所选回血/摸牌。",
+      "logs": [
+        "姜维的准备阶段。",
+        "姜维摸了 2 张牌。",
+        "姜维减 1 点体力上限（现为 3）。",
+        "姜维因【志继】觉醒，获得【观星】。",
+        "姜维发动【观星】，观看牌堆顶 4 张牌。",
+        "姜维的判定阶段。",
+        "姜维的摸牌阶段。",
+        "姜维摸了 2 张牌。",
+        "姜维进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "liushan",
+      "id": "xiangle",
+      "name": "享乐",
+      "opportunity": "敌方使用杀且无额外基本牌可付",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "锁定杀附加成本。",
+      "logs": [
+        "甘宁对刘禅使用【杀】。",
+        "甘宁没有基本牌可弃，【享乐】令此【杀】对刘禅无效。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "liushan",
+      "id": "fangquan",
+      "name": "放权",
+      "opportunity": "出牌前仅有闪可支付，存活友方有杀且敌方存活",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "支付1牌换友方额外回合；窗口只观察授予，不估算整个额外回合胜率。",
+      "logs": [
+        "刘禅发动【放权】，跳过出牌阶段。",
+        "刘禅进入弃牌阶段。",
+        "刘禅进入结束阶段。",
+        "刘禅发动【放权】，弃置一张手牌，令张飞获得一个额外的回合。",
+        "刘禅结束回合。",
+        "张飞获得一个额外的回合。",
+        "张飞的准备阶段。",
+        "张飞的判定阶段。",
+        "张飞的摸牌阶段。",
+        "张飞摸了 2 张牌。",
+        "张飞进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "liushan",
+      "id": "ruoyu",
+      "name": "若愚",
+      "opportunity": "主公准备阶段最低体力，尚未觉醒",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally"
+        ],
+        "foes": [
+          "player",
+          "ally2"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 1,
+          "maxHp": 1,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "刘禅的准备阶段。",
+        "刘禅因【若愚】加 1 点体力上限并回复 1 点体力（现为 3 / 4）。",
+        "刘禅因【若愚】觉醒，获得【激将】。",
+        "刘禅的判定阶段。",
+        "刘禅的摸牌阶段。",
+        "刘禅摸了 2 张牌。",
+        "刘禅进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "sunce",
+      "id": "jiang",
+      "name": "激昂",
+      "opportunity": "自己使用红色杀",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "孙策对关羽使用【杀】。",
+        "孙策摸了 1 张牌。",
+        "孙策发动【激昂】，摸一张牌。",
+        "关羽因【杀】受到 1 点伤害。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "sunce",
+      "id": "hunzi",
+      "name": "魂姿",
+      "opportunity": "准备阶段1体力，尚未觉醒",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": -1,
+          "cards": 3,
+          "hand": 3,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "孙策的准备阶段。",
+        "孙策减 1 点体力上限（现为 3）。",
+        "孙策因【魂姿】觉醒，获得【英姿】。",
+        "孙策因【魂姿】觉醒，获得【英魂】。",
+        "关羽摸了 1 张牌。",
+        "孙策发动【英魂】，令关羽摸 1 张牌，然后由其选择弃牌。",
+        "【英魂】令关羽弃置 1 张牌。",
+        "孙策的判定阶段。",
+        "孙策的摸牌阶段。",
+        "孙策发动【英姿】，摸牌阶段额外摸一张牌。",
+        "孙策摸了 3 张牌。",
+        "孙策进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "sunce",
+      "id": "zhiba",
+      "name": "制霸",
+      "opportunity": "吴势力友方有2手牌；孙策主公有K点牌",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally",
+          "ally2"
+        ],
+        "foes": [
+          "player"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "发动者为主公友方AI；收益归技能持有者。",
+      "logs": [
+        "张飞与孙策进行【制霸】拼点。",
+        "张飞扣置一张手牌作为拼点牌。",
+        "孙策扣置一张手牌作为拼点牌。",
+        "张飞亮出【闪】（点数 3），孙策亮出【闪】（点数 13）。",
+        "张飞拼点没赢。",
+        "孙策发动【制霸】，获得两张拼点的牌。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "erzhang",
+      "id": "zhijian",
+      "name": "直谏",
+      "opportunity": "自己手持装备，存活友方有相应空装备栏",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "张飞装备了【青釭剑】。",
+        "张昭张纮发动【直谏】，将【青釭剑】置入张飞的装备区并摸一张牌。",
+        "张昭张纮摸了 1 张牌。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "erzhang",
+      "id": "guzheng",
+      "name": "固政",
+      "opportunity": "其他角色弃牌阶段弃2张手牌",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁弃置 2 张牌，满足手牌上限。",
+        "张昭张纮发动【固政】，将【闪】交还给甘宁，并获得其余 1 张弃牌。",
+        "甘宁进入结束阶段。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "caiwenji",
+      "id": "beige",
+      "name": "悲歌",
+      "opportunity": "友方受到杀伤害，自己有弃牌成本，判定红桃",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "甘宁对张飞使用【杀】。",
+        "张飞因【杀】受到 1 点伤害。",
+        "蔡文姬发动【悲歌】，弃置【闪】。",
+        "张飞进行【悲歌】判定：【杀】heart 5。",
+        "【悲歌】判定为红桃，张飞回复 1 点体力。"
+      ]
+    },
+    {
+      "pack": "shan",
+      "hero": "caiwenji",
+      "id": "duanchang",
+      "name": "断肠",
+      "opportunity": "自己1体力被有技能的敌方杀死",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 3,
+          "hand": 3,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "死亡后的锁定惩罚；自己死亡不是主动AI成本。",
+      "logs": [
+        "甘宁对蔡文姬使用【杀】。",
+        "蔡文姬因【杀】受到 1 点伤害。",
+        "蔡文姬体力为 0，进入濒死状态。",
+        "甘宁没有可用的【桃】/【酒】，无法救援。",
+        "张飞没有可用的【桃】/【酒】，无法救援。",
+        "关羽没有可用的【桃】/【酒】，无法救援。",
+        "蔡文姬没有可用的【桃】/【酒】，无法救援。",
+        "蔡文姬没有人救援，死亡。",
+        "蔡文姬的【断肠】令甘宁失去其所有技能（1 个）。",
+        "蔡文姬阵亡（反贼），弃置其所有牌。",
+        "甘宁击杀反贼，摸三张牌。",
+        "甘宁摸了 3 张牌。"
+      ]
+    },
+    {
+      "pack": "sp",
+      "hero": "sp_guanyu",
+      "id": "danji",
+      "name": "单骑",
+      "opportunity": "曹操主公，准备阶段手牌数高于体力",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": -1,
+          "maxHp": -1,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "",
+      "logs": [
+        "SP 关羽的准备阶段。",
+        "SP 关羽减 1 点体力上限（现为 3）。",
+        "SP 关羽因【单骑】觉醒，获得【马术】。",
+        "SP 关羽的判定阶段。",
+        "SP 关羽的摸牌阶段。",
+        "SP 关羽摸了 2 张牌。",
+        "SP 关羽进入出牌阶段。"
+      ]
+    },
+    {
+      "pack": "sp",
+      "hero": "sp_yuanshu",
+      "id": "yongsi",
+      "name": "庸肆",
+      "opportunity": "摸牌阶段有多个存活势力",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 5,
+          "hand": 5,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "只量额外摸牌；强制弃牌成本在另一个阶段，不能将这里净增牌当整回合收益。",
+      "logs": [
+        "SP 袁术的摸牌阶段。",
+        "SP 袁术因【庸肆】多摸 3 张牌。",
+        "SP 袁术摸了 5 张牌。"
+      ]
+    },
+    {
+      "pack": "sp",
+      "hero": "sp_yuanshu",
+      "id": "weidi",
+      "name": "伪帝",
+      "opportunity": "非主公袁术视为拥有主公颂威，其他魏角色黑色判定",
+      "opportunities": 1,
+      "uses": 1,
+      "groups": {
+        "self": [
+          "enemy"
+        ],
+        "friends": [
+          "ally2"
+        ],
+        "foes": [
+          "player",
+          "ally"
+        ]
+      },
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "note": "视为拥有主公技能后获得颂威摸牌；不将伪帝本身视为主动发动。",
+      "logs": [
+        "甘宁的判定阶段。",
+        "甘宁进行【乐不思蜀】判定：【杀】spade 5。",
+        "曹丕摸了 1 张牌。",
+        "甘宁的黑色判定牌生效，发动【颂威】令曹丕摸一张牌。",
+        "SP 袁术摸了 1 张牌。",
+        "甘宁的黑色判定牌生效，发动【颂威】令SP 袁术摸一张牌。",
+        "甘宁【乐不思蜀】判定失败，跳过出牌阶段。"
+      ]
+    }
+  ],
+  "interventions": [
+    {
+      "id": "huoji",
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -2,
+          "hand": -2,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": -1,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "logs": [
+        "卧龙诸葛亮发动【火计】，将【闪】当【火攻】使用。",
+        "甘宁展示【闪】（spade）。",
+        "卧龙诸葛亮弃置同花色【杀】发动【火攻】。",
+        "甘宁因【火攻】受到 1 点伤害。"
+      ]
+    },
+    {
+      "id": "lianhuan",
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "logs": [
+        "庞统发动【连环】，将【闪】当【铁索连环】使用。",
+        "庞统使用【铁索连环】，甘宁横置。",
+        "庞统使用【铁索连环】，关羽横置。"
+      ]
+    },
+    {
+      "id": "duanliang",
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "logs": [
+        "徐晃发动【断粮】，将【闪】当【兵粮寸断】使用。",
+        "徐晃将【兵粮寸断】置入甘宁的判定区。"
+      ]
+    },
+    {
+      "id": "jiuchi",
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "logs": [
+        "董卓发动【酒池】，将【闪】当【酒】使用。",
+        "董卓饮下【酒】，本回合下一张【杀】伤害 +1。"
+      ]
+    },
+    {
+      "id": "qiaobian",
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "logs": [
+        "张郃的摸牌阶段。",
+        "张郃发动【巧变】，弃置一张手牌跳过摸牌阶段。",
+        "张郃发动【巧变】，获得关羽的一张手牌。",
+        "张郃发动【巧变】，获得甘宁的一张手牌。"
+      ]
+    },
+    {
+      "id": "jixi",
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 1,
+          "hand": 1,
+          "tian": -1,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "logs": [
+        "邓艾发动【急袭】，将【闪】当【顺手牵羊】使用。",
+        "邓艾使用【顺手牵羊】，获得了甘宁手牌的一张牌。"
+      ]
+    },
+    {
+      "id": "fangquan",
+      "uses": 1,
+      "delta": {
+        "player": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "enemy": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": -1,
+          "hand": -1,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 0,
+          "hand": 0,
+          "tian": 0,
+          "turned": 0
+        },
+        "ally2": {
+          "hp": 0,
+          "maxHp": 0,
+          "cards": 2,
+          "hand": 2,
+          "tian": 0,
+          "turned": 0
+        }
+      },
+      "logs": [
+        "刘禅发动【放权】，跳过出牌阶段。",
+        "刘禅进入弃牌阶段。",
+        "刘禅进入结束阶段。",
+        "刘禅发动【放权】，弃置一张手牌，令张飞获得一个额外的回合。",
+        "刘禅结束回合。",
+        "张飞获得一个额外的回合。",
+        "张飞的准备阶段。",
+        "张飞的判定阶段。",
+        "张飞的摸牌阶段。",
+        "张飞摸了 2 张牌。",
+        "张飞进入出牌阶段。"
+      ]
+    }
+  ],
+  "mixed": {
+    "seeds": 96,
+    "firstSeed": 169401,
+    "maxActions": 120,
+    "actions": 2723,
+    "finished": 96,
+    "truncated": 0,
+    "pendingKinds": [
+      "cixiong-choose",
+      "cixiong-fire",
+      "god-choice",
+      "guohe-1v1-pick",
+      "luanwu-sha",
+      "pindian-card",
+      "tiaoxin-demand",
+      "xiangle-cost"
+    ],
+    "rows": {
+      "qiangxi": {
+        "games": 12,
+        "decisionIntervals": 30,
+        "intervalsWithSkillLog": 12,
+        "hpDelta": -8,
+        "cardDelta": -21
+      },
+      "quhu": {
+        "games": 12,
+        "decisionIntervals": 72,
+        "intervalsWithSkillLog": 21,
+        "hpDelta": -4,
+        "cardDelta": -20
+      },
+      "jieming": {
+        "games": 12,
+        "decisionIntervals": 72,
+        "intervalsWithSkillLog": 9,
+        "hpDelta": -9,
+        "cardDelta": 6
+      },
+      "bazhen": {
+        "games": 12,
+        "decisionIntervals": 80,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "huoji": {
+        "games": 12,
+        "decisionIntervals": 80,
+        "intervalsWithSkillLog": 11,
+        "hpDelta": 0,
+        "cardDelta": -33
+      },
+      "kanpo": {
+        "games": 12,
+        "decisionIntervals": 80,
+        "intervalsWithSkillLog": 7,
+        "hpDelta": 0,
+        "cardDelta": -9
+      },
+      "lianhuan": {
+        "games": 11,
+        "decisionIntervals": 135,
+        "intervalsWithSkillLog": 3,
+        "hpDelta": 0,
+        "cardDelta": -10
+      },
+      "niepan": {
+        "games": 11,
+        "decisionIntervals": 135,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "tianyi": {
+        "games": 11,
+        "decisionIntervals": 79,
+        "intervalsWithSkillLog": 7,
+        "hpDelta": 0,
+        "cardDelta": -7
+      },
+      "mengjin": {
+        "games": 11,
+        "decisionIntervals": 104,
+        "intervalsWithSkillLog": 3,
+        "hpDelta": 0,
+        "cardDelta": -7
+      },
+      "shuangxiong": {
+        "games": 11,
+        "decisionIntervals": 87,
+        "intervalsWithSkillLog": 15,
+        "hpDelta": -1,
+        "cardDelta": -1
+      },
+      "luanji": {
+        "games": 12,
+        "decisionIntervals": 36,
+        "intervalsWithSkillLog": 11,
+        "hpDelta": 0,
+        "cardDelta": -41
+      },
+      "xueyi": {
+        "games": 12,
+        "decisionIntervals": 11,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "duanliang": {
+        "games": 12,
+        "decisionIntervals": 73,
+        "intervalsWithSkillLog": 10,
+        "hpDelta": 1,
+        "cardDelta": -29
+      },
+      "xingshang": {
+        "games": 12,
+        "decisionIntervals": 76,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "fangzhu": {
+        "games": 12,
+        "decisionIntervals": 76,
+        "intervalsWithSkillLog": 7,
+        "hpDelta": -7,
+        "cardDelta": 8
+      },
+      "songwei": {
+        "games": 12,
+        "decisionIntervals": 13,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "yinghun": {
+        "games": 11,
+        "decisionIntervals": 168,
+        "intervalsWithSkillLog": 14,
+        "hpDelta": -5,
+        "cardDelta": 13
+      },
+      "haoshi": {
+        "games": 11,
+        "decisionIntervals": 66,
+        "intervalsWithSkillLog": 15,
+        "hpDelta": -3,
+        "cardDelta": 27
+      },
+      "dimeng": {
+        "games": 11,
+        "decisionIntervals": 66,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "huoshou": {
+        "games": 11,
+        "decisionIntervals": 91,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "zaiqi": {
+        "games": 11,
+        "decisionIntervals": 91,
+        "intervalsWithSkillLog": 2,
+        "hpDelta": 0,
+        "cardDelta": 3
+      },
+      "juxiang": {
+        "games": 11,
+        "decisionIntervals": 94,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "lieren": {
+        "games": 11,
+        "decisionIntervals": 94,
+        "intervalsWithSkillLog": 2,
+        "hpDelta": 0,
+        "cardDelta": -3
+      },
+      "wansha": {
+        "games": 12,
+        "decisionIntervals": 79,
+        "intervalsWithSkillLog": 3,
+        "hpDelta": 0,
+        "cardDelta": -4
+      },
+      "luanwu": {
+        "games": 12,
+        "decisionIntervals": 79,
+        "intervalsWithSkillLog": 10,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "weimu": {
+        "games": 12,
+        "decisionIntervals": 79,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "jiuchi": {
+        "games": 12,
+        "decisionIntervals": 82,
+        "intervalsWithSkillLog": 3,
+        "hpDelta": -2,
+        "cardDelta": -9
+      },
+      "roulin": {
+        "games": 12,
+        "decisionIntervals": 82,
+        "intervalsWithSkillLog": 1,
+        "hpDelta": -1,
+        "cardDelta": -2
+      },
+      "benghuai": {
+        "games": 12,
+        "decisionIntervals": 82,
+        "intervalsWithSkillLog": 14,
+        "hpDelta": -10,
+        "cardDelta": -30
+      },
+      "baonue": {
+        "games": 12,
+        "decisionIntervals": 30,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "qiaobian": {
+        "games": 12,
+        "decisionIntervals": 99,
+        "intervalsWithSkillLog": 16,
+        "hpDelta": -7,
+        "cardDelta": 15
+      },
+      "tuntian": {
+        "games": 11,
+        "decisionIntervals": 89,
+        "intervalsWithSkillLog": 6,
+        "hpDelta": -3,
+        "cardDelta": -6
+      },
+      "zaoxian": {
+        "games": 11,
+        "decisionIntervals": 89,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "jixi": {
+        "games": 11,
+        "decisionIntervals": 21,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "tiaoxin": {
+        "games": 11,
+        "decisionIntervals": 69,
+        "intervalsWithSkillLog": 11,
+        "hpDelta": -1,
+        "cardDelta": -11
+      },
+      "zhiji": {
+        "games": 11,
+        "decisionIntervals": 69,
+        "intervalsWithSkillLog": 1,
+        "hpDelta": 1,
+        "cardDelta": 0
+      },
+      "xiangle": {
+        "games": 11,
+        "decisionIntervals": 66,
+        "intervalsWithSkillLog": 7,
+        "hpDelta": -3,
+        "cardDelta": 1
+      },
+      "fangquan": {
+        "games": 11,
+        "decisionIntervals": 66,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "ruoyu": {
+        "games": 11,
+        "decisionIntervals": 43,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "jiang": {
+        "games": 11,
+        "decisionIntervals": 93,
+        "intervalsWithSkillLog": 9,
+        "hpDelta": -3,
+        "cardDelta": -3
+      },
+      "hunzi": {
+        "games": 11,
+        "decisionIntervals": 93,
+        "intervalsWithSkillLog": 3,
+        "hpDelta": -2,
+        "cardDelta": -1
+      },
+      "zhiba": {
+        "games": 11,
+        "decisionIntervals": 44,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "zhijian": {
+        "games": 12,
+        "decisionIntervals": 87,
+        "intervalsWithSkillLog": 2,
+        "hpDelta": 0,
+        "cardDelta": -6
+      },
+      "guzheng": {
+        "games": 12,
+        "decisionIntervals": 87,
+        "intervalsWithSkillLog": 10,
+        "hpDelta": 0,
+        "cardDelta": 9
+      },
+      "beige": {
+        "games": 12,
+        "decisionIntervals": 52,
+        "intervalsWithSkillLog": 22,
+        "hpDelta": -4,
+        "cardDelta": -18
+      },
+      "duanchang": {
+        "games": 12,
+        "decisionIntervals": 52,
+        "intervalsWithSkillLog": 1,
+        "hpDelta": -2,
+        "cardDelta": 0
+      },
+      "danji": {
+        "games": 12,
+        "decisionIntervals": 101,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "yongsi": {
+        "games": 12,
+        "decisionIntervals": 99,
+        "intervalsWithSkillLog": 31,
+        "hpDelta": -3,
+        "cardDelta": 7
+      },
+      "weidi": {
+        "games": 12,
+        "decisionIntervals": 99,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      }
+    }
+  },
+  "godMixed": {
+    "seeds": 24,
+    "firstSeed": 169601,
+    "maxActions": 120,
+    "actions": 509,
+    "finished": 24,
+    "truncated": 0,
+    "pendingKinds": [
+      "guohe-1v1-pick",
+      "qilin-pick"
+    ],
+    "rows": {
+      "wushen": {
+        "games": 9,
+        "decisionIntervals": 40,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "wuhun": {
+        "games": 9,
+        "decisionIntervals": 40,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "shelie": {
+        "games": 9,
+        "decisionIntervals": 36,
+        "intervalsWithSkillLog": 8,
+        "hpDelta": -6,
+        "cardDelta": 21
+      },
+      "gongxin": {
+        "games": 9,
+        "decisionIntervals": 36,
+        "intervalsWithSkillLog": 7,
+        "hpDelta": 3,
+        "cardDelta": -19
+      },
+      "qinyin": {
+        "games": 9,
+        "decisionIntervals": 47,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "yeyan": {
+        "games": 9,
+        "decisionIntervals": 47,
+        "intervalsWithSkillLog": 9,
+        "hpDelta": -9,
+        "cardDelta": -25
+      },
+      "qixing": {
+        "games": 9,
+        "decisionIntervals": 58,
+        "intervalsWithSkillLog": 11,
+        "hpDelta": -4,
+        "cardDelta": 21
+      },
+      "kuangfeng": {
+        "games": 9,
+        "decisionIntervals": 58,
+        "intervalsWithSkillLog": 9,
+        "hpDelta": 6,
+        "cardDelta": -25
+      },
+      "dawu": {
+        "games": 9,
+        "decisionIntervals": 58,
+        "intervalsWithSkillLog": 12,
+        "hpDelta": 6,
+        "cardDelta": -24
+      },
+      "guixin": {
+        "games": 9,
+        "decisionIntervals": 50,
+        "intervalsWithSkillLog": 7,
+        "hpDelta": -8,
+        "cardDelta": 22
+      },
+      "feiying": {
+        "games": 9,
+        "decisionIntervals": 50,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "kuangbao": {
+        "games": 9,
+        "decisionIntervals": 62,
+        "intervalsWithSkillLog": 13,
+        "hpDelta": -11,
+        "cardDelta": -12
+      },
+      "wumou": {
+        "games": 9,
+        "decisionIntervals": 62,
+        "intervalsWithSkillLog": 5,
+        "hpDelta": -5,
+        "cardDelta": -13
+      },
+      "shenfen": {
+        "games": 9,
+        "decisionIntervals": 62,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "wuqian": {
+        "games": 9,
+        "decisionIntervals": 62,
+        "intervalsWithSkillLog": 8,
+        "hpDelta": -3,
+        "cardDelta": -18
+      },
+      "juejing": {
+        "games": 9,
+        "decisionIntervals": 53,
+        "intervalsWithSkillLog": 6,
+        "hpDelta": -1,
+        "cardDelta": 16
+      },
+      "longhun": {
+        "games": 9,
+        "decisionIntervals": 53,
+        "intervalsWithSkillLog": 12,
+        "hpDelta": -2,
+        "cardDelta": -19
+      },
+      "renjie": {
+        "games": 9,
+        "decisionIntervals": 32,
+        "intervalsWithSkillLog": 15,
+        "hpDelta": -17,
+        "cardDelta": 11
+      },
+      "baiyin": {
+        "games": 9,
+        "decisionIntervals": 32,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "lianpo": {
+        "games": 9,
+        "decisionIntervals": 32,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      },
+      "jilue": {
+        "games": 9,
+        "decisionIntervals": 7,
+        "intervalsWithSkillLog": 0,
+        "hpDelta": 0,
+        "cardDelta": 0
+      }
+    }
+  }
+}

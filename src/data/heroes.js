@@ -71,7 +71,7 @@
         { id: 'huangzhong', name: '黄忠', camp: '蜀', gender: 'male', title: '老当益壮', maxHp: 4, quote: '百步穿杨！', skills: [{ id: 'liegong', name: '烈弓', desc: '满足条件时目标不能闪。' }] },
         { id: 'weiyan', name: '魏延', camp: '蜀', gender: 'male', title: '嗜血的独狼', maxHp: 4, quote: '谁敢杀我？', skills: [{ id: 'kuanggu', name: '狂骨', desc: '造成伤害后可回复体力。' }] },
         { id: 'xiaoqiao', name: '小乔', camp: '吴', gender: 'female', title: '矫情之花', maxHp: 3, quote: '接着哦。', skills: [{ id: 'tianxiang', name: '天香', desc: '受到伤害时可弃红桃转移。' }, { id: 'hongyan', name: '红颜', desc: '黑桃牌视为红桃。' }] },
-        { id: 'zhoutai', name: '周泰', camp: '吴', gender: 'male', title: '历战之躯', maxHp: 4, quote: '还不够！', skills: [{ id: 'buqu', name: '不屈', desc: '濒死时以不屈牌维持生存。' }] },
+        { id: 'zhoutai', name: '周泰', camp: '吴', gender: 'male', title: '历战之躯', maxHp: 4, quote: '还不够！', skills: [{ id: 'buqu', name: '不屈', desc: '濒死时以不屈牌维持生存。' }, { id: 'fenji', name: '奋激', desc: '其他角色弃置或获得手牌导致角色失去手牌后，可失去1点体力令其摸两张牌。' }] },
         { id: 'zhangjiao', name: '张角', camp: '群', gender: 'male', title: '天公将军', maxHp: 3, quote: '苍天已死，黄天当立！', skills: [{ id: 'leiji', name: '雷击', desc: '使用或打出闪时，可令一名其他角色判定，黑桃则其受2点雷伤。' }, { id: 'guidao', name: '鬼道', desc: '一名角色的判定牌生效前，可打出一张黑色牌（手牌或装备牌）替换之，并获得原判定牌。' }, { id: 'huangtian', name: '黄天', desc: '主公技：群势力可给你闪/闪电。', lord: true }] },
         { id: 'yuji', name: '于吉', camp: '群', gender: 'male', title: '太平道人', maxHp: 3, quote: '猜猜看哪。', skills: [{ id: 'guhuo', name: '蛊惑', desc: '可声明任意基本牌/锦囊。' }] }
       ]);
@@ -209,7 +209,7 @@
         // v11 C7 (批次 31):
         yaowu:     { trigger: 'damageAfter',       frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
         // v11 C8 (批次 32):
-        wangzun:   { trigger: 'preparePhase',      frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['processPreparePhase'] },
+        wangzun:   { trigger: 'preparePhase',      frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['continueTurnAfterPreparePhase'] },
         tongji:    { trigger: 'targetValidation',  frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onCardTarget'] },
         // v12 G1 (修复批): 风包首批 3 技能。据守 = 摸三张+翻面 (跳过下回合);
         // 烈弓 = "你可以…" 可选触发 (对齐铁骑惯例); 狂骨 = 锁定技。
@@ -217,21 +217,23 @@
         // 框架后实装 (见下方 shensu/hongyan 条目; v14 O3 更新此过时注记)。
         jushou:   { trigger: 'turnEnd',           frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'turnOver' },                 hooks: ['onTurnEnd'] },
         liegong:  { trigger: 'cardUse',           frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onNeedResponse'] },
-        kuanggu:  { trigger: 'damageAfter',       frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
+        kuanggu:  { trigger: 'damageDealt',       frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDamageDealt'] },
         // v12 G2: 风包第二批。神速成本 = 跳过阶段 (选项二另弃一装备);
         // 天香成本 = 弃一张红桃手牌; 红颜/不屈为锁定技; 雷击/鬼道可选。
         shensu:   { trigger: 'preparePhase',      frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'phaseSkip' },                hooks: ['processPreparePhase', 'playSha'] },
         tianxiang:{ trigger: 'damageTaken',       frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onDamageModify'] },
-        hongyan:  { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['judgeSuitView', 'effectiveCardColor'] },
+        hongyan:  { trigger: 'passive',           frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['effectiveCardSuit', 'effectiveCardColor'] },
         leiji:    { trigger: 'cardUse',           frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onShanUsed'] },
         guidao:   { trigger: 'beforeJudgement',   frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onJudgementBeforeResolve'] },
-        buqu:     { trigger: 'dyingEnter',        frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDyingEnter'] },
+        buqu:     { trigger: 'dyingEnter',        frequency: 'passiveAlways',   optional: false, mandatory: true,  cost: { type: 'none' },                     hooks: ['onDyingEnter', 'handLimit'] },
+        // AC：新风周泰完整卡另有奋激；保留 TODO，不冒充已实现。
+        fenji:    { trigger: 'cardLost', frequency: 'unlimited', optional: true, mandatory: false, cost: { type: 'loseHp', count: 1 }, hooks: ['onHandLostByOther'], sourceLine: 'card__hero__wu.md:367' },
         // v12 H7: 主公技/多人技 (身份场激活; 1v1 无同势力队友/凑不齐目标 → no-op)。
         // 激将: 主动 (出牌阶段求杀) + 响应 (决斗/南蛮需打出杀时求助);
         // 护驾: 纯响应 (杀/万箭需打出闪时求助); 黄天: 全场型 (给牌者发动);
         // 离间: 出牌阶段限一次, 弃一张牌令两名男性角色虚拟决斗。
         jijiang:  { trigger: 'playPhase',         frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onActiveSkill', 'advanceDuelChain', 'advanceAOETargets'], lord: true },
-        hujia:    { trigger: 'needResponse',      frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['resolveShaResponse', 'advanceAOETargets'], lord: true },
+        hujia:    { trigger: 'needResponse',      frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['advanceShaResponses', 'advanceAOETargets'], lord: true },
         huangtian:{ trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'giveHand',   count: 1 },     hooks: ['onActiveSkill'], lord: true },
         lijian:   { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onActiveSkill'] },
         // v14 R1: 蛊惑 — 出牌阶段扣置手牌声明使用 (风包现行版, 每名角色
@@ -239,7 +241,7 @@
         guhuo:    { trigger: 'playPhase',         frequency: 'oncePerTurn',     optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['playGuhuoDeclare', 'guhuo-challenge'] },
         // ═════ v15 T: 火包 8 将 13 技 ═════
         // ═════ v15 U (林包 8 将 18 技) ═════
-        duanliang:{ trigger: 'cardConvert',        frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs'] },
+        duanliang:{ trigger: 'cardConvert',        frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'playHand',   count: 1 },     hooks: ['onCardAs', 'trickDistanceLimitFor'] },
         xingshang:{ trigger: 'death',              frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDeath'] },
         fangzhu:  { trigger: 'damageAfter',        frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onDamageAfter'] },
         songwei:  { trigger: 'afterJudgement',     frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'none' },                     hooks: ['onJudgementAfterResolve'] },
@@ -274,7 +276,7 @@
         // 觉醒技 (凿险/志继/若愚/魂姿) 是**锁定**的一次性技能: 条件满足就
         // 必须觉醒 → optional:false / mandatory:true / frequency:'oncePerGame'。
         qiaobian: { trigger: 'phaseStart',        frequency: 'oncePerPhase',    optional: true,  mandatory: false, cost: { type: 'discardOwn', count: 1 },     hooks: ['onDrawPhase', 'onBeforePlayPhase'] },
-        tuntian:  { trigger: 'cardLost',          frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['onCardLost', 'onJudgementAfterResolve'] },
+        tuntian:  { trigger: 'cardLost',          frequency: 'unlimited',       optional: true,  mandatory: false, cost: { type: 'judgement' },                hooks: ['onCardLost', 'onJudgementAfterResolve', 'distanceBetween'] },
         zaoxian:  { trigger: 'preparePhase',      frequency: 'oncePerGame',     optional: false, mandatory: true,  cost: { type: 'reduceMaxHp', count: 1 },    hooks: ['onPreparePhase'], awakening: true },
         // 急袭 没有武将牌归属 —— 它只能由【凿险】觉醒授予, HERO_CATALOG 里
         // 任何武将的技能列表都不该出现它 (否则英雄图鉴会把邓艾显示成开局
@@ -303,7 +305,7 @@
         gongxin: {"trigger": "playPhase", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "none"}, "hooks": ["onActiveSkill"]},
         qinyin: {"trigger": "discardPhase", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "none"}, "hooks": ["onDiscardPhaseEnd"]},
         yeyan: {"trigger": "playPhase", "frequency": "oncePerGame", "optional": true, "mandatory": false, "cost": {"type": "compound", "condition": "anyTargetDamageAtLeast2", "costs": [{"type": "discardOwn", "count": 4, "zone": "hand", "distinctSuits": true}, {"type": "loseHp", "count": 3}]}, "hooks": ["onActiveSkill"]},
-        qixing: {"trigger": "phaseStart", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "exchange", "zone": "stars", "count": "any"}, "hooks": ["onInitialHand", "onDrawPhaseEnd"], "initialMandatory": true},
+        qixing: {"trigger": "phaseStart", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "exchange", "zone": "stars", "count": "any"}, "hooks": ["onInitialHand", "onDrawPhaseEnd", 'beginInitialHand', 'beginDrawPhaseEnd'], "initialMandatory": true},
         kuangfeng: {"trigger": "turnEnd", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "discardAttached", "zone": "stars", "count": 1}, "hooks": ["onDamageBegin", "beginEndPhase", "clearWeather", "recordDeath"]},
         dawu: {"trigger": "turnEnd", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "discardAttached", "zone": "stars", "count": "any"}, "hooks": ["onDamageBegin", "beginEndPhase", "clearWeather", "recordDeath"]},
         guixin: {"trigger": "damageAfter", "frequency": "unlimited", "optional": true, "mandatory": false, "cost": {"type": "none"}, "hooks": ["onDamageAfter"]},
@@ -313,7 +315,7 @@
         shenfen: {"trigger": "playPhase", "frequency": "oncePerPhase", "optional": true, "mandatory": false, "cost": {"type": "discardMark", "mark": "rage", "count": 6}, "hooks": ["onActiveSkill"]},
         wuqian: {"trigger": "playPhase", "frequency": "unlimited", "optional": true, "mandatory": false, "cost": {"type": "discardMark", "mark": "rage", "count": 2}, "hooks": ["onActiveSkill", "clearTurnEffects", "clearDeathEffects"]},
         juejing: {"trigger": "drawPhase", "frequency": "passiveAlways", "optional": false, "mandatory": true, "cost": {"type": "none"}, "hooks": ["onDrawPhase", "handLimit"]},
-        longhun: {"trigger": "cardConvert", "frequency": "unlimited", "optional": true, "mandatory": false, "cost": {"type": "playOwn", "count": "max(1,hp)", "zones": ["hand", "equipment"], "sameSuit": true}, "hooks": ["onCardAs", "onActiveSkill"]},
+        longhun: {"trigger": "cardConvert", "frequency": "unlimited", "optional": true, "mandatory": false, "cost": {"type": "playOwn", "count": "max(1,hp)", "zones": ["hand", "equipment"], "sameSuit": true}, "hooks": ["onCardAs", "onActiveSkill", 'longhunResponseOptions', 'takeResponse']},
         renjie: {"trigger": "damageAfter", "frequency": "passiveAlways", "optional": false, "mandatory": true, "cost": {"type": "none"}, "hooks": ["onDamageAfter", "onDiscardPhaseLoss"]},
         baiyin: {"trigger": "preparePhase", "frequency": "oncePerGame", "optional": false, "mandatory": true, "cost": {"type": "reduceMaxHp", "count": 1}, "hooks": ["onPreparePhase"], "awakening": true},
         jilue: {"trigger": "phaseStart", "frequency": "unlimited", "optional": true, "mandatory": false, "cost": {"type": "discardMark", "mark": "nin", "count": 1}, "hooks": ["onDamageAfter", "onCardUse", "onActiveSkill", "triggerGuicaiJudgementBeforeResolve"], "grantedBy": "baiyin", "desc": "可弃1枚忍发动鬼才、放逐、集智，或出牌阶段发动制衡（每阶段限一次），或令本回合拥有完杀的效果。"},

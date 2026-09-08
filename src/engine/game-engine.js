@@ -196,7 +196,11 @@
         if (game.deck.length > 0 || game.discard.length === 0) return;
         log(game, '牌堆耗尽，洗混弃牌堆形成新的牌堆。');
         // 唯一的整堆搬移站点 (弃牌堆→洗混→新牌堆), 不走逐张 moveCard。
-        game.deck = shuffle(game.discard.splice(0), game.random);
+        // JSON does not retain an injected random function. As with the
+        // existing randomSuit fallback, keep restoration reproducible without
+        // claiming to recreate the caller's unrecorded generator state.
+        var random = typeof game.random === 'function' ? game.random : Runtime.makeRng(game.discard.length);
+        game.deck = shuffle(game.discard.splice(0), random);
       }
 
       function drawCards(game, actor, count) {
@@ -415,7 +419,11 @@
 
       function randomHandIndex(game, state) {
         if (!state.hand.length) return -1;
-        return Math.floor(game.random() * state.hand.length);
+        // A JSON-restored choice cannot keep an injected function. Match
+        // randomSuit's reproducible fallback; this does not promise replay of
+        // an external generator's unrecorded state.
+        if (typeof game.random === 'function') return Math.floor(game.random() * state.hand.length);
+        return ((game.deck || []).length + (game.discard || []).length) % state.hand.length;
       }
 
       function fail(message) {
@@ -528,8 +536,9 @@
         // 牌堆时会把仍在结算中的杀洗回并摸走 — opus 对抗实证)。链收尾的
         // finishShaChain 先清链态再调本函数, 此处放行统一弃置。
         var activeShaChain = game.pauseState && game.pauseState.shaChain;
-        if (activeShaChain && activeShaChain.card
-            && physicalCardOf(activeShaChain.card) === physical) return;
+        if (physical && activeShaChain && activeShaChain.card
+            && physicalCardOf(activeShaChain.card)
+            && physicalCardOf(activeShaChain.card).id === physical.id) return;
         // audit4-H1: "已落地"判定改为全区域定位 (findCardZone: 牌堆/弃牌堆/
         // 各席手牌/判定区/创区/装备) — 此前漏 牌堆与判定区: AOE 中途击杀
         // 奖励摸空牌堆触发洗牌, 已弃置的南蛮/万箭被洗回 deck, 旧检查误判
@@ -910,6 +919,7 @@
       // consumeWuxie/requestPlayerResponse 为函数声明/已装配别名, 提升与
       // 装配顺序保证前向引用安全。
       var TricksRuntime = createTricksRuntime({
+        discardSourceCardIfPending: discardSourceCardIfPending,
         godJudgements: {
           register: function (key, callback, options) { if (GodJudgements) return GodJudgements.register(key, callback, options); godJudgementRegistrations.push([key, callback, options]); },
           start: function (game, actor, reason, key, context) { return GodJudgements.start(game, actor, reason, key, context); }
@@ -1014,6 +1024,8 @@
       // v11 B1: 装备域装配 — 依赖注入引擎闭包能力 (函数声明经包装注入,
       // 提升保证前向引用); yinyue-response 在工厂内自注册。
       var EquipmentRuntime = createEquipmentRuntime({
+        notifyCardLoss: notifyCardLoss,
+        discardSourceCardIfPending: discardSourceCardIfPending,
         godJudgements: {
           register: function (key, callback, options) { if (GodJudgements) return GodJudgements.register(key, callback, options); godJudgementRegistrations.push([key, callback, options]); },
           start: function (game, actor, reason, key, context) { return GodJudgements.start(game, actor, reason, key, context); }
@@ -1231,6 +1243,10 @@
       // 与 tricks/judge-area 的既有包装先例一致)。直调面回绑同名 var, 使
       // registerResponseKind 注册块 / processPreparePhase / 导出表零改动。
       var SkillDomain = installStandardSkillHandlers(skillRegistry, {
+        godChoices: GodChoices,
+        aiShouldUseQiaobianDraw: function (game, actor) { return AIRuntime.aiShouldUseQiaobianDraw(game, actor); },
+        aiShouldUseFangquan: function (game, actor) { return AIRuntime.aiShouldUseFangquan(game, actor); },
+        responseFlows: ResponseRuntime.responseFlows,
         godJudgements: GodJudgements, finishDrawPhaseAndAdvance: finishDrawPhaseAndAdvance,
         findResponseCard: function (state, type, id, game) { return findResponseCard(state, type, id, game); },
         listShaResponseOptions: listShaResponseOptions,
@@ -2582,6 +2598,11 @@
             putCard(game, card, { zone: 'hand', actor: actor });
             return fail('请选择要横置或重置的角色。');
           }
+          // AC-R1: selection order never changes the common action order
+          // (rule__principle.md:50), including each target's Wuxie window.
+          targets = seatsFrom(game, game.turn || actor, true).filter(function (seat) {
+            return targets.indexOf(seat) >= 0;
+          });
           discardCard(game, card);
           return advanceTiesuoTargets(game, {
             actor: actor, card: card, options: options, targets: targets, idx: 0
@@ -3301,7 +3322,7 @@
         });
       }
 
-      function canPlayCardAs(game, actor, cardOrId, asType) {
+      function canPlayCardAs(game, actor, cardOrId, asType, options) {
         var self = game[actor];
         if (!self) return fail('未知角色。');
         // v6.1: accept either a card object OR an id; the id may refer to a
@@ -3344,8 +3365,23 @@
         // v15 T: 锦囊/延时类一律走同一条 — 虚拟牌交给普通 canPlayCard
         // 把关 (目标存在性/阶段/距离/∃合法目标 等在那里统一判定)。
         var virtualTrick = virtualTrickFromCard(asType, original);
-        var playableTrick = canPlayCard(game, actor, virtualTrick);
+        var targetGame = game;
+        var fieldMaterial = asType === 'shunshou' && (self.tian || []).some(function (card) { return card.id === original.id; });
+        if (fieldMaterial) {
+          // AC Jixi: glossary__card.md:45 excludes the field being consumed.
+          // Preview only; failed target checks must preserve its ID and zone.
+          targetGame = Object.assign({}, game);
+          targetGame[actor] = Object.assign({}, self, {
+            tian: self.tian.filter(function (card) { return card.id !== original.id; })
+          });
+        }
+        var playableTrick = canPlayCard(targetGame, actor, virtualTrick);
         if (!playableTrick.ok) return playableTrick;
+        if (fieldMaterial) {
+          var fieldTarget = resolveTrickTargetActor(targetGame, actor, virtualTrick, options);
+          if (!fieldTarget) return fail('无效的【顺手牵羊】目标（不计入消耗的田）。');
+          playableTrick.conversionTarget = fieldTarget;
+        }
         playableTrick.skillName = conversion.skillName;
         playableTrick.message = '发动【' + conversion.skillName + '】，将【' + original.name
           + '】当【' + virtualTrick.name + '】使用。';
@@ -3360,7 +3396,7 @@
         var hit = findOwnCardById(self, cardId);
         if (!hit) return fail('找不到这张牌。');
         var original = hit.card;
-        var playable = canPlayCardAs(game, actor, original, asType);
+        var playable = canPlayCardAs(game, actor, original, asType, options);
         if (!playable.ok) return playable;
         if (playable.skillName === '龙魂') return GodConversion.playLonghun(game, actor, [cardId], options || {});
         // v13 K2 (结算加压自审): 转化牌目标此前硬编码 opponent(actor) —
@@ -3381,7 +3417,7 @@
               || (options.targets && options.targets.length)))) {
             asTargetActor = actor;
           } else {
-            asTargetActor = resolveTrickTargetActor(game, actor, asVirtual, options);
+            asTargetActor = playable.conversionTarget || resolveTrickTargetActor(game, actor, asVirtual, options);
           }
           if (!asTargetActor) return fail('无效的【' + asVirtual.name + '】目标。');
         } else if (asType === 'sha') {

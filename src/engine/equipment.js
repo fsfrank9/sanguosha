@@ -30,6 +30,8 @@
     var consumeResponse = deps.consumeResponse;
     var hasShanResponseAvailable = deps.hasShanResponseAvailable;
     var listShanResponseOptions = deps.listShanResponseOptions;
+    var notifyCardLoss = deps.notifyCardLoss;
+    var discardSourceCardIfPending = deps.discardSourceCardIfPending;
     // v13 审计三轮: 银月枪走八卦先行 (sha-flow 域后置装配, 包装注入)
     var tryBaguaDodge = deps.tryBaguaDodge;
 
@@ -61,13 +63,21 @@
       var slot = card.slot || (CARD_CATALOG[card.type] && CARD_CATALOG[card.type].slot);
       if (!slot) return fail('装备槽位未知。');
       removeCardFromHand(self, card.id);
+      var replaced = null;
       if (self.equipment[slot]) {
-        var replaced = takeCard(game, self.equipment[slot], { zone: 'equipment', actor: actor, slot: slot });
-        discardCard(game, replaced);
-        log(game, actorName(game, actor) + '替换并弃置了原有装备【' + replaced.name + '】。');
-        triggerEquipmentLoss(game, actor, replaced);
+        replaced = takeCard(game, self.equipment[slot], { zone: 'equipment', actor: actor, slot: slot });
+        game.pauseState = game.pauseState || {};
+        // Replacement is simultaneous: the new card enters equipment while
+        // the old card remains in processing until loss effects have settled.
+        game.pauseState.equipmentReplacement = { actor: actor, card: replaced };
       }
       putCard(game, card, { zone: 'equipment', actor: actor, slot: slot });
+      if (replaced) {
+        triggerEquipmentLoss(game, actor, replaced);
+        discardCard(game, replaced);
+        game.pauseState.equipmentReplacement = null;
+        log(game, actorName(game, actor) + '替换并弃置了原有装备【' + replaced.name + '】。');
+      }
       log(game, actorName(game, actor) + '装备了【' + card.name + '】。');
       return success('装备成功。');
     }
@@ -90,8 +100,7 @@
     //
     // skillPreferences.qilin（写入发动者 state）：
     //   'auto'    (AI/enemy 默认): 总是触发；目标有 2 匹马时默认弃 +1 马
-    //   'ask'     (player 默认):   2 匹马时 pendingChoice 让 source 选；
-    //                              1 匹马仍自动弃（没的选）
+    //   'ask'     (player 默认):   有至少1匹马即询问，可放弃发动
     //   'decline':                 完全不触发
     function applyQilinDiscard(game, sourceActor, targetActor) {
       var target = game[targetActor];
@@ -107,12 +116,6 @@
         log(game, actorName(game, sourceActor) + '选择不发动【麒麟弓】。');
         return;
       }
-      if (slots.length === 1) {
-        loseEquipment(game, targetActor, slots[0]);
-        log(game, actorName(game, sourceActor) + '发动【麒麟弓】，弃置' + actorName(game, targetActor) + '的坐骑牌。');
-        return;
-      }
-      // slots.length === 2
       if (pref === 'ask') {
         setPendingChoice(game, {
           kind: 'qilin-pick',
@@ -120,6 +123,11 @@
           target: targetActor,
           horseSlots: slots.slice()
         });
+        return;
+      }
+      if (slots.length === 1) {
+        loseEquipment(game, targetActor, slots[0]);
+        log(game, actorName(game, sourceActor) + '发动【麒麟弓】，弃置' + actorName(game, targetActor) + '的坐骑牌。');
         return;
       }
       // 'auto': default heuristic — kill +1 马 first（多数情况对目标更具威胁）。
@@ -158,7 +166,8 @@
     // 藤甲 火+1/防止 → 古锭 无手牌+1 → 白银 clamp 到 1 → 寒冰 弃两张防止)。
     // handler 契约: (game, ctx) → null | { amount } | { prevented: true };
     // ctx = { targetActor, sourceActor, reason, sourceCard, amount, nature,
-    // ignoreArmor }。prevented 的来源牌弃置由调用方 (damage) 统一收尾。
+    // ignoreArmor }。prevented 的来源牌默认由 damage 收尾；可暂停的寒冰帧
+    // 返回 sourceCardRetained 并承担完成/取消时的来源牌收尾。
     // ==================================================================
 
     function applyTengjiaModifier(game, ctx) {
@@ -213,8 +222,8 @@
       // v13 审计三轮: 同古锭 — 天香转移后不对接收者重新判定寒冰。
       if (ctx.sourceWeaponExpired) return null;
       if (ctx.amount <= 0 || !ctx.sourceActor || !ctx.sourceCard || !CardRuntime.isShaCard(ctx.sourceCard)) return null;
-      var hbResult = applyHanbingPrevent(game, ctx.sourceActor, ctx.targetActor);
-      if (hbResult && hbResult.prevented) return { prevented: true };
+      var hbResult = applyHanbingPrevent(game, ctx.sourceActor, ctx.targetActor, ctx.sourceCard);
+      if (hbResult && hbResult.prevented) return { prevented: true, sourceCardRetained: true };
       return null;
     }
 
@@ -228,7 +237,8 @@
     function applyEquipmentDamageModifiers(game, ctx) {
       for (var i = 0; i < EQUIPMENT_DAMAGE_MODIFIERS.length; i += 1) {
         var result = EQUIPMENT_DAMAGE_MODIFIERS[i].apply(game, ctx);
-        if (result && result.prevented) return { prevented: true, amount: ctx.amount };
+        if (result && result.prevented) return { prevented: true, amount: ctx.amount,
+          sourceCardRetained: !!result.sourceCardRetained };
         if (result && typeof result.amount === 'number') ctx.amount = result.amount;
       }
       return { prevented: false, amount: ctx.amount };
@@ -236,11 +246,11 @@
 
     // v8 PR-B1: 寒冰剑 — 由 damage() 在 hp 扣减前调用。源装寒冰且
     // sourceCard 是杀类时尝试触发。skillPreferences.hanbing:
-    //   'auto'  (默认): 触发 → 按 装备 > 判定 > 手牌优先级弃 2 张, 防止伤害
+    //   'auto'  (默认): 触发 → 按 装备 > 手牌优先级弃 2 张, 防止伤害
     //   'decline':      不触发, 让伤害正常结算
     // 返回 {prevented:true} 表示防止伤害成功; 否则返回 null。
     // UI ask 模式待 PR-B1-bis 接入 pendingChoice 面板。
-    function applyHanbingPrevent(game, sourceActor, targetActor) {
+    function applyHanbingPrevent(game, sourceActor, targetActor, sourceCard) {
       var source = game[sourceActor];
       var target = game[targetActor];
       if (!source || !target) return null;
@@ -258,24 +268,55 @@
         log(game, actorName(game, sourceActor) + '选择不发动【寒冰剑】。');
         return null;
       }
-      // auto / 其它: 按 装备 > 手牌 顺序弃 2 张
-      var discarded = 0;
-      var equips = equipmentList(target).slice();
-      for (var ei = 0; ei < equips.length && discarded < 2; ei += 1) {
-        loseEquipment(game, targetActor, equips[ei].slot);
-        discarded += 1;
-      }
-      while (discarded < 2 && (target.hand || []).length > 0) {
-        var hcard = takeCard(game, target.hand[0], { zone: 'hand', actor: targetActor });
-        if (hcard) {
-          discardCard(game, hcard);
-          log(game, '【寒冰剑】依次弃置' + actorName(game, targetActor) + '手牌【' + hcard.name + '】。');
-          discarded += 1;
-        }
-      }
-      log(game, actorName(game, sourceActor) + '发动【寒冰剑】，防止本次伤害并依次弃置' + actorName(game, targetActor) + ' ' + discarded + ' 张牌。');
-      return { prevented: true, discarded: discarded };
+      var sequence = { sourceActor: sourceActor, targetActor: targetActor,
+        sourceCard: sourceCard || null, discarded: 0, stage: 'discard' };
+      deps.responseFlows.run(game, 'hanbing-discard', sequence);
+      return { prevented: true, discarded: sequence.discarded };
     }
+
+    function advanceHanbingDiscard(game, source) {
+      var target = game[source.targetActor];
+      while (!game.pendingChoice && game.phase !== 'gameover') {
+        if (source.stage === 'equipment-loss') {
+          source.stage = 'discard';
+          if (source.lostEquipment) {
+            var lost = source.lostEquipment;
+            source.lostEquipment = null;
+            triggerEquipmentLoss(game, source.targetActor, lost);
+            if (game.pendingChoice) return { ok: true, suspended: true };
+          }
+        }
+        if (!target || target.hp <= 0 || source.discarded >= 2) break;
+        // Recompute the second choice after the first card's loss effects:
+        // Tuntian/Jilue can suspend, Lianying/Xiaoji can change available cards.
+        var equipped = equipmentList(target)[0];
+        var card = equipped
+          ? takeCard(game, equipped.card, { zone: 'equipment', actor: source.targetActor, slot: equipped.slot })
+          : takeCard(game, target.hand[0], { zone: 'hand', actor: source.targetActor });
+        if (!card) break;
+        source.discarded += 1;
+        source.stage = 'equipment-loss';
+        source.lostEquipment = equipped ? card : null;
+        discardCard(game, card);
+        log(game, '【寒冰剑】依次弃置' + actorName(game, source.targetActor) + '的【' + card.name + '】。');
+        if (notifyCardLoss) notifyCardLoss(game, source.targetActor);
+        if (game.pendingChoice) return { ok: true, suspended: true };
+      }
+      deps.responseFlows.finish(game, 'hanbing-discard', source);
+      if (source.sourceCard) discardSourceCardIfPending(game, source.sourceCard);
+      if (game.phase !== 'gameover') {
+        log(game, actorName(game, source.sourceActor) + '发动【寒冰剑】，防止本次伤害并依次弃置'
+          + actorName(game, source.targetActor) + ' ' + source.discarded + ' 张牌。');
+      }
+      return success('寒冰剑结算完成。');
+    }
+
+    if (deps.responseFlows) deps.responseFlows.register('hanbing-discard', {
+      key: 'hanbingDiscard', advance: advanceHanbingDiscard,
+      cancel: function (game, source) {
+        if (source.sourceCard) discardSourceCardIfPending(game, source.sourceCard);
+      }
+    });
 
     function applyWeaponHitEffects(game, actor, targetActor) {
       var weapon = game[actor].equipment && game[actor].equipment.weapon;
@@ -423,9 +464,7 @@
       if (!game || game.phase === 'gameover') return;
       if (game.pauseState && game.pauseState.dying) {
         if (!game.pauseState.deferredAfterDying) game.pauseState.deferredAfterDying = [];
-        game.pauseState.deferredAfterDying.push(function () {
-          triggerYinyueQiang(game, holderActor);
-        });
+        game.pauseState.deferredAfterDying.push({ kind: 'yinyue-trigger', holderActor: holderActor });
         return;
       }
       var holder = game[holderActor];

@@ -54,7 +54,14 @@ function stockDeck(game, n, prefix = 'dk') {
 // ═══════════════════ 1. 无懈立场 — 忠臣不帮敌人反无懈 ═══════════════════
 
 test('1. 无懈阵营立场: 反贼拆主公装备, 忠臣持无懈但不反无懈自家抵消', () => {
-  const game = buildGame({ seed: 36002 });
+  // AC-R2: rule__principle.md:50 的响应顺序从当前回合角色开始，已不再
+  // 从被拆者开始。明确设为 enemy→player→ally，让主公先自行抵消，
+  // 再验证忠臣不反消；身份、手牌、保武器/忠臣保无懈断言均不变。
+  const game = Engine.newGame({ seed: 36002, seats: ['player', 'ally', 'enemy'],
+    playerHero: 'liubei', enemyHero: 'caocao', allyHero: 'guanyu',
+    roles: { player: '主公', enemy: '反贼', ally: '忠臣' } });
+  resetSeats(game);
+  game.phase = 'play';
   game.turn = 'enemy';
   game.player.equipment.weapon = c('qinggang', { id: 'p-wp' });
   game.enemy.hand = [c('guohe', { id: 'gh' })];
@@ -64,6 +71,7 @@ test('1. 无懈阵营立场: 反贼拆主公装备, 忠臣持无懈但不反无�
   assert.equal(res.ok, true, res.message);
   assert.ok(game.player.equipment.weapon, '武器保住 (主公自己的无懈生效)');
   assert.equal(game.ally.hand.length, 1, '忠臣不反无懈自家抵消 (保留无懈)');
+  assert.ok(game.discard.some(card => card.id === 'p-wx'), '主公先用自己的无懈');
 });
 
 // ═══════════════════ 2. 阵营救援 — 忠臣桃救濒死主公 ═══════════════════════

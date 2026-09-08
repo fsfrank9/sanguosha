@@ -318,14 +318,14 @@
         qilin: {
           summary: '【杀】对目标造成伤害时，你可以弃置其装备区里的一张坐骑牌。',
           timing: 'passive',
-          effect: 'v7 PR-3: 触发时机为造成伤害（applyWeaponHitEffects 内）；目标 0 匹马则不触发；1 匹马默认弃；2 匹马按 skillPreferences.qilin = auto/ask/decline 处理（auto 缺省弃 +1 马，ask 发起 pendingChoice "qilin-pick"）。',
+          effect: 'AC：造成伤害时（applyWeaponHitEffects），目标无坐骑不触发；一或两匹坐骑均按 skillPreferences.qilin = auto/ask/decline 处理。玩家默认 ask，可选择不发动；auto 优先弃 +1 马，ask 发起 qilin-pick。',
           frequency: 'passive',
           engineHooks: ['applyWeaponHitEffects → applyQilinDiscard', 'resolveQilinPickChoice', 'pendingChoice:qilin-pick']
         },
         hanbing: {
-          summary: '【杀】对目标造成伤害时，若其有牌，你可以防止此伤害并依次弃置其两张牌（任意区域）。',
+          summary: '【杀】对目标造成伤害时，若其有牌，你可以防止此伤害并依次弃置其两张手牌或装备牌。',
           timing: 'passive',
-          effect: 'v8 PR-B1: gltjk card__equipment.md "每当你使用【杀】对目标角色造成伤害时, 若其有牌, 你可以防止此伤害, 依次弃置其两张牌"。触发时机=damage() 函数内 hp 扣减前。skillPreferences.hanbing: auto (AI 默认, 触发) / decline (不触发, 让伤害正常结算) — 二者目前均为 player 默认 = auto (即不会暴露 pendingChoice; UI 后续 PR 可补 ask 面板)。AI 弃牌优先级: 装备区 > 判定区 > 手牌。',
+          effect: 'AC：在伤害扣体力前防止，依次弃置目标两张手牌或装备，不含判定区。每张失牌引起的子窗口完成后再弃下一张。skillPreferences.hanbing 默认 auto（装备优先于手牌）或 decline；尚无玩家逐张挑选面板，该交互简化在AC4明确收案。',
           frequency: 'passive',
           engineHooks: ['damage:hanbingPrevent', 'applyHanbingDiscard']
         },

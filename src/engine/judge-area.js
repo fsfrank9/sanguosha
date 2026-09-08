@@ -146,17 +146,23 @@
         // (否则被"弃置"的【乐不思蜀】照常生效)。这条活引用让区域清空类
         // 效果可以认领在途批次; 认领的牌记进 claimed, 循环跳过。
         var inFlight = game.pauseState.judgeAreaInFlight;
-        if (!inFlight || inFlight.pending !== pending) {
+        if (!inFlight || inFlight.actor !== actor || !saved) {
           inFlight = { actor: actor, pending: pending, claimed: [] };
           game.pauseState.judgeAreaInFlight = inFlight;
         }
+        // JSON preserves card IDs, not aliases between the two pause records.
+        // Rebind the batch without losing cards already claimed by Niepan.
+        inFlight.pending = pending;
+        function wasClaimed(card) {
+          return inFlight.claimed.some(function (claimed) { return claimed.id === card.id; });
+        }
         for (var i = startIdx; i < pending.length; i += 1) {
-          if (inFlight.claimed.indexOf(pending[i]) >= 0) continue; // 已被区域清空类效果取走
+          if (wasClaimed(pending[i])) continue; // 已被区域清空类效果取走
           // v12 H5: 该角色已在判定结算中阵亡 (闪电, 身份场对局继续) —
           // 剩余在途延时锦囊直接置入弃牌堆, 不再为亡者结算。
           if (game[actor].hp <= 0) {
             for (var deadRest = i; deadRest < pending.length; deadRest += 1) {
-              discardCard(game, pending[deadRest]);
+              if (!wasClaimed(pending[deadRest])) discardCard(game, pending[deadRest]);
             }
             if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
             game.pauseState.judgeAreaInFlight = null;
@@ -235,7 +241,7 @@
             // 整批取出) 一并入弃牌堆 — 否则从所有区域凭空消失 (守恒破坏,
             // 叠放多张延时锦囊 + 首张致死场景)。
             for (var overRest = i + 1; overRest < pending.length; overRest += 1) {
-              discardCard(game, pending[overRest]);
+              if (!wasClaimed(pending[overRest])) discardCard(game, pending[overRest]);
             }
             if (game.pauseState && game.pauseState.judgeArea) game.pauseState.judgeArea = null;
             game.pauseState.judgeAreaInFlight = null;
@@ -302,6 +308,9 @@
 
       function applyJudgeAreaOutcome(game, actor, state, trick, reason, judgementCard) {
         var outcome = evaluateDelayedTrick(trick, judgementCard);
+        // flow__judge: Tiandu and judgement disposal finish before the enclosing
+        // delayed card applies its result. A judged Wine can rescue Lightning.
+        resolveJudgementCard(game, actor, state, reason, judgementCard);
         if (outcome.skipPlay) {
           state.flags.skipPlay = true;
           log(game, actorName(game, actor) + '【乐不思蜀】判定失败，跳过出牌阶段。');
@@ -317,7 +326,6 @@
           // 抽出为 moveShandianOnward, 与"被无懈后移动"共用。
           moveShandianOnward(game, actor, trick);
         }
-        resolveJudgementCard(game, actor, state, reason, judgementCard);
         if (outcome.discardTrick) discardCard(game, trick);
       }
 

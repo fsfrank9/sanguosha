@@ -126,7 +126,8 @@ test('wind pack fixture is a separate pack with the same spec contract', () => {
   assert.deepEqual(windByName['黄忠'].skills, ['烈弓']);
   assert.deepEqual(windByName['魏延'].skills, ['狂骨']);
   assert.deepEqual(windByName['小乔'].skills, ['天香', '红颜']);
-  assert.deepEqual(windByName['周泰'].skills, ['不屈']);
+  // AC whole-card source repair: wu.md:363–367 includes native Fenji (still TODO).
+  assert.deepEqual(windByName['周泰'].skills, ['不屈', '奋激']);
   assert.deepEqual(windByName['张角'].skills, ['雷击', '鬼道', '黄天']);
   assert.deepEqual(windByName['于吉'].skills, ['蛊惑']);
 

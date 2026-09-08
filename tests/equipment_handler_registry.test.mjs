@@ -26,6 +26,7 @@ const RULE_FILES = [
   'src/engine/god-conversion.js',
   'src/engine/god-strategy.js',
   'src/engine/god-wrath.js',
+  'src/engine/forced-discard.js',
 ];
 
 test('引擎规则文件不含裸装备型号判断 (收口到 flag/handler 注册表)', () => {

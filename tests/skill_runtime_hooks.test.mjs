@@ -299,7 +299,9 @@ test('game engine dispatches Fankui through onDamageAfter and gains a source-are
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]fankui['"]/, 'Fankui should be registered with SkillRuntime.registerSkill');
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]fankui['"][\s\S]*?onDamageAfter\s*:/, 'Fankui should register an onDamageAfter hook');
   assert.match(skillsSource, /triggerFankuiDamageAfter\(context\)/, 'Fankui hook should forward the damage context to an isolated helper');
-  assert.match(fankuiSource, /sourceActor\s*===\s*targetActor|targetActor\s*===\s*sourceActor/, 'Fankui should ignore self-damage contexts instead of moving Sima Yi own cards');
+  // AC WS2: wei.md:61 has no self-source exclusion. This former assertion
+  // codified the opposite rule; public self-chain and source-less lightning
+  // positive/negative guards now live in v16_ac_wei_shu_audit.test.mjs.
   assert.match(fankuiSource, /removeTargetZoneCard\(\s*game\s*,\s*sourceActor\s*,\s*autoZone\s*\)/, 'Fankui should remove one gainable card from the damage source area');
   // v11 A2: 获得牌统一走 moveCard 原语 (putCard 入手牌), 不再裸 push。
   assert.match(fankuiSource, /putCard\(\s*game\s*,\s*gained\.card\s*,\s*\{\s*zone:\s*['"]hand['"]\s*,\s*actor:\s*targetActor\s*\}\s*\)/, 'Fankui should move the gained source card into Sima Yi hand via putCard');
@@ -312,7 +314,8 @@ test('game engine dispatches Wusheng, Longdan, and Qingguo card-as conversions t
   const responseMatch = source.match(/function findResponseCard\([^)]*\)/);
   const responseStart = responseMatch ? responseMatch.index : -1;
   const responseEnd = source.indexOf('function consumeResponse(game, actor, type, reason', responseStart);
-  const canPlayStart = source.indexOf('function canPlayCardAs(game, actor, cardOrId, asType)');
+  // AC WS10: optional target options join the shared Jixi pre-payment gate.
+  const canPlayStart = source.indexOf('function canPlayCardAs(game, actor, cardOrId, asType, options)');
   // v11 C3 (批次 27): playCardAs 增加 options 形参 (奇袭 targetZone 透传)。
   const canPlayEnd = source.indexOf('function playCardAs(game, actor, cardId, asType, options)', canPlayStart);
   assert.ok(responseStart >= 0 && responseEnd > responseStart, 'findResponseCard source should be extractable');
