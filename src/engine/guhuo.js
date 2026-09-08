@@ -116,7 +116,7 @@ export function createGuhuoRuntime(deps) {
   // v16 Y: 全座席；AI 质疑窗口由响应帧保留已付张数和当前消费位置。
   function guhuoResponsePossible(game, actor) {
     var state = game && game[actor];
-    if (!state || !StateRuntime.hasSkill(state, 'guhuo')) return false;
+    if (!state || !StateRuntime.skillEnabled(state, 'guhuo')) return false;
     if (state.flags && state.flags.guhuoUsedThisTurn) return false;
     return (state.hand || []).length > 0;
   }
@@ -172,7 +172,7 @@ export function createGuhuoRuntime(deps) {
     var actor = pending.actor;
     var state = game[actor];
     if (!state) return fail('未知角色。');
-    if (!StateRuntime.hasSkill(state, 'guhuo')) return fail('该角色没有【蛊惑】。');
+    if (!StateRuntime.skillEnabled(state, 'guhuo')) return fail('该角色没有【蛊惑】。');
     if (state.flags && state.flags.guhuoUsedThisTurn) return fail('【蛊惑】每名角色的回合内限一次。');
     // v16 Y3: 各窗口 gate / 两个公开 dispatcher / UI 门禁复用全座席谓词。
     if (!guhuoResponsePossible(game, actor)) return fail('该角色当前不能在响应中发动【蛊惑】。');
@@ -274,7 +274,7 @@ export function createGuhuoRuntime(deps) {
 
   function guhuoAvailable(game, actor) {
     var state = game && game[actor];
-    if (!state || !StateRuntime.hasSkill(state, 'guhuo')) return false;
+    if (!state || !StateRuntime.skillEnabled(state, 'guhuo')) return false;
     if (game.turn !== actor || game.phase !== 'play') return false;
     if (state.flags && state.flags.guhuoUsedThisTurn) return false;
     return (state.hand || []).length > 0;
@@ -301,7 +301,7 @@ export function createGuhuoRuntime(deps) {
     var state = game[actor];
     opts = opts || {};
     if (!state) return fail('未知角色。');
-    if (!StateRuntime.hasSkill(state, 'guhuo')) return fail('该角色没有【蛊惑】。');
+    if (!StateRuntime.skillEnabled(state, 'guhuo')) return fail('该角色没有【蛊惑】。');
     if (game.turn !== actor || game.phase !== 'play') return fail('只能在自己的出牌阶段发动【蛊惑】。');
     if (state.flags && state.flags.guhuoUsedThisTurn) return fail('【蛊惑】每名角色的回合内限一次。');
     if (GUHUO_DECLARABLE.indexOf(opts.declareType) < 0) return fail('【蛊惑】只能声明基本牌或非延时类锦囊牌。');
@@ -379,7 +379,7 @@ export function createGuhuoRuntime(deps) {
   function buildChallengeQueue(game, actor) {
     return StateRuntime.seatsFrom(game, game.turn, true).filter(function (seat) {
       var st = game[seat];
-      return seat !== actor && st && st.hp > 0 && !st.chanyuan;
+      return seat !== actor && st && st.hp > 0 && !StateRuntime.skillEnabled(st, 'chanyuan', game);
     });
   }
 
@@ -474,15 +474,13 @@ export function createGuhuoRuntime(deps) {
 
   // 缠怨: 获得性锁定技 — 入 state.skills (UI 技能栏/图鉴外挂显示) + 快查
   // 旗标。效果两面: ① 不能质疑蛊惑 (buildChallengeQueue 过滤);
-  // ② 体力值为 1 时除缠怨外技能无效 (state.js hasSkill / skill-runtime
-  // hasPassiveEffect 双闸压制; 装备技不在武将技能面, 不受压制 — 口径
+  // ② 体力值为 1 时除缠怨外技能无效 (SkillRuntime.skillState 单点裁决; 装备技不在武将技能面, 不受压制 — 口径
   // 记录于 R1 执行记录)。
   function grantChanyuan(game, seat) {
     var st = game[seat];
-    if (!st || st.chanyuan) return;
+    if (!st || StateRuntime.ownsSkill(st, 'chanyuan', game)) return;
     st.chanyuan = true;
-    st.skills = st.skills || [];
-    st.skills.push({
+    StateRuntime.grantSkill(st, 'chanyuan', '缠怨', {
       id: 'chanyuan',
       name: '缠怨',
       desc: '锁定技，你不能对「蛊惑」进行质疑；若你的体力值为1，你除「缠怨」外的技能无效。',

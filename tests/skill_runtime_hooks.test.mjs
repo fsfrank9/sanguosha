@@ -4,6 +4,8 @@ import path from 'node:path';
 import { SkillRuntime } from './helpers/load-engine.mjs';
 import { test, runTests } from './helpers/harness.mjs';
 
+// AA1: 迁移期同时识别旧 hasSkill 与 canonical skillEnabled。正向结构断言
+// 接受两者; 禁止内联的负向守护也同时拦截两者, 不因接口改名失效。
 const root = path.resolve(import.meta.dirname, '..');
 const skillsSource = fs.readFileSync(path.join(root, 'src/engine/skills.js'), 'utf8');
 // v12 F5: 杀链域拆分 — playSha 链切片改读 sha-flow.js
@@ -80,7 +82,7 @@ test('game engine dispatches Keji through onBeforeDiscardPhase hook seam', () =>
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]keji['"]/, 'Keji should be registered with SkillRuntime.registerSkill');
   assert.match(skillsSource, /onBeforeDiscardPhase\s*:/, 'Keji should register an onBeforeDiscardPhase hook');
   assert.match(finishPlayPhaseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onBeforeDiscardPhase['"]/, 'finishPlayPhase should dispatch onBeforeDiscardPhase before entering discard');
-  assert.doesNotMatch(finishPlayPhaseSource, /hasSkill\(\s*state\s*,\s*['"]keji['"]/, 'finishPlayPhase should no longer directly own Keji skill detection');
+  assert.doesNotMatch(finishPlayPhaseSource, /(?:hasSkill|skillEnabled)\(\s*state\s*,\s*['"]keji['"]/, 'finishPlayPhase should no longer directly own Keji skill detection');
 });
 
 test('game engine dispatches Jizhi through onCardUse hook seam', () => {
@@ -114,7 +116,7 @@ test('game engine dispatches Yingzi through onDrawPhase hook seam', () => {
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yingzi['"]/, 'Yingzi should be registered with SkillRuntime.registerSkill');
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yingzi['"][\s\S]*?onDrawPhase\s*:/, 'Yingzi should register an onDrawPhase hook');
   assert.match(performDrawPhaseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDrawPhase['"]/, 'performDrawPhase should dispatch draw-stage skills through onDrawPhase');
-  assert.doesNotMatch(performDrawPhaseSource, /hasSkill\([^)]*['"]yingzi['"]/, 'performDrawPhase should no longer directly own Yingzi skill detection');
+  assert.doesNotMatch(performDrawPhaseSource, /(?:hasSkill|skillEnabled)\([^)]*['"]yingzi['"]/, 'performDrawPhase should no longer directly own Yingzi skill detection');
 });
 
 test('game engine dispatches Tuxi through onDrawPhase hook seam', () => {
@@ -127,7 +129,7 @@ test('game engine dispatches Tuxi through onDrawPhase hook seam', () => {
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tuxi['"]/, 'Tuxi should be registered with SkillRuntime.registerSkill');
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]tuxi['"][\s\S]*?onDrawPhase\s*:/, 'Tuxi should register an onDrawPhase hook');
   assert.match(performDrawPhaseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDrawPhase['"]/, 'performDrawPhase should dispatch draw-stage skills through onDrawPhase');
-  assert.doesNotMatch(performDrawPhaseSource, /hasSkill\([^)]*['"]tuxi['"]/, 'performDrawPhase should no longer directly own Tuxi skill detection');
+  assert.doesNotMatch(performDrawPhaseSource, /(?:hasSkill|skillEnabled)\([^)]*['"]tuxi['"]/, 'performDrawPhase should no longer directly own Tuxi skill detection');
 });
 
 test('SkillRuntime exposes passive effect helpers for locked skill seams', () => {
@@ -146,14 +148,14 @@ test('state runtime resolves Paoxiao and Mashu through SkillRuntime passive effe
 
   assert.match(stateSource, /SkillRuntime\.hasPassiveEffect\(\s*state\s*,\s*['"]unlimitedSha['"]/, 'canUseUnlimitedSha should query SkillRuntime passive effects');
   assert.match(stateSource, /SkillRuntime\.sumPassiveEffect\(\s*from\s*,\s*['"]outgoingDistance['"]/, 'distanceBetween should query SkillRuntime passive distance modifiers');
-  assert.doesNotMatch(stateSource, /hasSkill\([^)]*['"]paoxiao['"]/, 'StateRuntime should not directly hard-code Paoxiao detection');
-  assert.doesNotMatch(stateSource, /hasSkill\([^)]*['"]mashu['"]/, 'StateRuntime should not directly hard-code Mashu detection');
+  assert.doesNotMatch(stateSource, /(?:hasSkill|skillEnabled)\([^)]*['"]paoxiao['"]/, 'StateRuntime should not directly hard-code Paoxiao detection');
+  assert.doesNotMatch(stateSource, /(?:hasSkill|skillEnabled)\([^)]*['"]mashu['"]/, 'StateRuntime should not directly hard-code Mashu detection');
 });
 
 test('game engine resolves trick distance checks through 1V1-spec-compliant path (v7 PR-10/11)', () => {
   // v7 PR-10/11: 1V1 spec 把 顺手牵羊 / 兵粮寸断 的距离限制都去掉了，
   // 1V1 标准包内已无 distance-limited 锦囊牌。canPlayCard 仍然必须：
-  //   - 不硬编码 hasSkill('qicai') 检测（保留 seam 给未来恢复时用）
+  //   - 不硬编码 hasSkill / skillEnabled 的奇才检测（保留 seam 给未来恢复时用）
   //   - 保留 1V1 spec 注释说明
   const source = fs.readFileSync(path.join(root, 'src/engine/game-engine.js'), 'utf8');
   const canPlayStart = source.indexOf('function canPlayCard(game, actor, card)');
@@ -162,7 +164,7 @@ test('game engine resolves trick distance checks through 1V1-spec-compliant path
   assert.ok(canPlayStart >= 0 && canPlayEnd > canPlayStart, 'canPlayCard source should be extractable');
   const canPlaySource = source.slice(canPlayStart, canPlayEnd);
 
-  assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"]qicai['"]/, 'canPlayCard should not directly hard-code Qicai detection');
+  assert.doesNotMatch(canPlaySource, /(?:hasSkill|skillEnabled)\([^)]*['"]qicai['"]/, 'canPlayCard should not directly hard-code Qicai detection');
   assert.match(canPlaySource, /1V1/, 'canPlayCard 应当带 1V1 spec 注释说明无距离限制锦囊的现状');
 });
 
@@ -180,8 +182,8 @@ test('game engine dispatches Kongcheng through onCardTarget hook seam', () => {
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]kongcheng['"]/, 'Kongcheng should be registered with SkillRuntime.registerSkill');
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]kongcheng['"][\s\S]*?onCardTarget\s*:/, 'Kongcheng should register an onCardTarget hook');
   assert.match(source, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardTarget['"]/, 'target validation should dispatch through onCardTarget');
-  assert.doesNotMatch(canPlaySource, /isKongchengProtected|hasSkill\([^)]*['"]kongcheng['"]/, 'canPlayCard should no longer directly own Kongcheng target protection');
-  assert.doesNotMatch(playShaSource, /isKongchengProtected|hasSkill\([^)]*['"]kongcheng['"]/, 'playSha should no longer directly own Kongcheng target protection');
+  assert.doesNotMatch(canPlaySource, /isKongchengProtected|(?:hasSkill|skillEnabled)\([^)]*['"]kongcheng['"]/, 'canPlayCard should no longer directly own Kongcheng target protection');
+  assert.doesNotMatch(playShaSource, /isKongchengProtected|(?:hasSkill|skillEnabled)\([^)]*['"]kongcheng['"]/, 'playSha should no longer directly own Kongcheng target protection');
 });
 
 test('game engine dispatches Qianxun through onCardTarget hook seam', () => {
@@ -201,8 +203,8 @@ test('game engine dispatches Qianxun through onCardTarget hook seam', () => {
   assert.match(skillsSource, /triggerQianxunCardTarget\(context\)/, 'Qianxun hook should delegate target-protection logic to an isolated helper');
   // v12 H1: 保护检查泛化为逐座席 ∃-检查 (seat 变量), 仍走共享 onCardTarget 缝
   assert.match(canPlaySource, /cardTargetProtection\(game, actor, seat, card\)/, 'canPlayCard should use shared target protection for Qianxun-protected cards');
-  assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"]qianxun['"]/, 'canPlayCard should not directly hard-code Qianxun detection');
-  assert.doesNotMatch(playCardSource, /hasSkill\([^)]*['"]qianxun['"]/, 'playCard should not directly hard-code Qianxun detection');
+  assert.doesNotMatch(canPlaySource, /(?:hasSkill|skillEnabled)\([^)]*['"]qianxun['"]/, 'canPlayCard should not directly hard-code Qianxun detection');
+  assert.doesNotMatch(playCardSource, /(?:hasSkill|skillEnabled)\([^)]*['"]qianxun['"]/, 'playCard should not directly hard-code Qianxun detection');
 });
 
 test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
@@ -218,7 +220,7 @@ test('game engine dispatches Tieqi through onNeedResponse hook seam', () => {
   assert.match(skillsSource, /function triggerTieqiNeedResponse\(game, actor, targetActor, responseType, triggeringCard\)/, 'Tieqi response helper should accept the triggering card');
   assert.match(skillsSource, /!isShaCard\(triggeringCard\)/, 'Tieqi response helper should self-filter to Sha response windows only');
   assert.match(playShaSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onNeedResponse['"]/, 'playSha should dispatch the Shan response window through onNeedResponse');
-  assert.doesNotMatch(playShaSource, /hasSkill\([^)]*['"]tieqi['"]|tieqiLocked/, 'playSha should no longer directly own Tieqi response locking');
+  assert.doesNotMatch(playShaSource, /(?:hasSkill|skillEnabled)\([^)]*['"]tieqi['"]|tieqiLocked/, 'playSha should no longer directly own Tieqi response locking');
 });
 
 test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
@@ -237,7 +239,7 @@ test('game engine dispatches Jianxiong through onDamageAfter hook seam', () => {
   assert.match(skillsSource, /function triggerJianxiongDamageAfter\(game, targetActor, sourceCard\)/, 'Jianxiong helper should isolate the damage-after side effect');
   assert.match(damageSource, /var damageContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should build a complete damage-after context');
   assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch through onDamageAfter');
-  assert.doesNotMatch(damageSource, /hasSkill\([^)]*['"]jianxiong['"]|发动【奸雄】/, 'damage should no longer directly own Jianxiong skill logic');
+  assert.doesNotMatch(damageSource, /(?:hasSkill|skillEnabled)\([^)]*['"]jianxiong['"]|发动【奸雄】/, 'damage should no longer directly own Jianxiong skill logic');
 });
 
 test('game engine dispatches Ganglie through onDamageAfter and finalizes its judgment card', () => {
@@ -262,7 +264,7 @@ test('game engine dispatches Ganglie through onDamageAfter and finalizes its jud
   assert.match(ganglieSource, /resolveJudgementCard\(\s*game\s*,\s*targetActor\s*,\s*target\s*,\s*['"]【刚烈】['"]\s*,\s*ganglieJudge\s*\)/, 'Ganglie should route its judgment card through the shared finalizer');
   assert.match(ganglieSource, /ganglieJudge\.suit\s*!==\s*['"]heart['"]/, 'Ganglie should only retaliate when the judgment is not heart');
   assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch through onDamageAfter');
-  assert.doesNotMatch(damageSource, /hasSkill\([^)]*['"]ganglie['"]|发动【刚烈】/, 'damage should not directly own Ganglie skill logic');
+  assert.doesNotMatch(damageSource, /(?:hasSkill|skillEnabled)\([^)]*['"]ganglie['"]|发动【刚烈】/, 'damage should not directly own Ganglie skill logic');
 });
 
 test('game engine dispatches Fankui through onDamageAfter and gains a source-area card', () => {
@@ -288,7 +290,7 @@ test('game engine dispatches Fankui through onDamageAfter and gains a source-are
   // v11 A2: 获得牌统一走 moveCard 原语 (putCard 入手牌), 不再裸 push。
   assert.match(fankuiSource, /putCard\(\s*game\s*,\s*gained\.card\s*,\s*\{\s*zone:\s*['"]hand['"]\s*,\s*actor:\s*targetActor\s*\}\s*\)/, 'Fankui should move the gained source card into Sima Yi hand via putCard');
   assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch through onDamageAfter');
-  assert.doesNotMatch(damageSource, /hasSkill\([^)]*['"]fankui['"]|发动【反馈】/, 'damage should not directly own Fankui skill logic');
+  assert.doesNotMatch(damageSource, /(?:hasSkill|skillEnabled)\([^)]*['"]fankui['"]|发动【反馈】/, 'damage should not directly own Fankui skill logic');
 });
 
 test('game engine dispatches Wusheng, Longdan, and Qingguo card-as conversions through onCardAs hook seam', () => {
@@ -315,8 +317,8 @@ test('game engine dispatches Wusheng, Longdan, and Qingguo card-as conversions t
   assert.match(skillsSource, /triggerQingguoCardAs\(context\)/, 'Qingguo hook should delegate conversion decisions to an isolated helper');
   assert.match(responseSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardAs['"]\s*,\s*responseContext\s*\)/, 'automatic response selection should dispatch conversion opportunities through onCardAs');
   assert.match(canPlaySource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onCardAs['"]\s*,\s*cardAsContext\s*\)/, 'proactive card-as validation should dispatch through onCardAs');
-  assert.doesNotMatch(responseSource, /hasSkill\([^)]*['"](?:wusheng|longdan|qingguo)['"]/, 'findResponseCard should no longer directly own Wusheng, Longdan, or Qingguo detection');
-  assert.doesNotMatch(canPlaySource, /hasSkill\([^)]*['"](?:wusheng|longdan|qingguo)['"]/, 'canPlayCardAs should no longer directly own Wusheng, Longdan, or Qingguo detection');
+  assert.doesNotMatch(responseSource, /(?:hasSkill|skillEnabled)\([^)]*['"](?:wusheng|longdan|qingguo)['"]/, 'findResponseCard should no longer directly own Wusheng, Longdan, or Qingguo detection');
+  assert.doesNotMatch(canPlaySource, /(?:hasSkill|skillEnabled)\([^)]*['"](?:wusheng|longdan|qingguo)['"]/, 'canPlayCardAs should no longer directly own Wusheng, Longdan, or Qingguo detection');
 });
 
 test('game engine dispatches implemented active skills through onActiveSkill hook seam', () => {
@@ -357,7 +359,7 @@ test('game engine dispatches Guanxing preview through onSkillPreview hook seam',
   assert.match(previewSource, /var previewContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*self[\s\S]*skillId:\s*['"]guanxing['"][\s\S]*\}/, 'getGuanxingPreview should build a preview context');
   assert.match(previewSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onSkillPreview['"]\s*,\s*previewContext\s*\)/, 'getGuanxingPreview should dispatch preview through onSkillPreview');
   assert.match(previewSource, /selectActiveSkillResult\(\s*previewResults\s*,\s*['"]guanxing['"]\s*\)/, 'getGuanxingPreview should select Guanxing preview hook result');
-  assert.doesNotMatch(previewSource, /hasSkill\([^)]*['"]guanxing['"]/, 'getGuanxingPreview should no longer directly own Guanxing skill detection');
+  assert.doesNotMatch(previewSource, /(?:hasSkill|skillEnabled)\([^)]*['"]guanxing['"]/, 'getGuanxingPreview should no longer directly own Guanxing skill detection');
 });
 
 test('game engine dispatches Tiandu judgement-card gain through onJudgementAfterResolve hook seam', () => {
@@ -388,7 +390,7 @@ test('game engine dispatches Yiji per-damage-point draw through onDamageAfter ho
 
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]yiji['"][\s\S]*?onDamageAfter\s*:/, 'Yiji should register an onDamageAfter hook');
   assert.match(skillsSource, /triggerYijiDamageAfter\(context\)/, 'Yiji hook should delegate to an isolated helper');
-  assert.match(skillsSource, /function triggerYijiDamageAfter\(context\) \{[\s\S]*var target = game\[targetActor\][\s\S]*hasSkill\(target, ['"]yiji['"]\)[\s\S]*for \(var i = 0; i < context\.amount; i \+= 1\) \{[\s\S]*drawCards\(game, targetActor, 2\);[\s\S]*\}/, 'Yiji helper should self-filter and draw two cards once per damage point');
+  assert.match(skillsSource, /function triggerYijiDamageAfter\(context\) \{[\s\S]*var target = game\[targetActor\][\s\S]*(?:hasSkill|skillEnabled)\(target, ['"]yiji['"]\)[\s\S]*for \(var i = 0; i < context\.amount; i \+= 1\) \{[\s\S]*drawCards\(game, targetActor, 2\);[\s\S]*\}/, 'Yiji helper should self-filter and draw two cards once per damage point');
   assert.match(damageSource, /var damageContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should include damage amount in the hook context');
   assert.match(damageSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onDamageAfter['"]\s*,\s*damageContext\s*\)/, 'damage should dispatch damage-after skills through SkillRuntime');
 });
@@ -411,9 +413,13 @@ test('game engine dispatches Luoyi through draw and damage-modifier hook seams',
   assert.match(skillsSource, /SkillRuntime\.registerSkill\(\s*skillRegistry\s*,\s*['"]luoyi['"][\s\S]*?onDrawPhase\s*:[\s\S]*?onDamageModify\s*:/, 'Luoyi should register draw and damage modifier hooks');
   assert.match(skillsSource, /triggerLuoyiDrawPhase\(context\)/, 'Luoyi draw hook should delegate to an isolated helper');
   assert.match(skillsSource, /triggerLuoyiDamageModify\(context\)/, 'Luoyi damage hook should delegate to an isolated helper');
-  assert.doesNotMatch(drawSource, /hasSkill\([^)]*['"]luoyi['"]/, 'performDrawPhase should not directly own Luoyi skill detection');
-  assert.match(skillsSource, /function triggerLuoyiDrawPhase\(context\) \{[\s\S]*hasSkill\(state, ['"]luoyi['"]\)[\s\S]*context\.drawCount\s*=\s*Math\.max\(0, context\.drawCount - 1\)[\s\S]*flags\.luoyi\s*=\s*true/, 'Luoyi draw helper should self-filter, draw one fewer, and set a turn flag');
-  assert.match(skillsSource, /function triggerLuoyiDamageModify\(context\) \{[\s\S]*hasSkill\(source, ['"]luoyi['"]\)[\s\S]*source\.flags\.luoyi[\s\S]*isShaCard\(context\.sourceCard\)[\s\S]*\/决斗\/\.test\(context\.reason \|\| ['"]['"]\)[\s\S]*context\.amount\s*\+=\s*1/, 'Luoyi damage helper should self-filter and add one damage only for Sha or Duel damage');
+  assert.doesNotMatch(drawSource, /(?:hasSkill|skillEnabled)\([^)]*['"]luoyi['"]/, 'performDrawPhase should not directly own Luoyi skill detection');
+  assert.match(skillsSource, /function triggerLuoyiDrawPhase\(context\) \{[\s\S]*(?:hasSkill|skillEnabled)\(state, ['"]luoyi['"]\)[\s\S]*context\.drawCount\s*=\s*Math\.max\(0, context\.drawCount - 1\)[\s\S]*flags\.luoyi\s*=\s*true/, 'Luoyi draw helper should self-filter, draw one fewer, and set a turn flag');
+  // AA1: official Xuchu/Duanchang ruling preserves the paid turn effect after
+  // skill loss. The damage hook must filter the effect flag, not current ownership.
+  const luoyiDamageHelper = skillsSource.slice(skillsSource.indexOf('function triggerLuoyiDamageModify(context)'), skillsSource.indexOf('function shouldTriggerJizhi'));
+  assert.match(luoyiDamageHelper, /source\.flags\.luoyi[\s\S]*game\.turn !== sourceActor[\s\S]*isShaCard\(context\.sourceCard\)[\s\S]*\/决斗\/\.test\(context\.reason \|\| ['"]['"]\)[\s\S]*context\.amount\s*\+=\s*1/, 'Luoyi damage helper should require its paid turn effect and add one only for Sha or Duel damage');
+  assert.doesNotMatch(luoyiDamageHelper, /(?:hasSkill|skillEnabled)\(/, 'skill loss must not revoke an already activated Luoyi effect');
   assert.match(damageSource, /var damageModifyContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*targetActor:\s*targetActor[\s\S]*sourceActor:\s*sourceActor[\s\S]*reason:\s*reason[\s\S]*sourceCard:\s*sourceCard[\s\S]*amount:\s*amount[\s\S]*nature:\s*damageNature[\s\S]*\}/, 'damage should build a mutable damage modifier context');
   var modifierIndex = damageSource.indexOf("SkillRuntime.runHook(skillRegistry, 'onDamageModify', damageModifyContext)");
   var hpLossIndex = damageSource.indexOf('target.hp =');
@@ -434,9 +440,9 @@ test('game engine dispatches Guicai through judgement before-resolve hook seam',
   // v6.1 (cross-actor fix): the holder may be either the judgement actor
   // (own-judgement case) or the opponent (司马懿 replacing opponent's
   // judgement). We accept `state` or `holderState` as the variable name.
-  // v13 评审收口: 自筛可经内联 hasSkill 或共享座次环扫描 findRingSkillHolder
-  // (内部同样 hasSkill 过滤) — 两种形状均满足"自筛"守护意图。
-  assert.match(skillsSource, /function triggerGuicaiJudgementBeforeResolve\(context\) \{[\s\S]*(?:hasSkill\(\s*\w+\s*,\s*['"]guicai['"]\)|findRingSkillHolder\(\s*game\s*,\s*\w+\s*,\s*['"]guicai['"])[\s\S]*removeCardFromHand\(\s*\w+\s*,\s*replacement\.id\s*\)[\s\S]*discardCard\(game, originalCard\)[\s\S]*context\.card\s*=\s*replacement[\s\S]*context\.replaced\s*=\s*true/, 'Guicai helper should self-filter, pay a hand-card cost, discard the original judgement, and replace the context card');
+  // v13 评审收口: 自筛可经内联 hasSkill / skillEnabled 或共享座次环扫描 findRingSkillHolder
+  // (内部同样按技能是否生效过滤) — 两种形状均满足"自筛"守护意图。
+  assert.match(skillsSource, /function triggerGuicaiJudgementBeforeResolve\(context\) \{[\s\S]*(?:(?:hasSkill|skillEnabled)\(\s*\w+\s*,\s*['"]guicai['"]\)|findRingSkillHolder\(\s*game\s*,\s*\w+\s*,\s*['"]guicai['"])[\s\S]*removeCardFromHand\(\s*\w+\s*,\s*replacement\.id\s*\)[\s\S]*discardCard\(game, originalCard\)[\s\S]*context\.card\s*=\s*replacement[\s\S]*context\.replaced\s*=\s*true/, 'Guicai helper should self-filter, pay a hand-card cost, discard the original judgement, and replace the context card');
   assert.match(judgeSource, /var judgementContext\s*=\s*\{[\s\S]*game:\s*game[\s\S]*actor:\s*actor[\s\S]*state:\s*state[\s\S]*reason:\s*reason[\s\S]*card:\s*card[\s\S]*originalCard:\s*card[\s\S]*replaced:\s*false[\s\S]*\}/, 'judge should build a mutable before-resolve judgement context');
   assert.match(judgeSource, /SkillRuntime\.runHook\(\s*skillRegistry\s*,\s*['"]onJudgementBeforeResolve['"]\s*,\s*judgementContext\s*\)/, 'judge should dispatch before-resolve judgement replacement through SkillRuntime');
   assert.match(judgeSource, /return judgementContext\.card/, 'judge should return the possibly replaced judgement card');

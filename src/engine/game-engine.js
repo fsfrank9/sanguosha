@@ -13,6 +13,8 @@
       import { createGuhuoRuntime } from './guhuo.js';
       import { createPindianRuntime } from './pindian.js';
       import { createJudgeAreaRuntime } from './judge-area.js';
+      import { GeneralCardRuntime } from './general-card-runtime.js';
+      import { createGeneralSelectionRuntime } from './general-selection.js';
       import { installStandardSkillHandlers, PLAY_PHASE_ACTIVE_SKILLS } from './skills.js';
       import { HERO_CATALOG, HEROES } from '../data/heroes.js';
       import { CARD_CATALOG, CARD_INFO, PHASES } from '../data/cards.js';
@@ -45,7 +47,7 @@
       var nextSeat = StateRuntime.nextSeat;
       var seatsFrom = StateRuntime.seatsFrom;
       var resolveSeatOption = StateRuntime.resolveSeatOption;
-      var hasSkill = StateRuntime.hasSkill;
+      var skillEnabled = StateRuntime.skillEnabled;
       var canUseUnlimitedSha = StateRuntime.canUseUnlimitedSha;
       var weaponRange = StateRuntime.weaponRange;
       var distanceBetween = StateRuntime.distanceBetween;
@@ -386,7 +388,8 @@
           // W2-F13: 铁骑/烈弓锁定已在雌雄之前预结算 (快照携带), 经 presetLock
           // 传入 — 恢复路径不重跑 onNeedResponse (铁骑不二次判定)。
           return continueShaAfterCixiong(game, saved.actor, saved.card, saved.amount, saved.targetActor,
-            { responseLocked: !!saved.responseLocked });
+            { responseLocked: !!saved.responseLocked,
+              shanRequired: saved.shanRequired, doubleShanReason: saved.doubleShanReason });
         }
         // v14 P1: 多目标链的雌雄挂起 (锁定阶段, 游标已先行) → 续跑链驱动。
         if (game.pauseState && game.pauseState.shaChain) {
@@ -450,6 +453,25 @@
       var resumeSuspendedTurnFlowIfReady = ResponseRuntime.resumeSuspendedTurnFlowIfReady;
       var finishPendingChoiceResolution = ResponseRuntime.finishPendingChoiceResolution;
       var pendingChoiceGuard = ResponseRuntime.pendingChoiceGuard;
+      var GeneralSelectionRuntime = createGeneralSelectionRuntime({
+        catalog: HERO_CATALOG,
+        responseFlows: ResponseRuntime.responseFlows,
+        requestPlayerResponse: requestPlayerResponse,
+        registerResponseKind: registerResponseKind,
+        success: success,
+        fail: fail,
+        continueBoundary: function (game, source) {
+          if (source.continuation.kind === 'initial-hands') return finishGameSetup(game, source.actor, source.continuation.startWithFirstTurn);
+          if (source.continuation.kind === 'prepare') return beginPreparePhase(game, source.actor);
+          if (source.continuation.kind === 'next-turn') return advanceToNextTurn(game, source.actor);
+          return success('时机结算完成。');
+        }
+      });
+      StateRuntime.setAllSkillsLostHandler(function (state, game) {
+        if (!game || !game.generalCards) return;
+        var actor = seatList(game).find(function (seat) { return game[seat] === state; });
+        if (actor) GeneralCardRuntime.releaseAll(game, actor);
+      });
       // v15 T: 拼点域 (驱虎/天义 前置; 后续烈刃/制霸/间书 同框架)。
       var PindianRuntime = createPindianRuntime({
         responseFlows: ResponseRuntime.responseFlows,
@@ -541,7 +563,7 @@
       CardRuntime.setHandLossHandler(function (game, originState) {
         if (!game || game.phase === 'gameover') return;
         if (!originState || (originState.hand || []).length > 0) return;
-        if (!hasSkill(originState, 'lianying')) return;
+        if (!skillEnabled(originState, 'lianying')) return;
         if (originState.skillPreferences && originState.skillPreferences.lianying === 'decline') return;
         // v12 H 复核修复: 座席归属泛化 (此前第三席解析为 null → 连营静默失效)。
         var actor = seatOfState(game, originState);
@@ -560,8 +582,8 @@
         }
         if (!card) return null;
         if (card.type === 'shan') return { via: null };
-        if (hasSkill(state, 'longdan') && isShaCard(card)) return { via: '龙胆' };
-        if (hasSkill(state, 'qingguo') && card.color === 'black') return { via: '倾国' };
+        if (skillEnabled(state, 'longdan') && isShaCard(card)) return { via: '龙胆' };
+        if (skillEnabled(state, 'qingguo') && card.color === 'black') return { via: '倾国' };
         return null;
       }
 
@@ -585,8 +607,8 @@
         }
         if (!card) return null;
         if (isShaCard(card)) return { via: null };
-        if (hasSkill(state, 'longdan') && card.type === 'shan') return { via: '龙胆' };
-        if (hasSkill(state, 'wusheng') && card.color === 'red') return { via: '武圣' };
+        if (skillEnabled(state, 'longdan') && card.type === 'shan') return { via: '龙胆' };
+        if (skillEnabled(state, 'wusheng') && card.color === 'red') return { via: '武圣' };
         return null;
       }
 
@@ -883,7 +905,7 @@
         moveCard: moveCard,
         takeCard: takeCard,
         equipmentList: equipmentList,
-        hasSkill: hasSkill,
+        skillEnabled: skillEnabled,
         canReachWithSha: canReachWithSha,
         hasEquipmentEffect: hasEquipmentEffect,
         hasShaResponseAvailable: hasShaResponseAvailable,
@@ -1112,7 +1134,7 @@
       // 与 tricks/judge-area 的既有包装先例一致)。直调面回绑同名 var, 使
       // registerResponseKind 注册块 / processPreparePhase / 导出表零改动。
       var SkillDomain = installStandardSkillHandlers(skillRegistry, {
-        hasSkill: hasSkill,
+        skillEnabled: skillEnabled,
         // v15 T 评审收口: 涅槃 ask 挂起后重入濒死循环 (DamageDyingRuntime
         // 早于本处装配, 直绑即可)。
         processDyingNext: DamageDyingRuntime.processDyingNext,
@@ -1330,7 +1352,7 @@
         var spec = LORD_AID_SPECS[skillId];
         return seatsFrom(game, lordActor, false).filter(function (seat) {
           var state = game[seat];
-          return state && state.hp > 0 && state.camp === spec.camp
+          return state && state.hp > 0 && StateRuntime.effectiveCamp(state) === spec.camp
             && StateRuntime.sideOf(game, seat) !== null
             && !StateRuntime.isHostileSeat(game, seat, lordActor);
         });
@@ -1515,7 +1537,8 @@
 
       function newGame(options) {
         options = options || {};
-        var random = makeRng(options.seed || Date.now());
+        var gameSeed = options.seed || Date.now();
+        var random = makeRng(gameSeed);
         var seats = (options.seats && options.seats.length ? options.seats.slice() : ['player', 'enemy']);
         var roles = options.roles ? clone(options.roles) : {
           player: options.playerRole || '主公',
@@ -1588,11 +1611,22 @@
             }
           }
         }
+        GeneralCardRuntime.initialize(game, { seed: gameSeed, catalog: HERO_CATALOG });
         game.deck = buildDeck(game, random);
+        game.turn = null;
+        game.phase = 'setup';
+        GeneralSelectionRuntime.runBoundary(game, 'onGameStart', firstActor,
+          { kind: 'initial-hands', startWithFirstTurn: !!options.startWithFirstTurn });
+        return game;
+      }
+
+      function finishGameSetup(game, firstActor, startWithFirstTurn) {
+        game.turn = firstActor;
+        game.phase = 'play';
         seatList(game).forEach(function (seat) { drawCards(game, seat, 4); });
         log(game, '乱世开局：' + actorName(game, firstActor) + '为主公先手。');
-        if (options.startWithFirstTurn) startTurn(game, firstActor);
-        return game;
+        if (startWithFirstTurn) return startTurn(game, firstActor);
+        return success('开局完成。');
       }
 
       function equipmentSlots() {
@@ -1826,7 +1860,7 @@
       // 虚拟转化牌的颜色继承来源实体, 故"把黑色牌当锦囊使用"同样被挡。
       function weimuBlocksCard(game, seat, card) {
         var seatState = game[seat];
-        if (!seatState || !hasSkill(seatState, 'weimu')) return false;
+        if (!seatState || !skillEnabled(seatState, 'weimu')) return false;
         if (!card) return false;
         if (card.family !== 'trick' && card.family !== 'delayed') return false;
         return card.suit === 'spade' || card.suit === 'club'
@@ -1836,7 +1870,7 @@
       function trickDistanceLimitFor(game, actor, cardType) {
         if (!trickDistanceLimited(game)) return Infinity;
         if (ignoresTrickDistance(game[actor])) return Infinity;
-        if (cardType === 'bingliang' && hasSkill(game[actor], 'duanliang')) return 2;
+        if (cardType === 'bingliang' && skillEnabled(game[actor], 'duanliang')) return 2;
         return 1;
       }
 
@@ -1977,7 +2011,7 @@
         var target = game[targetActor];
         var user = game[userActor];
         if (!target || !user || !StateRuntime.hasLordSkill(game, targetActor, 'jiuyuan')) return 0;
-        if (user.camp !== '吴') return 0;
+        if (StateRuntime.effectiveCamp(user) !== '吴') return 0;
         log(game, actorName(game, targetActor) + '的【救援】生效，回复量 +1。');
         return 1;
       }
@@ -2402,6 +2436,7 @@
         // 递归安全: 本次已翻回正面, 座次环一圈内必然终止。
         // v12 H5: 阵亡座席不再拥有回合 — 直接传给座次环下一名存活角色。
         if (game[actor].hp <= 0) {
+          if (game.extraTurnReturnSeat) return advanceToNextTurn(game, actor);
           var nextAliveActor = nextSeat(game, actor);
           if (!nextAliveActor || nextAliveActor === actor) return fail('没有存活角色可开始回合。');
           return startTurn(game, nextAliveActor);
@@ -2409,6 +2444,9 @@
         if (game[actor].turnedOver) {
           game[actor].turnedOver = false;
           log(game, actorName(game, actor) + '的武将牌翻回正面，跳过此回合。');
+          // A skipped extra turn still returns to the original turn's next
+          // seat; the recipient's neighbour is not the continuation anchor.
+          if (game.extraTurnReturnSeat) return advanceToNextTurn(game, actor);
           return startTurn(game, nextSeat(game, actor));
         }
         game.turn = actor;
@@ -2417,7 +2455,15 @@
         // v15 S1: 蛊惑"每名角色的回合内限一次"是全场按回合刷新的额度
         // (响应窗口声明发生在他人回合内) → 每席随回合切换复位。
         resetGuhuoTurnLimit(game);
+        game.phase = 'turn-start';
+        return GeneralSelectionRuntime.runBoundary(game, 'onTurnStart', actor, { kind: 'prepare' });
+      }
 
+      function beginPreparePhase(game, actor) {
+        if (game.phase === 'gameover') return success('游戏结束。');
+        // The start boundary can end this actor's turn before prepare. Preserve
+        // queued extra turns and their original return seat when continuing.
+        if (!game[actor] || game[actor].hp <= 0) return advanceToNextTurn(game, actor);
         setPhase(game, actor, 'prepare');
         log(game, actorName(game, actor) + '的准备阶段。');
 
@@ -2459,7 +2505,7 @@
           game.pauseState.prepareResume = { actor: actor };
           return { suspended: true };
         }
-        if (hasSkill(state, 'guanxing') && !state.flags.guanxingUsed && game.deck.length > 0) {
+        if (skillEnabled(state, 'guanxing') && !state.flags.guanxingUsed && game.deck.length > 0) {
           var pref = (state.skillPreferences && state.skillPreferences.guanxing) || null;
           if (pref === 'decline') {
             state.flags.guanxingUsed = true;
@@ -2485,7 +2531,7 @@
           useSkill(game, actor, 'guanxing', [], {});
         }
         // v8 PR-C5: 洛神 (甄姬) — 准备阶段开始时可连续黑色判定获得。
-        if (hasSkill(state, 'luoshen')) {
+        if (skillEnabled(state, 'luoshen')) {
           var luoshenResult = triggerLuoshenPrepare(game, actor);
           if (luoshenResult && luoshenResult.suspended) return luoshenResult;
         }
@@ -2493,7 +2539,7 @@
         // 虚拟【杀】。玩家经 pendingChoice 'shensu-options' 选择; AI 走
         // 保守启发 (对手 1 血才动用选项一)。AI 虚拟杀若为玩家开出闪响应
         // 窗口, 挂 pauseState.prepareResume 由选择排空后续跑。
-        if (hasSkill(state, 'shensu')) {
+        if (skillEnabled(state, 'shensu')) {
           var shensuResult = triggerShensuPrepare(game, actor);
           if (shensuResult && shensuResult.suspended) return shensuResult;
         }
@@ -2512,7 +2558,7 @@
         // v12 H5: 持有者座次环扫描 (1v1 恒为对手; 多席各自触发)。
         seatsFrom(game, actor, false).forEach(function (wangzunHolderActor) {
           var wangzunHolder = game[wangzunHolderActor];
-          if (wangzunHolder && wangzunHolder.hp > 0 && hasSkill(wangzunHolder, 'wangzun')
+          if (wangzunHolder && wangzunHolder.hp > 0 && skillEnabled(wangzunHolder, 'wangzun')
               && game.roles && game.roles[actor] === '主公'
               && !(wangzunHolder.skillPreferences && wangzunHolder.skillPreferences.wangzun === 'decline')) {
             log(game, actorName(game, wangzunHolderActor) + '发动【妄尊】，摸一张牌，' + actorName(game, actor) + '本回合手牌上限 -1。');
@@ -2853,18 +2899,7 @@
           clearAllShaBonus(game);
           // v15 V: 阵亡早退同样要派发已排队的额外回合 (放权 的受赠者可能
           // 正是杀死回合角色的人), 否则队列会一直压着不消费。
-          var deadExtra = takeNextExtraTurn(game);
-          if (deadExtra) {
-            log(game, actorName(game, deadExtra) + '获得一个额外的回合。');
-            game.extraTurnReturnSeat = game.extraTurnReturnSeat || nextSeat(game, ending);
-            return startTurn(game, deadExtra);
-          }
-          var deadResume = game.extraTurnReturnSeat;
-          if (deadResume) {
-            game.extraTurnReturnSeat = null;
-            return startTurn(game, deadResume);
-          }
-          return startTurn(game, nextSeat(game, ending));
+          return afterTurnEndBoundary(game, ending);
         }
         SkillRuntime.runHook(skillRegistry, 'onTurnEnd', {
           game: game,
@@ -2887,6 +2922,17 @@
         resetEndOfTurnState(game[ending]);
         clearAllShaBonus(game);
         log(game, actorName(game, ending) + '结束回合。');
+        return afterTurnEndBoundary(game, ending);
+      }
+
+      function afterTurnEndBoundary(game, ending) {
+        if (game.phase === 'gameover') return success('游戏结束。');
+        game.turn = null;
+        game.phase = 'between-turns';
+        return GeneralSelectionRuntime.runBoundary(game, 'onAfterTurnEnd', ending, { kind: 'next-turn' });
+      }
+
+      function advanceToNextTurn(game, ending) {
         var extra = takeNextExtraTurn(game);
         if (extra) {
           log(game, actorName(game, extra) + '获得一个额外的回合。');
@@ -3264,7 +3310,7 @@
         cardIds = cardIds || [];
         options = options || {};
         if (!self) return fail('未知角色。');
-        if (!hasSkill(self, skillId, game) && !lordWideSkillAvailable(game, skillId)) return fail('没有这个技能。');
+        if (!skillEnabled(self, skillId, game) && !lordWideSkillAvailable(game, skillId)) return fail('没有这个技能。');
         if (game.phase === 'gameover') return fail('游戏已经结束。');
         if (game.turn !== actor) return fail('还没有轮到你行动。');
         if (PLAY_PHASE_ACTIVE_SKILLS[skillId] && game.phase !== 'play') return fail('主动技能只能在出牌阶段发动。');
@@ -3425,6 +3471,9 @@
         PHASES: PHASES,
         makeTestCard: makeTestCard,
         newGame: newGame,
+        requestGeneralSelection: GeneralSelectionRuntime.requestGeneralSelection,
+        registerBoundaryHook: GeneralSelectionRuntime.registerBoundaryHook,
+        generalCardView: GeneralCardRuntime.view,
         distanceBetween: distanceBetween,
         // v15 T 评审收口 [低 L2]: 攻击范围谓词的公开出口 — UI 的强袭座席
         // 高亮读的就是 `Engine.canReachWithSha`, 而它此前没在公开面上 →
@@ -3463,6 +3512,8 @@
         discardSelected: discardSelected,
         handLimit: handLimit,
         skillsForActor: StateRuntime.skillsForActor,
+        effectiveCamp: StateRuntime.effectiveCamp,
+        effectiveGender: StateRuntime.effectiveGender,
         hasLordSkill: StateRuntime.hasLordSkill,
         lordSkillTargetAvailable: StateRuntime.lordSkillTargetAvailable,
         getActorStatus: getActorStatus,

@@ -720,7 +720,7 @@
       zhiba: {
         label: '制霸', hint: '制霸：选择一名拥有有效【制霸】的角色拼点',
         eligible: function (game, seat) {
-          return game.player.camp === '吴' && Engine.lordSkillTargetAvailable(game, 'player', 'zhiba', seat)
+          return Engine.effectiveCamp(game.player) === '吴' && Engine.lordSkillTargetAvailable(game, 'player', 'zhiba', seat)
             && Engine.pindianEligible(game, 'player', seat);
         }
       },
@@ -819,7 +819,7 @@
       var game = getGame();
       if (!game) return false;
       var legalSeats = Engine.aliveSeats(game).filter(function (s) {
-        return s !== 'player' && game[s] && game[s].gender === 'male';
+        return s !== 'player' && game[s] && Engine.effectiveGender(game[s]) === 'male';
       });
       if (legalSeats.length < 2) return false;
       startSeatPicker({

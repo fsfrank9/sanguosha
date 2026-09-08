@@ -23,8 +23,8 @@ test('v9 PR-E26: shanOptionForCard 识别 真闪 / 龙胆 / 倾国', () => {
   const fn = engine.match(/function shanOptionForCard\([\s\S]*?\n\s{6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /card\.type\s*===\s*'shan'/);
-  assert.match(fn[0], /hasSkill\(state,\s*'longdan'\)/);
-  assert.match(fn[0], /hasSkill\(state,\s*'qingguo'\)/);
+  assert.match(fn[0], /(?:hasSkill|skillEnabled)\(state,\s*'longdan'\)/);
+  assert.match(fn[0], /(?:hasSkill|skillEnabled)\(state,\s*'qingguo'\)/);
 });
 
 test('v9 PR-E26: findResponseCard 支持 preferredCardId (指定牌当闪)', () => {

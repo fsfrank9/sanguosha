@@ -26,7 +26,7 @@
         els[actor + 'Name'].textContent = state.name;
         // v14 R1: 缠怨 (蛊惑质疑真牌惩罚) — 公开状态, 势力行附注 (影响
         // 质疑资格与 hp1 技能压制, 全场可见)。
-        els[actor + 'Camp'].textContent = state.camp + ' · ' + state.title
+        els[actor + 'Camp'].textContent = Engine.effectiveCamp(state) + ' · ' + state.title
           + (state.chanyuan ? ' · 缠怨' : '');
         els[actor + 'Quote'].textContent = state.quote;
         els[actor + 'Hp'].innerHTML = hpMarkup(state);
@@ -34,7 +34,7 @@
         // v13 UI修缮6: 手牌数角标 (官方: 卡角小方块数字; 敌方手牌隐私 —
         // 仅数字, 不再渲染牌背行)。
         if (els[actor + 'HandBadge']) els[actor + 'HandBadge'].textContent = state.hand.length;
-        els[actor + 'Hero'].setAttribute('data-camp', state.camp);
+        els[actor + 'Hero'].setAttribute('data-camp', Engine.effectiveCamp(state));
         els[actor + 'Hero'].classList.toggle('is-chained', !!state.chained);
         // v12 H6: identity3 单目标牌/主动技 座席点选模式 — 合法目标座席
         // 高亮 (view.seatTargetLegalSeats 为 null 时恒 false, 1v1 零回归)。
@@ -82,7 +82,7 @@
               + (suspectSide === 'rebelSide' ? 'rebel' : 'lord');
           }
         }
-        if (els[actor + 'Ribbon']) els[actor + 'Ribbon'].textContent = state.camp;
+        if (els[actor + 'Ribbon']) els[actor + 'Ribbon'].textContent = Engine.effectiveCamp(state);
         if (actor === 'player') {
           lobbyPanels.renderPlayerSkillBar({
             state: state,

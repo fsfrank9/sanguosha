@@ -9,6 +9,7 @@
       import { createLobbyPanels } from './panels/lobby-panels.js';
       import { createBoardPanels } from './panels/board-panels.js';
       import { createLordAidPanels } from './panels/lord-aid-panels.js';
+      import { createGeneralCardPanels } from './panels/general-card-panels.js';
 
       var Engine = SanguoshaEngine;
       var game = null;
@@ -160,6 +161,15 @@
         }
       });
 
+      var generalCardPanels = createGeneralCardPanels({
+        els: els,
+        Engine: Engine,
+        getGame: function () { return game; },
+        render: function () { render(); },
+        renderLog: function () { renderLog(); },
+        escapeHtml: function (text) { return escapeHtml(text); }
+      });
+
       function $(id) {
         return document.getElementById(id);
       }
@@ -219,6 +229,8 @@
           // v15 T: 猛进弃牌选择 / 拼点选牌
           'mengjinPanel', 'mengjinHint', 'mengjinChoices', 'mengjinDeclineBtn',
           'pindianPanel', 'pindianHint', 'pindianChoices',
+          'generalCardPanel', 'generalCardHint', 'generalCardCurrent', 'generalCardOptions',
+          'generalCardSkills', 'generalCardConfirmBtn', 'generalCardDeclineBtn',
           // v15 T 评审收口: 官方"你可以 / 你选择"的四个决策面。
           'niepanPanel', 'niepanHint', 'niepanConfirmBtn', 'niepanDeclineBtn',
           // v15 U (林包) 六个决策窗
@@ -371,6 +383,9 @@
       function activeCardSkillConfig() { return boardPanels.activeCardSkillConfig(uiView()); }
       function playerCardAction(card) { return boardPanels.playerCardAction(uiView(), card); }
       function render() {
+        // AA3: 公共确认/取消栏读取面板按钮状态，先同步当前选择窗口。
+        var generalPending = game && Engine.getPendingChoice(game);
+        generalCardPanels.render(generalPending && generalPending.kind, generalPending);
         boardPanels.renderBoard(uiView());
         renderPendingChoice();
         // v9 PR-E24: pendingChoice 已消失 (响应面板关闭) → 清掉 stale 的 staged.
@@ -1444,6 +1459,7 @@
         // 拼点牌是必付成本, 不能放弃)。
         { panelId: 'mengjinPanel',          confirmBtnId: null,                     cancelBtnId: 'mengjinDeclineBtn' },
         { panelId: 'pindianPanel',          confirmBtnId: null,                     cancelBtnId: null },
+        { panelId: 'generalCardPanel',      confirmBtnId: 'generalCardConfirmBtn',  cancelBtnId: 'generalCardDeclineBtn' },
         // v15 T 评审收口: 涅槃/双雄 是二选一按钮型; 驱虎受害者是必选
         // (赢已成事实, 伤害必落, 只是选谁 → 无 cancel); 节命可逐点放弃。
         { panelId: 'niepanPanel',           confirmBtnId: 'niepanConfirmBtn',       cancelBtnId: 'niepanDeclineBtn' },
@@ -1678,6 +1694,7 @@
         responsePanels.bind();
         // v12 H6/H7: 激将/护驾 求助响应面板 (候选 stage 两步 + 不响应)。
         lordAidPanels.bind();
+        generalCardPanels.bind();
         // v12 H6: 对战模式切换按钮 — duel / identity3。v13 K3: + 4/5 人档。
         if (els.modeDuelBtn) els.modeDuelBtn.addEventListener('click', function () { setMatchMode('duel'); });
         if (els.modeIdentity3Btn) els.modeIdentity3Btn.addEventListener('click', function () { setMatchMode('identity3'); });
@@ -1812,6 +1829,11 @@
           if (!skill || skill.disabled) return;
           var toggle = skill.getAttribute('data-skill-toggle');
           if (toggle) {
+            // AA1: 来源可在上次渲染后失效；偏好点击也查询当前技能裁决。
+            var liveSkill = game && Engine.skillsForActor(game, 'player').find(function (entry) {
+              return entry.id === toggle;
+            });
+            if (!liveSkill || liveSkill.enabled === false) { render(); return; }
             var current = Engine.getSkillPreference(game, 'player', toggle);
             // Each skill has its own opt-in/opt-out value vs the default.
             // null = default; flipping cycles to the skill-specific value.

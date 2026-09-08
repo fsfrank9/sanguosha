@@ -7,7 +7,7 @@
 
   var makeRng = Runtime.makeRng;
   var isShaType = CardRuntime.isShaType;
-  var hasSkill = StateRuntime.hasSkill;
+  var skillEnabled = StateRuntime.skillEnabled;
   var opponent = StateRuntime.opponent;
   var canUseUnlimitedSha = StateRuntime.canUseUnlimitedSha;
   var hasEquipmentEffect = StateRuntime.hasEquipmentEffect;
@@ -44,7 +44,7 @@
       if (!state) return 0;
       var count = (state.hand || []).filter(function (c) { return isShaType(c.type); }).length;
       // 武圣: 红色手牌 + 红色装备 可当杀。已计为 sha 的不重复计入。
-      if (hasSkill(state, 'wusheng')) {
+      if (skillEnabled(state, 'wusheng')) {
         count += (state.hand || []).filter(function (c) {
           return c.color === 'red' && !isShaType(c.type);
         }).length;
@@ -54,7 +54,7 @@
         });
       }
       // 龙胆: 闪 ↔ 杀, 这里只计 闪 → 杀 方向 (用 estimateShanCount 时反过来)
-      if (hasSkill(state, 'longdan')) {
+      if (skillEnabled(state, 'longdan')) {
         count += (state.hand || []).filter(function (c) { return c.type === 'shan'; }).length;
       }
       // 丈八: 任意两张手牌当杀。保守取剩余手牌的一半 (排除已计入的 sha / wusheng-red)。
@@ -62,8 +62,8 @@
           && (state.hand || []).length >= 2) {
         var sparePool = (state.hand || []).filter(function (c) {
           if (isShaType(c.type)) return false;
-          if (hasSkill(state, 'wusheng') && c.color === 'red') return false;
-          if (hasSkill(state, 'longdan') && c.type === 'shan') return false;
+          if (skillEnabled(state, 'wusheng') && c.color === 'red') return false;
+          if (skillEnabled(state, 'longdan') && c.type === 'shan') return false;
           return true;
         });
         count += Math.floor(sparePool.length / 2);
@@ -75,11 +75,11 @@
       if (!state) return 0;
       var count = (state.hand || []).filter(function (c) { return c.type === 'shan'; }).length;
       // 龙胆: 杀 → 闪
-      if (hasSkill(state, 'longdan')) {
+      if (skillEnabled(state, 'longdan')) {
         count += (state.hand || []).filter(function (c) { return isShaType(c.type); }).length;
       }
       // 倾国: 黑色手牌 → 闪
-      if (hasSkill(state, 'qingguo')) {
+      if (skillEnabled(state, 'qingguo')) {
         count += (state.hand || []).filter(function (c) {
           return c.color === 'black' && c.type !== 'shan';
         }).length;
@@ -178,8 +178,8 @@
         return aiWushengEquipShaCount(st);
       }
       var perCard = unknown.sha / unknown.total;
-      if (hasSkill(st, 'wusheng')) perCard += Math.max(0, unknown.red - unknown.shaRed) / unknown.total;
-      if (hasSkill(st, 'longdan')) perCard += unknown.shan / unknown.total;
+      if (skillEnabled(st, 'wusheng')) perCard += Math.max(0, unknown.red - unknown.shaRed) / unknown.total;
+      if (skillEnabled(st, 'longdan')) perCard += unknown.shan / unknown.total;
       var estimate = hand * Math.min(1, perCard) + aiWushengEquipShaCount(st);
       if (hasEquipmentEffect(st, 'zhangbaTwoHandSha') && hand >= 2) {
         estimate += Math.floor(Math.max(0, hand - estimate) / 2);
@@ -188,7 +188,7 @@
     }
 
     function aiWushengEquipShaCount(st) {
-      if (!hasSkill(st, 'wusheng')) return 0;
+      if (!skillEnabled(st, 'wusheng')) return 0;
       var count = 0;
       ['weapon', 'armor', 'horsePlus', 'horseMinus'].forEach(function (slot) {
         var eq = st.equipment && st.equipment[slot];
@@ -208,8 +208,8 @@
       var hand = (st.hand || []).length;
       if (unknown.total <= 0 || hand <= 0) return 0;
       var perCard = unknown.shan / unknown.total;
-      if (hasSkill(st, 'longdan')) perCard += unknown.sha / unknown.total;
-      if (hasSkill(st, 'qingguo')) perCard += Math.max(0, unknown.black - unknown.shanBlack) / unknown.total;
+      if (skillEnabled(st, 'longdan')) perCard += unknown.sha / unknown.total;
+      if (skillEnabled(st, 'qingguo')) perCard += Math.max(0, unknown.black - unknown.shanBlack) / unknown.total;
       return hand * Math.min(1, perCard);
     }
 
@@ -629,7 +629,7 @@
       // — 期望值为负的自残轮盘, 不主动使用; 例外: 红颜 (小乔) 黑桃视为
       // 红桃 → 闪电对自己必不命中, 挂出去零风险纯威胁。
       if (card.type === 'shandian' && aiFeatureOn(game, actor, 'killPressure')
-          && !hasSkill(self, 'hongyan')) {
+          && !skillEnabled(self, 'hongyan')) {
         return -30;
       }
       if (card.family === 'delayed') return 48;
@@ -643,13 +643,13 @@
     function aiReserveLastTao(game, actor, card) {
       if (card.type !== 'tao' || !aiFeatureOn(game, actor, 'killPressure')) return false;
       var self = game[actor];
-      if (hasSkill(self, 'yongsi')) {
+      if (skillEnabled(self, 'yongsi')) {
         // 庸肆会额外弃 X 张手牌/装备; 全部牌都不得不弃时保留桃没有收益。
         // 仅在公开可知的必弃面放行, 仍有其他牌可满足成本时继续留桃。
         var available = self.hand.length + ['weapon', 'armor', 'horsePlus', 'horseMinus']
           .filter(function (slot) { return self.equipment && self.equipment[slot]; }).length;
         var camps = new Set(StateRuntime.aliveSeats(game).map(function (seat) {
-          return game[seat].camp;
+          return StateRuntime.effectiveCamp(game[seat]);
         })).size;
         if (camps >= available) return false;
       }
@@ -979,7 +979,7 @@
       // ═════ v15 T (火包) 主动技启发 ═════
       // 强袭 (典韦): 弃武器成本优先 (无武器时才用血), 且只在能打死人或
       // 血线宽裕 (hp>=3) 时才用血; 目标取攻击范围内感知敌对血线最低者。
-      if (hasSkill(self, 'qiangxi') && !self.flags.qiangxiUsed) {
+      if (skillEnabled(self, 'qiangxi') && !self.flags.qiangxiUsed) {
         // 评审收口 [中]: 两种成本的攻击范围**不同** —
         // 弃装备区武器作成本时按 glossary__card.md:41 不能再用该武器的
         // 攻击范围 (引擎按 effectiveRange=1 校验)。此前启发一律按当前武器
@@ -1011,7 +1011,7 @@
       // v15 U (林包) 主动技启发 —— 只读公开信息 (手牌**数**/体力/势力/感知立场)。
       // 缔盟 (鲁肃): 把手牌最多的**感知敌对**座席与手牌最少的座席对调, 净损敌人;
       // 成本 X = 两人手牌差, 自己手牌不够就不发动。
-      if (hasSkill(self, 'dimeng') && !self.flags.dimengUsed) {
+      if (skillEnabled(self, 'dimeng') && !self.flags.dimengUsed) {
         var dmOthers = StateRuntime.aliveSeats(game).filter(function (seat) { return seat !== actor; });
         if (dmOthers.length >= 2) {
           var dmSorted = dmOthers.slice().sort(function (a, b) {
@@ -1032,7 +1032,7 @@
       // 乱武 (贾诩): 限定技, 全场每人对最近者出杀否则掉血 —— 对自己零伤害。
       // 血线判据只读公开的体力值: 场上有至少两名感知敌对座席、且其中有人
       // 血线 <= 2 (掉 1 血就可能濒死) 时才值得烧掉限定技。
-      if (hasSkill(self, 'luanwu') && !self.flags.luanwuUsed) {
+      if (skillEnabled(self, 'luanwu') && !self.flags.luanwuUsed) {
         var lwFoes = StateRuntime.perceivedHostileSeats(game, actor).filter(function (seat) {
           return game[seat] && game[seat].hp > 0;
         });
@@ -1043,7 +1043,7 @@
 
       // 天义 (太史慈): 手上有【杀】才值得赌 (赢=多一次杀+无距离+多目标,
       // 没赢=本回合不能出杀); 手上没杀时拼点毫无收益, 不发动。
-      if (hasSkill(self, 'tianyi') && !self.flags.tianyiUsed && !self.flags.tianyiLost) {
+      if (skillEnabled(self, 'tianyi') && !self.flags.tianyiUsed && !self.flags.tianyiLost) {
         var tyHasSha = (self.hand || []).some(function (card) { return isShaType(card.type); });
         var tyTargets = StateRuntime.perceivedHostileFirstPool(game, actor,
           StateRuntime.aliveSeats(game).filter(function (seat) {
@@ -1060,7 +1060,7 @@
 
       // 驱虎 (荀彧): 拼点赢 → 让体力大于己的角色去打别人; 没赢 → 自己吃
       // 1 伤害。血线见底 (hp<=1) 时不赌。
-      if (hasSkill(self, 'quhu') && !self.flags.quhuUsed && self.hp > 1) {
+      if (skillEnabled(self, 'quhu') && !self.flags.quhuUsed && self.hp > 1) {
         var qhTargets = StateRuntime.perceivedHostileFirstPool(game, actor,
           StateRuntime.aliveSeats(game).filter(function (seat) {
             return seat !== actor && game[seat].hp > self.hp
@@ -1076,7 +1076,7 @@
 
       // 乱击 (袁绍): 两张同花色手牌当【万箭齐发】 — 只在"敌方受伤面 >
       // 己方受伤面"时发动 (万箭打全场, 队友也吃)。
-      if (hasSkill(self, 'luanji')) {
+      if (skillEnabled(self, 'luanji')) {
         var bySuit = {};
         (self.hand || []).forEach(function (card) {
           if (!card || !card.suit) return;
@@ -1101,7 +1101,7 @@
       // ═════ v15 V (山包) 主动技启发 ═════
       // 挑衅 (姜维): 稳赚 —— 对方要么替你出一张【杀】(你随后可用闪/护甲应付,
       // 且消耗了对方一张杀), 要么白丢一张牌。血线见底时不主动招杀。
-      if (hasSkill(self, 'tiaoxin') && !self.flags.tiaoxinUsed && self.hp > 1) {
+      if (skillEnabled(self, 'tiaoxin') && !self.flags.tiaoxinUsed && self.hp > 1) {
         var txPool = StateRuntime.aliveSeats(game).filter(function (seat) {
           return seat !== actor && StateRuntime.canReachWithSha(game, seat, actor)
             && ((game[seat].hand || []).length > 0
@@ -1117,7 +1117,7 @@
 
       // 直谏 (张昭张纮): 把手里的装备牌塞给**感知友方**换一张牌 —— 送给敌人
       // 等于资敌 (给他武器/防具), 所以没有友方就不发动。1v1 恒无友方 → no-op。
-      if (hasSkill(self, 'zhijian')) {
+      if (skillEnabled(self, 'zhijian')) {
         var zjEquip = (self.hand || []).find(function (card) { return card.family === 'equipment'; });
         var zjFriend = StateRuntime.aliveSeats(game).find(function (seat) {
           return seat !== actor && !StateRuntime.perceivedHostile(game, actor, seat);
@@ -1134,14 +1134,14 @@
         var zbLord = StateRuntime.aliveSeats(game).find(function (seat) {
           return StateRuntime.lordSkillTargetAvailable(game, actor, 'zhiba', seat);
         });
-        if (zbLord && self.camp === '吴' && !StateRuntime.perceivedHostile(game, actor, zbLord)
+        if (zbLord && StateRuntime.effectiveCamp(self) === '吴' && !StateRuntime.perceivedHostile(game, actor, zbLord)
             && deps.pindianEligible && deps.pindianEligible(game, actor, zbLord)) {
           return { skillId: 'zhiba', cardIds: [], options: { target: zbLord } };
         }
       }
 
       // 观星: free information; fire once per turn whenever deck has cards.
-      if (hasSkill(self, 'guanxing') && !self.flags.guanxingUsed && game.deck.length > 0) {
+      if (skillEnabled(self, 'guanxing') && !self.flags.guanxingUsed && game.deck.length > 0) {
         return { skillId: 'guanxing', cardIds: [], options: {} };
       }
 
@@ -1150,7 +1150,7 @@
       // (rendeGiven >= 1 means one more triggers heal), or (b) we are at
       // 1 HP and need 2 cards to start the heal chain. Always pick the
       // lowest-value card to give.
-      if (hasSkill(self, 'rende') && self.hp < self.maxHp && !self.flags.rendeHealed && self.hand.length > 0) {
+      if (skillEnabled(self, 'rende') && self.hp < self.maxHp && !self.flags.rendeHealed && self.hand.length > 0) {
         var rendeGiven = self.flags.rendeGiven || 0;
         var emergency = self.hp <= 1 && self.hand.length >= 2;
         if (rendeGiven >= 1 || emergency) {
@@ -1168,12 +1168,12 @@
         }
       }
 
-      if (hasSkill(self, 'kurou') && !self.flags.aiKurouUsed && self.hp > 1) {
+      if (skillEnabled(self, 'kurou') && !self.flags.aiKurouUsed && self.hp > 1) {
         var hasPlayable = !!aiChooseCard(game, actor);
         if (!hasPlayable || self.hand.length <= 1) return { skillId: 'kurou', cardIds: [] };
       }
 
-      if (hasSkill(self, 'zhiheng') && !self.flags.zhihengUsed && self.hand.length > 0 && game.deck.length > 0) {
+      if (skillEnabled(self, 'zhiheng') && !self.flags.zhihengUsed && self.hand.length > 0 && game.deck.length > 0) {
         var candidates = self.hand
           .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
           .filter(function (item) { return item.score <= 0 || !canPlayCard(game, actor, item.card).ok; })
@@ -1188,9 +1188,9 @@
       // v11 C6 (批次 30): 结姻 — 与受伤男性对手"各回复 1", 也给敌方回血,
       // 净收益仅在自保紧急时成立: 自身 hp<=2 且受伤 + 目标男性受伤 +
       // 手牌足够 (>=3, 保留至少 1 张) 时弃两张最低分牌换自身 +1。
-      if (hasSkill(self, 'jieyin') && !self.flags.jieyinUsed
+      if (skillEnabled(self, 'jieyin') && !self.flags.jieyinUsed
           && self.hp < self.maxHp && self.hp <= 2 && self.hand.length >= 3
-          && target && target.gender === 'male' && target.hp < target.maxHp) {
+          && target && StateRuntime.effectiveGender(target) === 'male' && target.hp < target.maxHp) {
         var jieyinCandidates = self.hand
           .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
           .sort(function (a, b) { return a.score - b.score; });
@@ -1200,7 +1200,7 @@
 
       // 青囊: heal whenever 自身 is wounded and 有手牌可弃。优先自救；
       // 自己满血但对方受伤时不会触发（不应该给敌人回血）。
-      if (hasSkill(self, 'qingnang') && !self.flags.qingnangUsed && self.hand.length > 0 && self.hp < self.maxHp) {
+      if (skillEnabled(self, 'qingnang') && !self.flags.qingnangUsed && self.hand.length > 0 && self.hp < self.maxHp) {
         var qingnangCandidates = self.hand
           .map(function (card) { return { card: card, score: scoreCardForAI(game, actor, card) }; })
           .sort(function (a, b) { return a.score - b.score; });
@@ -1208,10 +1208,10 @@
       }
 
       // v12 H7: 离间 (貂蝉) — 场上有两名敌对男性时弃最低分牌挑起决斗。
-      if (hasSkill(self, 'lijian') && !self.flags.lijianUsed && self.hand.length > 1) {
+      if (skillEnabled(self, 'lijian') && !self.flags.lijianUsed && self.hand.length > 1) {
         // v13 M2: 感知敌对路由 (明置恒等直读)。
         var lijianMales = StateRuntime.perceivedHostileSeats(game, actor).filter(function (seat) {
-          return game[seat] && game[seat].hp > 0 && game[seat].gender === 'male';
+          return game[seat] && game[seat].hp > 0 && StateRuntime.effectiveGender(game[seat]) === 'male';
         });
         if (lijianMales.length >= 2) {
           var lijianCost = self.hand
@@ -1227,7 +1227,7 @@
       }
 
       // v12 H7: 黄天 — 群势力 AI 在自己出牌阶段把多余【闪】交给同阵营主公张角。
-      if (game.mode === 'identity3' && self.camp === '群') {
+      if (game.mode === 'identity3' && StateRuntime.effectiveCamp(self) === '群') {
         var htLordSeat = null;
         StateRuntime.seatList(game).forEach(function (seat) {
           if (htLordSeat || seat === actor) return;
@@ -1254,7 +1254,7 @@
       // toward triggering damage. Only fire when we can afford the card
       // loss — either we are over hand limit (the card would be discarded
       // anyway) or the opponent is at low HP and the chip helps close out.
-      if (hasSkill(self, 'fanjian') && !self.flags.fanjianUsed && self.hand.length > 0 && target) {
+      if (skillEnabled(self, 'fanjian') && !self.flags.fanjianUsed && self.hand.length > 0 && target) {
         var overLimit = self.hand.length > handLimit(game, actor);
         var oppLowHp = target.hp <= 2;
         if (overLimit || oppLowHp) {
@@ -1543,7 +1543,7 @@
 
     function aiShouldChallengeGuhuo(game, seat, gh) {
       var st = game[seat];
-      if (!st || st.chanyuan) return false;
+      if (!st || StateRuntime.skillEnabled(st, 'chanyuan', game)) return false;
       if (guhuoResponseWorthChallenging(game, seat, gh)) return true;
       var declarer = game[gh.actor] || {};
       if ((declarer.guhuoBusted || 0) > (declarer.guhuoProven || 0) && st.hp >= 2
@@ -1625,7 +1625,7 @@
     function aiGuhuoWouldBeChallenged(game, actor) {
       return StateRuntime.aliveSeats(game).some(function (seat) {
         var other = game[seat];
-        return seat !== actor && other && !other.chanyuan && other.hp >= 3
+        return seat !== actor && other && !StateRuntime.skillEnabled(other, 'chanyuan', game) && other.hp >= 3
           && StateRuntime.perceivedHostile(game, actor, seat);
       });
     }

@@ -63,8 +63,8 @@
     if (!state) return [];
     return VIRTUAL_EQUIPMENT_SKILLS.filter(function (entry) {
       // "装备区里没有防具牌" — 真实防具在位时虚拟层让位 (官方口径);
-      // hasSkill 走统一出口 → 缠怨 hp1 压制等对锁定技照常生效。
-      if (!hasSkill(state, entry.skill)) return false;
+      // skillEnabled 走统一出口 → 缠怨 hp1 压制等对锁定技照常生效。
+      if (!skillEnabled(state, entry.skill)) return false;
       return !(state.equipment && state.equipment[entry.slot]);
     }).map(function (entry) { return entry.as; });
   }
@@ -289,26 +289,29 @@
     return hostiles.length ? hostiles : (candidates || []);
   }
 
-  // v16 Z1: 伪帝局部视图；只读取当下主公技能集，不复制进自身技能数组。
-  // 获得的激将仍可保留在 skills 中，其发动资格另由 hasLordSkill 判定。
-  // AA 三态层收编时替换此局部出口。
-  var LORD_SKILL_IDS = { hujia: true, jijiang: true, jiuyuan: true, huangtian: true,
-    xueyi: true, songwei: true, baonue: true, ruoyu: true, zhiba: true };
+  // AA1: 所有技能来源/有效性由 SkillRuntime 的同一 reducer 裁决。
+  var skillState = SkillRuntime.skillState;
+  var skillEnabled = SkillRuntime.skillEnabled;
+  var ownsSkill = SkillRuntime.ownsSkill;
+  var skillEntries = SkillRuntime.skillEntries;
+  var grantSkill = SkillRuntime.grantSkill;
+  var stripAllSkills = SkillRuntime.stripAllSkills;
 
-  function viewedLordSkills(game, actor) {
-    var state = game && game[actor];
-    if (!state || !hasSkill(state, 'weidi') || !game.roles || game.roles[actor] === '主公') return [];
-    var lord = seatList(game).find(function (seat) { return game.roles[seat] === '主公'; });
-    return lord && game[lord] ? (game[lord].skills || []).filter(function (skill) {
-      return skill.lord || LORD_SKILL_IDS[skill.id];
-    }) : [];
+  // 过渡兼容出口只供旧测试/调用者；生产查询全部迁往 skillEnabled。
+  function hasSkill(state, skillId, game) {
+    return SkillRuntime.legacyHasSkill(state, skillId, game);
   }
 
   function hasLordSkill(game, actor, skillId) {
-    var state = game && game[actor];
-    if (!state || (state.chanyuan && state.hp === 1)) return false;
-    if (game.roles && game.roles[actor] === '主公') return hasSkill(state, skillId);
-    return viewedLordSkills(game, actor).some(function (skill) { return skill.id === skillId; });
+    return SkillRuntime.hasLordSkill(game, actor, skillId);
+  }
+
+  function viewedLordSkills(game, actor) {
+    return SkillRuntime.viewedLordSkills(game, actor);
+  }
+
+  function skillsForActor(game, actor) {
+    return skillEntries(game && game[actor], game);
   }
 
   function lordSkillTargetAvailable(game, actor, skillId, target) {
@@ -319,61 +322,34 @@
     return used ? !used[target] : !flags[skillId + 'Used'];
   }
 
-  function skillsForActor(game, actor) {
-    var owned = ((game && game[actor] && game[actor].skills) || []).slice();
-    viewedLordSkills(game, actor).forEach(function (skill) {
-      if (!owned.some(function (item) { return item.id === skill.id; })) {
-        owned.push(Object.assign({}, skill, { viewedByWeidi: true }));
-      }
+  // AA2: 已选化身改变的是当前视图，原 camp/gender 保留；临时技能无效不会
+  // 撤销已经完成的选形态效果。实际失去化身/全部技能时才由移除出口清视图。
+  function effectiveCamp(state) {
+    if (!state) return null;
+    var override = state.identityOverride;
+    return override && override.camp !== undefined ? override.camp : state.camp;
+  }
+
+  function effectiveGender(state) {
+    if (!state) return null;
+    var override = state.identityOverride;
+    return override && override.gender !== undefined ? override.gender : state.gender;
+  }
+
+  function setIdentityOverride(state, source, values) {
+    if (!state || !source || !values) return false;
+    var override = { source: source };
+    ['camp', 'gender'].forEach(function (key) {
+      if (values[key] !== undefined) override[key] = values[key];
     });
-    return owned;
-  }
-
-  function hasSkill(state, skillId, game) {
-    // v14 R1 缠怨 (蛊惑质疑真牌惩罚): 锁定技 — 体力值为 1 时除「缠怨」外
-    // 技能无效。武将技能归属统一经本闸判定, 此处单点压制即全局生效
-    // (装备技走 hasEquipmentEffect, 不在压制面 — 口径见 R1 执行记录;
-    // 被动效果面 skill-runtime.hasPassiveEffect 同步双闸)。
-    if (state && state.chanyuan && state.hp === 1 && skillId !== 'chanyuan') return false;
-    if (!state) return false;
-    if ((state.skills || []).some(function (skill) { return skill.id === skillId; })) return true;
-    if (!game || !LORD_SKILL_IDS[skillId]) return false;
-    var actor = seatList(game).find(function (seat) { return game[seat] === state; });
-    return viewedLordSkills(game, actor).some(function (skill) { return skill.id === skillId; });
-  }
-
-  // ═════ v15 V: 觉醒技共用基建 — 动态获得技能 ═════
-  // 山包 17 技里有 **4 个觉醒技** (凿险/志继/若愚/魂姿), 形状完全相同:
-  //   "准备阶段开始时，若<条件>，<代价/收益>，然后获得<新技能>"。
-  // 本仓此前**没有任何动态技能层** —— state.skills 一律来自 HERO_CATALOG
-  // 静态展开 (`grep "state.skills ="` 零命中)。觉醒技需要的只是最简形态:
-  // 往 state.skills 追加一条, 之后 hasSkill / hasPassiveEffect 这两个单点
-  // 自动认得 (138 处调用面零改动)。
-  //
-  // 注意与左慈【化身】的区别 (V 批未接入, 见 spec 简报的成本评估门):
-  // 化身要的是**三态**(未获得 / 已获得且有效 / 已获得但无效) + 可切换 +
-  // 性别势力改写, 那是另一个量级的层, 不是本函数能覆盖的。
-  function grantSkill(state, skillId, skillName, meta) {
-    if (!state) return false;
-    if (!state.skills) state.skills = [];
-    if (state.skills.some(function (skill) { return skill.id === skillId; })) return false;
-    var entry = { id: skillId, name: skillName || skillId, granted: true };
-    if (meta) {
-      ['trigger', 'frequency', 'optional', 'mandatory', 'cost', 'hooks', 'desc'].forEach(function (key) {
-        if (meta[key] !== undefined) entry[key] = meta[key];
-      });
-    }
-    state.skills.push(entry);
+    state.identityOverride = override;
     return true;
   }
 
-  // 断肠 (蔡文姬): "你令杀死你的角色失去其所有技能" —— 与 grantSkill 对称的
-  // 移除面。移除后 hasSkill 恒假, 锁定技/触发技一并失效。
-  function stripAllSkills(state) {
-    if (!state || !state.skills) return 0;
-    var removed = state.skills.length;
-    state.skills = [];
-    return removed;
+  function clearIdentityOverride(state, source) {
+    if (!state || !state.identityOverride || state.identityOverride.source !== source) return false;
+    delete state.identityOverride;
+    return true;
   }
 
   function canUseUnlimitedSha(state) {
@@ -419,7 +395,7 @@
     // 距离这一半**完全没接**, 技能实际只剩个收牌器。
     // 与马术同一口径 (二者措辞逐字相同): 只减**出向**距离 (你到别人),
     // 等价于一匹随"田"数增长的 -1 马。
-    if (hasSkill(from, 'tuntian')) distance -= ((from.tian && from.tian.length) || 0);
+    if (skillEnabled(from, 'tuntian')) distance -= ((from.tian && from.tian.length) || 0);
     return Math.max(1, distance);
   }
 
@@ -451,7 +427,7 @@
     // 评审收口: 贾诩阵亡后完杀立即失效 (rule__principle.md — 角色死亡后
     // 其技能不再生效)。回合可能仍挂在亡者名下 (死于自己回合中)。
     if (game[turnActor].hp <= 0) return false;
-    if (!hasSkill(game[turnActor], 'wansha')) return false;
+    if (!skillEnabled(game[turnActor], 'wansha', game)) return false;
     if (userActor === turnActor) return false;            // ① 贾诩自己不受限
     // ② 使用者本人正处于濒死状态 → 不受限。濒死者恒为 pauseState.dying.actor。
     var dying = (game.pauseState && game.pauseState.dying)
@@ -480,10 +456,11 @@
 
   function handLimit(game, actor) {
     var state = game[actor];
-    // v12 G2: 不屈 — 武将牌上有"创"时, 手牌上限 = 体力上限 - "创"数
-    // (gltjk wind spec), 妄尊等回合级修正照常叠加。
-    if (state.chuang && state.chuang.length > 0) {
-      return Math.max(0, (state.maxHp || 0) - state.chuang.length + (state.handLimitDelta || 0));
+    // AA1 复核当前新风不屈 (card__hero__wu.md:365)：有创时基础上限
+    // 为创数。旧摘要误写成 maxHp - 创数；妄尊等回合级修正照常叠加。
+    // AA1: 创作为区域牌保留，手牌上限的锁定技视图则只在不屈有效时适用。
+    if (skillEnabled(state, 'buqu', game) && state.chuang && state.chuang.length > 0) {
+      return Math.max(0, state.chuang.length + (state.handLimitDelta || 0));
     }
     // v11 C8 (批次 32): handLimitDelta — 回合级手牌上限修正 (妄尊 -1 等),
     // 由 resetActorTurnState / resetEndOfTurnState 复位。
@@ -494,13 +471,13 @@
   // v15 T: 血裔 — "主公技，锁定技，你的手牌上限+2X（X为其他群势力角色数）"
   // (card__hero__neutral.md:151 逐字)。主公技随身份场激活 (1v1 无身份 →
   // 恒 0, 与激将/护驾/妄尊同惯例); X 按**存活**的其他群势力角色计
-  // (阵亡角色不再是场上角色)。锁定技 → 无开关, 但走 hasSkill 统一出口
+  // (阵亡角色不再是场上角色)。锁定技 → 无开关, 但走 skillEnabled 统一出口
   // (缠怨 hp1 压制照常)。
   function xueyiHandLimitBonus(game, actor) {
     var state = game && game[actor];
     if (!state || !hasLordSkill(game, actor, 'xueyi')) return 0;
     var others = aliveSeats(game).filter(function (seat) {
-      return seat !== actor && game[seat] && game[seat].camp === '群';
+      return seat !== actor && game[seat] && effectiveCamp(game[seat]) === '群';
     });
     return 2 * others.length;
   }
@@ -509,13 +486,13 @@
   // 只做"读取视图", 不改物理牌 (朱雀教训: 判定/弃置的物理牌不可污染)。
   function effectiveCardSuit(state, card) {
     if (!card) return null;
-    if (state && hasSkill(state, 'hongyan') && card.suit === 'spade') return 'heart';
+    if (state && skillEnabled(state, 'hongyan') && card.suit === 'spade') return 'heart';
     return card.suit;
   }
 
   function effectiveCardColor(state, card) {
     if (!card) return null;
-    if (state && hasSkill(state, 'hongyan') && card.suit === 'spade') return 'red';
+    if (state && skillEnabled(state, 'hongyan') && card.suit === 'spade') return 'red';
     return card.color;
   }
 
@@ -559,6 +536,15 @@
     seatsInShaRangeOf: seatsInShaRangeOf,
     opponent: opponent,
     hasSkill: hasSkill,
+    skillState: skillState,
+    skillEnabled: skillEnabled,
+    ownsSkill: ownsSkill,
+    skillEntries: skillEntries,
+    activateSkillSource: SkillRuntime.activateSkillSource,
+    clearSkillSource: SkillRuntime.clearSkillSource,
+    resetLegacySkillQueryCount: SkillRuntime.resetLegacySkillQueryCount,
+    readLegacySkillQueryCount: SkillRuntime.readLegacySkillQueryCount,
+    setAllSkillsLostHandler: SkillRuntime.setAllSkillsLostHandler,
     hasLordSkill: hasLordSkill,
     lordSkillTargetAvailable: lordSkillTargetAvailable,
     viewedLordSkills: viewedLordSkills,
@@ -579,6 +565,10 @@
     handLimit: handLimit,
     effectiveCardSuit: effectiveCardSuit,
     effectiveCardColor: effectiveCardColor,
+    effectiveCamp: effectiveCamp,
+    effectiveGender: effectiveGender,
+    setIdentityOverride: setIdentityOverride,
+    clearIdentityOverride: clearIdentityOverride,
     getActorStatus: getActorStatus,
     aliveActorCount: aliveActorCount
   };

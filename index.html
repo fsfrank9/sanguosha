@@ -785,6 +785,17 @@
             <button class="btn small" id="mengjinDeclineBtn">不发动</button>
           </div>
         </div>
+        <!-- AA3: 场外武将牌只展示当前窗口公开给玩家的候选。 -->
+        <div class="pending-prompt-panel" id="generalCardPanel" hidden>
+          <span class="badge pending-prompt-panel__hint" id="generalCardHint">选择一张武将牌</span>
+          <span class="badge" id="generalCardCurrent" aria-live="polite"></span>
+          <div class="pending-prompt-panel__choices" id="generalCardOptions" aria-label="武将牌" aria-live="polite"></div>
+          <div class="pending-prompt-panel__choices" id="generalCardSkills" aria-label="武将技能" aria-live="polite"></div>
+          <div class="pending-prompt-panel__actions">
+            <button class="btn small" id="generalCardConfirmBtn" disabled>确定</button>
+            <button class="btn small" id="generalCardDeclineBtn" hidden>暂不选择</button>
+          </div>
+        </div>
         <!-- v15 T: 拼点选牌 (驱虎/天义 等) — 双方各扣置一张手牌比点数。 -->
         <div class="pindian-panel pending-prompt-panel" id="pindianPanel" hidden>
           <span class="badge pending-prompt-panel__hint" id="pindianHint">拼点：选择一张手牌扣置</span>

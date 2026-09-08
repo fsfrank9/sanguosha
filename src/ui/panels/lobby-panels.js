@@ -209,6 +209,22 @@
             dataAttrs = ' data-skill-toggle="tuxi"';
             if (tuxiDeclined) statusClass += ' skill-toggle-off';
           }
+          // AA1: 来源无效仍属于已获得技能。三态裁决放在偏好开关分支之后，
+          // 避免裸衣/铁骑等 toggle 把无效来源或缠怨压制的按钮重新启用。
+          var sources = skill.sources || [];
+          var acquired = sources.some(function (source) {
+            return source.source !== 'native' && source.source !== 'granted' && source.source !== 'weidi';
+          }) && !sources.some(function (source) { return source.source === 'native'; });
+          if (skill.enabled === false) {
+            active = false;
+            label += '·当前无效';
+            var reason = { 'source-inactive': '当前未选用此技能', 'chanyuan': '受到缠怨限制',
+              'lord-ineligible': '当前不具备主公技发动资格' }[skill.disabledReason] || '当前不可发动';
+            title += '｜' + (acquired ? '已获得，' : '') + '当前无效：' + reason;
+          } else if (acquired) {
+            label += '·获得';
+            title += '｜已获得，当前有效';
+          }
           return '<button class="mini-card skill-button' + statusClass + '" data-skill-id="' + escapeHtml(skill.id) + '"' + dataAttrs + ' ' + (active ? '' : 'disabled') + ' title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
         }
 
@@ -222,7 +238,7 @@
         // 拒绝, 此处口径与引擎一致 (忠臣与主公同阵营才非敌对)。
         function huangtianAidButtonHtml(state, game, enemyThinking) {
           if (!game || game.mode !== 'identity3' || !game.roles || !game.roleSides) return '';
-          if (!state || state.camp !== '群') return '';
+          if (!state || Engine.effectiveCamp(state) !== '群') return '';
           var playerSide = game.roleSides[game.roles.player];
           if (!playerSide || playerSide === 'renegade') return '';
           var lordSeat = (game.seats || []).find(function (seat) {
@@ -244,7 +260,7 @@
           if (!els.playerSkillBar) return;
           var state = ctx.state;
           var skills = Engine.skillsForActor(ctx.game, 'player');
-          if (state.camp === '吴' && !skills.some(function (skill) { return skill.id === 'zhiba'; })
+          if (Engine.effectiveCamp(state) === '吴' && !skills.some(function (skill) { return skill.id === 'zhiba'; })
               && Engine.aliveSeats(ctx.game).some(function (seat) {
                 return seat !== 'player' && Engine.hasLordSkill(ctx.game, seat, 'zhiba');
               })) skills.push({ id: 'zhiba', name: '制霸', desc: '向拥有制霸的角色发起拼点。' });

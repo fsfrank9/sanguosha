@@ -6,7 +6,7 @@
       import { SKILL_METADATA } from '../data/heroes.js';
 
       export function installStandardSkillHandlers(skillRegistry, deps) {
-        var hasSkill = deps.hasSkill;
+        var skillEnabled = StateRuntime.skillEnabled;
         var opponent = deps.opponent;
         var actorName = deps.actorName;
         var seatList = deps.seatList;
@@ -76,7 +76,7 @@
 
       function triggerQianxunCardTarget(context) {
         var target = context.game[context.targetActor];
-        if (!target || !hasSkill(target, 'qianxun')) return null;
+        if (!target || !skillEnabled(target, 'qianxun')) return null;
         if (context.cardType !== 'shunshou' && context.cardType !== 'lebusishu') return null;
         return {
           protected: true,
@@ -101,7 +101,7 @@
         });
         for (var i = 0; i < others.length; i += 1) {
           var holder = game[others[i]];
-          if (holder && hasSkill(holder, 'tongji')
+          if (holder && skillEnabled(holder, 'tongji')
               && (holder.hand || []).length > holder.hp
               && canReachWithSha(game, context.actor, others[i])) {
             return {
@@ -116,7 +116,7 @@
       function triggerLuoyiDrawPhase(context) {
         var game = context.game;
         var state = game[context.actor];
-        if (!state || !hasSkill(state, 'luoyi') || context.drawCount <= 0) return null;
+        if (!state || !skillEnabled(state, 'luoyi') || context.drawCount <= 0) return null;
         state.flags = state.flags || {};
         state.skillPreferences = state.skillPreferences || {};
         var flags = state.flags;
@@ -136,7 +136,10 @@
         var game = context.game;
         var sourceActor = context.sourceActor;
         var source = game[sourceActor];
-        if (!source || !hasSkill(source, 'luoyi') || !source.flags || !source.flags.luoyi || game.turn !== sourceActor) return null;
+        // AA1: 摸牌时已付出的少摸成本产生整回合效果。官方
+        // rule__classification.md 的许褚/断肠例明确：失去裸衣后新决斗
+        // 仍然加伤；切换化身或暂时无效也不撤销已经产生的效果。
+        if (!source || !source.flags || !source.flags.luoyi || game.turn !== sourceActor) return null;
         var isShaDamage = isShaCard(context.sourceCard);
         var isDuelDamage = /决斗/.test(context.reason || '');
         if (!isShaDamage && !isDuelDamage) return null;
@@ -151,14 +154,14 @@
 
       function triggerJizhi(game, actor, card, options) {
         var state = game[actor];
-        if (!state || !hasSkill(state, 'jizhi') || !shouldTriggerJizhi(card, options) || game.phase === 'gameover') return;
+        if (!state || !skillEnabled(state, 'jizhi') || !shouldTriggerJizhi(card, options) || game.phase === 'gameover') return;
         log(game, actorName(game, actor) + '发动【集智】，使用普通锦囊后摸 1 张牌。');
         drawCards(game, actor, 1);
       }
 
       function triggerJianxiongDamageAfter(game, targetActor, sourceCard) {
         var target = game[targetActor];
-        if (!sourceCard || !target || !hasSkill(target, 'jianxiong')) return null;
+        if (!sourceCard || !target || !skillEnabled(target, 'jianxiong')) return null;
         // H1: 虚拟合成牌 (丈八蛇矛) 造成伤害时, 奸雄获得组成它的实体牌
         // (转化时已进入弃牌堆), 而不是把无实体的虚拟牌收进手牌。
         if (sourceCard.virtual) {
@@ -218,7 +221,7 @@
         var target = game[targetActor];
         var source = game[sourceActor];
         if (!target || !sourceActor || !source || sourceActor === targetActor
-          || !hasSkill(target, 'fankui') || game.phase === 'gameover') return null;
+          || !skillEnabled(target, 'fankui') || game.phase === 'gameover') return null;
         var pref = (target.skillPreferences && target.skillPreferences.fankui)
           || (targetActor === 'player' ? 'ask' : 'auto');
         if (pref === 'decline') {
@@ -315,7 +318,7 @@
         var game = context.game;
         var actor = context.actor;
         var self = context.state;
-        if (!self || !hasSkill(self, 'quhu')) return null;
+        if (!self || !skillEnabled(self, 'quhu')) return null;
         if (self.flags.quhuUsed) return fail('【驱虎】每回合限一次。');
         var targetActor = context.targetActor;
         if (!targetActor) {
@@ -429,7 +432,7 @@
         var game = context.game;
         var actor = context.actor;
         var self = context.state;
-        if (!self || !hasSkill(self, 'tianyi')) return null;
+        if (!self || !skillEnabled(self, 'tianyi')) return null;
         if (self.flags.tianyiUsed) return fail('【天义】每回合限一次。');
         var targetActor = context.targetActor;
         if (!targetActor) {
@@ -473,7 +476,7 @@
         var actor = context.actor;
         var self = context.state;
         var cardIds = context.cardIds || [];
-        if (!self || !hasSkill(self, 'luanji')) return null;
+        if (!self || !skillEnabled(self, 'luanji')) return null;
         if (cardIds.length !== 2 || cardIds[0] === cardIds[1]) {
           return fail('【乱击】需要两张花色相同的手牌。');
         }
@@ -517,7 +520,7 @@
         var game = context.game;
         var actor = context.actor;
         var self = game[actor];
-        if (!self || !hasSkill(self, 'shuangxiong')) return null;
+        if (!self || !skillEnabled(self, 'shuangxiong')) return null;
         var pref = (self.skillPreferences && self.skillPreferences.shuangxiong)
           || (actor === 'player' ? 'ask' : 'auto');
         if (pref === 'decline') return null;
@@ -548,6 +551,8 @@
       // ask 档由 resolveShuangxiongAskChoice 调用 (context 为轻量壳)。
       function applyShuangxiongDrawPhase(game, actor, context) {
         var self = game[actor];
+        // 询问不等于发动：尚未放弃摸牌时，必须重新确认当前技能有效。
+        if (!self || !StateRuntime.skillEnabled(self, 'shuangxiong', game)) return null;
         var judgeResult = judge(game, actor, '【双雄】');
         if (!judgeResult) return null;
         context.drawCount = 0; // 放弃摸牌
@@ -572,7 +577,7 @@
         var actor = context.actor;
         var state = context.state;
         var physicalCard = physicalCardOf(context.card);
-        if (!state || !physicalCard || !hasSkill(state, 'shuangxiong')) return null;
+        if (!state || !physicalCard) return null;
         if (!state.flags || !state.flags.shuangxiongClaimPending) return null;
         if (context.claimed) return null; // 已被其他技能认领 (如天妒)
         putCard(game, physicalCard, { zone: 'hand', actor: actor });
@@ -592,7 +597,7 @@
         var game = context.game;
         var dyingActor = context.dyingActor;
         var self = game[dyingActor];
-        if (!self || !hasSkill(self, 'niepan')) return null;
+        if (!self || !skillEnabled(self, 'niepan')) return null;
         self.flags = self.flags || {};
         if (self.flags.niepanUsed) return null;
         // 评审收口 [中]: 官方"限定技，当你处于濒死状态时，你**可以**…"
@@ -703,7 +708,7 @@
         var self = game[actor];
         var target = game[targetActor];
         if (!self || !target || actor === targetActor) return null;
-        if (!hasSkill(self, 'mengjin') || game.phase === 'gameover') return null;
+        if (!skillEnabled(self, 'mengjin') || game.phase === 'gameover') return null;
         if (target.hp <= 0) return null;
         var pref = (self.skillPreferences && self.skillPreferences.mengjin)
           || (actor === 'player' ? 'ask' : 'auto');
@@ -791,7 +796,7 @@
         var game = context.game;
         var targetActor = context.targetActor;
         var target = game[targetActor];
-        if (!target || !hasSkill(target, 'yiji') || game.phase === 'gameover' || context.amount <= 0) return null;
+        if (!target || !skillEnabled(target, 'yiji') || game.phase === 'gameover' || context.amount <= 0) return null;
         var pref = (target.skillPreferences && target.skillPreferences.yiji) || 'auto';
         if (pref === 'decline') {
           log(game, actorName(game, targetActor) + '选择不发动【遗计】。');
@@ -921,7 +926,7 @@
         var sourceActor = context.sourceActor;
         var target = game[targetActor];
         var source = game[sourceActor];
-        if (!target || !sourceActor || !source || !hasSkill(target, 'ganglie') || game.phase === 'gameover') return null;
+        if (!target || !sourceActor || !source || !skillEnabled(target, 'ganglie') || game.phase === 'gameover') return null;
         var pref = (target.skillPreferences && target.skillPreferences.ganglie)
           || (targetActor === 'player' ? 'ask' : 'auto');
         if (pref === 'decline') {
@@ -949,7 +954,7 @@
         var game = context.game;
         var actor = context.actor;
         var state = game[actor];
-        if (!state || !hasSkill(state, 'jushou') || game.phase === 'gameover') return null;
+        if (!state || !skillEnabled(state, 'jushou') || game.phase === 'gameover') return null;
         var pref = state.skillPreferences && state.skillPreferences.jushou;
         if (pref === 'decline') {
           log(game, actorName(game, actor) + '选择不发动【据守】。');
@@ -978,7 +983,7 @@
         var sourceActor = context.sourceActor;
         var targetActor = context.targetActor;
         var source = game[sourceActor];
-        if (!source || !hasSkill(source, 'kuanggu') || game.phase === 'gameover') return null;
+        if (!source || !skillEnabled(source, 'kuanggu') || game.phase === 'gameover') return null;
         if (distanceBetween(game, sourceActor, targetActor) > 1) return null;
         var heal = Math.min(source.maxHp - source.hp, context.amount || 0);
         if (heal <= 0) return null;
@@ -998,7 +1003,7 @@
         var source = game[actor];
         var target = game[targetActor];
         if (responseType !== 'shan' || !isShaCard(triggeringCard)) return null;
-        if (!source || !target || !hasSkill(source, 'liegong')) return null;
+        if (!source || !target || !skillEnabled(source, 'liegong')) return null;
         if (game.turn !== actor) return null;
         var pref = source.skillPreferences && source.skillPreferences.liegong;
         if (pref === 'decline') {
@@ -1022,7 +1027,7 @@
         var sourceActor = context.sourceActor;
         var target = game[targetActor];
         var source = game[sourceActor];
-        if (!target || !sourceActor || !source || !hasSkill(target, 'yaowu') || game.phase === 'gameover') return null;
+        if (!target || !sourceActor || !source || !skillEnabled(target, 'yaowu') || game.phase === 'gameover') return null;
         var sourceCard = context.sourceCard;
         if (!sourceCard || !isShaCard(sourceCard) || sourceCard.color !== 'red') return null;
         log(game, actorName(game, targetActor) + '的【耀武】被触发，' + actorName(game, sourceActor) + '选择一项奖励。');
@@ -1236,7 +1241,7 @@
         var actor = context.actor;
         var state = context.state || game[actor];
         var physicalCard = physicalCardOf(context.card);
-        if (!state || !physicalCard || !hasSkill(state, 'tiandu')) return null;
+        if (!state || !physicalCard || !skillEnabled(state, 'tiandu')) return null;
         putCard(game, physicalCard, { zone: 'hand', actor: actor });
         context.claimed = true;
         log(game, actorName(game, actor) + '发动【天妒】，获得了判定牌【' + physicalCard.name + '】。');
@@ -1267,7 +1272,7 @@
         var order = StateRuntime.seatsFrom(game, anchorActor, true);
         for (var i = 0; i < order.length; i += 1) {
           var s = game[order[i]];
-          if (s && s.hp > 0 && hasSkill(s, skillId) && canPay(s)) return order[i];
+          if (s && s.hp > 0 && skillEnabled(s, skillId) && canPay(s)) return order[i];
         }
         return null;
       }
@@ -1345,7 +1350,7 @@
 
       function triggerLongdanCardAs(context) {
         var state = context.state;
-        if (!state || !hasSkill(state, 'longdan')) return null;
+        if (!state || !skillEnabled(state, 'longdan')) return null;
         if (context.asType === 'shan' && context.mode === 'response') {
           var shaCard = firstMatchingCard(state, function (item) { return isShaCard(item); });
           return shaCard ? { card: shaCard, asName: '闪', skillName: '龙胆', priority: 20 } : null;
@@ -1363,7 +1368,7 @@
 
       function triggerWushengCardAs(context) {
         var state = context.state;
-        if (!state || !hasSkill(state, 'wusheng') || context.asType !== 'sha') return null;
+        if (!state || !skillEnabled(state, 'wusheng') || context.asType !== 'sha') return null;
         if (context.mode === 'response') {
           // v6.1: spec condition is "发动者有红色手牌**或装备牌**" — scan
           // both zones for a red card to use as 杀.
@@ -1378,7 +1383,7 @@
 
       function triggerQingguoCardAs(context) {
         var state = context.state;
-        if (!state || !hasSkill(state, 'qingguo')) return null;
+        if (!state || !skillEnabled(state, 'qingguo')) return null;
         if (context.mode !== 'response' || context.asType !== 'shan') return null;
         var blackCard = firstMatchingCard(state, function (item) { return item.color === 'black'; });
         return blackCard ? { card: blackCard, asName: '闪', skillName: '倾国', priority: 10 } : null;
@@ -1402,7 +1407,7 @@
       //   null                  不触发 / 放弃
       function triggerLiuliOnShaTargeted(context) {
         var target = context.target;
-        if (!target || !hasSkill(target, 'liuli')) return null;
+        if (!target || !skillEnabled(target, 'liuli')) return null;
         if (target.hp <= 0) return null;
         var game = context.game;
         var targetActor = context.targetActor;
@@ -1475,7 +1480,7 @@
       // 仅 proactive 模式（出牌阶段主动用方片当乐），不影响 response 流程。
       function triggerGuoseCardAs(context) {
         var state = context.state;
-        if (!state || !hasSkill(state, 'guose')) return null;
+        if (!state || !skillEnabled(state, 'guose')) return null;
         if (context.mode !== 'proactive' || context.asType !== 'lebusishu') return null;
         if (!context.card || context.card.suit !== 'diamond') return null;
         return { card: context.card, asName: '乐不思蜀', skillName: '国色', priority: 10 };
@@ -1499,7 +1504,7 @@
           // W2 F5: 死亡时机改为按官方轮转序逐席派发 → 只处理轮到的那一席。
           if (context.resolvingSeat && seat !== context.resolvingSeat) return;
           var state = game[seat];
-          if (seat === deadActor || !state || !hasSkill(state, 'xingshang')) return;
+          if (seat === deadActor || !state || !skillEnabled(state, 'xingshang')) return;
           var pref = (state.skillPreferences && state.skillPreferences.xingshang)
             || 'auto'; // "你可以" — 但获得牌恒为正收益, 缺省发动 (含玩家席)
           if (pref === 'decline') {
@@ -1540,7 +1545,7 @@
         var game = context.game;
         var targetActor = context.targetActor;
         var self = game[targetActor];
-        if (!self || !hasSkill(self, 'fangzhu') || game.phase === 'gameover') return null;
+        if (!self || !skillEnabled(self, 'fangzhu') || game.phase === 'gameover') return null;
         if (context.amount <= 0 || self.hp <= 0) return null;
         var pref = (self.skillPreferences && self.skillPreferences.fangzhu)
           || (targetActor === 'player' ? 'ask' : 'auto');
@@ -1615,7 +1620,7 @@
         var card = physicalCardOf(context.card);
         if (!state || !card) return null;
         if (StateRuntime.effectiveCardColor(state, card) !== 'black') return null;
-        if (state.camp !== '魏') return null;
+        if (StateRuntime.effectiveCamp(state) !== '魏') return null;
         var roles = game.roles || {};
         var lords = StateRuntime.seatsFrom(game, game.turn, true).filter(function (seat) {
           return game[seat].hp > 0 && seat !== actor && StateRuntime.hasLordSkill(game, seat, 'songwei');
@@ -1638,7 +1643,7 @@
         var game = context.game;
         var actor = context.actor;
         var self = game[actor];
-        if (!self || !hasSkill(self, 'yinghun') || game.phase === 'gameover') return null;
+        if (!self || !skillEnabled(self, 'yinghun') || game.phase === 'gameover') return null;
         var lost = Math.max(0, (self.maxHp || 0) - self.hp);
         if (lost <= 0) return null; // "若你已受伤"
         var pref = (self.skillPreferences && self.skillPreferences.yinghun)
@@ -1734,7 +1739,7 @@
         var game = context.game;
         var actor = context.actor;
         var self = game[actor];
-        if (!self || !hasSkill(self, 'haoshi')) return null;
+        if (!self || !skillEnabled(self, 'haoshi')) return null;
         var pref = (self.skillPreferences && self.skillPreferences.haoshi) || 'auto';
         if (pref === 'decline') {
           log(game, actorName(game, actor) + '选择不发动【好施】。');
@@ -1816,7 +1821,7 @@
         var game = context.game;
         var actor = context.actor;
         var self = context.state;
-        if (!self || !hasSkill(self, 'dimeng')) return null;
+        if (!self || !skillEnabled(self, 'dimeng')) return null;
         if (self.flags.dimengUsed) return fail('【缔盟】每回合限一次。');
         var opts = context.options || {};
         var seatA = StateRuntime.resolveSeatOption(game, opts.targetA || opts.target);
@@ -1894,7 +1899,7 @@
         var game = context.game;
         var actor = context.actor;
         var self = game[actor];
-        if (!self || !hasSkill(self, 'zaiqi')) return null;
+        if (!self || !skillEnabled(self, 'zaiqi')) return null;
         var lost = Math.max(0, (self.maxHp || 0) - self.hp);
         if (lost <= 0) return null; // "若你已受伤"
         var pref = (self.skillPreferences && self.skillPreferences.zaiqi)
@@ -1963,7 +1968,7 @@
         var self = game[actor];
         var target = game[targetActor];
         if (!self || !target || actor === targetActor) return null;
-        if (!hasSkill(self, 'lieren') || game.phase === 'gameover') return null;
+        if (!skillEnabled(self, 'lieren') || game.phase === 'gameover') return null;
         if (target.hp <= 0) return null;
         var pref = (self.skillPreferences && self.skillPreferences.lieren)
           || (actor === 'player' ? 'auto' : 'auto');
@@ -2038,7 +2043,7 @@
         var game = context.game;
         var actor = context.actor;
         var self = context.state;
-        if (!self || !hasSkill(self, 'luanwu')) return null;
+        if (!self || !skillEnabled(self, 'luanwu')) return null;
         if (self.flags.luanwuUsed) return fail('【乱武】是限定技，每局限一次。');
         var order = StateRuntime.seatsFrom(game, actor, false).filter(function (seat) {
           return game[seat] && game[seat].hp > 0;
@@ -2170,7 +2175,7 @@
       // 且是**锁定**的 —— 条件满足就必须觉醒, 没有"不发动"这条出路。
       function runAwakening(game, actor, spec) {
         var state = game[actor];
-        if (!state || !hasSkill(state, spec.skillId, game)) return null;
+        if (!state || !skillEnabled(state, spec.skillId, game)) return null;
         state.flags = state.flags || {};
         var flag = spec.skillId + 'Awakened';
         if (state.flags[flag]) return null;
@@ -2212,11 +2217,11 @@
       }
 
       function yongsiCampCount(game) {
-        return new Set(StateRuntime.aliveSeats(game).map(function (seat) { return game[seat].camp; })).size;
+        return new Set(StateRuntime.aliveSeats(game).map(function (seat) { return StateRuntime.effectiveCamp(game[seat]); })).size;
       }
 
       function triggerYongsiDraw(context) {
-        if (!hasSkill(context.game[context.actor], 'yongsi')) return null;
+        if (!skillEnabled(context.game[context.actor], 'yongsi')) return null;
         var count = yongsiCampCount(context.game);
         context.drawCount += count;
         log(context.game, actorName(context.game, context.actor) + '因【庸肆】多摸 ' + count + ' 张牌。');
@@ -2232,7 +2237,7 @@
       }
 
       function triggerYongsiDiscardStart(game, actor) {
-        if (!game[actor] || !hasSkill(game[actor], 'yongsi')) return;
+        if (!game[actor] || !skillEnabled(game[actor], 'yongsi')) return;
         var options = yongsiDiscardOptions(game, actor);
         var needed = Math.min(yongsiCampCount(game), options.length);
         if (!needed) return;
@@ -2284,7 +2289,7 @@
         var game = context.game;
         var actor = context.actor;
         var state = game[actor];
-        if (!state || !hasSkill(state, 'tuntian') || game.phase === 'gameover') return null;
+        if (!state || !skillEnabled(state, 'tuntian') || game.phase === 'gameover') return null;
         if (game.turn === actor) return null; // "于**回合外**失去牌后"
         var pref = (state.skillPreferences && state.skillPreferences.tuntian) || 'auto';
         if (pref === 'decline') return null;
@@ -2308,7 +2313,7 @@
         var actor = context.actor;
         var state = context.state;
         var physicalCard = physicalCardOf(context.card);
-        if (!state || !physicalCard || !hasSkill(state, 'tuntian')) return null;
+        if (!state || !physicalCard || !skillEnabled(state, 'tuntian')) return null;
         if (!state.flags || !state.flags.tuntianClaimPending) return null;
         if (context.claimed) return null;
         if (!state.tian) state.tian = [];
@@ -2334,7 +2339,7 @@
       // 急袭 (凿险授予): "你可以将一张"田"当【顺手牵羊】使用"。
       function triggerJixiCardAs(context) {
         var state = context.state;
-        if (!state || !hasSkill(state, 'jixi')) return null;
+        if (!state || !skillEnabled(state, 'jixi')) return null;
         if (context.mode !== 'proactive' || context.asType !== 'shunshou') return null;
         var card = context.card;
         if (!card || !(state.tian || []).some(function (item) { return item.id === card.id; })) return null;
@@ -2349,7 +2354,7 @@
         var game = context.game;
         var actor = context.actor;
         var self = context.state;
-        if (!self || !hasSkill(self, 'tiaoxin')) return null;
+        if (!self || !skillEnabled(self, 'tiaoxin')) return null;
         if (self.flags.tiaoxinUsed) return fail('【挑衅】每回合限一次。');
         // "**攻击范围内含有你**的一名角色" —— 以对方为原点算, 不是以姜维。
         var candidates = StateRuntime.aliveSeats(game).filter(function (seat) {
@@ -2505,7 +2510,7 @@
         var sourceActor = context.sourceActor;
         var target = game[targetActor];
         var source = game[sourceActor];
-        if (!target || !hasSkill(target, 'xiangle')) return null;
+        if (!target || !skillEnabled(target, 'xiangle')) return null;
         if (sourceActor === targetActor) return null; // "其他角色使用的【杀】"
         if (!source || source.hp <= 0) return { cancelSha: true }; // "其已死亡"
         var basics = (source.hand || []).filter(function (card) { return card.family === 'basic'; });
@@ -2529,7 +2534,8 @@
             pauseKey: 'xiangleCost',
             source: {
               actor: sourceActor, targetActor: targetActor, card: context.card,
-              amount: context.amount, responseLocked: !!context.responseLocked
+              amount: context.amount, responseLocked: !!context.responseLocked,
+              shanRequired: context.shanRequired, doubleShanReason: context.doubleShanReason
             },
             options: basics.map(function (card) {
               return { cardId: card.id, name: card.name, suit: card.suit, rank: card.rank };
@@ -2561,7 +2567,7 @@
         var game = context.game;
         var actor = context.actor;
         var state = game[actor];
-        if (!state || !hasSkill(state, 'fangquan')) return null;
+        if (!state || !skillEnabled(state, 'fangquan')) return null;
         var pref = (state.skillPreferences && state.skillPreferences.fangquan) || 'decline';
         if (pref === 'decline') return null;
         state.flags = state.flags || {};
@@ -2577,7 +2583,7 @@
         var game = context.game;
         var actor = context.actor;
         var state = game[actor];
-        if (!state || !hasSkill(state, 'fangquan') || game.phase === 'gameover') return null;
+        if (!state || !skillEnabled(state, 'fangquan') || game.phase === 'gameover') return null;
         if (!state.flags || !state.flags.fangquanSkipped) return null;
         state.flags.fangquanSkipped = false;
         if (!(state.hand || []).length) return null;
@@ -2679,7 +2685,7 @@
         if ((context.previousTargets || []).indexOf(context.targetActor) >= 0) return null;
         [context.sourceActor, context.targetActor].forEach(function (seat) {
           var state = game[seat];
-          if (!state || state.hp <= 0 || !hasSkill(state, 'jiang')) return;
+          if (!state || state.hp <= 0 || !skillEnabled(state, 'jiang')) return;
           var pref = (state.skillPreferences && state.skillPreferences.jiang) || 'auto';
           if (pref === 'decline') return;
           drawCards(game, seat, 1);
@@ -2697,7 +2703,7 @@
         if (!card || card.type !== 'juedou') return null;
         [context.sourceActor, context.targetActor].forEach(function (seat) {
           var state = game[seat];
-          if (!state || state.hp <= 0 || !hasSkill(state, 'jiang')) return;
+          if (!state || state.hp <= 0 || !skillEnabled(state, 'jiang')) return;
           var pref = (state.skillPreferences && state.skillPreferences.jiang) || 'auto';
           if (pref === 'decline') return;
           drawCards(game, seat, 1);
@@ -2740,7 +2746,7 @@
           return fail(spent ? '对同一角色的【制霸】每回合限一次。' : '场上没有拥有【制霸】的主公。');
         }
         if (lord === actor) return fail('【制霸】由其他吴势力角色发起。');
-        if (self.camp !== '吴') return fail('【制霸】只有吴势力角色可以发起。');
+        if (StateRuntime.effectiveCamp(self) !== '吴') return fail('【制霸】只有吴势力角色可以发起。');
         if (!StateRuntime.lordSkillTargetAvailable(game, actor, 'zhiba', lord)) return fail('对同一角色的【制霸】每回合限一次。');
         if (!pindianEligible || !pindianEligible(game, actor, lord)) {
           return fail('拼点需要双方各有至少一张手牌。');
@@ -2794,7 +2800,7 @@
         var game = context.game;
         var actor = context.actor;
         var self = context.state;
-        if (!self || !hasSkill(self, 'zhijian')) return null;
+        if (!self || !skillEnabled(self, 'zhijian')) return null;
         var cardIds = context.cardIds || [];
         var card = cardIds.length
           ? (self.hand || []).find(function (item) { return item.id === cardIds[0]; })
@@ -2831,7 +2837,7 @@
         var discarded = context.discardedCards || [];
         if (!discarded.length || game.phase === 'gameover') return null;
         var holder = StateRuntime.aliveSeats(game).find(function (seat) {
-          return seat !== discarder && hasSkill(game[seat], 'guzheng');
+          return seat !== discarder && skillEnabled(game[seat], 'guzheng');
         });
         if (!holder) return null;
         var pref = (game[holder].skillPreferences && game[holder].skillPreferences.guzheng) || 'auto';
@@ -2869,7 +2875,7 @@
         var victimState = game[victim];
         if (!victimState || victimState.hp <= 0) return null; // "若其存活"
         var holder = StateRuntime.aliveSeats(game).find(function (seat) {
-          return hasSkill(game[seat], 'beige');
+          return skillEnabled(game[seat], 'beige');
         });
         if (!holder) return null;
         var holderState = game[holder];
@@ -2928,9 +2934,9 @@
         // W2 F5: 断肠的持有者就是死者本人 —— 只在轮到他那一席时结算。
         if (context.resolvingSeat && context.resolvingSeat !== deadActor) return null;
         var dead = game[deadActor];
-        if (!dead || !hasSkill(dead, 'duanchang')) return null;
+        if (!dead || !skillEnabled(dead, 'duanchang')) return null;
         if (!killer || killer === deadActor || !game[killer]) return null;
-        var removed = StateRuntime.stripAllSkills(game[killer]);
+        var removed = StateRuntime.stripAllSkills(game[killer], game);
         if (removed > 0) {
           log(game, actorName(game, deadActor) + '的【断肠】令' + actorName(game, killer)
             + '失去其所有技能（' + removed + ' 个）。');
@@ -2947,7 +2953,7 @@
         var game = context.game;
         var actor = context.actor;
         var state = game[actor];
-        if (!state || !hasSkill(state, 'qiaobian')) return null;
+        if (!state || !skillEnabled(state, 'qiaobian')) return null;
         if (!(state.hand || []).length) return null;
         var pref = (state.skillPreferences && state.skillPreferences.qiaobian) || 'decline';
         if (pref === 'decline') return null;
@@ -2990,8 +2996,8 @@
                 if (!entry.slot || game[target].equipment[entry.slot]) return;
               } else {
                 if ((game[target].judgeArea || []).some(function (held) { return held.type === card.type; })) return;
-                if (card.type === 'lebusishu' && hasSkill(game[target], 'qianxun')) return;
-                if (hasSkill(game[target], 'weimu') && (card.suit === 'spade' || card.suit === 'club'
+                if (card.type === 'lebusishu' && skillEnabled(game[target], 'qianxun')) return;
+                if (skillEnabled(game[target], 'weimu') && (card.suit === 'spade' || card.suit === 'club'
                     || (!card.suit && card.color === 'black'))) return;
               }
               moves.push({ sourceActor: source, sourceZone: entry.zone, cardId: card.id,
@@ -3011,7 +3017,7 @@
 
       function triggerQiaobianBeforePlay(context) {
         var game = context.game, actor = context.actor, state = game[actor];
-        if (!state || !hasSkill(state, 'qiaobian') || !(state.hand || []).length) return null;
+        if (!state || !skillEnabled(state, 'qiaobian') || !(state.hand || []).length) return null;
         var pref = state.skillPreferences && state.skillPreferences.qiaobianPlay;
         if (pref === 'decline') return null;
         // rule__classification.md:71: 已被乐不思蜀跳过，仍可付费发动，不能移牌。
@@ -3108,7 +3114,7 @@
       // 【火攻】使用。" — 限手牌 (对照武圣的"红色牌"含装备区)。
       function triggerHuojiCardAs(context) {
         var state = context.state;
-        if (!state || !hasSkill(state, 'huoji')) return null;
+        if (!state || !skillEnabled(state, 'huoji')) return null;
         if (context.mode !== 'proactive' || context.asType !== 'huogong') return null;
         if (!context.card || !isHandCardOf(state, context.card)) return null;
         if (StateRuntime.effectiveCardColor(state, context.card) !== 'red') return null;
@@ -3120,7 +3126,7 @@
       // lianhuanCanRecast (引擎重铸入口查此谓词)。
       function triggerLianhuanCardAs(context) {
         var state = context.state;
-        if (!state || !hasSkill(state, 'lianhuan')) return null;
+        if (!state || !skillEnabled(state, 'lianhuan')) return null;
         if (context.mode !== 'proactive' || context.asType !== 'tiesuo') return null;
         if (!context.card || !isHandCardOf(state, context.card)) return null;
         if (context.card.suit !== 'club') return null;
@@ -3132,7 +3138,7 @@
       // 【酒】使用。" — 限黑桃、限手牌。【酒】不是锦囊, 走基本牌转化面。
       function triggerJiuchiCardAs(context) {
         var state = context.state;
-        if (!state || !hasSkill(state, 'jiuchi')) return null;
+        if (!state || !skillEnabled(state, 'jiuchi')) return null;
         if (context.asType !== 'jiu') return null;
         if (!context.card || !isHandCardOf(state, context.card)) return null;
         // 花色按"实际花色"读 (红颜等改花色技能经 effectiveCardSuit 单点)。
@@ -3153,7 +3159,7 @@
       //     不是"无视距离" (缜略那类) —— 见 duanliangTrickRange。
       function triggerDuanliangCardAs(context) {
         var state = context.state;
-        if (!state || !hasSkill(state, 'duanliang')) return null;
+        if (!state || !skillEnabled(state, 'duanliang')) return null;
         if (context.mode !== 'proactive' || context.asType !== 'bingliang') return null;
         var card = context.card;
         if (!card) return null;
@@ -3173,7 +3179,7 @@
         var game = context.game;
         var actor = context.actor;
         var state = game[actor];
-        if (!state || !hasSkill(state, 'benghuai') || game.phase === 'gameover') return null;
+        if (!state || !skillEnabled(state, 'benghuai') || game.phase === 'gameover') return null;
         if (state.hp <= 0) return null;
         // "若你不是体力值最小的角色" — 与全场存活角色比 (含自己)。并列最小时
         // 自己**也是**最小之一 → 不发动。
@@ -3232,7 +3238,9 @@
       // 【决斗】使用" — 回合级授权, 颜色由 flags.shuangxiongColor 记录。
       function triggerShuangxiongCardAs(context) {
         var state = context.state;
-        if (!state || !hasSkill(state, 'shuangxiong')) return null;
+        // AA1: 已发动双雄留下的是回合级授权；官方断肠例要求失去
+        // 技能后仍可继续转化。未发动时没有颜色记录，自然不可转化。
+        if (!state) return null;
         if (context.mode !== 'proactive' || context.asType !== 'juedou') return null;
         var judgedColor = state.flags && state.flags.shuangxiongColor;
         if (!judgedColor) return null;
@@ -3248,7 +3256,7 @@
 
       function triggerQixiCardAs(context) {
         var state = context.state;
-        if (!state || !hasSkill(state, 'qixi')) return null;
+        if (!state || !skillEnabled(state, 'qixi')) return null;
         if (context.mode !== 'proactive' || context.asType !== 'guohe') return null;
         if (!context.card || context.card.color !== 'black') return null;
         return { card: context.card, asName: '过河拆桥', skillName: '奇袭', priority: 10 };
@@ -3260,7 +3268,7 @@
         var actor = context.actor;
         var self = context.state;
         var cardIds = context.cardIds || [];
-        if (!self || !hasSkill(self, 'zhiheng')) return null;
+        if (!self || !skillEnabled(self, 'zhiheng')) return null;
         if (self.flags.zhihengUsed) return fail('【制衡】每回合限一次。');
         if (!cardIds.length) return fail('请选择要弃置的牌。');
         // v6.1: spec cost is "弃置任意数量手牌**或装备区牌**". We accept ids
@@ -3286,7 +3294,7 @@
         var game = context.game;
         var actor = context.actor;
         var self = context.state;
-        if (!self || !hasSkill(self, 'kurou')) return null;
+        if (!self || !skillEnabled(self, 'kurou')) return null;
         // v6.1: spec condition is "发动者存活" — hp must be > 0, not > 1.
         // Allow hp=1 → 0; this 1v1-minimal engine treats hp≤0 as immediate
         // game-over (the multi-player 濒死/桃 救援 flow isn't modeled here).
@@ -3334,7 +3342,7 @@
         var self = context.state;
         var cardIds = context.cardIds || [];
         var options = context.options || {};
-        if (!self || !hasSkill(self, 'qingnang')) return null;
+        if (!self || !skillEnabled(self, 'qingnang')) return null;
         if (self.flags.qingnangUsed) return fail('【青囊】每回合限一次。');
         if (!cardIds.length) return fail('请选择要弃置的一张手牌。');
         var targetActor = options.target || options.targetActor;
@@ -3381,7 +3389,7 @@
         var actor = context.actor;
         var self = context.state;
         var cardIds = context.cardIds || [];
-        if (!self || !hasSkill(self, 'qiangxi')) return null;
+        if (!self || !skillEnabled(self, 'qiangxi')) return null;
         if (self.flags.qiangxiUsed) return fail('【强袭】每回合限一次。');
         // 成本: 指定了牌 → 弃武器牌 (手牌或装备区均可 — 官方只写"弃置
         // 一张武器牌", 未限定区域); 不指定 → 失去 1 点体力。
@@ -3473,7 +3481,7 @@
         var game = context.game;
         var targetActor = context.targetActor;
         var self = game[targetActor];
-        if (!self || !hasSkill(self, 'jieming') || game.phase === 'gameover') return null;
+        if (!self || !skillEnabled(self, 'jieming') || game.phase === 'gameover') return null;
         if (context.amount <= 0) return null;
         // 评审收口 [中]: 官方"你**可以**令**一名角色**将手牌补至 X 张" —
         // 发动与否、给谁, 都是发动者的选择。玩家席改逐点开窗 (与遗计同款
@@ -3616,12 +3624,12 @@
         var actor = context.actor;
         var self = context.state;
         var cardIds = context.cardIds || [];
-        if (!self || !hasSkill(self, 'jieyin')) return null;
+        if (!self || !skillEnabled(self, 'jieyin')) return null;
         if (self.flags.jieyinUsed) return fail('【结姻】每回合限一次。');
         // v12 H5: 目标经 context.targetActor (options.target 校验后缺省对手)
         var targetActor = context.targetActor || opponent(actor);
         var target = game[targetActor];
-        if (!target || target.gender !== 'male') return fail('【结姻】需要一名男性角色为目标。');
+        if (!target || StateRuntime.effectiveGender(target) !== 'male') return fail('【结姻】需要一名男性角色为目标。');
         // audit4-H2: 亡者 hp 0 < maxHp 会骗过"已受伤"检查 → 给尸体回血。
         if (target.hp <= 0) return fail('目标已阵亡。');
         if (target.hp >= target.maxHp) return fail('目标未受伤，不能发动【结姻】。');
@@ -3648,7 +3656,7 @@
         var self = context.state;
         var cardIds = context.cardIds || [];
         var target = game[context.targetActor];
-        if (!self || !target || !hasSkill(self, 'rende')) return null;
+        if (!self || !target || !skillEnabled(self, 'rende')) return null;
         // audit4-H2: 不向亡者交牌 (缺省对手可能已亡)。
         if (target.hp <= 0) return fail('目标已阵亡。');
         if (!cardIds.length) return fail('请选择要给出的牌。');
@@ -3697,7 +3705,7 @@
         var targetActor = context.targetActor;
         var target = game[targetActor];
         var options = context.options || {};
-        if (!self || !target || !hasSkill(self, 'fanjian')) return null;
+        if (!self || !target || !skillEnabled(self, 'fanjian')) return null;
         // audit4-H2: 缺省对手可能已亡 (身份场对局未终) — 对尸体发动会重放
         // 濒死/死亡结算与奖惩, 与 playCard 的存活约束对齐。
         if (target.hp <= 0) return fail('目标已阵亡。');
@@ -3774,7 +3782,7 @@
         if (context.skillId !== 'guanxing') return null;
         var game = context.game;
         var self = context.state;
-        if (!self || !hasSkill(self, 'guanxing')) return fail('没有【观星】。');
+        if (!self || !skillEnabled(self, 'guanxing')) return fail('没有【观星】。');
         var alive = StateRuntime.aliveActorCount(game);
         var count = Math.min(alive || 0, 5, game.deck.length);
         var preview = success('观星预览完成。');
@@ -3797,7 +3805,7 @@
         var actor = context.actor;
         var self = context.state;
         var options = context.options || {};
-        if (!self || !hasSkill(self, 'guanxing')) return null;
+        if (!self || !skillEnabled(self, 'guanxing')) return null;
         if (self.flags.guanxingUsed) return fail('【观星】每回合限一次。');
         var preview = triggerGuanxingPreview(context);
         if (!preview.ok) return preview;
@@ -4000,7 +4008,7 @@
       //                        still 闪 normally)
       function triggerTieqiNeedResponse(game, actor, targetActor, responseType, triggeringCard) {
         var source = game[actor];
-        if (!source || responseType !== 'shan' || !isShaCard(triggeringCard) || !hasSkill(source, 'tieqi')) return null;
+        if (!source || responseType !== 'shan' || !isShaCard(triggeringCard) || !skillEnabled(source, 'tieqi')) return null;
         var pref = source.skillPreferences && source.skillPreferences.tieqi;
         if (pref === 'decline') {
           log(game, actorName(game, actor) + '选择不发动【铁骑】。');
@@ -4027,7 +4035,7 @@
       //   'ask'     → 玩家每次决定是否继续（首次也询问）
       function triggerLuoshenPrepare(game, actor) {
         var state = game[actor];
-        if (!state || !hasSkill(state, 'luoshen')) return null;
+        if (!state || !skillEnabled(state, 'luoshen')) return null;
         var pref = (state.skillPreferences && state.skillPreferences.luoshen)
           || (actor === 'player' ? 'ask' : 'auto');
         if (pref === 'decline') {
@@ -4085,7 +4093,7 @@
       // 或单纯不想暴露"我这回合没出杀"), 且成本只有一个偏好闸。
       function triggerKejiBeforeDiscard(game, actor, context) {
         var state = game[actor];
-        if (!state || !hasSkill(state, 'keji') || state.usedOrRespondedSha) return false;
+        if (!state || !skillEnabled(state, 'keji') || state.usedOrRespondedSha) return false;
         var kejiPref = (state.skillPreferences && state.skillPreferences.keji) || 'auto';
         if (kejiPref === 'decline') {
           log(game, actorName(game, actor) + '选择不发动【克己】，照常进入弃牌阶段。');
@@ -4102,7 +4110,7 @@
 
       function triggerBiyue(game, actor) {
         var state = game[actor];
-        if (!state || !hasSkill(state, 'biyue') || game.phase === 'gameover') return;
+        if (!state || !skillEnabled(state, 'biyue') || game.phase === 'gameover') return;
         state.flags = state.flags || {};
         if (state.flags.biyueTriggered) return;
         state.flags.biyueTriggered = true;
@@ -4168,7 +4176,7 @@
 
         function triggerShensuPrepare(game, actor) {
           var state = game[actor];
-          if (!state || !hasSkill(state, 'shensu') || game.phase === 'gameover') return null;
+          if (!state || !skillEnabled(state, 'shensu') || game.phase === 'gameover') return null;
           var pref = state.skillPreferences && state.skillPreferences.shensu;
           if (pref === 'decline') return null;
           if (actor === 'player') {
@@ -4278,7 +4286,7 @@
           var game = context.game;
           var targetActor = context.targetActor;
           var state = game[targetActor];
-          if (!state || !hasSkill(state, 'tianxiang') || game.phase === 'gameover') return null;
+          if (!state || !skillEnabled(state, 'tianxiang') || game.phase === 'gameover') return null;
           var opts = context.opts || {};
           if (opts.noTianxiangTransfer) return null;
           var amount = Number(context.amount) || 0;
@@ -4436,7 +4444,7 @@
           var game = context.game;
           var actor = context.actor;
           var state = game[actor];
-          if (!state || !hasSkill(state, 'leiji') || game.phase === 'gameover') return null;
+          if (!state || !skillEnabled(state, 'leiji') || game.phase === 'gameover') return null;
           var pref = state.skillPreferences && state.skillPreferences.leiji;
           if (pref === 'decline') {
             log(game, actorName(game, actor) + '选择不发动【雷击】。');
@@ -4582,7 +4590,7 @@
           if (!autoEntries.length) return null;
           if (context.reason === '【雷击】') {
             if (originalCard.suit === 'spade') return null;
-            if (hasSkill(game[judgementActor], 'hongyan')) return null;
+            if (skillEnabled(game[judgementActor], 'hongyan')) return null;
             autoEntries = autoEntries.filter(function (e) { return e.card.suit === 'spade'; });
             if (!autoEntries.length) return null;
           }
@@ -4672,7 +4680,7 @@
           var game = context.game;
           var dyingActor = context.dyingActor;
           var state = game[dyingActor];
-          if (!state || !hasSkill(state, 'buqu') || game.phase === 'gameover') return null;
+          if (!state || !skillEnabled(state, 'buqu') || game.phase === 'gameover') return null;
           reshuffleIfNeeded(game);
           var card = takeCard(game, null, { zone: 'deck' });
           if (!card) {
@@ -4715,7 +4723,7 @@
         SkillRuntime.registerSkill(skillRegistry, 'yingzi', {
         onDrawPhase: function (context) {
           var state = context.game[context.actor];
-          if (!state || !hasSkill(state, 'yingzi')) return;
+          if (!state || !skillEnabled(state, 'yingzi')) return;
           context.drawCount += 1;
           log(context.game, actorName(context.game, context.actor) + '发动【英姿】，摸牌阶段额外摸一张牌。');
         }
@@ -4725,7 +4733,7 @@
           var game = context.game;
           var actor = context.actor;
           var state = game[actor];
-          if (!state || !hasSkill(state, 'tuxi')) return;
+          if (!state || !skillEnabled(state, 'tuxi')) return;
           var pref = state.skillPreferences && state.skillPreferences.tuxi;
           if (pref === 'decline') {
             log(game, actorName(game, actor) + '选择本回合不发动【突袭】。');
@@ -4781,7 +4789,7 @@
         SkillRuntime.registerSkill(skillRegistry, 'kongcheng', {
         onCardTarget: function (context) {
           var target = context.game[context.targetActor];
-          if (!target || !hasSkill(target, 'kongcheng') || target.hand.length !== 0) return null;
+          if (!target || !skillEnabled(target, 'kongcheng') || target.hand.length !== 0) return null;
           if (!isShaType(context.cardType) && context.cardType !== 'juedou') return null;
           return {
             protected: true,
@@ -4869,7 +4877,7 @@
         },
         onCanRecast: function (context) {
           var state = context.state;
-          if (!state || !hasSkill(state, 'lianhuan')) return null;
+          if (!state || !skillEnabled(state, 'lianhuan')) return null;
           return !!(context.card && context.card.suit === 'club');
         }
       });
@@ -5142,7 +5150,7 @@
           var game = context.game;
           var actor = context.actor;
           var self = context.state;
-          if (!self || !hasSkill(self, 'jijiang', game)) return null;
+          if (!self || !skillEnabled(self, 'jijiang', game)) return null;
           if (!StateRuntime.hasLordSkill(game, actor, 'jijiang')) return fail('当前没有可发动的【激将】主公技。');
           // 评审收口 [中]: 与丈八同因 — 出杀入口一律走 shaUseAllowed 单点
           // (激将与天义不同将, 当前不可达, 但闸门口径必须一致, 否则下一个
@@ -5157,7 +5165,7 @@
           // 依座次向蜀势力同阵营 AI 座席借【杀】
           var jjAiders = StateRuntime.seatsFrom(game, actor, false).filter(function (seat) {
             var st = game[seat];
-            return st && st.hp > 0 && seat !== 'player' && st.camp === '蜀'
+            return st && st.hp > 0 && seat !== 'player' && StateRuntime.effectiveCamp(st) === '蜀'
               && StateRuntime.sideOf(game, seat) !== null
               && !StateRuntime.isHostileSeat(game, seat, actor);
           });
@@ -5199,7 +5207,7 @@
             }
           });
           if (!htLord) return fail('场上没有可响应【黄天】的主公张角。');
-          if (self.camp !== '群') return fail('只有群势力角色可以发动【黄天】。');
+          if (StateRuntime.effectiveCamp(self) !== '群') return fail('只有群势力角色可以发动【黄天】。');
           if (StateRuntime.isHostileSeat(game, actor, htLord)) return fail('敌对阵营不会响应【黄天】。');
           if (!StateRuntime.lordSkillTargetAvailable(game, actor, 'huangtian', htLord)) return fail('对同一角色的【黄天】每回合限一次。');
           if (cardIds.length !== 1) return fail('请选择一张【闪】或【闪电】交给主公。');
@@ -5225,7 +5233,7 @@
           var actor = context.actor;
           var self = context.state;
           var cardIds = context.cardIds || [];
-          if (!self || !hasSkill(self, 'lijian')) return null;
+          if (!self || !skillEnabled(self, 'lijian')) return null;
           if (self.flags.lijianUsed) return fail('【离间】每回合限一次。');
           if (cardIds.length !== 1) return fail('请弃置一张手牌发动【离间】。');
           var targets = (context.options && context.options.targets) || [];
@@ -5235,7 +5243,7 @@
             return fail('请选择两名其他男性角色。');
           }
           if (game[seatA].hp <= 0 || game[seatB].hp <= 0) return fail('目标已阵亡。');
-          if (game[seatA].gender !== 'male' || game[seatB].gender !== 'male') {
+          if (StateRuntime.effectiveGender(game[seatA]) !== 'male' || StateRuntime.effectiveGender(game[seatB]) !== 'male') {
             return fail('【离间】只能指定男性角色。');
           }
           // v13 审计三轮: 虚拟决斗须过目标合法性 — 空城等"不能成为【决斗】

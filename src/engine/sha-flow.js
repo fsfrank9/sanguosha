@@ -9,7 +9,7 @@
 
   var actorName = StateRuntime.actorName;
   var opponent = StateRuntime.opponent;
-  var hasSkill = StateRuntime.hasSkill;
+  var skillEnabled = StateRuntime.skillEnabled;
   var hasEquipmentEffect = StateRuntime.hasEquipmentEffect;
   var canUseUnlimitedSha = StateRuntime.canUseUnlimitedSha;
   var canReachWithSha = StateRuntime.canReachWithSha;
@@ -298,17 +298,20 @@
         // 相反。锁定结果随 pauseState.playSha 快照携带, 雌雄挂起恢复后经
         // presetLock 传入, 不重跑 hook (铁骑不二次判定)。判定挂起风险与
         // 原位置等同 (同一同步调用, 仅时点前移)。
+        var requirement = shaResponseRequirement(game, actor, targetActor);
         var responseLocked = computeShaResponseLock(game, actor, card, targetActor);
         var cixiongResult = applyCixiongOnDesignate(game, actor, targetActor);
         if (cixiongResult && cixiongResult.paused) {
           if (!game.pauseState) game.pauseState = {};
           game.pauseState.playSha = {
             actor: actor, targetActor: targetActor, card: card, amount: amount,
-            responseLocked: responseLocked
+            responseLocked: responseLocked,
+            shanRequired: requirement.shanRequired, doubleShanReason: requirement.doubleShanReason
           };
           return success('【雌雄双股剑】结算中…');
         }
-        return continueShaAfterCixiong(game, actor, card, amount, targetActor, { responseLocked: responseLocked });
+        return continueShaAfterCixiong(game, actor, card, amount, targetActor,
+          Object.assign({ responseLocked: responseLocked }, requirement));
       }
 
       // ── v14 P3: 流离时机驱动 — 对当前目标跑 onShaTargeted hook; 技能侧
@@ -421,6 +424,7 @@
           liuliIdx: 0,
           lockIdx: 0,
           locks: [],
+          responseRequirements: [],
           cixiongIdx: 0,
           resolveIdx: 0
         };
@@ -467,6 +471,10 @@
             var lockIdxNow = chain.lockIdx;
             chain.lockIdx += 1;
             if (!game[lockSeat] || game[lockSeat].hp <= 0) { chain.locks[lockIdxNow] = false; continue; }
+            // AA1: 流离已全部结束，此时为最终目标锁定整张杀的响应方式。
+            // 后续目标结算时即使断肠/化身使来源技能失效，也不重新裁定。
+            chain.responseRequirements = chain.responseRequirements || [];
+            chain.responseRequirements[lockIdxNow] = shaResponseRequirement(game, chain.actor, lockSeat);
             chain.locks[lockIdxNow] = computeShaResponseLock(game, chain.actor, chain.card, lockSeat);
             if (game.pendingChoice) return success('等待响应结算…'); // 防御 (铁骑判定链上的改判挂起等)
           }
@@ -491,7 +499,8 @@
           chain.resolveIdx += 1; // 游标先行 — 本席经 resolver 收尾后恢复自下一席
           if (!game[seat] || game[seat].hp <= 0) continue; // 结算期间倒下的席位不再是目标
           var seatResult = continueShaAfterCixiong(game, chain.actor, chain.card, chain.amount, seat,
-            { responseLocked: !!chain.locks[resolveIdxNow] });
+            Object.assign({ responseLocked: !!chain.locks[resolveIdxNow] },
+              (chain.responseRequirements || [])[resolveIdxNow] || {}));
           // 本席挂起 (闪响应/护驾/濒死/天香/雷击…) → 保留链, 选择排空后续跑。
           if (game.pendingChoice) return seatResult || success('等待响应结算…');
         }
@@ -584,12 +593,12 @@
       function shanRequiredAgainstSha(game, sourceActor, targetActor) {
         var source = game[sourceActor];
         var target = targetActor ? game[targetActor] : null;
-        var needed = hasSkill(source, 'wushuang') ? 2 : 1;
+        var needed = skillEnabled(source, 'wushuang') ? 2 : 1;
         if (target) {
           // 肉林①: 来源是董卓, 目标是女性。
-          if (hasSkill(source, 'roulin') && target.gender === 'female') needed = Math.max(needed, 2);
+          if (skillEnabled(source, 'roulin') && StateRuntime.effectiveGender(target) === 'female') needed = Math.max(needed, 2);
           // 肉林②: 目标是董卓, 来源是女性。
-          if (hasSkill(target, 'roulin') && source && source.gender === 'female') needed = Math.max(needed, 2);
+          if (skillEnabled(target, 'roulin') && source && StateRuntime.effectiveGender(source) === 'female') needed = Math.max(needed, 2);
         }
         return needed;
       }
@@ -598,10 +607,16 @@
       function doubleShanReasonLabel(game, sourceActor, targetActor) {
         var source = game[sourceActor];
         var target = targetActor ? game[targetActor] : null;
-        if (hasSkill(source, 'wushuang')) return '无双';
-        if (target && hasSkill(source, 'roulin') && target.gender === 'female') return '肉林';
-        if (target && hasSkill(target, 'roulin') && source && source.gender === 'female') return '肉林';
+        if (skillEnabled(source, 'wushuang')) return '无双';
+        if (target && skillEnabled(source, 'roulin') && StateRuntime.effectiveGender(target) === 'female') return '肉林';
+        if (target && skillEnabled(target, 'roulin') && source && StateRuntime.effectiveGender(source) === 'female') return '肉林';
         return '无双';
+      }
+
+      function shaResponseRequirement(game, sourceActor, targetActor) {
+        var needed = shanRequiredAgainstSha(game, sourceActor, targetActor);
+        return { shanRequired: needed,
+          doubleShanReason: needed > 1 ? doubleShanReasonLabel(game, sourceActor, targetActor) : null };
       }
 
       // v14 P1: presetLock — 多目标链在锁定阶段已按目标预结算 onNeedResponse
@@ -612,6 +627,10 @@
         targetActor = targetActor || opponent(actor);
         var target = game[targetActor];
         var ignoreArmor = isArmorIgnoredBySha(game, actor, card);
+        // 兼容不经过指定目标阶段的旧直调；正常链始终携带已锁定的快照。
+        var requirement = presetLock && presetLock.shanRequired
+          ? { shanRequired: presetLock.shanRequired, doubleShanReason: presetLock.doubleShanReason }
+          : shaResponseRequirement(game, actor, targetActor);
 
         // v14 Q3 (P 评审记录项复核落地): "指定目标后"锁定 (铁骑/烈弓) 前移至
         // 仁王盾/藤甲有效性检测之前 — 官方 flow__use.md 时机序: step 5 指定
@@ -663,6 +682,8 @@
             target: target,
             card: card,
             amount: amount,
+            shanRequired: requirement.shanRequired,
+            doubleShanReason: requirement.doubleShanReason,
             responseLocked: responseContext.responseLocked
           });
           // v15 T H1 的教训: 不用 `if (game.pendingChoice)` 判断"我这一跳是否
@@ -680,9 +701,9 @@
           }
         }
 
-        var needed = shanRequiredAgainstSha(game, actor, targetActor);
+        var needed = requirement.shanRequired;
         if (needed > 1 && !responseContext.responseLocked) {
-          log(game, '【' + doubleShanReasonLabel(game, actor, targetActor) + '】锁定：'
+          log(game, '【' + (requirement.doubleShanReason || '无双') + '】锁定：'
             + actorName(game, targetActor) + '需依次使用两张【闪】。');
         }
         return flows.run(game, 'sha', {
@@ -1105,7 +1126,8 @@
         discardCard(game, paid);
         log(game, actorName(game, saved.actor) + '弃置基本牌【' + paid.name + '】以抵消【享乐】。');
         return continueShaAfterCixiong(game, saved.actor, saved.card, saved.amount, saved.targetActor,
-          { responseLocked: !!saved.responseLocked, xiangleSettled: true });
+          { responseLocked: !!saved.responseLocked, xiangleSettled: true,
+            shanRequired: saved.shanRequired, doubleShanReason: saved.doubleShanReason });
       }
 
     return {
