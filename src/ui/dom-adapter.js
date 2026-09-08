@@ -1426,7 +1426,8 @@
       // v9 PR-E16: pending modal 与 hand-confirm/cancel 的统一 dispatch 注册表.
       // 各 modal 显示时, hand-confirm 触发 .confirm 对应 button.click(),
       // hand-cancel 同理. 没注册的 modal 仍保留自己内部按钮 (兼容).
-      // v10 V8: 6 个旧缺口面板 (fanjian/fankui/wugu/guohe/cixiongChoose 必选; dyingRescue 有 decline)
+      // AC4/C27 复核：六面板均已接入下面的分发表。反间/五谷/过河必须
+      // 完成选择；反馈/濒死可放弃，雌雄的取消键选择令来源摸牌。
       // 全部入册. 必选面板无 cancel 语义, 此处仍登记为 confirmBtnId=null/cancelBtnId=null
       // 仅用于 _firstVisibleDispatch 命中 — handConfirm/Cancel 不再 fall-through 到手牌.
       var PENDING_MODAL_DISPATCH = [

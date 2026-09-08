@@ -126,9 +126,13 @@ test('行殇: 其他角色死亡时获得其所有牌 (先于死亡弃置)', () 
   const before = collectCardCensus(game).ids.length;
   Engine.playCard(game, 'player', 'p-kill', { target: 'ally' });
   const gained = game.player.hand.map((card) => card.id);
-  for (const id of ['v-h1', 'v-h2', 'v-w', 'v-j']) {
+  // AC WS5: wei.md:349 + glossary__zone.md:80 exclude judgement-area cards
+  // from the deceased character's cards; old L4 incorrectly included v-j.
+  for (const id of ['v-h1', 'v-h2', 'v-w']) {
     assert.ok(gained.includes(id), `行殇应获得 ${id}`);
   }
+  assert.ok(!gained.includes('v-j'), '行殇不获得判定区牌');
+  assert.ok(game.discard.some(card => card.id === 'v-j'), '判定区牌由死亡清理弃置');
   assert.equal(collectCardCensus(game).ids.length, before, 'ID 守恒');
 });
 

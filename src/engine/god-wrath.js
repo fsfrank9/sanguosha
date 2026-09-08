@@ -94,6 +94,9 @@ export function installGodWrathHandlers(skillRegistry, deps) {
       return sum + enemy * (state.hp === 1 ? (seat === actor ? 8 : 4) : 1);
     }, 0);
   }
+  function qinyinCanRecover(game) {
+    return StateRuntime.aliveSeats(game).some(function (actor) { return game[actor].hp < game[actor].maxHp; });
+  }
   function qinyinDecision(game, actor) {
     var recover = qinyinScore(game, actor, 'recover');
     var lose = qinyinScore(game, actor, 'lose');
@@ -108,7 +111,8 @@ export function installGodWrathHandlers(skillRegistry, deps) {
           source.step = 'waiting';
           return choices.request(game, source.actor, 'qinyin', {
             skillId: 'qinyin', title: '琴音', prompt: '令所有角色各回复 1 点体力，或各失去 1 点体力？',
-            options: [{ id: 'recover', label: '所有角色回复 1 点体力' }, { id: 'lose', label: '所有角色失去 1 点体力' }],
+            options: (qinyinCanRecover(game) ? [{ id: 'recover', label: '所有角色回复 1 点体力' }] : [])
+              .concat([{ id: 'lose', label: '所有角色失去 1 点体力' }]),
             optional: true, context: { flowId: source.responseFlowId }
           }, qinyinDecision(game, source.actor));
         }
@@ -206,6 +210,7 @@ export function installGodWrathHandlers(skillRegistry, deps) {
     if (!source) return ok('【琴音】时机已结束。');
     if (decision.decline) return finish(game, source);
     if (['recover', 'lose'].indexOf(decision.optionId) < 0) return reject(game, pending, '请选择回复或失去体力。');
+    if (decision.optionId === 'recover' && !qinyinCanRecover(game)) return reject(game, pending, '所有角色体力已满，只能选择失去体力或放弃。');
     source.mode = decision.optionId; source.step = 'targets';
     source.order = actionOrder(game, true, source.actor); source.idx = 0;
     log(game, actorName(game, source.actor) + '发动【琴音】。');

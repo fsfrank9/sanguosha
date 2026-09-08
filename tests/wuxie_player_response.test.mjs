@@ -169,6 +169,11 @@ test('v10 V5 链: cardId 指定具体无懈 (面板候选选定)', () => {
   const res = Engine.resolvePendingChoice(game, { cardId: 'pw2' });
 
   assert.equal(res.ok, true);
+  // AC-R2: card__scroll.md:76-104 不排除使用者反消自己的无懈。
+  // 明确放弃剩余 pw1 的自反机会，保留本用例原来的指定牌与最终效果断言。
+  assert.equal(game.pendingChoice?.kind, 'wuxie-response');
+  assert.equal(game.pendingChoice.chainWuxied, true);
+  assert.equal(Engine.resolvePendingChoice(game, { decline: true }).ok, true);
   assert.equal(game.pendingChoice, null);
   assert.equal(game.player.equipment.weapon && game.player.equipment.weapon.id, 'pqg');
   // 检查是 pw2 被弃, pw1 仍在手

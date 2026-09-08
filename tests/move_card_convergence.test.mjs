@@ -23,6 +23,7 @@ const ENGINE_RULE_FILES = [
   'src/engine/god-conversion.js',
   'src/engine/god-strategy.js',
   'src/engine/god-wrath.js',
+  'src/engine/forced-discard.js',
   'src/engine/god-judgement.js',
   'src/engine/god-choices.js',
 ];
@@ -32,8 +33,9 @@ const engineSource = ENGINE_RULE_FILES
 
 // 允许保留的裸操作 (逐行精确匹配, 语义见各行注释):
 const ALLOWED_RAW_LINES = [
-  // reshuffleIfNeeded: 唯一的整堆搬移 (弃牌堆→洗混→新牌堆)
-  'game.deck = shuffle(game.discard.splice(0), game.random);',
+  // reshuffleIfNeeded: 唯一的整堆搬移 (弃牌堆→洗混→新牌堆)。
+  // AC only changes the RNG argument to a JSON-safe fallback; no new site.
+  'game.deck = shuffle(game.discard.splice(0), random);',
   // removeCardFromHand / removeFirstMatchingCard: state 签名的手牌移出适配器
   // (调用方无一例外持有 game, 但两个助手保持窄签名, 是受控的单一出口)
   'return state.hand.splice(index, 1)[0];',

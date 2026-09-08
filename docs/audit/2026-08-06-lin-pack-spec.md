@@ -65,7 +65,7 @@ docs/」) 的兑现。与火包同款: 逐字来源已入库
 | L1 | 断粮"不为**锦囊牌**的黑色牌" — 延时锦囊算不算锦囊 | `glossary__gamecard.md:41` 明写"延时**类锦囊牌**" | **算**: family 为 `trick` 或 `delayed` 一律排除, 只剩基本牌与装备牌 | `skills.js triggerDuanliangCardAs` |
 | L2 | 断粮措辞是"黑色**牌**"而非"黑色**手牌**" | 对照火计 `shu.md:338` 的"红色**手牌**"与武圣 `shu.md:98` 的"红色牌" | **含装备区** (走 `firstMatchingOwnCard` 而非 `isHandCardOf`) | 同上 |
 | L3 | 断粮"能对距离为 2 的角色使用" — 是放宽还是无视距离 | `wei.md:277` 逐字"距离为 2" | **放宽到 2**, 不是无限制 (对照奇才的"无距离限制")。新增单点 `trickDistanceLimitFor` 三层分开: 奇才 ∞ / 断粮兵粮 2 / 其余 1 | `game-engine.js` |
-| L4 | 行殇"获得其**所有牌**"的范围 | `wei.md:349` | 与死亡结算 `discardAllZones` 同一集合: 手牌 + 装备区 + 判定区 | `skills.js triggerXingshangDeath` |
+| L4 | 行殇"获得其**所有牌**"的范围 | `wei.md:349` | **AC 2026-09-08 纠正**：仅手牌区 + 装备区；`glossary__zone.md:80` 明确判定区牌不属于角色的牌，不能把死亡弃置集合当作“其所有牌” | `skills.js triggerXingshangDeath` |
 | L5 | 行殇的时机必须早于死亡弃置 | 官方"每当其他角色死亡时" | 新增 `onDeath` 钩子, 派发点在 `settleDeath` 的 `discardAllZones` **之前** | `damage-dying.js` |
 | L6 | 放逐 X 可能为 0 (满血受伤后被回满) | `wei.md:351` 未排除 X=0 | **不以 X>0 作门槛** — "摸 0 张然后翻面"仍成立 | `skills.js triggerFangzhuDamageAfter` |
 | L7 | 颂威"**其**可以令你摸一张牌" — 决定权在判定者 | `wei.md:353` 逐字 | 决定权确在判定者, 但对其**零成本**且收益全归主公 → 按恒发动处理 (判定者可用 `skillPreferences.songwei='decline'` 关)。如实记档为工程口径 | `skills.js triggerSongweiJudgementAfterResolve` |

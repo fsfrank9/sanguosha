@@ -28,8 +28,9 @@ test('v7 PR-3: 麒麟弓 不触发 when target has 0 horses', () => {
   assert.equal(game.pendingChoice, null);
 });
 
-test('v7 PR-3: 麒麟弓 single horseMinus → 自动弃 (no choice)', () => {
+test('v7 PR-3: 麒麟弓 single horseMinus + auto → 自动弃 (no choice)', () => {
   const game = makeGame();
+  game.player.skillPreferences.qilin = 'auto';
   game.enemy.equipment.horseMinus = { id: 'mh', type: 'minus_horse', name: '-1 马', family: 'equipment', slot: 'horseMinus' };
   dealSha(game.player, 's1');
   Engine.playCard(game, 'player', 's1');
@@ -38,8 +39,9 @@ test('v7 PR-3: 麒麟弓 single horseMinus → 自动弃 (no choice)', () => {
   assert.equal(game.pendingChoice, null, '不需要 pendingChoice');
 });
 
-test('v7 PR-3: 麒麟弓 single horsePlus → 自动弃 (no choice)', () => {
+test('v7 PR-3: 麒麟弓 single horsePlus + auto → 自动弃 (no choice)', () => {
   const game = makeGame();
+  game.player.skillPreferences.qilin = 'auto';
   game.enemy.equipment.horsePlus = { id: 'ph', type: 'plus_horse', name: '+1 马', family: 'equipment', slot: 'horsePlus' };
   dealSha(game.player, 's1b');
   Engine.playCard(game, 'player', 's1b');

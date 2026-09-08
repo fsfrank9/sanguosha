@@ -86,7 +86,10 @@ test('南蛮 3p: 一张无懈只抵消持有者自己的目标效果, 其余座�
   assert.equal(game.ally.hp, allyHp - 1, 'ally 照常受南蛮 1 伤 (无懈不再全场抵消)');
 });
 
-test('评审收口: AOE 逐目标无懈链跳过来源 — 出牌者不被询问无懈自己的南蛮', () => {
+// AC-R2 独立规则复核：card__scroll.md:76-104 不排除锦囊使用者；旧
+// “来源不被询问”的钉把 auto 策略错误当作规则。仅翻转 ask 的机会，
+// 放弃后原有目标伤害、保牌断言继续保留，auto 策略不变。
+test('AC-R2规则纠错: AOE 使用者 ask 有无懈自己南蛮的机会，放弃后照常结算', () => {
   const game = build({ seed: 13421 });
   game.player.hand = [c('nanman', { id: 'nm-src' }), c('wuxie', { id: 'p-wx' })];
   game.player.skillPreferences.wuxieResponse = 'ask';
@@ -94,12 +97,15 @@ test('评审收口: AOE 逐目标无懈链跳过来源 — 出牌者不被询问
   const hp = game.enemy.hp;
   const r = Engine.playCard(game, 'player', 'nm-src');
   assert.equal(r.ok, true, r.message);
-  assert.equal(game.pendingChoice, null, '出牌者不被询问无懈自己的牌');
+  assert.equal(game.pendingChoice?.kind, 'wuxie-response', '出牌者可以选择无懈自己的牌');
+  assert.equal(game.enemy.hp, hp, '决定前效果尚未执行');
+  assert.equal(Engine.resolvePendingChoice(game, { decline: true }).ok, true);
+  assert.equal(game.pendingChoice, null);
   assert.equal(game.enemy.hp, hp - 1, '南蛮照常结算');
   assert.ok(game.player.hand.some((x) => x.id === 'p-wx'), '无懈保留');
 });
 
-test('评审收口: 五谷出牌者不被询问无懈自己的牌 (首询锚点=picker 后的既有缺口)', () => {
+test('AC-R2规则纠错: 五谷使用者 ask 对每个目标都有无懈机会', () => {
   const game = build({ seed: 13422 });
   game.player.hand = [c('wugu', { id: 'wg-src' }), c('wuxie', { id: 'p-wx' })];
   game.player.skillPreferences.wuxieResponse = 'ask';
@@ -108,7 +114,14 @@ test('评审收口: 五谷出牌者不被询问无懈自己的牌 (首询锚点=
   game.deck = [c('sha', { id: 'r1' }), c('shan', { id: 'r2' })];
   const r = Engine.playCard(game, 'player', 'wg-src');
   assert.equal(r.ok, true, r.message);
-  assert.equal(game.pendingChoice, null, '出牌者 (首个 picker) 不被询问无懈自己的五谷');
+  assert.equal(game.pendingChoice?.kind, 'wuxie-response');
+  assert.equal(game.pendingChoice.targetActor, 'player');
+  assert.equal(Engine.resolvePendingChoice(game, { decline: true }).ok, true);
+  assert.equal(game.pendingChoice?.kind, 'wuxie-response');
+  assert.equal(game.pendingChoice.targetActor, 'enemy');
+  assert.equal(Engine.resolvePendingChoice(game, { decline: true }).ok, true);
+  assert.equal(game.pendingChoice, null);
+  assert.ok(game.player.hand.some((x) => x.id === 'p-wx'), '两次放弃仍保留无懈');
 });
 
 test('评审收口: 天香 ask × 万箭 — 挂起转移后 AOE 队列续跑剩余座席', () => {
