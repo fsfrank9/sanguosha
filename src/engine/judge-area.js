@@ -54,7 +54,7 @@
       // 都曾泄漏: 物理牌花色被永久改写 / 红颜对替换牌失效)。
       function applyHongyanJudgementView(game, actor, card) {
         if (card && card.suit === 'spade' && !card.hongyanOriginalSuit
-            && StateRuntime.hasSkill(game[actor], 'hongyan')) {
+            && StateRuntime.skillEnabled(game[actor], 'hongyan')) {
           card.hongyanOriginalSuit = 'spade';
           card.hongyanOriginalColor = card.color;
           card.suit = 'heart';

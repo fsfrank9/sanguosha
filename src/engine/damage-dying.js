@@ -5,6 +5,7 @@
   import { SkillRuntime } from './skill-runtime.js';
   import { CardRuntime } from './card-runtime.js';
   import { StateRuntime } from './state.js';
+  import { GeneralCardRuntime } from './general-card-runtime.js';
 
   var isShaCard = CardRuntime.isShaCard;
   var takeCard = CardRuntime.takeCard;
@@ -13,7 +14,7 @@
   var opponent = StateRuntime.opponent;
   var aliveSeats = StateRuntime.aliveSeats;
   var seatsFrom = StateRuntime.seatsFrom;
-  var hasSkill = StateRuntime.hasSkill;
+  var skillEnabled = StateRuntime.skillEnabled;
 
   export function createDamageDyingRuntime(deps) {
     var flows = deps.responseFlows;
@@ -51,7 +52,7 @@
       // opts.noTianxiangAsk), 钩子在重入时只跑一遍。
       if (amount > 0
           && !(opts && (opts.noTianxiangTransfer || opts.noTianxiangAsk || opts.tianxiangDecision))
-          && hasSkill(target, 'tianxiang')
+          && skillEnabled(target, 'tianxiang')
           && target.skillPreferences && target.skillPreferences.tianxiang === 'ask') {
         var txCosts = (target.hand || []).filter(function (hc) {
           return StateRuntime.effectiveCardSuit(target, hc) === 'heart';
@@ -180,7 +181,7 @@
       // 【闪电】3 点伤害后为 -2, 需 3 张【桃】方能回到 +1)。不再 clamp 到
       // 0, 否则深度致命伤被一张【桃】抹平, 严重削弱【闪电】/【酒】+【杀】等。
       // 暴虐读取伤害来源在受伤者扣血前的势力，保留此时快照跨濒死挂起。
-      var sourceCampBeforeDamage = sourceActor && game[sourceActor] ? game[sourceActor].camp : null;
+      var sourceCampBeforeDamage = sourceActor && game[sourceActor] ? StateRuntime.effectiveCamp(game[sourceActor]) : null;
       target.hp = target.hp - amount;
       log(game, actorName(game, targetActor) + '因' + reason + '受到 ' + amount + ' 点伤害。');
       // v12 I3: 敌意记账 (AI 目标评估用, 纯遥测不影响规则) — 记录"谁伤了谁",
@@ -584,6 +585,9 @@
       runDeathTimingHooks(game, deadActor, killerActor);
       log(game, actorName(game, deadActor) + '阵亡（' + (roles[deadActor] || '未知身份') + '），弃置其所有牌。');
       discardAllZones(game, deadActor);
+      // AA3 / flow__death.md:35: 死亡时技能及区域牌处理后、奖惩前归还武将牌。
+      // 只有真正走到系统处理的死亡才执行; 濒死求桃及终局早停不提前归还。
+      GeneralCardRuntime.releaseOnDeath(game, deadActor);
       deadState.chained = false;
       deadState.flags = {};
       var killer = killerActor && killerActor !== deadActor && game[killerActor] ? killerActor : null;
@@ -664,7 +668,7 @@
       //   触发条件: responder 装 jijiu + game.turn !== responder + 手牌有非桃非酒的红色牌
       //   救援目标: 任意 (含他人)
       var jijiuCards = [];
-      if (!wanshaBlocked && hasSkill(responderState, 'jijiu') && game.turn !== responder) {
+      if (!wanshaBlocked && skillEnabled(responderState, 'jijiu') && game.turn !== responder) {
         var jijiuRed = function (c) {
           return c && c.color === 'red' && c.type !== 'tao' && c.type !== 'jiu';
         };
@@ -827,12 +831,12 @@
         }
         return { healed: true };
       }
-      // v8 PR-C3: 急救 — 华佗回合外把红色牌当桃 (条件: hasSkill jijiu +
+      // v8 PR-C3: 急救 — 华佗回合外把红色牌当桃 (条件: skillEnabled jijiu +
       // turn !== responder + 卡是红色非桃非酒). source 卡 进 弃牌堆, 救
       // 1 hp. spec 允许救任意角色 (含他人), 但通过 attemptDyingRescue
       // auto path 已经过滤 — auto 不救他人; 玩家 ask 路径才可用此选项.
       if (kind === 'jijiu') {
-        if (!hasSkill(responderState, 'jijiu') || game.turn === responder) {
+        if (!skillEnabled(responderState, 'jijiu') || game.turn === responder) {
           // 条件不满足时回退
           rollbackRescueCard();
           return { skipped: true };

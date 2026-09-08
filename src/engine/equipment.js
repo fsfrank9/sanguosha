@@ -11,7 +11,7 @@
   var actorName = StateRuntime.actorName;
   var opponent = StateRuntime.opponent;
   var canReachWithSha = StateRuntime.canReachWithSha;
-  var hasSkill = StateRuntime.hasSkill;
+  var skillEnabled = StateRuntime.skillEnabled;
 
   export function createEquipmentRuntime(deps) {
     var log = deps.log;
@@ -47,7 +47,7 @@
       }
       // v11 C6 (批次 30): 枭姬 (孙尚香) — "失去装备区里的牌后, 摸两张牌"。
       // 挂在统一装备失去时机上: 替换/被拆/被顺/制衡成本/刚烈弃置 全部生效。
-      if (hasSkill(self, 'xiaoji') && game.phase !== 'gameover'
+      if (skillEnabled(self, 'xiaoji') && game.phase !== 'gameover'
           && !(self.skillPreferences && self.skillPreferences.xiaoji === 'decline')) {
         log(game, actorName(game, actor) + '发动【枭姬】，摸两张牌。');
         drawCards(game, actor, 2);
@@ -293,7 +293,7 @@
     //    你可以令其选择一项：1.弃置一张手牌；2.令你摸一张牌。"
     //
     // 时机：use-event step 5 "指定目标后"（响应窗口之前）。
-    // 性别检查：source.gender !== target.gender 才触发。
+    // 性别检查：来源与目标的当前有效性别不同才触发。
     // 两个决策：
     //   1) source 可以选择是否发动（skillPreferences.cixiong）
     //   2) target 选择一项（skillPreferences.cixiongResponse）
@@ -304,8 +304,8 @@
       if (!source || !target) return null;
       var weapon = source.equipment && source.equipment.weapon;
       if (!weapon || weapon.type !== 'cixiong') return null;
-      var sourceGender = source.gender;
-      var targetGender = target.gender;
+      var sourceGender = StateRuntime.effectiveGender(source);
+      var targetGender = StateRuntime.effectiveGender(target);
       if (!sourceGender || !targetGender || sourceGender === targetGender) return null;
       var sourcePref = (source.skillPreferences && source.skillPreferences.cixiong)
         || (sourceActor === 'player' ? 'ask' : 'auto');

@@ -191,13 +191,14 @@
           "name": "不屈",
           "localSkillId": "buqu",
           "implementationStatus": "implemented",
-          "sourceTextRef": "ccfdfeebaf94",
-          "sourceTextSha256": "ccfdfeebaf948c1bd3fb9af2d9aa4df7d9914810ed6c5d8cec1be8df3dbc0cf5",
+          "sourceTextRef": "3682f489eb5a",
+          "sourceTextSha256": "3682f489eb5a48b8a17dbe334f82a3a82c3e4dd3b74ec729bc5a0b4f93788eb2",
+          "sourceVerification": "AA1 2026-09-08：复核 gltjk pages/card__hero__wu.md:365（风）不屈，现有濒死回复至1点机制对应此行，X 为创数。修正原人工摘要的 maxHp-创数；此武将牌另有奋激，本仓目录尚未收录，不能据此宣称整张新风周泰覆盖完整。旧风:371 为负体力不进入濒死的另一机制，不在本次替换范围。",
           "implementationSpec": {
-            "summary": "锁定技：濒死时置牌堆顶牌为\"创\"，点数均不同则体力回复至1点；有\"创\"时手牌上限受限。",
+            "summary": "锁定技：濒死时置牌堆顶牌为\"创\"，点数均不同则体力回复至1点；技能有效且有\"创\"时，基础手牌上限为\"创\"数。",
             "timing": "当你处于濒死状态时。",
             "condition": "锁定技强制发动。",
-            "cost": "无主动成本；武将牌上的\"创\"会压低手牌上限（X=体力上限-\"创\"数）。",
+            "cost": "无主动成本；\"创\"为保留在武将牌上的游戏牌，上限改写是有效技能的实时效果，并非付出的成本。",
             "effect": "将牌堆顶一张牌置为\"创\"：点数与已有\"创\"均不同则体力回复至1点，相同则置入弃牌堆。",
             "frequency": "锁定技，每次濒死均触发。",
             "engineHooks": [

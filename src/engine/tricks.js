@@ -48,7 +48,7 @@
     var getTargetZoneCards = deps.getTargetZoneCards;
     var removeOwnCardFromAnyZone = deps.removeOwnCardFromAnyZone;
     var equipmentList = deps.equipmentList;
-    var hasSkill = deps.hasSkill;
+    var skillEnabled = StateRuntime.skillEnabled;
     var canReachWithSha = deps.canReachWithSha;
     var hasEquipmentEffect = deps.hasEquipmentEffect;
     var hasShaResponseAvailable = deps.hasShaResponseAvailable;
@@ -92,7 +92,7 @@
     function wuxieOptionForCard(state, card) {
       if (!card) return null;
       if (card.type === 'wuxie') return { via: null };
-      if (hasSkill(state, 'kanpo') && StateRuntime.effectiveCardColor(state, card) === 'black') {
+      if (skillEnabled(state, 'kanpo') && StateRuntime.effectiveCardColor(state, card) === 'black') {
         return { via: '看破' };
       }
       return null;
@@ -121,6 +121,11 @@
     // targetActor = 首个被询问者 (受该锦囊影响的座席)。
     function checkWuxieAndContinue(game, targetActor, reason, trickName, ctx) {
       if (!game.pauseState) game.pauseState = {};
+      // AA1: 无双于使用/成为决斗目标后改写整张决斗；此时已先于无懈窗口。
+      // 锁定两方各自的需求，避免无懈挂起期间失去技能令已触发效果消失。
+      if (trickName === 'juedou') {
+        ctx.duelShaRequired = captureDuelRequirements(game, ctx.actor, ctx.targetActor || targetActor);
+      }
       game.pauseState.wuxieChain = {
         trickName: trickName,
         ctx: ctx,
@@ -347,7 +352,7 @@
         return finishTrickUse(game, ctx.actor, ctx.card, success('决斗被无懈可击。'), ctx.options);
       }
       return finishTrickUse(game, ctx.actor, ctx.card,
-        playDuel(game, ctx.actor, ctx.card, ctx.targetActor), ctx.options);
+        playDuel(game, ctx.actor, ctx.card, ctx.targetActor, ctx.duelShaRequired), ctx.options);
     });
 
     registerWuxieContinuation('guohe', function (game, ctx, wuxied) {
@@ -1073,7 +1078,22 @@
       // v12 H2: 无双需求量按"决斗的另一方"判定 — 显式传入 demanderActor
       // (链内为 duelOtherParty), 未传时回退 opponent(responder) (1v1 旧行为)。
       function duelShaRequired(game, responder, demanderActor) {
-        return hasSkill(game[demanderActor || opponent(responder)], 'wushuang') ? 2 : 1;
+        return skillEnabled(game[demanderActor || opponent(responder)], 'wushuang', game) ? 2 : 1;
+      }
+
+      function captureDuelRequirements(game, starterActor, targetActor) {
+        var required = {};
+        required[starterActor] = duelShaRequired(game, starterActor, targetActor);
+        required[targetActor] = duelShaRequired(game, targetActor, starterActor);
+        return required;
+      }
+
+      function lockedDuelRequirement(game, chain, responder) {
+        // 旧暂停数据兼容：首次续行补一次快照，后续往返不再重查无双。
+        if (!chain.shaRequiredByActor) {
+          chain.shaRequiredByActor = captureDuelRequirements(game, chain.starterActor, chain.targetActor);
+        }
+        return chain.shaRequiredByActor[responder];
       }
 
       // v10 V6: 决斗 链状态机 — playDuel 启动, advanceDuelChain 推进.
@@ -1083,7 +1103,7 @@
       //   AI / 默认 走 consumeResponse 自动消耗 (有 sha / 转化即用).
       //   v12 H2: 决斗严格限定在 starterActor 与 targetActor 两方之间 —
       //   targetActor 显式传入 (多座席), 未传时回退 opponent(actor) (1v1)。
-      function playDuel(game, actor, card, targetActor) {
+      function playDuel(game, actor, card, targetActor, lockedRequirements) {
         discardCard(game, card);
         log(game, actorName(game, actor) + '发起【决斗】。');
         if (!game.pauseState) game.pauseState = {};
@@ -1091,6 +1111,7 @@
           starterActor: actor,
           targetActor: targetActor || opponent(actor),
           currentResponder: targetActor || opponent(actor),
+          shaRequiredByActor: lockedRequirements || captureDuelRequirements(game, actor, targetActor || opponent(actor)),
           reason: '【决斗】',
           // L2: 保留决斗牌引用 — 奸雄可获得"造成伤害的牌" (决斗/南蛮/万箭/火攻)
           // v12 H7: 离间的虚拟决斗无实体 — 伤害不携带来源牌 (奸雄无可获得)
@@ -1117,7 +1138,7 @@
             flows.finish(game, 'duel', chain);
             return success('【决斗】中止（一方已阵亡）。');
           }
-          var needed = chain.roundNeeded || duelShaRequired(game, responder, foe);
+          var needed = chain.roundNeeded || lockedDuelRequirement(game, chain, responder);
           if (!chain.roundNeeded && needed > 1) {
             log(game, '【无双】锁定：' + actorName(game, responder) + '需依次打出两张【杀】。');
           }
@@ -1187,7 +1208,7 @@
         if ((decision.cardId || decision.use)
             && consumeResponse(game, responder, 'sha', chain.reason, decision.cardId || null)) {
           chain.resumePaid = (chain.resumePaid || 0) + 1;
-          chain.shaRemaining = (chain.roundNeeded || duelShaRequired(game, responder, duelOtherParty(chain, responder)))
+          chain.shaRemaining = (chain.roundNeeded || lockedDuelRequirement(game, chain, responder))
             - chain.resumePaid;
         } else {
           chain.aidOnly = true;
@@ -1261,7 +1282,7 @@
       function resolveAoeDamageSource(game, aoe) {
         if (!aoe || !aoe.card || aoe.card.type !== 'nanman') return aoe.sourceActor;
         var holder = StateRuntime.aliveSeats(game).find(function (seat) {
-          return seat !== aoe.sourceActor && hasSkill(game[seat], 'huoshou');
+          return seat !== aoe.sourceActor && skillEnabled(game[seat], 'huoshou');
         });
         return holder || aoe.sourceActor;
       }
@@ -1429,7 +1450,7 @@
           // 巨象②的判例 (全场两人, 对唯一目标祝融无效, 该南蛮入弃后祝融仍
           // 获得之) 才成立: 它仍是一次完整的"使用并结算完毕"。
           if (aoe.card && aoe.card.type === 'nanman'
-              && (hasSkill(targetState, 'huoshou') || hasSkill(targetState, 'juxiang'))) {
+              && (skillEnabled(targetState, 'huoshou') || skillEnabled(targetState, 'juxiang'))) {
             log(game, actorName(game, targetActor) + '的锁定技令【' + aoe.title + '】对其无效。');
             return true;
           }
@@ -1465,7 +1486,7 @@
         var physical = CardRuntime.physicalCardOf(aoe.card);
         if (!physical || physical.type !== 'nanman') return;
         var holder = StateRuntime.aliveSeats(game).find(function (seat) {
-          return seat !== aoe.sourceActor && hasSkill(game[seat], 'juxiang');
+          return seat !== aoe.sourceActor && skillEnabled(game[seat], 'juxiang');
         });
         if (!holder) return;
         var idx = game.discard.indexOf(physical);

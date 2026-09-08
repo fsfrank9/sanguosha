@@ -28,8 +28,8 @@ test('v10 V6: shaOptionForCard 识别 真杀 / 龙胆(闪→杀) / 武圣(红→
   const fn = engineSrc.match(/function shaOptionForCard\(state, cardId\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /isShaCard\(card\)/);
-  assert.match(fn[0], /hasSkill\(state,\s*'longdan'\)\s*&&\s*card\.type\s*===\s*'shan'/);
-  assert.match(fn[0], /hasSkill\(state,\s*'wusheng'\)\s*&&\s*card\.color\s*===\s*'red'/);
+  assert.match(fn[0], /(?:hasSkill|skillEnabled)\(state,\s*'longdan'\)\s*&&\s*card\.type\s*===\s*'shan'/);
+  assert.match(fn[0], /(?:hasSkill|skillEnabled)\(state,\s*'wusheng'\)\s*&&\s*card\.color\s*===\s*'red'/);
 });
 
 test('v10 V6: findResponseCard 接受 preferredCardId for sha (与 shan 对称)', () => {
@@ -43,8 +43,8 @@ test('v10 V6: findResponseCard 接受 preferredCardId for sha (与 shan 对称)'
 // ───── 引擎: 链状态机 ────────────────────────────────────────────────
 
 test('v10 V6: playDuel 重构走 advanceDuelChain (不再含同步 while 循环)', () => {
-  // v12 H2: playDuel 增 targetActor 显式目标参数 (未传回退 opponent(actor))
-  const fn = engineSrc.match(/function playDuel\(game, actor, card, targetActor\)\s*\{[\s\S]*?\n {6}\}/);
+  // AA1: 第五参数传递无懈窗口前锁定的整张决斗响应需求。
+  const fn = engineSrc.match(/function playDuel\(game, actor, card, targetActor, lockedRequirements\)\s*\{[\s\S]*?\n {6}\}/);
   assert.ok(fn);
   assert.match(fn[0], /game\.pauseState\.duelChain/);
   assert.match(fn[0], /targetActor\s*\|\|\s*opponent\(actor\)/, '目标缺省回退 1v1 对手');

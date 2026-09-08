@@ -283,7 +283,7 @@
         cixiong: {
           summary: '使用【杀】指定与你性别不同的目标后，你可以令其选择：1) 弃 1 张手牌，2) 令你摸 1 张牌。',
           timing: 'passive',
-          effect: 'v7 PR-4: 触发时机 = 指定目标后（响应窗口之前，gltjk flow__use.md step 5）。需要 source.gender !== target.gender。source 通过 skillPreferences.cixiong (auto/ask/decline) 决定是否发动；target 通过 skillPreferences.cixiongResponse (auto=弃手牌；ask=pendingChoice "cixiong-choose") 选择 discard/draw。任一暂停时 sha 状态保存在 pauseState.playSha 等候续算。',
+          effect: 'v7 PR-4: 触发时机 = 指定目标后（响应窗口之前，gltjk flow__use.md step 5）。需要来源与目标的当前有效性别不同。source 通过 skillPreferences.cixiong (auto/ask/decline) 决定是否发动；target 通过 skillPreferences.cixiongResponse (auto=弃手牌；ask=pendingChoice "cixiong-choose") 选择 discard/draw。任一暂停时 sha 状态保存在 pauseState.playSha 等候续算。',
           frequency: 'passive',
           engineHooks: ['playSha → applyCixiongOnDesignate', 'fireCixiongTargetChoice', 'resolveCixiongFireChoice', 'resolveCixiongChoose', 'continueShaAfterCixiong', 'pauseState.playSha']
         },

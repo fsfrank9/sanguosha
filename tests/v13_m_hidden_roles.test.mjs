@@ -129,6 +129,8 @@ test('M2 守护: 引擎各文件直读计数锁定 (白名单外零残留)', () 
     'tricks.js': { isHostileSeat: 0, hostileSeats: 0, hostileFirstPool: 0 },
     'game-engine.js': { isHostileSeat: 1, hostileSeats: 0, hostileFirstPool: 0 },
     'damage-dying.js': { isHostileSeat: 0, hostileSeats: 0, hostileFirstPool: 0 },
+    // AA1: 唯一技能 reducer 也不得引入真实敌对身份查询。
+    'skill-runtime.js': { isHostileSeat: 0, hostileSeats: 0, hostileFirstPool: 0 },
   };
   for (const [file, limits] of Object.entries(budget)) {
     const text = srcText(file);
@@ -142,7 +144,7 @@ test('M2 守护: 引擎各文件直读计数锁定 (白名单外零残留)', () 
 test('M2 守护: 直读别名赋值零匹配 (防 var f = StateRuntime.isHostileSeat 绕过)', () => {
   // 计数锁只匹配 `StateRuntime.fn(` 调用形态 — 别名赋值后调用可绕过。
   // 本锚点封掉赋值形态 (当前全文件零匹配, 零误伤成本的加固)。
-  const files = ['ai.js', 'skills.js', 'sha-flow.js', 'tricks.js', 'game-engine.js', 'damage-dying.js'];
+  const files = ['ai.js', 'skills.js', 'sha-flow.js', 'tricks.js', 'game-engine.js', 'damage-dying.js', 'skill-runtime.js'];
   for (const file of files) {
     assert.doesNotMatch(srcText(file),
       /=\s*StateRuntime\.(isHostileSeat|hostileSeats|hostileFirstPool)\b/,
@@ -158,13 +160,32 @@ test('M2 守护: 黄天统一校验主公技资格，AI 对伪帝接收者仍只
   assert.match(context, /StateRuntime\.perceivedHostile\(game, actor, seat\)/);
   assert.doesNotMatch(context, /StateRuntime\.isHostileSeat|\.roles\[/);
   const state = srcText('state.js');
-  const targetGate = state.slice(state.indexOf('function lordSkillTargetAvailable('), state.indexOf('function skillsForActor('));
+  const runtime = srcText('skill-runtime.js');
+  // AA1 将资格实现从 state 局部特例移到 SkillRuntime；跟踪委托链而不要求
+  // state 包装重复写一套主公/伪帝判定，也不放宽真实身份读取预算。
+  function functionBody(text, name) {
+    const match = text.match(new RegExp('function ' + name + '\\([^)]*\\) \\{([\\s\\S]*?)\\n  \\}'));
+    assert.ok(match, name + ' 应存在且可核对');
+    return match[1];
+  }
+  const targetGate = functionBody(state, 'lordSkillTargetAvailable');
   assert.match(targetGate, /hasLordSkill\(game, target, skillId\)/, '目标仍须通过有效主公技资格出口');
-  const ownerGate = state.slice(state.indexOf('function hasLordSkill('), state.indexOf('function lordSkillTargetAvailable('));
-  assert.match(ownerGate, /game\.roles\[actor\] === '主公'/, '真实主公分支仍须校验主公身份');
-  assert.match(ownerGate, /viewedLordSkills\(game, actor\)/, '非主公只能经伪帝视图获得资格');
-  const viewedGate = state.slice(state.indexOf('function viewedLordSkills('), state.indexOf('function hasLordSkill('));
-  assert.match(viewedGate, /hasSkill\(state, 'weidi'\)/, '视图仍要求自身有效伪帝');
+  assert.match(functionBody(state, 'hasLordSkill'), /return SkillRuntime\.hasLordSkill\(game, actor, skillId\)/,
+    'state 只委托核心资格判定');
+  const ownerGate = functionBody(runtime, 'hasLordSkill');
+  assert.match(ownerGate, /skillState\(game\[actor\], skillId, game\)/, '核心资格查询必须带真实对局上下文');
+  assert.match(ownerGate, /result\.lord && result\.enabled/, '仍须同时是主公技且当前有效');
+  const reducer = functionBody(runtime, 'skillState');
+  assert.match(reducer, /realLordState\(game\) === state/, '真实主公分支仍须对应公开的主公座席');
+  assert.match(reducer, /entry\.source === 'weidi'/, '非主公的发动资格来自伪帝来源');
+  assert.match(reducer, /enabled = owned && sourceEnabled && !suppressed && lordEligible/,
+    '主公角色限制与来源、压制必须共同决定有效性');
+  const viewedGate = functionBody(runtime, 'viewedSources');
+  assert.match(viewedGate, /isSuppressed\(state, 'weidi'\)/, '视图不得绕过伪帝本人的技能压制');
+  assert.match(viewedGate, /localSkillSources\(state, 'weidi'\)\.some\([\s\S]*entry\.enabled/,
+    '视图仍要求有效伪帝来源');
+  assert.match(functionBody(runtime, 'realLordState'), /game\.roles\[entry\] === '主公'/,
+    '技能层只以公开主公身份定位复制源');
 });
 
 test('M2 守护: 感知路由已接管 AI 知识层 (perceived* 存在性锚点)', () => {
